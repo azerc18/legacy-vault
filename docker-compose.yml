@@ -1,0 +1,16 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-legacy_vault}
+      MYSQL_USER: ${MYSQL_USER:-legacy_vault_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-legacyvault_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - legacyvault_mysql:/var/lib/mysql
+
+volumes:
+  legacyvault_mysql:
