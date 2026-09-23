@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: legacy-vault
+    properties:
+      logging.level.org.springframework.security=DEBUG
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:legacyvault}
     username: ${DB_USERNAME:legacy_vault_user}
