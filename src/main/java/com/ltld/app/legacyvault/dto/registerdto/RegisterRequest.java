@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.dto;
+package com.ltld.app.legacyvault.dto.registerdto;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
