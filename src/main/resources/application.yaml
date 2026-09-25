@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: legacy-vault
+    properties:
+      logging.level.org.springframework.security=DEBUG
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:legacyvault}
     username: ${DB_USERNAME:legacy_vault_user}
@@ -13,6 +15,17 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 security:
   jwt:
