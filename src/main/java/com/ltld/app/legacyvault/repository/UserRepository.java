@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.repository;
 
-import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.dto.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

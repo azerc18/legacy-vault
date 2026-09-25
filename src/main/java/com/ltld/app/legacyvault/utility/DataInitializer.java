@@ -1,14 +1,13 @@
 package com.ltld.app.legacyvault.utility;
 
-import com.ltld.app.legacyvault.entity.Authority;
-import com.ltld.app.legacyvault.entity.Role;
+import com.ltld.app.legacyvault.dto.entity.Authority;
+import com.ltld.app.legacyvault.dto.entity.Role;
 import com.ltld.app.legacyvault.repository.AuthorityRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
