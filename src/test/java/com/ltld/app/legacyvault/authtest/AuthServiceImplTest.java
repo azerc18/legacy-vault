@@ -1,7 +1,7 @@
 package com.ltld.app.legacyvault.authtest;
 
-import com.ltld.app.legacyvault.dto.entity.Role;
-import com.ltld.app.legacyvault.dto.entity.User;
+import com.ltld.app.legacyvault.entity.Role;
+import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.exception.EmailAlreadyExistsException;
 import com.ltld.app.legacyvault.repository.RoleRepository;

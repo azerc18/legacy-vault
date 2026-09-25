@@ -1,7 +1,7 @@
 package com.ltld.app.legacyvault.verificationtokentest;
 
-import com.ltld.app.legacyvault.dto.entity.User;
-import com.ltld.app.legacyvault.dto.entity.VerificationToken;
+import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.enums.UserStatus;

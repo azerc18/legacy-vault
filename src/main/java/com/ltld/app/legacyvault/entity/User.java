@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.dto.entity;
+package com.ltld.app.legacyvault.entity;
 
 import com.ltld.app.legacyvault.enums.KycLevel;
 import com.ltld.app.legacyvault.enums.UserStatus;
