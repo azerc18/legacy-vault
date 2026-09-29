@@ -44,4 +44,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Validation error", errors));
     }
+
+    @ExceptionHandler(BeneficiaryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBeneficiaryException(BeneficiaryException e) {
+        // Trả về HTTP 400 Bad Request kèm theo câu thông báo lỗi bạn đã viết trong Service
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
