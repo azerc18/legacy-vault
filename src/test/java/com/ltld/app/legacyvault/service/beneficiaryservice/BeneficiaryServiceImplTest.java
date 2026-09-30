@@ -45,11 +45,7 @@ public class BeneficiaryServiceImplTest {
 
     @InjectMocks
     private BeneficiaryServiceImpl beneficiaryService;
-    private BeneficiaryClaim claim(ClaimStatus status, LocalDateTime deadline) {
-        return BeneficiaryClaim.builder()
-                .id(UUID.randomUUID()).vault(unlockedVault)
-                .status(status).claimDeadlineAt(deadline).build();
-    }
+
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
     private User currentBeneficiary;
@@ -72,6 +68,12 @@ public class BeneficiaryServiceImplTest {
         unlockedVault.setId(vaultId);
         unlockedVault.setBeneficiary(currentBeneficiary);
         unlockedVault.setStatus(VaultStatus.UNLOCKED);
+    }
+
+    private BeneficiaryClaim claim(ClaimStatus status, LocalDateTime deadline) {
+        return BeneficiaryClaim.builder()
+                .id(UUID.randomUUID()).vault(unlockedVault)
+                .status(status).claimDeadlineAt(deadline).build();
     }
 
     @Test
@@ -121,8 +123,8 @@ public class BeneficiaryServiceImplTest {
                 .vault(unlockedVault)
                 .status(VerificationStatus.PENDING)
                 .build();
-        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
-                any(), any(), any(), any())).thenReturn(Optional.of(pendingVerification));
+        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                any(), any(), any(), any(), any())).thenReturn(Optional.of(pendingVerification));
         BeneficiaryClaimResponse response = beneficiaryService.initializeClaim(request, currentUserId);
 
         // Kiểm tra xem hàm save của verification có KHÔNG bị gọi thêm lần nào (tái sử dụng thành công)
@@ -196,8 +198,8 @@ public class BeneficiaryServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
         when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
         when(claimRepository.save(any(BeneficiaryClaim.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
-                any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                any(), any(), any(), any(), any())).thenReturn(Optional.empty());
         when(verificationRepository.save(any(IdentityVerification.class))).thenAnswer(inv -> inv.getArgument(0));
 
         beneficiaryService.initializeClaim(request, currentUserId);
@@ -224,8 +226,8 @@ public class BeneficiaryServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
         when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
         when(claimRepository.save(any(BeneficiaryClaim.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
-                any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                any(), any(), any(), any(), any())).thenReturn(Optional.empty());
         when(verificationRepository.save(any(IdentityVerification.class))).thenAnswer(inv -> inv.getArgument(0));
 
         beneficiaryService.initializeClaim(request, currentUserId);
@@ -249,6 +251,50 @@ public class BeneficiaryServiceImplTest {
 
         assertEquals(HttpStatus.GONE, ex.getStatus());
         verify(verificationRepository, never()).save(any());
+    }
+
+    @Test
+    void initializeClaim_vaultAlreadyClaimed_throws409() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        BeneficiaryException ex = assertThrows(BeneficiaryException.class,
+                () -> beneficiaryService.initializeClaim(request, currentUserId));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(verificationRepository, never()).save(any());
+    }
+
+    @Test
+    void initializeClaim_vaultArchivedLocked_throws410() {
+        unlockedVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        BeneficiaryException ex = assertThrows(BeneficiaryException.class,
+                () -> beneficiaryService.initializeClaim(request, currentUserId));
+
+        assertEquals(HttpStatus.GONE, ex.getStatus());
+    }
+
+    @Test
+    void initializeClaim_differentMethodThanPendingSession_createsNewVerification() {
+        request.setVerificationMethod(VerificationMethod.EKYC_MOCK);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+                claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5))));
+        when(verificationRepository
+                .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                        any(), any(), eq(VerificationMethod.EKYC_MOCK), any(), any()))
+                .thenReturn(Optional.empty());
+        when(verificationRepository.save(any(IdentityVerification.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        beneficiaryService.initializeClaim(request, currentUserId);
+
+        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
+        verify(verificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getMethod()).isEqualTo(VerificationMethod.EKYC_MOCK);
     }
 
 }

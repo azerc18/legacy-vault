@@ -25,12 +25,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class BeneficiaryServiceImpl implements BeneficiaryService {
 
-    private final VaultRepository vaultRepository;
-    private final BeneficiaryClaimRepository claimRepository;
-    private final IdentityVerificationRepository verificationRepository;
     private static final int VERIFICATION_TTL_MINUTES = 15;
     private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
     private static final int CLAIM_TIMEOUT_DAYS = 60;
+    private final VaultRepository vaultRepository;
+    private final BeneficiaryClaimRepository claimRepository;
+    private final IdentityVerificationRepository verificationRepository;
+
+
+    private LocalDateTime resolveDeadline(Vault vault) {
+        if (vault.getClaimDeadlineAt() != null) {
+            return vault.getClaimDeadlineAt();
+        }
+        LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
+        return base.plusDays(CLAIM_TIMEOUT_DAYS);
+    }
 
     @Override
     @Transactional
@@ -46,6 +55,12 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         // 2. Kiểm tra trạng thái Vault
+        if (vault.getStatus() == VaultStatus.CLAIMED) {
+            throw new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT);
+        }
+        if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
+            throw new BeneficiaryException("Thời hạn yêu cầu nhận tài sản đã kết thúc.", HttpStatus.GONE);
+        }
         if (vault.getStatus() != VaultStatus.UNLOCKED) {
             throw new BeneficiaryException("Tài sản chưa sẵn sàng để nhận.", HttpStatus.BAD_REQUEST);
         }
@@ -73,8 +88,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
         IdentityVerification verification = verificationRepository
-                .findFirstByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
-                        vault.getId(), currentUserId, VerificationStatus.PENDING,
+                .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                        vault.getId(), currentUserId, request.getVerificationMethod(),
+                        VerificationStatus.PENDING,
                         LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES))
                 .orElseGet(() -> verificationRepository.save(
                         IdentityVerification.builder()
@@ -95,11 +111,5 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
-    private LocalDateTime resolveDeadline(Vault vault) {
-        if (vault.getClaimDeadlineAt() != null) {
-            return vault.getClaimDeadlineAt();
-        }
-        LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
-        return base.plusDays(CLAIM_TIMEOUT_DAYS);
-    }
+
 }

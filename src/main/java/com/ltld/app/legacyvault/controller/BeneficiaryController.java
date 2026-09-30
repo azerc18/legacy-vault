@@ -26,8 +26,8 @@ public class BeneficiaryController {
     public ResponseEntity<ApiResponse<BeneficiaryClaimResponse>> initializeClaim(
             @Valid @RequestBody BeneficiaryClaimRequest request) {
 
-        // TODO: thay bằng user từ SecurityContext khi có JWT. Hiện endpoint chưa dùng được end-to-end.
-        // Tạm thời fix cứng một UUID để pass luồng test FR-16 và đáp ứng việc kiểm tra IDOR (so khớp quyền).
+        // TODO(#4): thay bằng user từ SecurityContext khi có JWT. Hiện endpoint chưa dùng được end-to-end.
+        // Tạm thời hard-code UUID (không khớp beneficiary nào nên API luôn trả 404, fail-closed).
         UUID currentUserId = UUID.fromString("00000000-0000-0000-0000-000000000000");
 
         BeneficiaryClaimResponse response = beneficiaryService.initializeClaim(request, currentUserId);

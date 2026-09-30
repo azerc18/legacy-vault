@@ -56,7 +56,7 @@ public class BeneficiaryControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Success")) // Assert Message như yêu cầu của Reviewer
+                .andExpect(jsonPath("$.message").value("Success"))
                 .andExpect(jsonPath("$.data.verificationId").value(mockVerificationId.toString()));
     }
 
@@ -74,5 +74,21 @@ public class BeneficiaryControllerTest {
                 .andExpect(status().isNotFound()) // Expect mã HTTP 404
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Không tìm thấy yêu cầu nhận tài sản."));
+    }
+
+    @Test
+    void initializeClaim_missingVaultId_returns400() throws Exception {
+        mockMvc.perform(post("/api/beneficiaries/claim")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"verificationMethod\":\"OTP\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void initializeClaim_missingVerificationMethod_returns400() throws Exception {
+        mockMvc.perform(post("/api/beneficiaries/claim")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vaultId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isBadRequest());
     }
 }
