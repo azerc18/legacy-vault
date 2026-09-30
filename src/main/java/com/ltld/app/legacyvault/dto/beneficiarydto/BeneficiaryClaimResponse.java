@@ -13,6 +13,7 @@ import java.util.UUID;
 public class BeneficiaryClaimResponse {
     private UUID claimId;
     private UUID vaultId;
+    private UUID verificationId;
     private ClaimStatus status;
     private LocalDateTime claimDeadlineAt;
     private LocalDateTime claimedAt;

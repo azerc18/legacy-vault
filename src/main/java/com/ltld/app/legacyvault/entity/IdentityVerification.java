@@ -3,17 +3,16 @@ package com.ltld.app.legacyvault.entity;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "identity_verifications")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -49,7 +48,7 @@ public class IdentityVerification {
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 }

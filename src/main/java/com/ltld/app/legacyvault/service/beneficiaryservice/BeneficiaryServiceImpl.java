@@ -4,63 +4,102 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
+import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class BeneficiaryServiceImpl implements BeneficiaryService {
 
+    private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
     private final IdentityVerificationRepository verificationRepository;
+    private static final int VERIFICATION_TTL_MINUTES = 15;
+    private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
+    private static final int CLAIM_TIMEOUT_DAYS = 60;
 
     @Override
     @Transactional
-    public BeneficiaryClaimResponse initializeClaim(BeneficiaryClaimRequest request) {
+    public BeneficiaryClaimResponse initializeClaim(BeneficiaryClaimRequest request, UUID currentUserId) {
 
-        // 1. TÌM KIẾM VÀ KIỂM TRA SỰ TỒN TẠI CỦA YÊU CẦU
-        Optional<BeneficiaryClaim> optionalClaim = claimRepository.findByVaultId(request.getVaultId());
+        // 1. Kiểm tra Vault và Phân quyền (Ngăn lộ Vault ID)
+        Vault vault = vaultRepository.findById(request.getVaultId())
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
 
-        if (optionalClaim.isEmpty()) {
-            throw new RuntimeException("Không tìm thấy yêu cầu nhận tài sản cho Vault ID này.");
+        User beneficiary = vault.getBeneficiary();
+        if (beneficiary == null || !beneficiary.getId().equals(currentUserId)) {
+            throw new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND);
         }
 
-        BeneficiaryClaim claim = optionalClaim.get();
+        // 2. Kiểm tra trạng thái Vault
+        if (vault.getStatus() != VaultStatus.UNLOCKED) {
+            throw new BeneficiaryException("Tài sản chưa sẵn sàng để nhận.", HttpStatus.BAD_REQUEST);
+        }
 
-        // 2. KIỂM TRA ĐIỀU KIỆN NGHIỆP VỤ (BUSINESS RULES VALIDATION)
-        if (claim.getStatus() == ClaimStatus.CLAIMED) {
-            throw new RuntimeException("Tài sản này đã được nhận, không thể yêu cầu lại.");
+        // 3. Khởi tạo hoặc lấy BeneficiaryClaim hiện tại
+        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId()).orElse(null);
+
+        if (claim != null) {
+            if (claim.getStatus() == ClaimStatus.CLAIMED) {
+                throw new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT);
+            }
+        } else {
+            claim = BeneficiaryClaim.builder()
+                    .vault(vault)
+                    .beneficiary(beneficiary)
+                    .status(ClaimStatus.PENDING)
+                    .claimDeadlineAt(resolveDeadline(vault))
+                    .build();
+            claim = claimRepository.save(claim);
         }
 
         if (claim.getStatus() == ClaimStatus.EXPIRED || LocalDateTime.now().isAfter(claim.getClaimDeadlineAt())) {
-            throw new RuntimeException("Thời hạn yêu cầu nhận tài sản đã kết thúc.");
+            throw new BeneficiaryException("Thời hạn yêu cầu nhận tài sản đã kết thúc.", HttpStatus.GONE);
         }
 
-        // 3. KHỞI TẠO PHIÊN XÁC THỰC DANH TÍNH (LƯU VÀO BẢNG IDENTITY_VERIFICATIONS)
-        IdentityVerification verification = IdentityVerification.builder()
-                .beneficiary(claim.getBeneficiary()) // Lưu ý: Chỉnh sửa dựa trên Entity mapping thực tế của bạn
-                .vault(claim.getVault())             // Lưu ý: Chỉnh sửa dựa trên Entity mapping thực tế của bạn
-                .method(request.getVerificationMethod())
-                .status(VerificationStatus.PENDING)
-                .build();
+        // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
+        IdentityVerification verification = verificationRepository
+                .findFirstByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+                        vault.getId(), currentUserId, VerificationStatus.PENDING,
+                        LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES))
+                .orElseGet(() -> verificationRepository.save(
+                        IdentityVerification.builder()
+                                .beneficiary(beneficiary)
+                                .vault(vault)
+                                .method(request.getVerificationMethod())
+                                .status(VerificationStatus.PENDING)
+                                .build()));
 
-        verificationRepository.save(verification);
-
-        // 4. ĐÓNG GÓI DỮ LIỆU VÀ TRẢ VỀ CHO FRONTEND (MAPPING ENTITY -> DTO)
+        // 5. Trả về kết quả kèm verificationId
         return BeneficiaryClaimResponse.builder()
                 .claimId(claim.getId())
-                .vaultId(claim.getVault().getId())
+                .vaultId(vault.getId())
+                .verificationId(verification.getId())
                 .status(claim.getStatus())
                 .claimDeadlineAt(claim.getClaimDeadlineAt())
                 .claimedAt(claim.getClaimedAt())
                 .build();
+    }
+
+    private LocalDateTime resolveDeadline(Vault vault) {
+        if (vault.getClaimDeadlineAt() != null) {
+            return vault.getClaimDeadlineAt();
+        }
+        LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
+        return base.plusDays(CLAIM_TIMEOUT_DAYS);
     }
 }

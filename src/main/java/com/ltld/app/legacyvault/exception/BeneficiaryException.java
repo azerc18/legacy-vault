@@ -1,8 +1,16 @@
 package com.ltld.app.legacyvault.exception;
 
-// Kế thừa RuntimeException để Spring Boot có thể tự động bắt lỗi
+import org.springframework.http.HttpStatus;
+
 public class BeneficiaryException extends RuntimeException {
-    public BeneficiaryException(String message) {
+    private final HttpStatus status;
+
+    public BeneficiaryException(String message, HttpStatus status) {
         super(message);
+        this.status = status;
+    }
+
+    public HttpStatus getStatus() {
+        return status;
     }
 }
