@@ -44,4 +44,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Validation error", errors));
     }
+
+    @ExceptionHandler(BeneficiaryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBeneficiaryException(BeneficiaryException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
