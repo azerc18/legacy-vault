@@ -4,7 +4,7 @@ import Dashboard from './Dashboard';
 import LegalVerifierDashboard from './LegalVerifier/LegalVerifierDashboard.jsx'; // Import trang của bạn
 import Login from './LogInLogOut/Login.jsx';
 import Register from './LogInLogOut/Register.jsx';
-
+import VerificationRequestDetail from './LegalVerifier/VerificationRequestDetail.jsx';
 function App() {
     return (
         <BrowserRouter>
@@ -14,6 +14,7 @@ function App() {
                 <Route path="/verifier" element={<LegalVerifierDashboard />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/verifier/request/:requestId" element={<VerificationRequestDetail />} />
             </Routes>
         </BrowserRouter>
     );
