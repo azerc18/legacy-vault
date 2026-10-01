@@ -6,11 +6,14 @@ import com.ltld.app.legacyvault.dto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.entity.DigitalSignature;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.LegalVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
+    private final VerificationRequestVaultRepository requestVaultRepository;
 
     @Override
     public List<VerificationRequestResponseDto> getPendingRequests() {
@@ -54,9 +58,18 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
         signatureRepository.save(signature);
 
+        LocalDateTime now = LocalDateTime.now();
+
         request.setStatus(VerificationStatus.APPROVED);
-        request.setDecidedAt(LocalDateTime.now());
+        request.setDecidedAt(now);
         request.setVerifier(User.builder().id(verifierId).build());
+
+        // Mở khóa các Vault thuộc hồ sơ này (FR-14)
+        requestVaultRepository.findByRequestId(requestId).forEach(rv -> {
+            Vault vault = rv.getVault();
+            vault.setStatus(VaultStatus.UNLOCKED);
+            vault.setUnlockedAt(now);
+        });
 
         return toDto(requestRepository.save(request));
     }

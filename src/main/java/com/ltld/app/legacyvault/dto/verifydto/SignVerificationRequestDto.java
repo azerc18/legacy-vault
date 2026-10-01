@@ -1,5 +1,4 @@
 package com.ltld.app.legacyvault.dto;
-
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
