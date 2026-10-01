@@ -1,0 +1,86 @@
+### ==========================================
+### LUỒNG THÀNH CÔNG: SỬ DỤNG OTP
+### ==========================================
+
+### 1. Khởi tạo yêu cầu với OTP (FR-16)
+POST http://localhost:8084/api/v1/beneficiaries/claim
+Content-Type: application/json
+
+{
+  "vaultId": "22222222-2222-2222-2222-222222222222",
+  "verificationMethod": "OTP"
+}
+
+###
+
+### 2. Gửi mã OTP xác thực (FR-17 & FR-18)
+POST http://localhost:8084/api/v1/beneficiaries/verify
+Content-Type: application/json
+
+{
+  "vaultId": "22222222-2222-2222-2222-222222222222",
+  "authCode": "123456"
+}
+
+
+### ==========================================
+### LUỒNG THÀNH CÔNG: SỬ DỤNG eKYC (MOCK)
+### ==========================================
+# Lưu ý: Reset trạng thái DB về PENDING trước khi test luồng này nếu luồng OTP đã làm đổi trạng thái.
+
+### 3. Khởi tạo yêu cầu với eKYC (FR-16)
+POST http://localhost:8084/api/v1/beneficiaries/claim
+Content-Type: application/json
+
+{
+  "vaultId": "22222222-2222-2222-2222-222222222222",
+  "verificationMethod": "EKYC_MOCK"
+}
+
+###
+
+### 4. Gửi token eKYC xác thực (FR-17 & FR-18)
+# Mock data: Vẫn dùng 123456 để pass qua bước xác thực giả lập
+POST http://localhost:8084/api/v1/beneficiaries/verify
+Content-Type: application/json
+
+{
+  "vaultId": "22222222-2222-2222-2222-222222222222",
+  "authCode": "123456"
+}
+
+
+### ==========================================
+### ĐÓNG HỒ SƠ & CÁC LUỒNG BẮT LỖI
+### ==========================================
+
+### 5. Xác nhận đóng hồ sơ (FR-19)
+POST http://localhost:8084/api/v1/beneficiaries/confirm/22222222-2222-2222-2222-222222222222
+
+###
+
+### 6. Lỗi: Vault ID không tồn tại trong DB (Mã lỗi 400)
+POST http://localhost:8084/api/v1/beneficiaries/claim
+Content-Type: application/json
+
+{
+  "vaultId": "99999999-9999-9999-9999-999999999999",
+  "verificationMethod": "OTP"
+}
+
+###
+
+### 7. Lỗi: Nhập sai mã OTP / eKYC (Mã lỗi 400)
+POST http://localhost:8084/api/v1/beneficiaries/verify
+Content-Type: application/json
+
+{
+  "vaultId": "22222222-2222-2222-2222-222222222222",
+  "authCode": "111111"
+}
+
+###
+
+### 8. Lỗi: Thao tác trên hồ sơ đã đóng (Mã lỗi 400)
+# (Chạy API số 5 để đóng hồ sơ trước, sau đó chạy API này)
+POST http://localhost:8084/api/v1/beneficiaries/confirm/22222222-2222-2222-2222-222222222222
