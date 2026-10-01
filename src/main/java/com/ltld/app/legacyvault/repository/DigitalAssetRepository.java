@@ -5,7 +5,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.UUID;
-
-public interface DigitalAssetRepository {
+@Repository
+public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID> {
     List<DigitalAsset> findByVaultId(UUID vaultId);
 }
