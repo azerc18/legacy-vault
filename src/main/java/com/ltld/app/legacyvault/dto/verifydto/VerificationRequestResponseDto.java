@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.dto;
 
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +17,7 @@ public class VerificationRequestResponseDto {
     private UUID id;
     private String ownerName;
     private String executorName;
-    private VerificationStatus status;
+    private LegalVerificationStatus status;
     private String deathCertificateFileUrlEncrypted;
     private String rejectionReason;
     private LocalDateTime decidedAt;

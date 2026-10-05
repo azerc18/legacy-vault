@@ -8,7 +8,7 @@ import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
@@ -33,7 +33,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     @Override
     public List<VerificationRequestResponseDto> getPendingRequests() {
-        return requestRepository.findByStatus(VerificationStatus.PENDING)
+        return requestRepository.findByStatus(LegalVerificationStatus.PENDING)
                 .stream().map(this::toDto).toList();
     }
 
@@ -60,7 +60,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        request.setStatus(VerificationStatus.APPROVED);
+        request.setStatus(LegalVerificationStatus.APPROVED);
         request.setDecidedAt(now);
         request.setVerifier(User.builder().id(verifierId).build());
 
@@ -80,7 +80,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
 
-        request.setStatus(VerificationStatus.REJECTED);
+        request.setStatus(LegalVerificationStatus.REJECTED);
         request.setRejectionReason(dto.getReason());
         request.setDecidedAt(LocalDateTime.now());
         request.setVerifier(User.builder().id(verifierId).build());
@@ -94,7 +94,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     }
 
     private void assertPending(LegalVerificationRequest request) {
-        if (request.getStatus() != VerificationStatus.PENDING) {
+        if (request.getStatus() != LegalVerificationStatus.PENDING) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
         }
     }

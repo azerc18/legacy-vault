@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.enums;
 
-public enum VerificationStatus {
+public enum LegalVerificationStatus {
     PENDING,
     APPROVED,
     REJECTED
