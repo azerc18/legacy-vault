@@ -48,6 +48,14 @@ public class IdentityVerification {
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
+    // FR-17: mã OTP của phiên xác thực (NULL khi chưa gửi OTP hoặc sau khi đã dùng xong)
+    @Column(name = "otp_code", length = 6)
+    private String otpCode;
+
+    // FR-17: thời điểm OTP hết hạn
+    @Column(name = "otp_expires_at")
+    private LocalDateTime otpExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

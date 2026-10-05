@@ -2,25 +2,40 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
+import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
+import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.MockKycVerifier;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BeneficiaryServiceImpl implements BeneficiaryService {
@@ -28,10 +43,27 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final int VERIFICATION_TTL_MINUTES = 15;
     private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
     private static final int CLAIM_TIMEOUT_DAYS = 60;
+
+    // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
+    private static final int OTP_TTL_MINUTES = 5;
+    private static final int OTP_RESEND_SECONDS = 60;
+    private static final int MAX_VERIFY_ATTEMPTS = 5;
+    private static final int VIEW_SESSION_MINUTES = 30;
+
+    private static final String ALREADY_CLAIMED_MSG = "Tài sản này đã được nhận.";
+    private static final String CLAIM_ENDED_MSG = "Thời hạn yêu cầu nhận tài sản đã kết thúc.";
+    private static final String NOT_READY_MSG = "Tài sản chưa sẵn sàng để nhận.";
+    private static final String NO_SESSION_MSG = "Chưa có phiên xác thực. Vui lòng khởi tạo yêu cầu nhận tài sản trước.";
+    private static final String LOCKED_MSG = "Truy cập đã bị tạm khóa do xác thực sai nhiều lần. Vui lòng liên hệ Admin để được hỗ trợ.";
+
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
     private final IdentityVerificationRepository verificationRepository;
-
+    private final DigitalAssetRepository digitalAssetRepository;
+    private final CryptoService cryptoService;
+    private final MockKycVerifier mockKycVerifier;
+    private final EmailSender emailSender;
+    private final OtpGenerator otpGenerator;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -40,6 +72,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
         return base.plusDays(CLAIM_TIMEOUT_DAYS);
     }
+
+    // ===================== FR-16 =====================
 
     @Override
     @Transactional
@@ -111,5 +145,209 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // ===================== FR-17 =====================
 
+    @Override
+    @Transactional
+    public void sendIdentityOtp(BeneficiaryClaimRequest request, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(request.getVaultId(), currentUserId);
+        assertNotLocked(vault.getId(), currentUserId);
+
+        if (request.getVerificationMethod() != VerificationMethod.OTP) {
+            throw new BeneficiaryException("Phương thức xác thực này không dùng OTP.", HttpStatus.BAD_REQUEST);
+        }
+
+        IdentityVerification verification =
+                findPendingSession(vault.getId(), currentUserId, VerificationMethod.OTP);
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // Chặn gửi lại quá nhanh. Thời điểm gửi lần trước = otpExpiresAt - OTP_TTL_MINUTES
+        if (verification.getOtpExpiresAt() != null) {
+            LocalDateTime lastSentAt = verification.getOtpExpiresAt().minusMinutes(OTP_TTL_MINUTES);
+            if (now.isBefore(lastSentAt.plusSeconds(OTP_RESEND_SECONDS))) {
+                throw new BeneficiaryException(
+                        "Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.", HttpStatus.TOO_MANY_REQUESTS);
+            }
+        }
+
+        // Gửi lại KHÔNG reset attemptCount, tránh lách giới hạn số lần thử
+        String otp = otpGenerator.generate();
+        verification.setOtpCode(otp);
+        verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
+        verificationRepository.save(verification);
+
+        emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
+    }
+
+    // noRollbackFor: số lần sai phải được lưu dù method ném BeneficiaryException,
+    // nếu không transaction rollback và giới hạn số lần thử vô tác dụng
+    @Override
+    @Transactional(noRollbackFor = BeneficiaryException.class)
+    public VerifyIdentityResponse verifyIdentity(VerifyIdentityRequest request, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(request.getVaultId(), currentUserId);
+        assertNotLocked(vault.getId(), currentUserId);
+
+        IdentityVerification verification =
+                findPendingSession(vault.getId(), currentUserId, request.getVerificationMethod());
+
+        LocalDateTime now = LocalDateTime.now();
+        boolean passed;
+
+        if (request.getVerificationMethod() == VerificationMethod.OTP) {
+            if (request.getOtp() == null) {
+                throw new BeneficiaryException("OTP không được để trống.", HttpStatus.BAD_REQUEST);
+            }
+            if (verification.getOtpCode() == null || verification.getOtpExpiresAt() == null) {
+                throw new BeneficiaryException(
+                        "Chưa có OTP. Vui lòng yêu cầu gửi OTP trước.", HttpStatus.BAD_REQUEST);
+            }
+            if (now.isAfter(verification.getOtpExpiresAt())) {
+                throw new BeneficiaryException(
+                        "OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP.", HttpStatus.BAD_REQUEST);
+            }
+            passed = verification.getOtpCode().equals(request.getOtp());
+        } else {
+            if (request.getKycIdNumber() == null) {
+                throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
+            }
+            passed = mockKycVerifier.verify(request.getKycIdNumber());
+        }
+
+        if (!passed) {
+            int attempts = (verification.getAttemptCount() == null ? 0 : verification.getAttemptCount()) + 1;
+            verification.setAttemptCount(attempts);
+
+            if (attempts >= MAX_VERIFY_ATTEMPTS) {
+                verification.setStatus(VerificationStatus.FAILED);
+                verification.setOtpCode(null);
+                verification.setOtpExpiresAt(null);
+                verificationRepository.save(verification);
+                throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
+            }
+
+            verificationRepository.save(verification);
+            throw new BeneficiaryException(
+                    "Xác thực không thành công. Bạn còn " + (MAX_VERIFY_ATTEMPTS - attempts) + " lần thử.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        verification.setStatus(VerificationStatus.SUCCESS);
+        verification.setVerifiedAt(now);
+        verification.setOtpCode(null);
+        verification.setOtpExpiresAt(null);
+        verificationRepository.save(verification);
+
+        return VerifyIdentityResponse.builder()
+                .verificationId(verification.getId())
+                .status(VerificationStatus.SUCCESS)
+                .verifiedAt(now)
+                .viewSessionExpiresAt(now.plusMinutes(VIEW_SESSION_MINUTES))
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<InheritedAssetSummaryResponse> getInheritedAssets(UUID vaultId, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId);
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+
+        return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .map(asset -> InheritedAssetSummaryResponse.builder()
+                        .id(asset.getId())
+                        .assetType(asset.getAssetType())
+                        .assetName(asset.getAssetName())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InheritedAssetDetailResponse getInheritedAssetDetail(UUID vaultId, UUID assetId, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId);
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+
+        DigitalAsset asset = digitalAssetRepository
+                .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
+                .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
+
+        try {
+            // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
+            return InheritedAssetDetailResponse.builder()
+                    .id(asset.getId())
+                    .assetType(asset.getAssetType())
+                    .assetName(asset.getAssetName())
+                    .secret(cryptoService.decrypt(asset.getEncryptedSecret()))
+                    .notes(cryptoService.decrypt(asset.getNotesEncrypted()))
+                    .attachmentUrl(asset.getAttachmentUrl())
+                    .build();
+        } catch (Exception e) {
+            // Không log dữ liệu đã giải mã, chỉ log id tài sản
+            log.error("Decrypt failed for asset {}", asset.getId(), e);
+            throw new BeneficiaryException(
+                    "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ===================== Helper dùng chung cho FR-17 =====================
+
+    // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
+    private Vault loadAccessibleVault(UUID vaultId, UUID currentUserId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+
+        User beneficiary = vault.getBeneficiary();
+        if (beneficiary == null || !beneficiary.getId().equals(currentUserId)) {
+            throw new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND);
+        }
+
+        if (vault.getStatus() == VaultStatus.CLAIMED) {
+            throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
+        }
+        if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
+            throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
+        }
+        if (vault.getStatus() != VaultStatus.UNLOCKED) {
+            throw new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST);
+        }
+
+        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId())
+                .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
+
+        if (claim.getStatus() == ClaimStatus.CLAIMED) {
+            throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
+        }
+        if (claim.getStatus() == ClaimStatus.EXPIRED || LocalDateTime.now().isAfter(claim.getClaimDeadlineAt())) {
+            throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
+        }
+        return vault;
+    }
+
+    // Khóa theo (vault, beneficiary): đã có phiên FAILED thì không tạo phiên mới để lách
+    private void assertNotLocked(UUID vaultId, UUID currentUserId) {
+        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
+                vaultId, currentUserId, VerificationStatus.FAILED)) {
+            throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
+        }
+    }
+
+    private IdentityVerification findPendingSession(UUID vaultId, UUID currentUserId, VerificationMethod method) {
+        return verificationRepository
+                .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusOrderByCreatedAtDesc(
+                        vaultId, currentUserId, method, VerificationStatus.PENDING)
+                .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
+    }
+
+    // Phiên xem hợp lệ = có phiên SUCCESS với verifiedAt trong VIEW_SESSION_MINUTES gần nhất
+    private void assertViewSession(UUID vaultId, UUID currentUserId) {
+        boolean valid = verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
+                vaultId, currentUserId, VerificationStatus.SUCCESS,
+                LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
+        if (!valid) {
+            throw new BeneficiaryException(
+                    "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN);
+        }
+    }
 }
