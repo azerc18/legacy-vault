@@ -8,7 +8,7 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
@@ -59,7 +59,7 @@ public class LegalVerificationServiceImplTest {
                 .owner(User.builder().fullName("Test Owner").build())
                 .executor(User.builder().fullName("Test Executor").build())
                 .deathCertificateFileUrlEncrypted("enc://test.pdf")
-                .status(VerificationStatus.PENDING)
+                .status(LegalVerificationStatus.PENDING)
                 .build();
     }
 
@@ -76,7 +76,7 @@ public class LegalVerificationServiceImplTest {
 
         service.reject(requestId, verifierId, dto);
 
-        assertThat(pendingRequest.getStatus()).isEqualTo(VerificationStatus.REJECTED);
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
         assertThat(pendingRequest.getRejectionReason()).isEqualTo("Giấy chứng tử không hợp lệ");
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
     }
@@ -93,7 +93,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void reject_alreadyApproved_throwsAlreadyReviewedException() {
-        pendingRequest.setStatus(VerificationStatus.APPROVED);
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId, new RejectVerificationRequestDto()))
@@ -123,7 +123,7 @@ public class LegalVerificationServiceImplTest {
 
         service.approveAndSign(requestId, verifierId, dto);
 
-        assertThat(pendingRequest.getStatus()).isEqualTo(VerificationStatus.APPROVED);
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         assertThat(vault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(vault.getUnlockedAt()).isNotNull();
         verify(signatureRepository, times(1)).save(any());
@@ -131,7 +131,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void approveAndSign_alreadyRejected_throwsAndDoesNotSignOrUnlock() {
-        pendingRequest.setStatus(VerificationStatus.REJECTED);
+        pendingRequest.setStatus(LegalVerificationStatus.REJECTED);
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
         SignVerificationRequestDto dto = new SignVerificationRequestDto();

@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.entity;
 
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -35,7 +35,7 @@ public class LegalVerificationRequest {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private VerificationStatus status = VerificationStatus.PENDING;
+    private LegalVerificationStatus status = LegalVerificationStatus.PENDING;
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
