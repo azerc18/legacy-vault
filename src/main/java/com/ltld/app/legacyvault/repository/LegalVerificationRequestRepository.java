@@ -13,5 +13,7 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
 
     List<LegalVerificationRequest> findByVerifierId(UUID verifierId);
 
+    List<LegalVerificationRequest> findByVerifierIdOrderByDecidedAtDesc(UUID verifierId);
+
     List<LegalVerificationRequest> findByOwnerId(UUID ownerId);
 }
