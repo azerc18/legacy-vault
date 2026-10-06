@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.exception.NotActiveUserException;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,7 @@ public class AuthControllerTest {
     private static final String SEND_OTP_URL = "/api/auth/send-otp";
     private static final String VERIFY_EMAIL_URL = "/api/auth/verify-email";
     private static final String LOGIN_URL = "/api/auth/login";
+    private static final String LOGOUT_URL = "/api/auth/logout";
 
     private static final String EMAIL = "test@example.com";
     private static final String IP = "127.0.0.1";          // remoteAddr mặc định của MockMvc
@@ -332,6 +334,37 @@ public class AuthControllerTest {
                     .andExpect(jsonPath("$.data.password").exists());
 
             verifyNoInteractions(authService);
+        }
+    }
+    // ---------- POST /api/auth/logout ----------
+
+    @Nested
+    @DisplayName("POST /api/auth/logout")
+    class Logout {
+
+        @Test
+        void logout_withCookie_returnsOkAndClearsRefreshCookie() throws Exception {
+            mockMvc.perform(post(LOGOUT_URL)
+                            .cookie(new Cookie("refresh_token", "raw-refresh-token")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refresh_token=;")))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/api/auth")))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Strict")));
+
+            verify(authService, times(1)).logout("raw-refresh-token");
+        }
+
+        @Test
+        void logout_withoutCookie_stillReturnsOkAndClearsCookie() throws Exception {
+            mockMvc.perform(post(LOGOUT_URL))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
+
+            verify(authService, times(1)).logout(null);
         }
     }
 

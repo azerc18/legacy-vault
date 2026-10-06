@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
+import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.EmailAlreadyExistsException;
 import com.ltld.app.legacyvault.exception.InvalidCredentialException;
@@ -242,6 +243,21 @@ public class AuthServiceImplTest {
                 .isInstanceOf(NotActiveUserException.class);
 
         verifyNoInteractions(tokenService);
+    }
+
+    @Test
+    void logout_withToken_revokesRefreshTokenWithLogoutReason() {
+        authService.logout("raw-refresh-token");
+
+        verify(tokenService).revokeRefreshToken("raw-refresh-token", RevokedReason.LOGOUT);
+        verifyNoMoreInteractions(tokenService);
+    }
+
+    @Test
+    void logout_withNullToken_delegatesWithoutThrowing() {
+        authService.logout(null);
+
+        verify(tokenService).revokeRefreshToken(null, RevokedReason.LOGOUT);
     }
 
 

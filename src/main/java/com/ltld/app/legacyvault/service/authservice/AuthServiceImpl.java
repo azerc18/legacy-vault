@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.EmailAlreadyExistsException;
 import com.ltld.app.legacyvault.exception.InvalidCredentialException;
@@ -99,5 +100,10 @@ public class AuthServiceImpl implements AuthService{
                 .build();
 
         return new LoginResult(response, refreshToken);
+    }
+
+    @Override
+    public void logout(String rawRefreshToken) {
+        tokenService.revokeRefreshToken(rawRefreshToken, RevokedReason.LOGOUT);
     }
 }

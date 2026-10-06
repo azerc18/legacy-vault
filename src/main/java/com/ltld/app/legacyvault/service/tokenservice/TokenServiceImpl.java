@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.entity.Authority;
 import com.ltld.app.legacyvault.entity.RefreshToken;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.repository.RefreshTokenRepository;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.utility.RefreshTokenUtil;
@@ -15,6 +16,7 @@ import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -84,5 +86,20 @@ public class TokenServiceImpl implements TokenService {
     private String truncate(String value, int max) {
         if (value == null) return null;
         return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    @Override
+    @Transactional
+    public void revokeRefreshToken(String rawToken, RevokedReason reason) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return;
+        }
+        refreshTokenRepository.findByTokenHash(refreshTokenUtil.hashToken(rawToken))
+                .filter(token -> token.getRevokedAt() == null)
+                .ifPresent(token -> {
+                    token.setRevokedAt(Instant.now());
+                    token.setRevokedReason(reason);
+                    refreshTokenRepository.save(token);
+                });
     }
 }
