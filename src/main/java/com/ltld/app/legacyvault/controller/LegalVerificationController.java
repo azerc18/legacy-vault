@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.VerificationRequestResponseDto;
@@ -9,6 +10,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,30 +24,46 @@ public class LegalVerificationController {
 
     private final LegalVerificationService service;
 
-    // FR-12: danh sách hồ sơ đang chờ duyệt
+    // UC12: danh sách hồ sơ đang chờ duyệt
     @GetMapping
     public ResponseEntity<ApiResponse<List<VerificationRequestResponseDto>>> getPending() {
         return ResponseEntity.ok(ApiResponse.success(service.getPendingRequests()));
     }
 
-    // FR-12: xem chi tiết 1 hồ sơ
+    // UC15: lịch sử hồ sơ đã xác minh
+    // Tạm lấy verifierId từ header, sau này đổi sang lấy từ JWT
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<List<VerificationRequestResponseDto>>> getHistory(
+            @RequestHeader("X-Verifier-Id") UUID verifierId,
+            @RequestParam(required = false) LegalVerificationStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success(
+                service.getHistory(verifierId, status, from, to)));
+    }
+
+    // UC12: xem chi tiết 1 hồ sơ
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(service.getById(id)));
     }
 
-    // FR-12 + FR-14: duyệt và ký
-    // Tạm lấy verifierId từ header, sau này đổi sang lấy từ JWT
+    // UC13: xác thực tài liệu (mock)
+    @GetMapping("/{id}/document/verify")
+    public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.success(service.verifyDocument(id)));
+    }
+
+    // UC12: phê duyệt (không cần body)
     @PostMapping("/{id}/approve")
     public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> approve(
             @PathVariable UUID id,
-            @RequestHeader("X-Verifier-Id") UUID verifierId,
-            @Valid @RequestBody SignVerificationRequestDto dto) {
+            @RequestHeader("X-Verifier-Id") UUID verifierId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Đã duyệt và ký", service.approveAndSign(id, verifierId, dto)));
+                "Đã phê duyệt hồ sơ", service.approve(id, verifierId)));
     }
 
-    // FR-12: từ chối
+    // UC12: từ chối
     @PostMapping("/{id}/reject")
     public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> reject(
             @PathVariable UUID id,
@@ -51,5 +71,15 @@ public class LegalVerificationController {
             @Valid @RequestBody RejectVerificationRequestDto dto) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Đã từ chối", service.reject(id, verifierId, dto)));
+    }
+
+    // UC14: ký xác nhận, mở khóa Vault
+    @PostMapping("/{id}/sign")
+    public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> sign(
+            @PathVariable UUID id,
+            @RequestHeader("X-Verifier-Id") UUID verifierId,
+            @Valid @RequestBody SignVerificationRequestDto dto) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã ký và mở khóa Vault", service.sign(id, verifierId, dto)));
     }
 }
