@@ -14,12 +14,14 @@ import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
@@ -73,6 +75,8 @@ public class BeneficiaryServiceImplTest {
     private User currentBeneficiary;
     private UUID vaultId;
     private UUID currentUserId;
+    @Spy
+    private OtpHasher otpHasher = new OtpHasher();
 
     @BeforeEach
     void setUp() {
@@ -393,57 +397,6 @@ public class BeneficiaryServiceImplTest {
 
     // ===================== FR-17: gửi OTP =====================
 
-    @Test
-    void sendIdentityOtp_success_savesOtpAndSendsEmail() {
-        currentBeneficiary.setEmail("beneficiary@example.com");
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        stubAccessibleVault();
-        stubPendingSession(session);
-        when(otpGenerator.generate()).thenReturn("123456");
-
-        beneficiaryService.sendIdentityOtp(request, currentUserId);
-
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getOtpCode()).isEqualTo("123456");
-        assertThat(captor.getValue().getOtpExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(4));
-        verify(emailSender).sendEmail("beneficiary@example.com", "123456");
-    }
-
-    @Test
-    void sendIdentityOtp_resendTooSoon_throws429() {
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setOtpCode("111111");
-        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(5)); // vừa gửi xong
-        stubAccessibleVault();
-        stubPendingSession(session);
-
-        expectError(HttpStatus.TOO_MANY_REQUESTS,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
-
-        verify(emailSender, never()).sendEmail(any(), any());
-        verify(verificationRepository, never()).save(any());
-    }
-
-    @Test
-    void sendIdentityOtp_resendAfterWindow_sendsNewOtpWithoutResettingAttempts() {
-        currentBeneficiary.setEmail("beneficiary@example.com");
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setOtpCode("111111");
-        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3)); // gửi cách đây ~2 phút
-        session.setAttemptCount(2);
-        stubAccessibleVault();
-        stubPendingSession(session);
-        when(otpGenerator.generate()).thenReturn("654321");
-
-        beneficiaryService.sendIdentityOtp(request, currentUserId);
-
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getOtpCode()).isEqualTo("654321");
-        assertThat(captor.getValue().getAttemptCount()).isEqualTo(2);
-        verify(emailSender).sendEmail("beneficiary@example.com", "654321");
-    }
 
     @Test
     void sendIdentityOtp_methodIsNotOtp_throws400() {
@@ -520,68 +473,6 @@ public class BeneficiaryServiceImplTest {
 
     // ===================== FR-17: xác thực danh tính =====================
 
-    @Test
-    void verifyIdentity_correctOtp_marksSuccessAndOpensViewSession() {
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setOtpCode("123456");
-        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
-        stubAccessibleVault();
-        stubPendingSession(session);
-
-        VerifyIdentityResponse response = beneficiaryService.verifyIdentity(
-                verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId);
-
-        assertThat(response.getStatus()).isEqualTo(VerificationStatus.SUCCESS);
-        assertThat(response.getVerifiedAt()).isNotNull();
-        assertThat(response.getViewSessionExpiresAt()).isAfter(response.getVerifiedAt());
-
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(VerificationStatus.SUCCESS);
-        assertThat(captor.getValue().getVerifiedAt()).isNotNull();
-        assertThat(captor.getValue().getOtpCode()).isNull(); // OTP không dùng lại được
-    }
-
-    @Test
-    void verifyIdentity_wrongOtp_incrementsAttemptsAndStaysPending() {
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setOtpCode("123456");
-        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
-        stubAccessibleVault();
-        stubPendingSession(session);
-
-        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.verifyIdentity(
-                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
-
-        assertThat(ex.getMessage()).contains("4"); // còn 4 lần thử
-
-        // Số lần sai phải được lưu TRƯỚC khi ném lỗi
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getAttemptCount()).isEqualTo(1);
-        assertThat(captor.getValue().getStatus()).isEqualTo(VerificationStatus.PENDING);
-    }
-
-    @Test
-    void verifyIdentity_fifthWrongAttempt_locksSession() {
-        IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setOtpCode("123456");
-        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
-        session.setAttemptCount(4);
-        stubAccessibleVault();
-        stubPendingSession(session);
-
-        expectError(HttpStatus.LOCKED,
-                () -> beneficiaryService.verifyIdentity(
-                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
-
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getStatus()).isEqualTo(VerificationStatus.FAILED);
-        assertThat(captor.getValue().getAttemptCount()).isEqualTo(5);
-        assertThat(captor.getValue().getOtpCode()).isNull();
-    }
 
     @Test
     void verifyIdentity_expiredOtp_throws400WithoutCountingAttempt() {
@@ -596,6 +487,7 @@ public class BeneficiaryServiceImplTest {
                         verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
 
         verify(verificationRepository, never()).save(any());
+        verify(verificationRepository, never()).incrementAttemptCount(any());
     }
 
     @Test
@@ -609,6 +501,7 @@ public class BeneficiaryServiceImplTest {
                         verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
 
         verify(verificationRepository, never()).save(any());
+        verify(verificationRepository, never()).incrementAttemptCount(any());
     }
 
     @Test
@@ -620,36 +513,9 @@ public class BeneficiaryServiceImplTest {
         expectError(HttpStatus.BAD_REQUEST,
                 () -> beneficiaryService.verifyIdentity(
                         verifyRequest(VerificationMethod.OTP, null, null), currentUserId));
+        verify(verificationRepository, never()).incrementAttemptCount(any());
     }
 
-    @Test
-    void verifyIdentity_ekycValid_marksSuccess() {
-        IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
-        stubAccessibleVault();
-        stubPendingSession(session);
-        when(mockKycVerifier.verify("123456789012")).thenReturn(true);
-
-        VerifyIdentityResponse response = beneficiaryService.verifyIdentity(
-                verifyRequest(VerificationMethod.EKYC_MOCK, null, "123456789012"), currentUserId);
-
-        assertThat(response.getStatus()).isEqualTo(VerificationStatus.SUCCESS);
-    }
-
-    @Test
-    void verifyIdentity_ekycInvalid_incrementsAttempts() {
-        IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
-        stubAccessibleVault();
-        stubPendingSession(session);
-        when(mockKycVerifier.verify("123")).thenReturn(false);
-
-        expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.verifyIdentity(
-                        verifyRequest(VerificationMethod.EKYC_MOCK, null, "123"), currentUserId));
-
-        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
-        verify(verificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getAttemptCount()).isEqualTo(1);
-    }
 
     @Test
     void verifyIdentity_ekycIdMissing_throws400() {
@@ -662,6 +528,7 @@ public class BeneficiaryServiceImplTest {
                         verifyRequest(VerificationMethod.EKYC_MOCK, null, null), currentUserId));
 
         verify(mockKycVerifier, never()).verify(any());
+        verify(verificationRepository, never()).incrementAttemptCount(any());
     }
 
     @Test
@@ -775,6 +642,174 @@ public class BeneficiaryServiceImplTest {
 
         verifyNoInteractions(digitalAssetRepository);
         verifyNoInteractions(cryptoService);
+    }
+
+    @Test
+    void sendIdentityOtp_success_storesOnlyHashAndSendsPlainOtpByEmail() {
+        currentBeneficiary.setEmail("beneficiary@example.com");
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(otpGenerator.generate()).thenReturn("123456");
+
+        beneficiaryService.sendIdentityOtp(request, currentUserId);
+
+        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
+        verify(verificationRepository).save(captor.capture());
+        IdentityVerification saved = captor.getValue();
+        assertThat(saved.getOtpCode()).isNotEqualTo("123456");
+        assertThat(saved.getOtpCode()).isEqualTo(otpHasher.hash(session.getId(), "123456"));
+        assertThat(saved.getOtpSentAt()).isNotNull();
+        assertThat(saved.getOtpExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(4));
+        verify(emailSender).sendEmail("beneficiary@example.com", "123456");
+    }
+
+    @Test
+    void sendIdentityOtp_resendTooSoon_throws429() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode("some-hash");
+        session.setOtpSentAt(LocalDateTime.now());
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+        stubAccessibleVault();
+        stubPendingSession(session);
+
+        expectError(HttpStatus.TOO_MANY_REQUESTS,
+                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+
+        verify(emailSender, never()).sendEmail(any(), any());
+        verify(verificationRepository, never()).save(any());
+    }
+
+    @Test
+    void sendIdentityOtp_resendAfterWindow_sendsNewOtpWithoutResettingAttempts() {
+        currentBeneficiary.setEmail("beneficiary@example.com");
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "111111"));
+        session.setOtpSentAt(LocalDateTime.now().minusMinutes(2));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        session.setAttemptCount(2);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(otpGenerator.generate()).thenReturn("654321");
+
+        beneficiaryService.sendIdentityOtp(request, currentUserId);
+
+        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
+        verify(verificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getOtpCode()).isEqualTo(otpHasher.hash(session.getId(), "654321"));
+        assertThat(captor.getValue().getAttemptCount()).isEqualTo(2);
+        verify(emailSender).sendEmail("beneficiary@example.com", "654321");
+    }
+
+    @Test
+    void verifyIdentity_correctOtp_marksSuccessAndOpensViewSession() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+
+        VerifyIdentityResponse response = beneficiaryService.verifyIdentity(
+                verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId);
+
+        assertThat(response.getStatus()).isEqualTo(VerificationStatus.SUCCESS);
+        assertThat(response.getVerifiedAt()).isNotNull();
+        assertThat(response.getViewSessionExpiresAt()).isAfter(response.getVerifiedAt());
+
+        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
+        verify(verificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(VerificationStatus.SUCCESS);
+        assertThat(captor.getValue().getOtpCode()).isNull(); // OTP không dùng lại được
+    }
+
+    @Test
+    void verifyIdentity_wrongOtp_reservesAttemptAtomicallyAndStaysPending() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+
+        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
+
+        assertThat(ex.getMessage()).contains("4"); // còn 4 lần thử
+        // Bộ đếm tăng trong DB bằng một câu UPDATE, không tính trên RAM
+        verify(verificationRepository).incrementAttemptCount(session.getId());
+        assertThat(session.getAttemptCount()).isEqualTo(1);
+        assertThat(session.getStatus()).isEqualTo(VerificationStatus.PENDING);
+    }
+
+    @Test
+    void verifyIdentity_fifthWrongAttempt_locksSession() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(5);
+
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
+
+        ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
+        verify(verificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatus()).isEqualTo(VerificationStatus.FAILED);
+        assertThat(captor.getValue().getAttemptCount()).isEqualTo(5);
+        assertThat(captor.getValue().getOtpCode()).isNull();
+    }
+
+    @Test
+    void verifyIdentity_attemptBeyondLimit_locksWithoutCheckingTheCode() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        // Request thứ 6 chen vào lúc phiên chưa kịp bị khóa
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(6);
+
+        // Dù gửi OTP ĐÚNG vẫn bị từ chối vì đã hết lượt
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
+
+        verify(otpHasher, never()).matches(any(), any(), any());
+        assertThat(session.getStatus()).isEqualTo(VerificationStatus.FAILED);
+    }
+
+    @Test
+    void verifyIdentity_ekycValid_marksSuccess() {
+        IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+        when(mockKycVerifier.verify("123456789012")).thenReturn(true);
+
+        VerifyIdentityResponse response = beneficiaryService.verifyIdentity(
+                verifyRequest(VerificationMethod.EKYC_MOCK, null, "123456789012"), currentUserId);
+
+        assertThat(response.getStatus()).isEqualTo(VerificationStatus.SUCCESS);
+    }
+
+    @Test
+    void verifyIdentity_ekycInvalid_reservesAttempt() {
+        IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+        when(mockKycVerifier.verify("123")).thenReturn(false);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.EKYC_MOCK, null, "123"), currentUserId));
+
+        verify(verificationRepository).incrementAttemptCount(session.getId());
+        assertThat(session.getAttemptCount()).isEqualTo(1);
     }
 
 }

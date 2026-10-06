@@ -5,6 +5,9 @@ import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -30,5 +33,15 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     // FR-17: còn phiên xem hợp lệ không (SUCCESS và verified_at sau mốc thời gian)
     boolean existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
             UUID vaultId, UUID beneficiaryId, VerificationStatus status, LocalDateTime verifiedAfter);
+
+    // FR-17: tăng bộ đếm NGUYÊN TỬ trong DB (UPDATE tự khóa dòng), tránh lost update khi nhiều request song song.
+    // COALESCE vì cột attempt_count cho phép NULL.
+    @Modifying
+    @Query("UPDATE IdentityVerification v SET v.attemptCount = COALESCE(v.attemptCount, 0) + 1 WHERE v.id = :id")
+    void incrementAttemptCount(@Param("id") UUID id);
+
+    // FR-17: đọc lại giá trị đếm sau khi tăng
+    @Query("SELECT COALESCE(v.attemptCount, 0) FROM IdentityVerification v WHERE v.id = :id")
+    int findAttemptCountById(@Param("id") UUID id);
 
 }

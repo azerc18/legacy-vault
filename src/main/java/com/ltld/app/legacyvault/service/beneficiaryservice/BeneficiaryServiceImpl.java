@@ -25,6 +25,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -64,6 +65,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final MockKycVerifier mockKycVerifier;
     private final EmailSender emailSender;
     private final OtpGenerator otpGenerator;
+    private final OtpHasher otpHasher;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -162,26 +164,27 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // Chặn gửi lại quá nhanh. Thời điểm gửi lần trước = otpExpiresAt - OTP_TTL_MINUTES
-        if (verification.getOtpExpiresAt() != null) {
-            LocalDateTime lastSentAt = verification.getOtpExpiresAt().minusMinutes(OTP_TTL_MINUTES);
-            if (now.isBefore(lastSentAt.plusSeconds(OTP_RESEND_SECONDS))) {
-                throw new BeneficiaryException(
-                        "Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.", HttpStatus.TOO_MANY_REQUESTS);
-            }
+        // Chặn gửi lại quá nhanh, dựa vào thời điểm gửi lần trước được lưu tường minh
+        if (verification.getOtpSentAt() != null
+                && now.isBefore(verification.getOtpSentAt().plusSeconds(OTP_RESEND_SECONDS))) {
+            throw new BeneficiaryException(
+                    "Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         // Gửi lại KHÔNG reset attemptCount, tránh lách giới hạn số lần thử
         String otp = otpGenerator.generate();
-        verification.setOtpCode(otp);
+        verification.setOtpCode(otpHasher.hash(verification.getId(), otp)); // DB chỉ giữ hash
+        verification.setOtpSentAt(now);
         verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
         verificationRepository.save(verification);
 
+        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log
         emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
     }
 
     // noRollbackFor: số lần sai phải được lưu dù method ném BeneficiaryException,
     // nếu không transaction rollback và giới hạn số lần thử vô tác dụng
+    // noRollbackFor: số lần thử phải được lưu dù method ném BeneficiaryException
     @Override
     @Transactional(noRollbackFor = BeneficiaryException.class)
     public VerifyIdentityResponse verifyIdentity(VerifyIdentityRequest request, UUID currentUserId) {
@@ -192,9 +195,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 findPendingSession(vault.getId(), currentUserId, request.getVerificationMethod());
 
         LocalDateTime now = LocalDateTime.now();
-        boolean passed;
+        boolean isOtp = request.getVerificationMethod() == VerificationMethod.OTP;
 
-        if (request.getVerificationMethod() == VerificationMethod.OTP) {
+        // 1. Kiểm tra đầu vào. Các lỗi này không tính vào số lần thử.
+        if (isOtp) {
             if (request.getOtp() == null) {
                 throw new BeneficiaryException("OTP không được để trống.", HttpStatus.BAD_REQUEST);
             }
@@ -206,36 +210,43 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 throw new BeneficiaryException(
                         "OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP.", HttpStatus.BAD_REQUEST);
             }
-            passed = verification.getOtpCode().equals(request.getOtp());
-        } else {
-            if (request.getKycIdNumber() == null) {
-                throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
-            }
-            passed = mockKycVerifier.verify(request.getKycIdNumber());
+        } else if (request.getKycIdNumber() == null) {
+            throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
         }
 
-        if (!passed) {
-            int attempts = (verification.getAttemptCount() == null ? 0 : verification.getAttemptCount()) + 1;
-            verification.setAttemptCount(attempts);
+        // 2. GIỮ CHỖ một lượt thử TRƯỚC khi chấm đáp án. UPDATE khóa dòng nên các request song song
+        //    bị xếp hàng, mỗi request nhận một số đếm khác nhau. Nếu chấm trước rồi mới đếm,
+        //    kẻ tấn công vẫn đoán được nhiều lần cùng lúc.
+        verificationRepository.incrementAttemptCount(verification.getId());
+        int attempts = verificationRepository.findAttemptCountById(verification.getId());
+        // Đồng bộ entity với DB, nếu không lần lưu sau sẽ ghi đè bằng số đếm cũ
+        verification.setAttemptCount(attempts);
 
+        // 3. Hết lượt: không chấm đáp án nữa, kể cả khi đáp án đúng
+        if (attempts > MAX_VERIFY_ATTEMPTS) {
+            lockSession(verification);
+            throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
+        }
+
+        // 4. Chấm đáp án
+        boolean passed = isOtp
+                ? otpHasher.matches(verification.getId(), request.getOtp(), verification.getOtpCode())
+                : mockKycVerifier.verify(request.getKycIdNumber());
+
+        if (!passed) {
             if (attempts >= MAX_VERIFY_ATTEMPTS) {
-                verification.setStatus(VerificationStatus.FAILED);
-                verification.setOtpCode(null);
-                verification.setOtpExpiresAt(null);
-                verificationRepository.save(verification);
+                lockSession(verification);
                 throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
             }
-
-            verificationRepository.save(verification);
             throw new BeneficiaryException(
                     "Xác thực không thành công. Bạn còn " + (MAX_VERIFY_ATTEMPTS - attempts) + " lần thử.",
                     HttpStatus.BAD_REQUEST);
         }
 
+        // 5. Thành công
         verification.setStatus(VerificationStatus.SUCCESS);
         verification.setVerifiedAt(now);
-        verification.setOtpCode(null);
-        verification.setOtpExpiresAt(null);
+        clearOtp(verification);
         verificationRepository.save(verification);
 
         return VerifyIdentityResponse.builder()
@@ -349,5 +360,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(
                     "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN);
         }
+    }
+
+    private void lockSession(IdentityVerification verification) {
+        verification.setStatus(VerificationStatus.FAILED);
+        clearOtp(verification);
+        verificationRepository.save(verification);
+    }
+
+    private void clearOtp(IdentityVerification verification) {
+        verification.setOtpCode(null);
+        verification.setOtpSentAt(null);
+        verification.setOtpExpiresAt(null);
     }
 }
