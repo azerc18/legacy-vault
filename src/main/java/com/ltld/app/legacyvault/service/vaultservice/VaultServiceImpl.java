@@ -10,6 +10,8 @@ import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class VaultServiceImpl implements VaultService {
     private final DigitalAssetRepository digitalAssetRepository;
     private final UserRepository userRepository;
     private final CryptoService cryptoService;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
@@ -59,23 +62,30 @@ public class VaultServiceImpl implements VaultService {
             }
         }
 
+        auditLogService.success(AuditAction.VAULT_CREATED, ownerId, owner.getEmail());
         return vault;
     }
 
     @Override
     @Transactional
     public void deleteVault(UUID vaultId, UUID ownerId) throws Exception {
+        // Find owner to get email for logging
+        User user = userRepository.findById(ownerId).orElse(null);
+        String email = (user != null) ? user.getEmail() : "unknown";
+
         // 1. Tìm Vault
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new RuntimeException("Vault not found"));
 
         // 2. Bảo mật: Két của ai người nấy xóa
         if (!vault.getOwner().getId().equals(ownerId)) {
+            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, email, "Unauthorized: You don't own this vault");
             throw new RuntimeException("Unauthorized: You don't own this vault");
         }
 
         // 3. Nghiệp vụ: Trạng thái không phải ACTIVE thì từ chối xóa
         if (vault.getStatus() != VaultStatus.ACTIVE) {
+            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, email, "Cannot delete vault that is not in active state");
             throw new RuntimeException("Cannot delete vault that is not in active state");
         }
 
@@ -84,5 +94,7 @@ public class VaultServiceImpl implements VaultService {
 
         // 5. Sau đó mới đập cái két (Vault)
         vaultRepository.delete(vault);
+        
+        auditLogService.success(AuditAction.VAULT_DELETED, ownerId, email);
     }
 }
