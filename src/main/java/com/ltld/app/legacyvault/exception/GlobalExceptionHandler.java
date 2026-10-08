@@ -44,4 +44,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Validation error", errors));
     }
+    @ExceptionHandler(InvalidCredentialException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredential(InvalidCredentialException e){
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+    @ExceptionHandler(LockedAccountException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLockedAccount(LockedAccountException e){
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+    @ExceptionHandler(NotActiveUserException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotActiveUser(NotActiveUserException e){
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(BeneficiaryException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBeneficiaryException(BeneficiaryException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
