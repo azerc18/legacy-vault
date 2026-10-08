@@ -4,13 +4,12 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.exception.ExpiredOtpException;
-import com.ltld.app.legacyvault.exception.InvalidOtpException;
-import com.ltld.app.legacyvault.exception.OtpNotFoundException;
-import com.ltld.app.legacyvault.exception.TooManyAttemptsException;
+import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenServiceImpl;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
@@ -42,6 +41,9 @@ public class VerificationTokenServiceImplTest {
 
     @Mock
     private EmailSender emailSender;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private VerificationTokenServiceImpl tokenService;
@@ -85,8 +87,6 @@ public class VerificationTokenServiceImplTest {
         User activeUser = User.builder().email("test@example.com").status(UserStatus.ACTIVE).build();
 
         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(activeUser));
-        when(tokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(activeUser))
-                .thenReturn(Optional.empty());
 
         tokenService.sendOtp(request);
 
@@ -102,8 +102,11 @@ public class VerificationTokenServiceImplTest {
         request.setEmail("test@example.com");
         User user = pendingUser();
         VerificationToken oldToken = tokenFor(user, "111111", 0, Instant.now().plusSeconds(100));
+        oldToken.setCreatedAt(Instant.now().minusSeconds(120));
 
         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+        when(tokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user))
+                .thenReturn(Optional.of(oldToken));
         when(tokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user))
                 .thenReturn(Optional.of(oldToken));
         when(otpGenerator.generate()).thenReturn("654321");
@@ -114,7 +117,6 @@ public class VerificationTokenServiceImplTest {
 
         ArgumentCaptor<VerificationToken> tokenCaptor = ArgumentCaptor.forClass(VerificationToken.class);
         verify(tokenRepository, times(2)).save(tokenCaptor.capture());
-        // lan save dau: oldToken bi invalidate; lan save thu hai: token OTP moi
         VerificationToken newToken = tokenCaptor.getAllValues().get(1);
         assertThat(newToken.getOtpCode()).isEqualTo("654321");
         assertThat(newToken.getUser()).isEqualTo(user);
@@ -140,6 +142,59 @@ public class VerificationTokenServiceImplTest {
     }
 
     @Test
+    void sendOtp_withinCooldown_throwsTooManyRequests_andDoesNotSendEmail() {
+        SendOtpRequest request = new SendOtpRequest();
+        request.setEmail("test@example.com");
+        User user = pendingUser();
+        VerificationToken last = tokenFor(user, "111111", 0, Instant.now().plusSeconds(100));
+        last.setCreatedAt(Instant.now().minusSeconds(20));       // mới gửi 20s trước
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user)).thenReturn(Optional.of(last));
+
+        assertThatThrownBy(() -> tokenService.sendOtp(request))
+                .isInstanceOf(TooManyOtpRequestsException.class);
+
+        verify(tokenRepository, never()).save(any());
+        verify(otpGenerator, never()).generate();
+        verify(emailSender, never()).sendEmail(anyString(), anyString());
+        verify(auditLogService).failure(eq(AuditAction.OTP_RATE_LIMITED), any(), eq("test@example.com"), eq("cooldown"));
+    }
+
+    @Test
+    void sendOtp_afterCooldown_sendsNewOtp() {
+        SendOtpRequest request = new SendOtpRequest();
+        request.setEmail("test@example.com");
+        User user = pendingUser();
+        VerificationToken last = tokenFor(user, "111111", 0, Instant.now().plusSeconds(100));
+        last.setCreatedAt(Instant.now().minusSeconds(61));
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(user)).thenReturn(Optional.of(last));
+        when(otpGenerator.generate()).thenReturn("222222");
+
+        tokenService.sendOtp(request);
+
+        verify(emailSender).sendEmail("test@example.com", "222222");
+    }
+
+    @Test
+    void sendOtp_hourlyLimitReached_throwsTooManyRequests() {
+        SendOtpRequest request = new SendOtpRequest();
+        request.setEmail("test@example.com");
+        User user = pendingUser();
+
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.countByUserAndCreatedAtAfter(eq(user), any(Instant.class))).thenReturn(5L);
+
+        assertThatThrownBy(() -> tokenService.sendOtp(request))
+                .isInstanceOf(TooManyOtpRequestsException.class);
+
+        verify(emailSender, never()).sendEmail(anyString(), anyString());
+        verify(auditLogService).failure(eq(AuditAction.OTP_RATE_LIMITED), any(), eq("test@example.com"), eq("hourly limit"));
+    }
+
+    @Test
     void verifyEmail_userNotFound_throwsOtpNotFoundException() {
         VerifyOtpRequest request = new VerifyOtpRequest();
         request.setEmail("notfound@example.com");
@@ -154,6 +209,7 @@ public class VerificationTokenServiceImplTest {
         verify(tokenRepository, never()).findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(any());
     }
 
+    @Test
     void verifyEmail_tokenNotFound_throwsOtpNotFoundException() {
         VerifyOtpRequest request = new VerifyOtpRequest();
         request.setEmail("test@example.com");
