@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.entity;
 
+import com.ltld.app.legacyvault.enums.TokenType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -39,6 +40,14 @@ public class VerificationToken {
 
     @Column(name = "used_at")
     private Instant usedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, name = "token_type")
+    private TokenType type;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
