@@ -8,4 +8,6 @@ import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 public interface AuthService {
      void register(RegisterRequest request);
      LoginResult login(LoginRequest request, String ipAddress, String userAgent);
+     void logout(String rawRefreshToken);
+     LoginResult refresh(String rawRefreshToken, String ipAddress, String userAgent);
 }

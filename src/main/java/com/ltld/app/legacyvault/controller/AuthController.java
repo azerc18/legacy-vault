@@ -18,10 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 
@@ -37,7 +34,6 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
 
         authService.register(request);
-
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Register Successfully"));
     }
@@ -77,5 +73,45 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(ApiResponse.success("Login successfully", result.response()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @CookieValue(name = "refresh_token", required = false) String refreshToken){
+        authService.logout(refreshToken);
+
+        ResponseCookie cookie = ResponseCookie.from("refresh_token","")
+                .httpOnly(true)
+                .secure(jwtProperties.isCookieSecure())
+                .sameSite("Strict")
+                .path("/api/auth")
+                .maxAge(0)
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(ApiResponse.success("Logout successfully"));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<LoginResponse>> refresh(
+            @CookieValue(name = "refresh_token", required = false) String refreshToken,
+            HttpServletRequest httpRequest) {
+        LoginResult result = authService.refresh(
+                refreshToken,
+                httpRequest.getRemoteAddr(),
+                httpRequest.getHeader(HttpHeaders.USER_AGENT));
+
+        ResponseCookie cookie = ResponseCookie.from("refresh_token",result.refreshToken())
+                .httpOnly(true)
+                .secure(jwtProperties.isCookieSecure())
+                .sameSite("Strict")
+                .path("/api/auth")
+                .maxAge(jwtProperties.getRefreshTokenTtlSeconds())
+                .build();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(ApiResponse.success("Token refreshed successfully", result.response()));
     }
 }

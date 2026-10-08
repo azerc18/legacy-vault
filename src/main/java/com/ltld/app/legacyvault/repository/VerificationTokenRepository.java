@@ -5,10 +5,12 @@ import com.ltld.app.legacyvault.entity.VerificationToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, UUID> {
     Optional<VerificationToken> findTopByUserAndIsUsedFalseOrderByCreatedAtDesc(User user);
+    long countByUserAndCreatedAtAfter(User user, Instant since);
 }
