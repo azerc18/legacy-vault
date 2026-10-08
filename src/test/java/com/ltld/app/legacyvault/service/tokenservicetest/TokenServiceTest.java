@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.entity.RefreshToken;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.repository.RefreshTokenRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenServiceImpl;
 import com.ltld.app.legacyvault.utility.RefreshTokenUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,9 @@ public class TokenServiceRevokeRefreshTokenTest {
 
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private TokenServiceImpl tokenService;
