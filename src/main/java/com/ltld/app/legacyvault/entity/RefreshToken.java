@@ -51,4 +51,8 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp
     private Instant createdAt;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }
