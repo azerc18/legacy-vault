@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -27,6 +28,7 @@ public class Role {
 
     private String description;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "role_authorities",

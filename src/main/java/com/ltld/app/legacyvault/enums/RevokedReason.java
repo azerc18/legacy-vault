@@ -4,5 +4,6 @@ public enum RevokedReason {
     LOGOUT,
     ROTATED,
     ADMIN_REVOKE,
-    EXPIRED
+    EXPIRED,
+    REUSE_DETECTED
 }

@@ -33,3 +33,7 @@ security:
     access-token-ttl-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:900}
     refresh-token-ttl-seconds: ${JWT_REFRESH_TOKEN_TTL_SECONDS:604800}
     cookie-secure: ${JWT_COOKIE_SECURE:false}
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173

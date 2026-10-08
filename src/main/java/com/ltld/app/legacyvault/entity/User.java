@@ -46,6 +46,7 @@ public class User {
     @Builder.Default
     private KycLevel kycLevel = KycLevel.NONE;
 
+    @Builder.Default
     @Column(name = "failed_login_attempts")
     private int failedLoginAttempts = 0;
 
@@ -60,6 +61,10 @@ public class User {
     @UpdateTimestamp
     private Instant updatedAt;
 
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
