@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.tokenservice;
 
+import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 
@@ -10,4 +11,5 @@ public interface TokenService {
     Instant getAccessTokenExpiry();
     String generateRefreshToken(User user, String ipAddress, String userAgent);
     void revokeRefreshToken(String rawToken, RevokedReason reason);
+    LoginResult refreshAccessToken(String rawToken, String ipAddress, String userAgent);
 }

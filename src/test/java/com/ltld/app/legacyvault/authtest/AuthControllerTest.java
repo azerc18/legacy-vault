@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.exception.InvalidCredentialException;
 import com.ltld.app.legacyvault.exception.LockedAccountException;
 import com.ltld.app.legacyvault.exception.NotActiveUserException;
+import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
@@ -201,6 +202,15 @@ public class AuthControllerTest {
 
             verify(tokenService, never()).sendOtp(any());
         }
+
+        @Test
+        void sendOtp_tooManyRequests_returns429WithRetryAfter() throws Exception {
+            doThrow(new TooManyOtpRequestsException(45)).when(tokenService).sendOtp(any(SendOtpRequest.class));
+
+            postJson(SEND_OTP_URL, sendOtpRequest(EMAIL))
+                    .andExpect(status().isTooManyRequests())
+                    .andExpect(header().string(HttpHeaders.RETRY_AFTER, "45"));
+        }
     }
 
     // ---------- POST /api/auth/verify-email ----------
@@ -368,5 +378,30 @@ public class AuthControllerTest {
         }
     }
 
+    // ---------- POST /api/auth/refresh ----------
+    @Test
+    void refresh_success_returnsNewTokens() throws Exception {
+        when(authService.refresh(eq("raw-refresh-token"), any(), any()))
+                .thenReturn(loginResult());
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("refresh_token", "raw-refresh-token"))
+                        .header(HttpHeaders.USER_AGENT, USER_AGENT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refresh_token=raw-refresh-token")));
+    }
+
+    @Test
+    void refresh_missingCookie_returnsOkButServiceWillFailOrHandle() throws Exception {
+        // Spring có thể tự handle lỗi thiếu cookie nếu @CookieValue required=true,
+        // nhưng ở đây required=false nên null sẽ được truyền xuống service.
+        when(authService.refresh(isNull(), any(), any()))
+                .thenThrow(new com.ltld.app.legacyvault.exception.InvalidRefreshTokenException());
+
+        mockMvc.perform(post("/api/auth/refresh"))
+                .andExpect(status().isUnauthorized()); // Giả định GlobalExceptionHandler map InvalidRefreshTokenException thành 401
+    }
 
 }
