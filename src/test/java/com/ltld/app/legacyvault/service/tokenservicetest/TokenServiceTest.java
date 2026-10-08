@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.tokenservicetest;
 
+import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.entity.RefreshToken;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -8,6 +9,7 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.InvalidRefreshTokenException;
 import com.ltld.app.legacyvault.exception.LockedAccountException;
 import com.ltld.app.legacyvault.repository.RefreshTokenRepository;
+import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenServiceImpl;
 import com.ltld.app.legacyvault.utility.RefreshTokenUtil;
@@ -20,6 +22,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 
 import java.time.Instant;
@@ -53,6 +57,9 @@ public class TokenServiceTest {
 
     @InjectMocks
     private TokenServiceImpl tokenService;
+
+    @Mock
+    private JwtProperties jwtProperties;
 
     @BeforeEach
     void setUp() {
@@ -107,7 +114,7 @@ public class TokenServiceTest {
                 .hasMessageContaining("Refresh token has expired");
 
         assertThat(activeToken.getRevokedReason()).isEqualTo(RevokedReason.EXPIRED);
-        verify(refreshTokenRepository).save(activeToken);
+        verify(refreshTokenRepository).saveAndFlush(activeToken);
     }
 
     @Test
@@ -143,6 +150,36 @@ public class TokenServiceTest {
                 .isInstanceOf(LockedAccountException.class);
 
         verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(), any(), any());
+    }
+
+    @Test
+    void refreshAccessToken_validToken_rotatesWithSaveAndFlush() {
+        when(refreshTokenUtil.hashToken(RAW_TOKEN)).thenReturn(TOKEN_HASH);
+        when(refreshTokenRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.of(activeToken));
+        when(refreshTokenUtil.generateRawToken()).thenReturn("new-raw-token");
+        when(refreshTokenUtil.hashToken("new-raw-token")).thenReturn("new-hash");
+        when(jwtEncoder.encode(any())).thenReturn(
+                Jwt.withTokenValue("access").header("alg", "HS256").claim("sub", "x").build());
+
+        LoginResult result = tokenService.refreshAccessToken(RAW_TOKEN, IP, USER_AGENT);
+
+        assertThat(activeToken.getRevokedReason()).isEqualTo(RevokedReason.ROTATED);
+        verify(refreshTokenRepository).saveAndFlush(activeToken);
+        assertThat(result.refreshToken()).isEqualTo("new-raw-token");
+    }
+
+    @Test
+    void refreshAccessToken_concurrentRotation_throwsConflict_andIssuesNoNewToken() {
+        when(refreshTokenUtil.hashToken(RAW_TOKEN)).thenReturn(TOKEN_HASH);
+        when(refreshTokenRepository.findByTokenHash(TOKEN_HASH)).thenReturn(Optional.of(activeToken));
+        when(refreshTokenRepository.saveAndFlush(activeToken))
+                .thenThrow(new ObjectOptimisticLockingFailureException(RefreshToken.class, UUID.randomUUID()));
+
+        assertThatThrownBy(() -> tokenService.refreshAccessToken(RAW_TOKEN, IP, USER_AGENT))
+                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
+
+        verifyNoInteractions(jwtEncoder);
+        verify(refreshTokenRepository, never()).save(any());
     }
 
     @Test
@@ -206,4 +243,6 @@ public class TokenServiceTest {
         assertThat(activeToken.getRevokedReason()).isEqualTo(RevokedReason.LOGOUT);
         verify(refreshTokenRepository).save(activeToken);
     }
+
+
 }

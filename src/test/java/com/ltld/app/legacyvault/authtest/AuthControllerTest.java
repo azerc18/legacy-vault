@@ -2,16 +2,16 @@ package com.ltld.app.legacyvault.authtest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ltld.app.legacyvault.controller.AuthController;
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
-import com.ltld.app.legacyvault.exception.InvalidCredentialException;
-import com.ltld.app.legacyvault.exception.LockedAccountException;
-import com.ltld.app.legacyvault.exception.NotActiveUserException;
-import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
+import com.ltld.app.legacyvault.entity.VerificationToken;
+import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
@@ -26,12 +26,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +55,8 @@ public class AuthControllerTest {
     private static final String VERIFY_EMAIL_URL = "/api/auth/verify-email";
     private static final String LOGIN_URL = "/api/auth/login";
     private static final String LOGOUT_URL = "/api/auth/logout";
+    private static final String FORGOT_PASSWORD_URL = "/api/auth/forgot-password";
+    private static final String RESET_PASSWORD_URL = "/api/auth/reset-password";
 
     private static final String EMAIL = "test@example.com";
     private static final String IP = "127.0.0.1";          // remoteAddr mặc định của MockMvc
@@ -76,6 +80,11 @@ public class AuthControllerTest {
         return mockMvc.perform(post(url)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(body)));
+    }
+
+    private Map<String, String> resetBody(String otp, String newPassword, String confirm) {
+        return Map.of("email", EMAIL, "otp", otp,
+                "newPassword", newPassword, "passwordConfirm", confirm);
     }
 
     private RegisterRequest validRegisterRequest() {
@@ -404,4 +413,72 @@ public class AuthControllerTest {
                 .andExpect(status().isUnauthorized()); // Giả định GlobalExceptionHandler map InvalidRefreshTokenException thành 401
     }
 
+    // ---------- POST /api/auth/forgot-password ----------
+    @Test
+    void forgotPassword_validEmail_returnsOk() throws Exception {
+        postJson(FORGOT_PASSWORD_URL, Map.of("email", EMAIL))
+                .andExpect(status().isOk());
+
+        verify(tokenService).sendPasswordResetOtp(any(ForgotPasswordRequest.class));
+    }
+
+    @Test
+    void forgotPassword_invalidEmail_returnsBadRequest() throws Exception {
+        postJson(FORGOT_PASSWORD_URL, Map.of("email", "not-an-email"))
+                .andExpect(status().isBadRequest());
+
+        verify(tokenService, never()).sendPasswordResetOtp(any());
+    }
+
+    // ---------- POST /api/auth/reset-password ----------
+    @Test
+    void resetPassword_valid_returnsOk() throws Exception {
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "NewPass123"))
+                .andExpect(status().isOk());
+
+        verify(authService).resetPassword(any(ResetPasswordRequest.class));
+    }
+
+    @Test
+    void resetPassword_passwordMismatch_returnsBadRequest() throws Exception {
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "Other123"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(any());
+    }
+
+    @Test
+    void resetPassword_otpNotSixDigits_returnsBadRequest() throws Exception {
+        postJson(RESET_PASSWORD_URL, resetBody("12ab", "NewPass123", "NewPass123"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(any());
+    }
+
+    @Test
+    void resetPassword_passwordTooShort_returnsBadRequest() throws Exception {
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "abc", "abc"))
+                .andExpect(status().isBadRequest());
+
+        verify(authService, never()).resetPassword(any());
+    }
+
+    @Test
+    void resetPassword_wrongOtp_returnsBadRequest() throws Exception {
+        doThrow(new InvalidOtpException("Wrong OTP for user"))
+                .when(authService).resetPassword(any(ResetPasswordRequest.class));
+
+        postJson(RESET_PASSWORD_URL, resetBody("000000", "NewPass123", "NewPass123"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Wrong OTP for user"));
+    }
+
+    @Test
+    void resetPassword_concurrentConflict_returns409() throws Exception {
+        doThrow(new ObjectOptimisticLockingFailureException(VerificationToken.class, UUID.randomUUID()))
+                .when(authService).resetPassword(any(ResetPasswordRequest.class));
+
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "NewPass123"))
+                .andExpect(status().isConflict());
+    }
 }

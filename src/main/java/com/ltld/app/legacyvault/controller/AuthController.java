@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
@@ -113,5 +115,17 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(ApiResponse.success("Token refreshed successfully", result.response()));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        tokenService.sendPasswordResetOtp(request);
+        return ResponseEntity.ok(ApiResponse.success("Reset code has been sent."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Password reset successfully. Please login again."));
     }
 }
