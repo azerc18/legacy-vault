@@ -51,6 +51,10 @@ public class BeneficiaryControllerTest {
 
     @Test
     void initializeClaim_success_returns200AndFullResponse() throws Exception {
+
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
         BeneficiaryClaimRequest request = validRequest();
         UUID mockVerificationId = UUID.randomUUID();
 
@@ -60,26 +64,34 @@ public class BeneficiaryControllerTest {
                 .verificationId(mockVerificationId)
                 .build();
 
-        when(beneficiaryService.initializeClaim(any(), any())).thenReturn(mockResponse);
+        when(beneficiaryService.initializeClaim(any(), eq(userId))).thenReturn(mockResponse);
 
         mockMvc.perform(post("/api/beneficiaries/claim")
+                        .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Success"))
                 .andExpect(jsonPath("$.data.verificationId").value(mockVerificationId.toString()));
+
+        verify(beneficiaryService).initializeClaim(any(), eq(userId));
     }
 
     @Test
     void initializeClaim_serviceThrowsBeneficiaryException_returnsCorrectError() throws Exception {
+
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
         BeneficiaryClaimRequest request = validRequest();
 
         // Giả lập Service ném lỗi 404 Không tìm thấy (Sai người gọi)
-        when(beneficiaryService.initializeClaim(any(), any()))
+        when(beneficiaryService.initializeClaim(any(), eq(userId)))
                 .thenThrow(new BeneficiaryException("Không tìm thấy yêu cầu nhận tài sản.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(post("/api/beneficiaries/claim")
+                        .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound()) // Expect mã HTTP 404

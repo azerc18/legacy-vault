@@ -33,13 +33,11 @@ public class BeneficiaryController {
     // FR-16: Khởi tạo yêu cầu nhận tài sản
     @PostMapping("/claim")
     public ResponseEntity<ApiResponse<BeneficiaryClaimResponse>> initializeClaim(
+            Principal principal,
             @Valid @RequestBody BeneficiaryClaimRequest request) {
 
-        // TODO(#4): thay bằng user từ SecurityContext khi có JWT. Hiện endpoint chưa dùng được end-to-end.
-        // Tạm thời hard-code UUID (không khớp beneficiary nào nên API luôn trả 404, fail-closed).
-        UUID currentUserId = UUID.fromString("00000000-0000-0000-0000-000000000000");
-
-        BeneficiaryClaimResponse response = beneficiaryService.initializeClaim(request, currentUserId);
+        BeneficiaryClaimResponse response =
+                beneficiaryService.initializeClaim(request, currentUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
