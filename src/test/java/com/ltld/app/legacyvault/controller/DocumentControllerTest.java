@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.entity.LegalDocument;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.service.documentservice.DocumentService;
 import org.junit.jupiter.api.Test;
@@ -38,8 +39,13 @@ public class DocumentControllerTest {
                 "file", "dichuc.pdf", "application/pdf", "dummy content".getBytes()
         );
 
+        Vault mockVault = new Vault();
+        mockVault.setId(vaultId);
+        
         LegalDocument mockDoc = new LegalDocument();
         mockDoc.setFileName("dichuc.pdf");
+        mockDoc.setVault(mockVault);
+        mockDoc.setDocumentType(DocumentType.WILL);
 
         when(documentService.uploadDocument(eq(ownerId), eq(vaultId), eq(DocumentType.WILL), any())).thenReturn(mockDoc);
 

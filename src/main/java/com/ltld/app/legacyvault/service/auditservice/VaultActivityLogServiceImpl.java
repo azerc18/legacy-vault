@@ -1,10 +1,10 @@
 package com.ltld.app.legacyvault.service.auditservice;
 
-import com.ltld.app.legacyvault.entity.AuditLog;
+import com.ltld.app.legacyvault.entity.VaultActivityLog;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.ActionType;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
+import com.ltld.app.legacyvault.repository.VaultActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -13,13 +13,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class AuditLogServiceImpl implements AuditLogService {
+public class VaultActivityLogServiceImpl implements VaultActivityLogService {
 
-    private final AuditLogRepository auditLogRepository;
+    private final VaultActivityLogRepository vaultActivityLogRepository;
 
     @Override
     public void logAction(UUID userId, UUID vaultId, ActionType actionType, String description, String ipAddress) {
-        // Tạo vỏ bọc User (chỉ cần ID là Spring Data tự hiểu để gán Khóa Ngoại)
         User user = new User();
         user.setId(userId);
 
@@ -29,8 +28,7 @@ public class AuditLogServiceImpl implements AuditLogService {
             vault.setId(vaultId);
         }
 
-        // Tạo cục dữ liệu Log
-        AuditLog log = AuditLog.builder()
+        VaultActivityLog log = VaultActivityLog.builder()
                 .user(user)
                 .vault(vault)
                 .actionType(actionType)
@@ -38,11 +36,11 @@ public class AuditLogServiceImpl implements AuditLogService {
                 .ipAddress(ipAddress)
                 .build();
 
-        auditLogRepository.save(log);
+        vaultActivityLogRepository.save(log);
     }
 
     @Override
-    public List<AuditLog> getUserLogs(UUID userId) {
-        return auditLogRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    public List<VaultActivityLog> getUserLogs(UUID userId) {
+        return vaultActivityLogRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 }

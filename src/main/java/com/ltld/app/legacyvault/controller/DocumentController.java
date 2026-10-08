@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.service.documentservice.DocumentService;
@@ -21,7 +22,7 @@ public class DocumentController {
 
     // Phải khai báo consumes = "multipart/form-data" vì gửi file khác với gửi JSON bình thường
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public ResponseEntity<ApiResponse<LegalDocument>> uploadDocument(
+    public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
             Principal principal,
             @RequestParam("vaultId") UUID vaultId,
             @RequestParam("type") DocumentType type,
@@ -32,6 +33,15 @@ public class DocumentController {
 
         // Ném dữ liệu cho Service xử lý
         LegalDocument document = documentService.uploadDocument(ownerId, vaultId, type, file);
-        return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", document));
+        
+        DocumentResponse response = DocumentResponse.builder()
+                .id(document.getId())
+                .vaultId(document.getVault().getId())
+                .documentType(document.getDocumentType())
+                .fileName(document.getFileName())
+                .uploadedAt(document.getUploadedAt())
+                .build();
+                
+        return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", response));
     }
 }
