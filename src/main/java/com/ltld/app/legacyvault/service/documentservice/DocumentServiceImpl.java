@@ -7,6 +7,8 @@ import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final VaultRepository vaultRepository;
     private final CryptoService cryptoService;
     private final FileStorageService fileStorageService;
+    private final AuditLogService auditLogService;
 
     @Override
     @Transactional
@@ -31,6 +34,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .orElseThrow(() -> new RuntimeException("Vault not found"));
 
         if (!vault.getOwner().getId().equals(ownerId)) {
+            auditLogService.failure(AuditAction.DOCUMENT_UPLOADED, ownerId, vault.getOwner().getEmail(), "Unauthorized: You don't own this vault");
             throw new RuntimeException("Unauthorized: You don't own this vault");
         }
 
@@ -48,6 +52,10 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileName(file.getOriginalFilename()) // Tên file lúc khách hàng chọn upload
                 .build();
 
-        return legalDocumentRepository.save(document);
+        LegalDocument saved = legalDocumentRepository.save(document);
+        
+        auditLogService.success(AuditAction.DOCUMENT_UPLOADED, ownerId, vault.getOwner().getEmail());
+        
+        return saved;
     }
 }

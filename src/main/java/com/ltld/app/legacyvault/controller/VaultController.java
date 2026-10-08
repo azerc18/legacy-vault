@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +22,7 @@ public class VaultController {
 
     // Khi Client gọi POST /api/vaults, hàm này chạy
     @PostMapping
+    @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<VaultResponse>> createVault(
             Principal principal,
             @RequestBody CreateVaultRequest request) throws Exception {
@@ -43,6 +45,7 @@ public class VaultController {
 
     // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy
     @DeleteMapping("/{vaultId}")
+    @PreAuthorize("hasAuthority('VAULT_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteVault(
             Principal principal,
             @PathVariable UUID vaultId) throws Exception {

@@ -37,6 +37,8 @@ class VaultServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private CryptoService cryptoService;
+    @Mock
+    private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks

@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.service.documentservice.DocumentService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,6 +23,7 @@ public class DocumentController {
 
     // Phải khai báo consumes = "multipart/form-data" vì gửi file khác với gửi JSON bình thường
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
             Principal principal,
             @RequestParam("vaultId") UUID vaultId,

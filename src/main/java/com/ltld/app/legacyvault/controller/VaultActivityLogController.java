@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.entity.VaultActivityLog;
 import com.ltld.app.legacyvault.service.auditservice.VaultActivityLogService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,6 +23,7 @@ public class VaultActivityLogController {
     private final VaultActivityLogService vaultActivityLogService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<List<VaultActivityLogResponse>>> getMyLogs(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
         List<VaultActivityLog> logs = vaultActivityLogService.getUserLogs(ownerId);
