@@ -26,7 +26,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -46,6 +48,9 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private VerificationRequestVaultRepository requestVaultRepository;
+
+    @Mock
+    private AuditLogService auditLogService;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -156,6 +161,9 @@ public class LegalVerificationServiceImplTest {
         assertThat(vault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(vault.getUnlockedAt()).isNotNull();
         verify(signatureRepository, times(1)).save(any());
+        verify(auditLogService, times(1)).log(
+                eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
+                isNull(), eq("Vault"), isNull(), anyString());
     }
 
     @Test
@@ -172,6 +180,7 @@ public class LegalVerificationServiceImplTest {
 
         verify(signatureRepository, never()).save(any());
         verify(requestVaultRepository, never()).findByRequestId(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test

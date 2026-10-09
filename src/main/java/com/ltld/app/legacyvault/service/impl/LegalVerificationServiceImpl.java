@@ -21,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
-
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +35,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
     private final VerificationRequestVaultRepository requestVaultRepository;
+    private final AuditLogService auditLogService;
 
     @Override
     public List<VerificationRequestResponseDto> getPendingRequests() {
@@ -111,12 +114,17 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
         signatureRepository.save(signature);
 
-        // Mở khóa các Vault thuộc hồ sơ này
+        // Mở khóa các Vault thuộc hồ sơ này, mỗi Vault ghi một dòng audit
         LocalDateTime now = LocalDateTime.now();
         requestVaultRepository.findByRequestId(requestId).forEach(rv -> {
             Vault vault = rv.getVault();
             vault.setStatus(VaultStatus.UNLOCKED);
             vault.setUnlockedAt(now);
+
+            auditLogService.log(AuditAction.VAULT_UNLOCK, AuditResult.SUCCESS, verifierId, null,
+                    "Vault",
+                    vault.getId() == null ? null : vault.getId().toString(),
+                    "unlocked by legal verifier, request " + requestId);
         });
 
         return toDto(request);
