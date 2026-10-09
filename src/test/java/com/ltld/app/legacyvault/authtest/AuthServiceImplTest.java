@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.authtest;
 
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
@@ -8,11 +9,9 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
+import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.exception.EmailAlreadyExistsException;
-import com.ltld.app.legacyvault.exception.InvalidCredentialException;
-import com.ltld.app.legacyvault.exception.LockedAccountException;
-import com.ltld.app.legacyvault.exception.NotActiveUserException;
+import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -70,6 +69,10 @@ public class AuthServiceImplTest {
 
     private User user;
 
+    private ResetPasswordRequest resetRequest(String otp) {
+        return new ResetPasswordRequest("test@example.com", otp, "NewPass123", "NewPass123");
+    }
+
     @BeforeEach
     void setUp() {
         ownerRole = Role.builder().code("OWNER").build();
@@ -125,7 +128,7 @@ public class AuthServiceImplTest {
         assertThat(savedUser.getPasswordHash()).isEqualTo("hashed-password");
         assertThat(savedUser.getRoles()).containsExactly(ownerRole);
 
-        verify(verificationTokenService).issueOtp(savedUser);
+        verify(verificationTokenService).issueOtp(savedUser, TokenType.EMAIL_VERIFICATION);
         verify(auditLogService).success(AuditAction.REGISTER, savedUser.getId(), "test@example.com");
     }
 
@@ -182,7 +185,7 @@ public class AuthServiceImplTest {
         user.setFailedLoginAttempts(3);
         LoginRequest request = loginRequest("test@example.com", "Password123");
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
         when(tokenService.generateAccessToken(user)).thenReturn("access-token");
         when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
@@ -206,7 +209,7 @@ public class AuthServiceImplTest {
     void login_emailWithSpacesAndUpperCase_isNormalizedBeforeLookup() {
         LoginRequest request = loginRequest("  Test@Example.COM ", "Password123");
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
         when(tokenService.generateAccessToken(user)).thenReturn("access-token");
         when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
@@ -214,13 +217,13 @@ public class AuthServiceImplTest {
 
         authService.login(request, IP, USER_AGENT);
 
-        verify(userRepository).findByEmail("test@example.com");
+        verify(userRepository).findByEmailForUpdate("test@example.com");
     }
 
     @Test
     void login_unknownEmail_throwsInvalidCredential() {
         LoginRequest request = loginRequest("nobody@example.com", "Password123");
-        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailForUpdate("nobody@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
                 .isInstanceOf(InvalidCredentialException.class);
@@ -235,7 +238,7 @@ public class AuthServiceImplTest {
     void login_lockedAccount_throwsLockedWithoutCheckingPassword() {
         user.setStatus(UserStatus.LOCKED);
         LoginRequest request = loginRequest("test@example.com", "Password123");
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
                 .isInstanceOf(LockedAccountException.class);
@@ -249,7 +252,7 @@ public class AuthServiceImplTest {
     @Test
     void login_wrongPassword_incrementsFailedAttemptsAndThrows() {
         LoginRequest request = loginRequest("test@example.com", "WrongPassword");
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
@@ -267,7 +270,7 @@ public class AuthServiceImplTest {
     void login_fifthWrongPassword_locksTemporarily() {
         user.setFailedLoginAttempts(4);
         LoginRequest request = loginRequest("test@example.com", "WrongPassword");
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
@@ -288,7 +291,7 @@ public class AuthServiceImplTest {
     void login_temporarilyLocked_throwsLockedWithoutCheckingPassword() {
         user.setLockedUntil(Instant.now().plus(10, ChronoUnit.MINUTES));
         LoginRequest request = loginRequest("test@example.com", "Password123");
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
                 .isInstanceOf(LockedAccountException.class);
@@ -305,7 +308,7 @@ public class AuthServiceImplTest {
         user.setLockedUntil(Instant.now().minus(1, ChronoUnit.MINUTES));
         LoginRequest request = loginRequest("test@example.com", "Password123");
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
         when(tokenService.generateAccessToken(user)).thenReturn("access-token");
         when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
@@ -324,7 +327,7 @@ public class AuthServiceImplTest {
         user.setLockedUntil(Instant.now().minus(1, ChronoUnit.MINUTES));
         LoginRequest request = loginRequest("test@example.com", "WrongPassword");
 
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
@@ -338,7 +341,7 @@ public class AuthServiceImplTest {
     void login_pendingUserWithCorrectPassword_throwsNotActive() {
         user.setStatus(UserStatus.PENDING);
         LoginRequest request = loginRequest("test@example.com", "Password123");
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
@@ -377,6 +380,58 @@ public class AuthServiceImplTest {
         assertThat(result).isEqualTo(expectedResult);
         verify(tokenService).refreshAccessToken("raw-token", IP, USER_AGENT);
     }
+
+    @Test
+    void resetPassword_success_updatesPassword_unlocks_andRevokesTokens() {
+        user.setFailedLoginAttempts(3);
+        user.setLockedUntil(Instant.now().plusSeconds(600));
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewPass123")).thenReturn("new-hash");
+
+        authService.resetPassword(resetRequest("123456"));
+
+        verify(verificationTokenService).consumeOtp(user, TokenType.PASSWORD_RESET,
+                "123456", AuditAction.PASSWORD_RESET_FAILED);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        User saved = captor.getValue();
+        assertThat(saved.getPasswordHash()).isEqualTo("new-hash");
+        assertThat(saved.getFailedLoginAttempts()).isZero();
+        assertThat(saved.getLockedUntil()).isNull();
+
+        verify(tokenService).revokeAllUserTokens(user.getId(), RevokedReason.PASSWORD_CHANGED);
+        verify(auditLogService).success(AuditAction.PASSWORD_RESET_SUCCESS, user.getId(), "test@example.com");
+    }
+
+    @Test
+    void resetPassword_wrongOtp_doesNotChangePasswordOrRevoke() {
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        doThrow(new InvalidOtpException("Wrong OTP for user"))
+                .when(verificationTokenService)
+                .consumeOtp(user, TokenType.PASSWORD_RESET, "000000", AuditAction.PASSWORD_RESET_FAILED);
+
+        assertThatThrownBy(() -> authService.resetPassword(resetRequest("000000")))
+                .isInstanceOf(InvalidOtpException.class);
+
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any());
+        verify(tokenService, never()).revokeAllUserTokens(any(), any());
+        assertThat(user.getPasswordHash()).isEqualTo("hashed-password");
+    }
+
+    @Test
+    void resetPassword_userNotFound_throwsAndNeverConsumesOtp() {
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword(resetRequest("123456")))
+                .isInstanceOf(OtpNotFoundException.class);
+
+        verify(verificationTokenService, never()).consumeOtp(any(), any(), any(), any());
+        verify(userRepository, never()).save(any());
+    }
+
+
 
 
 }

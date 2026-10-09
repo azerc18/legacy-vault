@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.authservice;
 
+import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
@@ -8,17 +9,16 @@ import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
+import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.exception.EmailAlreadyExistsException;
-import com.ltld.app.legacyvault.exception.InvalidCredentialException;
-import com.ltld.app.legacyvault.exception.LockedAccountException;
-import com.ltld.app.legacyvault.exception.NotActiveUserException;
+import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +39,7 @@ public class AuthServiceImpl implements AuthService{
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
+    private static final String DUMMY_HASH = new BCryptPasswordEncoder().encode("dummy-code");
 
 
     @Override
@@ -48,6 +49,7 @@ public class AuthServiceImpl implements AuthService{
 
         if (userRepository.existsByEmail(email)) {
             auditLogService.failure(AuditAction.REGISTER, null, email, "email already exists");
+            passwordEncoder.matches(request.getPassword(), DUMMY_HASH);
             throw new EmailAlreadyExistsException("Email already exists.");
         }
 
@@ -62,7 +64,7 @@ public class AuthServiceImpl implements AuthService{
                 .build());
 
         auditLogService.success(AuditAction.REGISTER, saved.getId(), email);
-        verificationTokenService.issueOtp(saved);
+        verificationTokenService.issueOtp(saved, TokenType.EMAIL_VERIFICATION);
     }
 
     @Override
@@ -73,7 +75,7 @@ public class AuthServiceImpl implements AuthService{
     public LoginResult login(LoginRequest request, String ipAddress, String userAgent) {
         String email = request.getEmail().trim().toLowerCase();
 
-        User user = userRepository.findByEmail(email).orElse(null);
+        User user = userRepository.findByEmailForUpdate(email).orElse(null);
         if (user == null) {
             auditLogService.failure(AuditAction.LOGIN_FAILED, null, email, "unknown email");
             throw new InvalidCredentialException();
@@ -144,5 +146,30 @@ public class AuthServiceImpl implements AuthService{
     @Override
     public LoginResult refresh(String rawRefreshToken, String ipAddress, String userAgent) {
         return tokenService.refreshAccessToken(rawRefreshToken, ipAddress, userAgent);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = {InvalidOtpException.class,
+            TooManyAttemptsException.class, ExpiredOtpException.class})
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+        User user = userRepository.findByEmailForUpdate(email).orElse(null);
+
+        if (user == null || user.getStatus() != UserStatus.ACTIVE) {
+            auditLogService.failure(AuditAction.PASSWORD_RESET_FAILED,
+                    user == null ? null : user.getId(), email, "user not found or not active");
+            throw new OtpNotFoundException("OTP not found");
+        }
+
+        verificationTokenService.consumeOtp(user, TokenType.PASSWORD_RESET,
+                request.getOtp(), AuditAction.PASSWORD_RESET_FAILED);
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+
+        tokenService.revokeAllUserTokens(user.getId(), RevokedReason.PASSWORD_CHANGED);
+        auditLogService.success(AuditAction.PASSWORD_RESET_SUCCESS, user.getId(), email);
     }
 }
