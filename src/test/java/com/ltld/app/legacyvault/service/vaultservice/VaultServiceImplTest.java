@@ -6,10 +6,13 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,9 +38,13 @@ class VaultServiceImplTest {
     @Mock
     private DigitalAssetRepository digitalAssetRepository;
     @Mock
+    private LegalDocumentRepository legalDocumentRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private CryptoService cryptoService;
+    @Mock
+    private FileStorageService fileStorageService;
     @Mock
     private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
 
@@ -52,6 +60,7 @@ class VaultServiceImplTest {
         ownerId = UUID.randomUUID();
         mockOwner = new User();
         mockOwner.setId(ownerId);
+        mockOwner.setEmail("owner@test.com");
     }
 
     // Kịch bản 1: Tạo Vault và tài sản số thành công (Mô phỏng FR-01)
@@ -101,11 +110,14 @@ class VaultServiceImplTest {
         vault.setStatus(VaultStatus.ACTIVE);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(digitalAssetRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
+        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
 
         vaultService.deleteVault(vaultId, ownerId);
 
-        // Đảm bảo phải tìm tài sản để xóa trước, rồi mới xóa vault sau
+        // Đảm bảo phải tìm tài sản và tài liệu để xóa trước, rồi mới xóa vault sau
         verify(digitalAssetRepository, times(1)).findByVaultId(vaultId);
+        verify(legalDocumentRepository, times(1)).findByVaultId(vaultId);
         verify(vaultRepository, times(1)).delete(vault);
     }
 
@@ -122,8 +134,8 @@ class VaultServiceImplTest {
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
 
-        // Bắt lỗi phải là RuntimeException
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        // Bắt lỗi phải là VaultException
+        Exception exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 

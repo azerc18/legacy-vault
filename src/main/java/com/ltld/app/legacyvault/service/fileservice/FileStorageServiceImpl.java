@@ -19,19 +19,39 @@ public class FileStorageServiceImpl implements FileStorageService {
     @Override
     public String storeFile(MultipartFile originalFile, byte[] encryptedContent) throws Exception {
         // 1. Tạo thư mục uploads/ nếu nó chưa tồn tại trên máy chủ
-        Path uploadPath = Paths.get(uploadDir);
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
 
-        // 2. Tạo tên file mới để tránh bị trùng tên (Ví dụ: abcd-1234_dichuc.pdf)
-        String fileName = UUID.randomUUID().toString() + "_" + originalFile.getOriginalFilename();
-        Path filePath = uploadPath.resolve(fileName);
+        // 2. Bảo mật: KHÔNG dùng getOriginalFilename() trực tiếp để tránh Path Traversal.
+        String originalFilename = originalFile.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String safeFileName = UUID.randomUUID().toString() + extension;
+        Path targetLocation = uploadPath.resolve(safeFileName).normalize();
+
+        if (!targetLocation.startsWith(uploadPath)) {
+            throw new RuntimeException("Security Error: Cannot store file outside current directory.");
+        }
 
         // 3. Ghi mảng byte (đã được mã hóa) xuống ổ cứng
-        Files.write(filePath, encryptedContent);
+        Files.write(targetLocation, encryptedContent);
 
         // 4. Trả về đường dẫn của file để lát nữa chúng ta lưu vào Database
-        return filePath.toString();
+        return targetLocation.toString();
+    }
+
+    @Override
+    public void deleteFile(String filePath) {
+        if (filePath == null || filePath.trim().isEmpty()) return;
+        try {
+            Path fileToDelete = Paths.get(filePath).toAbsolutePath().normalize();
+            Files.deleteIfExists(fileToDelete);
+        } catch (Exception e) {
+            System.err.println("Failed to delete file: " + filePath);
+        }
     }
 }

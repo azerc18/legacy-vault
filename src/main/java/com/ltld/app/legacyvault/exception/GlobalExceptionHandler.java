@@ -79,6 +79,13 @@ public class GlobalExceptionHandler {
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(Map.of("message", "Please try again later " + ex.getRetryAfterSeconds() + " seconds"));
     }
+
+    @ExceptionHandler(VaultException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultException(VaultException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleGlobalException(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

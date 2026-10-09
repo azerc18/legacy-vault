@@ -4,7 +4,10 @@ import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.DocumentType;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.*;
 class DocumentServiceImplTest {
 
     @Mock private LegalDocumentRepository legalDocumentRepository;
+    @Mock private UserRepository userRepository;
     @Mock private VaultRepository vaultRepository;
     @Mock private CryptoService cryptoService;
     @Mock private FileStorageService fileStorageService;
@@ -39,7 +43,7 @@ class DocumentServiceImplTest {
     private Vault mockVault;
     private UUID ownerId;
     private UUID vaultId;
-    private MockMultipartFile mockFile; // Dùng cái này để giả lập file do user ném lên
+    private MockMultipartFile mockFile;
 
     @BeforeEach
     void setUp() {
@@ -48,10 +52,12 @@ class DocumentServiceImplTest {
 
         mockOwner = new User();
         mockOwner.setId(ownerId);
+        mockOwner.setEmail("owner@example.com");
 
         mockVault = new Vault();
         mockVault.setId(vaultId);
         mockVault.setOwner(mockOwner);
+        mockVault.setStatus(VaultStatus.ACTIVE);
 
         // Giả lập một file tên là dichuc.pdf
         mockFile = new MockMultipartFile(
@@ -68,8 +74,12 @@ class DocumentServiceImplTest {
         when(cryptoService.encryptBytes(any(byte[].class))).thenReturn(encryptedBytes);
         when(fileStorageService.storeFile(any(), any(byte[].class))).thenReturn(savedPath);
 
-        // Mẹo: Trả về chính cái object bị nhét vào hàm save
-        when(legalDocumentRepository.save(any(LegalDocument.class))).thenAnswer(i -> i.getArgument(0));
+        // Mẹo: Trả về chính cái object bị nhét vào hàm save, và set ID giả
+        when(legalDocumentRepository.save(any(LegalDocument.class))).thenAnswer(i -> {
+            LegalDocument doc = i.getArgument(0);
+            doc.setId(UUID.randomUUID());
+            return doc;
+        });
 
         LegalDocument result = documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile);
 
@@ -89,10 +99,12 @@ class DocumentServiceImplTest {
         mockVault.setOwner(fakeOwner); // Cố tình đổi chủ
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        // Mock userRepository cho trường hợp attacker tra cứu email của chính mình
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Phải văng lỗi
+        // Phải văng lỗi VaultException (không còn là RuntimeException chung chung)
         assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(VaultException.class)
                 .hasMessageContaining("Unauthorized");
 
         // Và đương nhiên file không bao giờ được phép đem đi mã hóa hay lưu

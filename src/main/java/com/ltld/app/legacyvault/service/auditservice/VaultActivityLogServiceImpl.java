@@ -1,46 +1,96 @@
 package com.ltld.app.legacyvault.service.auditservice;
 
-import com.ltld.app.legacyvault.entity.VaultActivityLog;
+import com.ltld.app.legacyvault.dto.auditdto.VaultActivityLogResponse;
+import com.ltld.app.legacyvault.entity.AuditLog;
+import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.ActionType;
-import com.ltld.app.legacyvault.repository.VaultActivityLogRepository;
+import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.repository.AuditLogRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class VaultActivityLogServiceImpl implements VaultActivityLogService {
 
-    private final VaultActivityLogRepository vaultActivityLogRepository;
+    private final AuditLogRepository auditLogRepository;
+    private final VaultRepository vaultRepository;
 
     @Override
-    public void logAction(UUID userId, UUID vaultId, ActionType actionType, String description, String ipAddress) {
-        User user = new User();
-        user.setId(userId);
+    @Transactional(readOnly = true)
+    public Page<VaultActivityLogResponse> getVaultActivityLogs(UUID vaultId, UUID requesterId, Instant startDate, Instant endDate, Pageable pageable) {
+        // 1. Kiểm tra vault tồn tại
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        Vault vault = null;
-        if (vaultId != null) {
-            vault = new Vault();
-            vault.setId(vaultId);
+        // 2. Phân quyền: Chỉ chủ vault mới xem được
+        if (!vault.getOwner().getId().equals(requesterId)) {
+            throw new VaultException("Unauthorized: You don't have permission to view logs for this vault", HttpStatus.FORBIDDEN);
         }
 
-        VaultActivityLog log = VaultActivityLog.builder()
-                .user(user)
-                .vault(vault)
-                .actionType(actionType)
-                .description(description)
-                .ipAddress(ipAddress)
-                .build();
+        // 3. Truy vấn logs từ AuditLog (không cần bảng thứ hai)
+        Page<AuditLog> logs = auditLogRepository.findVaultActivity(vaultId, startDate, endDate, pageable);
 
-        vaultActivityLogRepository.save(log);
+        // 4. Map sang Response & Masking Identity
+        return logs.map(log -> mapToResponse(log, vault.getOwner().getId()));
     }
 
-    @Override
-    public List<VaultActivityLog> getUserLogs(UUID userId) {
-        return vaultActivityLogRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    private VaultActivityLogResponse mapToResponse(AuditLog log, UUID vaultOwnerId) {
+        return VaultActivityLogResponse.builder()
+                .id(log.getId())
+                .action(log.getAction())
+                .actorName(maskActorName(log.getActor(), vaultOwnerId))
+                .description(buildDescription(log))
+                .ipAddress(maskIpAddress(log.getActor(), vaultOwnerId, log.getIpAddress()))
+                .createdAt(log.getCreatedAt())
+                .build();
+    }
+
+    private String maskActorName(User actor, UUID vaultOwnerId) {
+        if (actor == null) return "Hệ thống";
+        if (actor.getId().equals(vaultOwnerId)) return "Bạn";
+
+        boolean isAdmin = false;
+        boolean isExecutor = false;
+        if (actor.getRoles() != null) {
+            for (Role role : actor.getRoles()) {
+                if ("ADMIN".equals(role.getName())) isAdmin = true;
+                if ("EXECUTOR".equals(role.getName())) isExecutor = true;
+            }
+        }
+        if (isAdmin) return "Quản trị viên hệ thống";
+        if (isExecutor) return "Người thi hành: " + actor.getFullName();
+        return "Người dùng khác";
+    }
+
+    private String maskIpAddress(User actor, UUID vaultOwnerId, String ipAddress) {
+        if (ipAddress == null) return null;
+        if (actor != null && actor.getId().equals(vaultOwnerId)) {
+            return ipAddress; // Chủ két thấy IP đầy đủ
+        }
+        return "***.***.***.***"; // Che giấu IP nếu không phải chủ két
+    }
+
+    private String buildDescription(AuditLog log) {
+        String detail = null;
+        if (log.getMetadata() != null && log.getMetadata().containsKey("detail")) {
+            detail = (String) log.getMetadata().get("detail");
+        }
+        return switch (log.getAction()) {
+            case VAULT_CREATED -> "Khởi tạo két sắt mới.";
+            case VAULT_DELETED -> "Xóa két sắt thành công.";
+            case VAULT_DELETE_DENIED -> "Từ chối xóa két sắt: " + (detail != null ? detail : "");
+            case DOCUMENT_UPLOADED -> "Tải lên tài liệu mới thành công.";
+            default -> "Thực hiện hành động: " + log.getAction();
+        };
     }
 }
