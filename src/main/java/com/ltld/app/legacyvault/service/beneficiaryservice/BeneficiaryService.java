@@ -2,7 +2,12 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 
+import java.util.List;
 import java.util.UUID;
 
 public interface BeneficiaryService {
@@ -13,4 +18,30 @@ public interface BeneficiaryService {
      * Tái sử dụng phiên PENDING còn hiệu lực (15 phút) thay vì tạo mới.
      */
     BeneficiaryClaimResponse initializeClaim(BeneficiaryClaimRequest request, UUID currentUserId);
+
+    /**
+     * FR-17: Gửi OTP qua email cho phiên xác thực PENDING của Beneficiary.
+     * Lỗi: 404 (không phải beneficiary), 400/409/410 (vault hoặc claim không hợp lệ,
+     * hoặc chưa có phiên PENDING), 423 (đã bị khóa), 429 (gửi lại quá sớm).
+     */
+    void sendIdentityOtp(BeneficiaryClaimRequest request, UUID currentUserId);
+
+    /**
+     * FR-17: Xác thực danh tính bằng OTP hoặc mock eKYC.
+     * Sai quá số lần cho phép thì phiên chuyển FAILED và Beneficiary bị tạm khóa (423),
+     * cần Admin hỗ trợ. Thành công thì mở phiên xem tài sản trong một khoảng thời gian.
+     */
+    VerifyIdentityResponse verifyIdentity(VerifyIdentityRequest request, UUID currentUserId);
+
+    /**
+     * FR-17: Danh sách tài sản còn hiệu lực trong Vault (chỉ thông tin tóm tắt).
+     * Yêu cầu phiên xác thực SUCCESS còn trong thời gian xem, nếu không trả 403.
+     */
+    List<InheritedAssetSummaryResponse> getInheritedAssets(UUID vaultId, UUID currentUserId);
+
+    /**
+     * FR-17: Chi tiết một tài sản, secret và ghi chú được giải mã tạm thời cho phiên xem.
+     * Yêu cầu phiên xác thực SUCCESS còn trong thời gian xem, nếu không trả 403.
+     */
+    InheritedAssetDetailResponse getInheritedAssetDetail(UUID vaultId, UUID assetId, UUID currentUserId);
 }

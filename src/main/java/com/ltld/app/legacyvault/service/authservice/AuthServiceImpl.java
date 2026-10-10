@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Set;
 
 @Service
@@ -55,12 +56,14 @@ public class AuthServiceImpl implements AuthService{
 
         Role defaultRole = roleRepository.findByCode("OWNER")
                 .orElseThrow(() -> new RuntimeException("Default role not found in database."));
+        Role beneficiaryRole = roleRepository.findByCode("BENEFICIARY")
+                .orElseThrow(() -> new RuntimeException("Beneficiary role not found in database."));
 
         User saved = userRepository.save(User.builder()
                 .email(email)
                 .fullName(request.getFullName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .roles(Set.of(defaultRole))
+                .roles(new HashSet<>(Set.of(defaultRole, beneficiaryRole)))
                 .build());
 
         auditLogService.success(AuditAction.REGISTER, saved.getId(), email);
