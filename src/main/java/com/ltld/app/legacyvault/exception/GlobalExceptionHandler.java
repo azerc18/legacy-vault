@@ -139,4 +139,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler({NotAssignedVerifierException.class, ConflictOfInterestException.class})
+    public ResponseEntity<ApiResponse<Void>> handleVerifierForbidden(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(VaultStateConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultStateConflict(VaultStateConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
