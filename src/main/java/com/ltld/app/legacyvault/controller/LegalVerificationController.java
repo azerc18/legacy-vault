@@ -1,9 +1,9 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.DocumentVerificationResponseDto;
-import com.ltld.app.legacyvault.dto.RejectVerificationRequestDto;
-import com.ltld.app.legacyvault.dto.SignVerificationRequestDto;
-import com.ltld.app.legacyvault.dto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.service.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
@@ -19,11 +19,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@PreAuthorize("hasAuthority('LEGAL_REVIEW')")
+@PreAuthorize("hasRole('LEGAL_VERIFIER') and hasAuthority('LEGAL_REVIEW')")
 @RestController
 @RequestMapping("/api/verifier/requests")
 @RequiredArgsConstructor
-
 public class LegalVerificationController {
 
     private final LegalVerificationService service;

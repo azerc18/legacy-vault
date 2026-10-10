@@ -1,9 +1,9 @@
 package com.ltld.app.legacyvault.legalverificationtest;
 
-import com.ltld.app.legacyvault.dto.DocumentVerificationResponseDto;
-import com.ltld.app.legacyvault.dto.RejectVerificationRequestDto;
-import com.ltld.app.legacyvault.dto.SignVerificationRequestDto;
-import com.ltld.app.legacyvault.dto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;

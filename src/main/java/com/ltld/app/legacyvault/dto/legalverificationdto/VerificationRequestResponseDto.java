@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.dto;
+package com.ltld.app.legacyvault.dto.legalverificationdto;
 
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import lombok.AllArgsConstructor;
