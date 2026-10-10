@@ -44,4 +44,14 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     @Query("SELECT COALESCE(v.attemptCount, 0) FROM IdentityVerification v WHERE v.id = :id")
     int findAttemptCountById(@Param("id") UUID id);
 
+    // FR-17: tổng lượt thử của các phiên PENDING khác trong 24h gần nhất (chống lách bằng phiên mới)
+    @Query("SELECT COALESCE(SUM(v.attemptCount), 0) FROM IdentityVerification v " +
+            "WHERE v.vault.id = :vaultId AND v.beneficiary.id = :beneficiaryId " +
+            "AND v.status = com.ltld.app.legacyvault.enums.VerificationStatus.PENDING " +
+            "AND v.id <> :excludeId AND v.createdAt > :after")
+    int sumAttemptsOfOtherPendingSessions(@Param("vaultId") UUID vaultId,
+                                          @Param("beneficiaryId") UUID beneficiaryId,
+                                          @Param("excludeId") UUID excludeId,
+                                          @Param("after") LocalDateTime after);
+
 }

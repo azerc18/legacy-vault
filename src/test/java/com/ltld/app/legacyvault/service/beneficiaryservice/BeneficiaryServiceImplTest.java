@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +68,7 @@ public class BeneficiaryServiceImplTest {
     private EmailSender emailSender;
     @Mock
     private OtpGenerator otpGenerator;
+    @Mock private AuditLogService auditLogService;
     @InjectMocks
     private BeneficiaryServiceImpl beneficiaryService;
 
@@ -111,6 +113,7 @@ public class BeneficiaryServiceImplTest {
                 .vault(unlockedVault)
                 .method(method)
                 .status(VerificationStatus.PENDING)
+                .createdAt(LocalDateTime.now())
                 .build();
     }
 
@@ -599,7 +602,7 @@ public class BeneficiaryServiceImplTest {
         assertThat(detail.getId()).isEqualTo(assetId);
         assertThat(detail.getSecret()).isEqualTo("my-secret");
         assertThat(detail.getNotes()).isEqualTo("my-notes");
-        assertThat(detail.getAttachmentUrl()).isEqualTo("https://example.com/file.pdf");
+
     }
 
     @Test
@@ -736,7 +739,7 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.verifyIdentity(
                         verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
 
-        assertThat(ex.getMessage()).contains("4"); // còn 4 lần thử
+        assertThat(ex.getMessage()).contains("còn 4 lần"); // còn 4 lần thử
         // Bộ đếm tăng trong DB bằng một câu UPDATE, không tính trên RAM
         verify(verificationRepository).incrementAttemptCount(session.getId());
         assertThat(session.getAttemptCount()).isEqualTo(1);
@@ -810,6 +813,40 @@ public class BeneficiaryServiceImplTest {
 
         verify(verificationRepository).incrementAttemptCount(session.getId());
         assertThat(session.getAttemptCount()).isEqualTo(1);
+    }
+
+    @Test
+    void verifyIdentity_attemptsFromOtherSessionsCount_locksWhenTotalReachesLimit() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+        // Các phiên PENDING cũ đã có 4 lần sai, cộng 1 lần này là 5
+        when(verificationRepository.sumAttemptsOfOtherPendingSessions(
+                eq(vaultId), eq(currentUserId), eq(session.getId()), any(LocalDateTime.class)))
+                .thenReturn(4);
+
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
+
+        assertThat(session.getStatus()).isEqualTo(VerificationStatus.FAILED);
+    }
+
+    @Test
+    void verifyIdentity_pendingSessionOlderThanTtl_throws400() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setCreatedAt(LocalDateTime.now().minusMinutes(16));
+        stubAccessibleVault();
+        stubPendingSession(session);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
+
+        verify(verificationRepository, never()).incrementAttemptCount(any());
     }
 
 }

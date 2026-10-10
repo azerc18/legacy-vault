@@ -1,6 +1,8 @@
 package com.ltld.app.legacyvault.utility;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+
 
 /**
  * Mock dịch vụ eKYC (SRS BR-07): không gọi nhà cung cấp thật.
@@ -10,7 +12,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class MockKycVerifier {
 
+    @Value("${app.kyc.mock.enabled:false}")
+    private boolean enabled;
+
     public boolean verify(String idNumber) {
-        return idNumber != null && idNumber.matches("\\d{12}");
+        return enabled && idNumber != null && idNumber.matches("\\d{12}");
     }
 }

@@ -6,11 +6,13 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -88,6 +90,10 @@ public class BeneficiaryController {
 
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController
     private UUID currentUserId(Principal principal) {
-        return UUID.fromString(principal.getName());
+        try {
+            return UUID.fromString(principal.getName());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BeneficiaryException("Unauthorized", HttpStatus.UNAUTHORIZED);
+        }
     }
 }

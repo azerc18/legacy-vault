@@ -294,4 +294,17 @@ public class BeneficiaryControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
+    @Test
+    void sendIdentityOtp_principalIsNotUuid_returns401() throws Exception {
+        Principal principal = () -> "not-a-uuid";
+
+        mockMvc.perform(post("/api/beneficiaries/verifications/otp")
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validRequest())))
+                .andExpect(status().isUnauthorized());
+
+        verify(beneficiaryService, never()).sendIdentityOtp(any(), any());
+    }
+
 }

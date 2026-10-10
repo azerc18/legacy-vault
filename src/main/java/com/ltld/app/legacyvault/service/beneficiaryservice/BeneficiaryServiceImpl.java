@@ -11,16 +11,13 @@ import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationMethod;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
@@ -66,6 +63,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final EmailSender emailSender;
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
+    private final AuditLogService auditLogService;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -180,11 +178,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log
         emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
+        auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
+                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
     }
 
-    // noRollbackFor: số lần sai phải được lưu dù method ném BeneficiaryException,
-    // nếu không transaction rollback và giới hạn số lần thử vô tác dụng
-    // noRollbackFor: số lần thử phải được lưu dù method ném BeneficiaryException
+
     @Override
     @Transactional(noRollbackFor = BeneficiaryException.class)
     public VerifyIdentityResponse verifyIdentity(VerifyIdentityRequest request, UUID currentUserId) {
@@ -221,10 +219,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         int attempts = verificationRepository.findAttemptCountById(verification.getId());
         // Đồng bộ entity với DB, nếu không lần lưu sau sẽ ghi đè bằng số đếm cũ
         verification.setAttemptCount(attempts);
+        int totalAttempts = attempts + verificationRepository.sumAttemptsOfOtherPendingSessions(
+                vault.getId(), currentUserId, verification.getId(), now.minusHours(24));
 
         // 3. Hết lượt: không chấm đáp án nữa, kể cả khi đáp án đúng
-        if (attempts > MAX_VERIFY_ATTEMPTS) {
+        if (totalAttempts > MAX_VERIFY_ATTEMPTS) {
             lockSession(verification);
+            auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
+                    vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }
 
@@ -234,12 +236,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 : mockKycVerifier.verify(request.getKycIdNumber());
 
         if (!passed) {
-            if (attempts >= MAX_VERIFY_ATTEMPTS) {
+            auditLogService.log(AuditAction.IDENTITY_VERIFY_FAILED, AuditResult.FAILURE, currentUserId,
+                    vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(),
+                    "method=" + request.getVerificationMethod() + ", attempt=" + totalAttempts);
+            if (totalAttempts >= MAX_VERIFY_ATTEMPTS) {
                 lockSession(verification);
+                auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
+                        vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
                 throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
             }
             throw new BeneficiaryException(
-                    "Xác thực không thành công. Bạn còn " + (MAX_VERIFY_ATTEMPTS - attempts) + " lần thử.",
+                    "Xác thực không thành công. Bạn còn " + (MAX_VERIFY_ATTEMPTS - totalAttempts) + " lần thử.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -248,6 +255,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setVerifiedAt(now);
         clearOtp(verification);
         verificationRepository.save(verification);
+
+        auditLogService.log(AuditAction.IDENTITY_VERIFIED, AuditResult.SUCCESS, currentUserId,
+                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(),
+                "method=" + request.getVerificationMethod());
 
         return VerifyIdentityResponse.builder()
                 .verificationId(verification.getId())
@@ -284,15 +295,15 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
                 .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
 
+        InheritedAssetDetailResponse response;
         try {
             // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
-            return InheritedAssetDetailResponse.builder()
+            response = InheritedAssetDetailResponse.builder()
                     .id(asset.getId())
                     .assetType(asset.getAssetType())
                     .assetName(asset.getAssetName())
                     .secret(cryptoService.decrypt(asset.getEncryptedSecret()))
                     .notes(cryptoService.decrypt(asset.getNotesEncrypted()))
-                    .attachmentUrl(asset.getAttachmentUrl())
                     .build();
         } catch (Exception e) {
             // Không log dữ liệu đã giải mã, chỉ log id tài sản
@@ -300,6 +311,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(
                     "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+
+        // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
+        auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
+                vault.getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
+        return response;
     }
 
     // ===================== Helper dùng chung cho FR-17 =====================
@@ -345,10 +361,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     }
 
     private IdentityVerification findPendingSession(UUID vaultId, UUID currentUserId, VerificationMethod method) {
-        return verificationRepository
+        IdentityVerification v = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusOrderByCreatedAtDesc(
                         vaultId, currentUserId, method, VerificationStatus.PENDING)
                 .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
+        if (v.getCreatedAt().isBefore(LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES))) {
+            throw new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST);
+        }
+        return v;
     }
 
     // Phiên xem hợp lệ = có phiên SUCCESS với verifiedAt trong VIEW_SESSION_MINUTES gần nhất
