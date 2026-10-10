@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.dto;
+package com.ltld.app.legacyvault.dto.legalverificationdto;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
