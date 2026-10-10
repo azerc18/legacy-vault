@@ -1,12 +1,14 @@
 package com.ltld.app.legacyvault.dto.beneficiarydto;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.ToString;
 
-@Data
+@Getter
 @Builder
+@ToString(exclude = "content")
 public class AssetDownloadResponse {
-    private String fileName;
+    private final String fileName;
     // Nội dung đã giải mã, chỉ tồn tại trong bộ nhớ để gửi về client, không lưu lại
-    private byte[] content;
+    private final byte[] content;
 }

@@ -342,6 +342,47 @@ public class BeneficiaryControllerTest {
     }
 
     @Test
+    void downloadInheritedAsset_vietnameseName_contentDispositionUsesRfc5987() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadInheritedAsset(vaultId, assetId, userId)).thenReturn(
+                AssetDownloadResponse.builder()
+                        .fileName("Tài khoản Vietcombank.txt")
+                        .content("x".getBytes(StandardCharsets.UTF_8))
+                        .build());
+
+        MvcResult result = mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download", vaultId, assetId)
+                                .principal(principal))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("attachment")
+                .contains("filename*=UTF-8''T%C3%A0i");
+    }
+
+    @Test
+    void downloadInheritedAsset_acceptTextPlain_errorStillReadable() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadInheritedAsset(vaultId, assetId, userId))
+                .thenThrow(new BeneficiaryException("Không tìm thấy", HttpStatus.NOT_FOUND));
+
+        mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download", vaultId, assetId)
+                                .principal(principal)
+                                .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void downloadInheritedAsset_noViewSession_returns403Json() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadInheritedAsset(any(), any(), any()))

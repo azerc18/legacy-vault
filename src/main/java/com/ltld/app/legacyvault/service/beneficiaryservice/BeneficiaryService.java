@@ -1,6 +1,12 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 
 import java.util.List;
 import java.util.UUID;

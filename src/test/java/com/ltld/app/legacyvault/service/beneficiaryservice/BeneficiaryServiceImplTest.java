@@ -1095,4 +1095,39 @@ public class BeneficiaryServiceImplTest {
                 any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    void assetDownloadResponse_toString_doesNotContainContent() {
+        AssetDownloadResponse r = AssetDownloadResponse.builder()
+                .fileName("a.txt")
+                .content("my-secret".getBytes(StandardCharsets.UTF_8))
+                .build();
+        assertThat(r.toString()).doesNotContain("content").contains("a.txt");
+    }
+
+    @Test
+    void downloadInheritedAsset_locked_throws423AndNoDecrypt() {
+        UUID assetId = UUID.randomUUID();
+        stubVaultAndClaim();
+        stubLocked(true);
+
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void downloadInheritedAsset_vaultClaimed_throws409() {
+        UUID assetId = UUID.randomUUID();
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
 }

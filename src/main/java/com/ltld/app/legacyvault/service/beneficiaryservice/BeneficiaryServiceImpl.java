@@ -1,23 +1,8 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
-import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.IdentityVerification;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationMethod;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -29,17 +14,19 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -61,6 +48,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final String NOT_READY_MSG = "Tài sản chưa sẵn sàng để nhận.";
     private static final String NO_SESSION_MSG = "Chưa có phiên xác thực. Vui lòng khởi tạo yêu cầu nhận tài sản trước.";
     private static final String LOCKED_MSG = "Truy cập đã bị tạm khóa do xác thực sai nhiều lần. Vui lòng liên hệ Admin để được hỗ trợ.";
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final DateTimeFormatter EXPORT_TIME_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
 
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
@@ -200,7 +190,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
                 vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
     }
-
 
     @Override
     @Transactional(noRollbackFor = BeneficiaryException.class)
@@ -348,7 +337,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
-
     // Kết quả đã giải mã, dùng chung cho xem chi tiết (FR-17) và tải xuống (FR-18)
     private record DecryptedAsset(Vault vault, DigitalAsset asset, String secret, String notes) {
     }
@@ -387,7 +375,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 + "Loại tài sản: " + asset.getAssetType() + "\n"
                 + "Thông tin truy cập: " + decrypted.secret() + "\n"
                 + "Ghi chú: " + notes + "\n"
-                + "Xuất lúc: " + LocalDateTime.now().withNano(0) + "\n"
+                + "Xuất lúc: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
                 + "\n"
                 + "Vui lòng lưu giữ thông tin này an toàn và xóa tệp sau khi đã lưu.\n";
     }
@@ -396,7 +384,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private String toSafeFileName(String assetName) {
         String base = (assetName == null ? "" : assetName)
                 .replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_")
-                .trim();
+                .trim()
+                .replaceAll("[. ]+$", "");
         if (base.isEmpty()) {
             return "asset";
         }
@@ -406,8 +395,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
     }
-
-
     // ===================== Helper dùng chung cho FR-17 =====================
 
     // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
