@@ -8,22 +8,27 @@ import com.ltld.app.legacyvault.entity.DigitalSignature;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VerificationRequestVault;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
+import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.LegalVerificationService;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDate;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +36,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class LegalVerificationServiceImpl implements LegalVerificationService {
+
+    private static final int CLAIM_TIMEOUT_DAYS = 60; // BR-04
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
@@ -54,6 +61,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     public VerificationRequestResponseDto approve(UUID requestId, UUID verifierId) {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
+        assertNoConflictOfInterest(request, verifierId);
 
         request.setStatus(LegalVerificationStatus.APPROVED);
         request.setDecidedAt(LocalDateTime.now());
@@ -62,11 +70,13 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         return toDto(requestRepository.save(request));
     }
 
+    // UC12: từ chối hồ sơ
     @Override
     @Transactional
     public VerificationRequestResponseDto reject(UUID requestId, UUID verifierId, RejectVerificationRequestDto dto) {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
+        assertNoConflictOfInterest(request, verifierId);
 
         request.setStatus(LegalVerificationStatus.REJECTED);
         request.setRejectionReason(dto.getReason());
@@ -91,7 +101,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
     }
 
-    // UC14: hồ sơ phải APPROVED và chưa ký mới được ký
+    // UC14: hồ sơ phải APPROVED, do chính verifier đã duyệt ký, và chưa ký
     @Override
     @Transactional
     public VerificationRequestResponseDto sign(UUID requestId, UUID verifierId, SignVerificationRequestDto dto) {
@@ -100,8 +110,29 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getStatus() != LegalVerificationStatus.APPROVED) {
             throw new RequestNotApprovedException("Hồ sơ phải được phê duyệt trước khi ký");
         }
+        // Chỉ verifier đã phê duyệt mới được ký
+        if (request.getVerifier() == null || !verifierId.equals(request.getVerifier().getId())) {
+            throw new NotAssignedVerifierException("Chỉ Legal Verifier đã phê duyệt hồ sơ mới được ký.");
+        }
         if (signatureRepository.existsByRequestId(requestId)) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó");
+        }
+
+        // Mọi Vault của hồ sơ phải ở trạng thái ACTIVE và thuộc đúng chủ sở hữu; sai một cái là hủy cả
+        List<VerificationRequestVault> links = requestVaultRepository.findByRequestIdFetchVault(requestId);
+        if (links.isEmpty()) {
+            throw new VaultStateConflictException("Hồ sơ không gắn với Vault nào.");
+        }
+        List<Vault> invalid = links.stream()
+                .map(VerificationRequestVault::getVault)
+                .filter(v -> v.getStatus() != VaultStatus.ACTIVE
+                        || v.getOwner() == null
+                        || !v.getOwner().getId().equals(request.getOwner().getId()))
+                .toList();
+        if (!invalid.isEmpty()) {
+            throw new VaultStateConflictException(
+                    "Có Vault không ở trạng thái cho phép mở khóa hoặc không thuộc chủ sở hữu của hồ sơ: "
+                            + invalid.stream().map(v -> String.valueOf(v.getId())).toList());
         }
 
         // Chữ ký giả lập: băm SHA-256 của (hồ sơ, người ký, phương thức, giấy chứng tử)
@@ -114,22 +145,24 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
         signatureRepository.save(signature);
 
-        // Mở khóa các Vault thuộc hồ sơ này, mỗi Vault ghi một dòng audit
+        // Mở khóa Vault, đặt hạn nhận 60 ngày, mỗi Vault ghi một dòng audit
         LocalDateTime now = LocalDateTime.now();
-        requestVaultRepository.findByRequestId(requestId).forEach(rv -> {
-            Vault vault = rv.getVault();
+        for (VerificationRequestVault link : links) {
+            Vault vault = link.getVault();
             vault.setStatus(VaultStatus.UNLOCKED);
             vault.setUnlockedAt(now);
+            vault.setClaimDeadlineAt(now.plusDays(CLAIM_TIMEOUT_DAYS));
 
             auditLogService.log(AuditAction.VAULT_UNLOCK, AuditResult.SUCCESS, verifierId, null,
                     "Vault",
                     vault.getId() == null ? null : vault.getId().toString(),
                     "unlocked by legal verifier, request " + requestId);
-        });
+        }
 
         return toDto(request);
     }
 
+    // UC15: lịch sử, lọc tùy chọn theo trạng thái và khoảng ngày
     @Override
     @Transactional(readOnly = true)
     public List<VerificationRequestResponseDto> getHistory(
@@ -166,6 +199,14 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private void assertPending(LegalVerificationRequest request) {
         if (request.getStatus() != LegalVerificationStatus.PENDING) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
+        }
+    }
+
+    // Verifier không được xử lý hồ sơ của chính mình (là chủ sở hữu hoặc executor)
+    private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
+        if (verifierId.equals(request.getOwner().getId())
+                || verifierId.equals(request.getExecutor().getId())) {
+            throw new ConflictOfInterestException("Bạn không được xử lý hồ sơ có liên quan đến chính mình.");
         }
     }
 
