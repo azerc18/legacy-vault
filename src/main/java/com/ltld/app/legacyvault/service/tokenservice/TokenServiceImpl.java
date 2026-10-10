@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -136,6 +137,11 @@ public class TokenServiceImpl implements TokenService {
             throw new LockedAccountException();
         }
 
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
+            auditLogService.failure(AuditAction.TOKEN_REFRESH_FAILED, user.getId(), null, "account temporarily locked");
+            throw new LockedAccountException();
+        }
+
         if(stored.getRevokedReason() == RevokedReason.ROTATED) {
             int revoked = refreshTokenRepository.revokeAllActiveByUserId(
                     user.getId(), Instant.now(), RevokedReason.REUSE_DETECTED);
@@ -153,14 +159,14 @@ public class TokenServiceImpl implements TokenService {
         if (stored.getExpiresAt().isBefore(Instant.now())) {
             stored.setRevokedAt(Instant.now());
             stored.setRevokedReason(RevokedReason.EXPIRED);
-            refreshTokenRepository.save(stored);
+            refreshTokenRepository.saveAndFlush(stored);
             auditLogService.failure(AuditAction.TOKEN_REFRESH_FAILED, user.getId(), null, "expired");
             throw new InvalidRefreshTokenException("Refresh token has expired. Please login again.");
         }
 
         stored.setRevokedAt(Instant.now());
         stored.setRevokedReason(RevokedReason.ROTATED);
-        refreshTokenRepository.save(stored);
+        refreshTokenRepository.saveAndFlush(stored);
 
         String newAccessToken  = generateAccessToken(user);
         String newRefreshToken = generateRefreshToken(user, ipAddress, userAgent);
@@ -174,5 +180,11 @@ public class TokenServiceImpl implements TokenService {
                 .build();
 
         return new LoginResult(response, newRefreshToken);
+    }
+
+    @Override
+    @Transactional
+    public int revokeAllUserTokens(UUID userId, RevokedReason reason) {
+        return refreshTokenRepository.revokeAllActiveByUserId(userId, Instant.now(), reason);
     }
 }
