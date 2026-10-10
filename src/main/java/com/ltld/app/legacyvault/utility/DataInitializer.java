@@ -82,7 +82,7 @@ public class DataInitializer {
         mapping.put("LEGAL_VERIFIER", List.of("VAULT_READ", "LEGAL_REVIEW"));
         mapping.put("ADMIN", List.of(
                 "VAULT_CREATE", "VAULT_READ", "VAULT_DELETE",
-                "EXECUTOR_MANAGE", "LEGAL_REVIEW", "ADMIN_MANAGE", "ASSET_DOWNLOAD"
+                "EXECUTOR_MANAGE", "ADMIN_MANAGE", "ASSET_DOWNLOAD"
         ));
 
         mapping.forEach((roleCode, authCodes) -> {
