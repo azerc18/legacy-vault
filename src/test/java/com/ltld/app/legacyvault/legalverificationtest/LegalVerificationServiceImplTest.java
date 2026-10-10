@@ -8,15 +8,21 @@ import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
+import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.impl.LegalVerificationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,11 +30,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,17 +61,19 @@ public class LegalVerificationServiceImplTest {
 
     private UUID requestId;
     private UUID verifierId;
+    private UUID ownerId;
     private LegalVerificationRequest pendingRequest;
 
     @BeforeEach
     void setUp() {
         requestId = UUID.randomUUID();
         verifierId = UUID.randomUUID();
+        ownerId = UUID.randomUUID();
 
         pendingRequest = LegalVerificationRequest.builder()
                 .id(requestId)
-                .owner(User.builder().fullName("Test Owner").build())
-                .executor(User.builder().fullName("Test Executor").build())
+                .owner(User.builder().id(ownerId).fullName("Test Owner").build())
+                .executor(User.builder().id(UUID.randomUUID()).fullName("Test Executor").build())
                 .deathCertificateFileUrlEncrypted("enc://test.pdf")
                 .status(LegalVerificationStatus.PENDING)
                 .build();
@@ -112,6 +118,18 @@ public class LegalVerificationServiceImplTest {
         verify(requestRepository, never()).save(any());
     }
 
+    @Test
+    void reject_verifierIsExecutor_throwsConflictOfInterest() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
+        dto.setReason("test");
+
+        assertThatThrownBy(() -> service.reject(requestId, pendingRequest.getExecutor().getId(), dto))
+                .isInstanceOf(ConflictOfInterestException.class);
+
+        verify(requestRepository, never()).save(any());
+    }
+
     // ---------- approve (UC12) ----------
 
     @Test
@@ -138,28 +156,49 @@ public class LegalVerificationServiceImplTest {
         verify(requestRepository, never()).save(any());
     }
 
+    @Test
+    void approve_verifierIsOwner_throwsConflictOfInterest() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.approve(requestId, ownerId))
+                .isInstanceOf(ConflictOfInterestException.class);
+
+        verify(requestRepository, never()).save(any());
+    }
+
     // ---------- sign (UC14) ----------
 
-    @Test
-    void sign_success_savesSignatureAndUnlocksVault() {
-        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
-        Vault vault = Vault.builder().status(VaultStatus.ACTIVE).build();
-        VerificationRequestVault link = VerificationRequestVault.builder()
-                .request(pendingRequest)
-                .vault(vault)
-                .build();
-
+    private SignVerificationRequestDto signDto() {
         SignVerificationRequestDto dto = new SignVerificationRequestDto();
         dto.setMethod(SignatureMethod.MOCK_OTP);
         dto.setCode("123456");
+        return dto;
+    }
+
+    private void approvedByVerifier() {
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        pendingRequest.setVerifier(User.builder().id(verifierId).build());
+    }
+
+    private Vault vaultOf(VaultStatus status) {
+        return Vault.builder().status(status).owner(pendingRequest.getOwner()).build();
+    }
+
+    @Test
+    void sign_success_savesSignatureUnlocksVaultAndSetsClaimDeadline() {
+        approvedByVerifier();
+        Vault vault = vaultOf(VaultStatus.ACTIVE);
+        VerificationRequestVault link = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(vault).build();
 
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
-        when(requestVaultRepository.findByRequestId(requestId)).thenReturn(List.of(link));
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
-        service.sign(requestId, verifierId, dto);
+        service.sign(requestId, verifierId, signDto());
 
         assertThat(vault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(vault.getUnlockedAt()).isNotNull();
+        assertThat(vault.getClaimDeadlineAt()).isEqualTo(vault.getUnlockedAt().plusDays(60));
         verify(signatureRepository, times(1)).save(any());
         verify(auditLogService, times(1)).log(
                 eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
@@ -171,30 +210,77 @@ public class LegalVerificationServiceImplTest {
         // pendingRequest đang PENDING, chưa được duyệt
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
-        SignVerificationRequestDto dto = new SignVerificationRequestDto();
-        dto.setMethod(SignatureMethod.MOCK_OTP);
-        dto.setCode("123456");
-
-        assertThatThrownBy(() -> service.sign(requestId, verifierId, dto))
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
                 .isInstanceOf(RequestNotApprovedException.class);
 
         verify(signatureRepository, never()).save(any());
-        verify(requestVaultRepository, never()).findByRequestId(any());
+        verifyNoInteractions(requestVaultRepository, auditLogService);
+    }
+
+    @Test
+    void sign_differentVerifier_throwsNotAssignedAndDoesNotSign() {
+        approvedByVerifier();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sign(requestId, UUID.randomUUID(), signDto()))
+                .isInstanceOf(NotAssignedVerifierException.class);
+
+        verify(signatureRepository, never()).save(any());
         verifyNoInteractions(auditLogService);
     }
 
     @Test
     void sign_alreadySigned_throwsAndDoesNotSignAgain() {
-        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        approvedByVerifier();
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
         when(signatureRepository.existsByRequestId(requestId)).thenReturn(true);
 
-        SignVerificationRequestDto dto = new SignVerificationRequestDto();
-        dto.setMethod(SignatureMethod.MOCK_OTP);
-        dto.setCode("123456");
-
-        assertThatThrownBy(() -> service.sign(requestId, verifierId, dto))
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
                 .isInstanceOf(RequestAlreadyReviewedException.class);
+
+        verify(signatureRepository, never()).save(any());
+    }
+
+    @Test
+    void sign_vaultNotActive_throwsAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        Vault archived = vaultOf(VaultStatus.ARCHIVED_LOCKED);
+        VerificationRequestVault link = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(archived).build();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        assertThat(archived.getStatus()).isEqualTo(VaultStatus.ARCHIVED_LOCKED);
+        verify(signatureRepository, never()).save(any());
+    }
+
+    @Test
+    void sign_vaultOfAnotherOwner_throwsConflict() {
+        approvedByVerifier();
+        Vault foreign = Vault.builder().status(VaultStatus.ACTIVE)
+                .owner(User.builder().id(UUID.randomUUID()).build()).build();
+        VerificationRequestVault link = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(foreign).build();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+    }
+
+    @Test
+    void sign_noVaultLinked_throwsConflict() {
+        approvedByVerifier();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
     }
@@ -228,7 +314,6 @@ public class LegalVerificationServiceImplTest {
     }
 
     // ---------- UC15: getHistory ----------
-
 
     @Test
     void getHistory_noFilter_returnsAllRequestsHandledByVerifier() {
