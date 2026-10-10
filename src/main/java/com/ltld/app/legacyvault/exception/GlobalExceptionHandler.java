@@ -115,5 +115,25 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Request conflict. Please try again."));
     }
 
+    @ExceptionHandler(VerificationRequestNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationRequestNotFound(
+            VerificationRequestNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(RequestAlreadyReviewedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestAlreadyReviewed(
+            RequestAlreadyReviewedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(RequestNotApprovedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestNotApproved(
+            RequestNotApprovedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 
 }
