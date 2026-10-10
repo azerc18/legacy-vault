@@ -6,10 +6,7 @@ import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationMethod;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
@@ -30,8 +27,6 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.utility.EmailSender;
@@ -377,8 +372,10 @@ public class BeneficiaryServiceImplTest {
         assertEquals(HttpStatus.GONE, ex.getStatus());
     }
 
+
     @Test
     void initializeClaim_differentMethodThanPendingSession_createsNewVerification() {
+        when(mockKycVerifier.isEnabled()).thenReturn(true);
         request.setVerificationMethod(VerificationMethod.EKYC_MOCK);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
@@ -522,6 +519,7 @@ public class BeneficiaryServiceImplTest {
 
     @Test
     void verifyIdentity_ekycIdMissing_throws400() {
+        when(mockKycVerifier.isEnabled()).thenReturn(true);
         IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
         stubAccessibleVault();
         stubPendingSession(session);
@@ -787,6 +785,7 @@ public class BeneficiaryServiceImplTest {
 
     @Test
     void verifyIdentity_ekycValid_marksSuccess() {
+        when(mockKycVerifier.isEnabled()).thenReturn(true);
         IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
         stubAccessibleVault();
         stubPendingSession(session);
@@ -801,6 +800,7 @@ public class BeneficiaryServiceImplTest {
 
     @Test
     void verifyIdentity_ekycInvalid_reservesAttempt() {
+        when(mockKycVerifier.isEnabled()).thenReturn(true);
         IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
         stubAccessibleVault();
         stubPendingSession(session);
@@ -847,6 +847,123 @@ public class BeneficiaryServiceImplTest {
                         verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
 
         verify(verificationRepository, never()).incrementAttemptCount(any());
+    }
+
+    @Test
+    void verifyIdentity_ekycWhenMockDisabled_throws400_andNoAttemptCounted() {
+        IdentityVerification session = pendingSession(VerificationMethod.EKYC_MOCK);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(mockKycVerifier.isEnabled()).thenReturn(false);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.EKYC_MOCK, null, "123456789012"), currentUserId));
+
+        verify(verificationRepository, never()).incrementAttemptCount(any());
+    }
+
+    @Test
+    void initializeClaim_ekycWhenMockDisabled_throws400_andNoSessionCreated() {
+        request.setVerificationMethod(VerificationMethod.EKYC_MOCK);
+        stubVaultAndClaim();
+        when(mockKycVerifier.isEnabled()).thenReturn(false);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.initializeClaim(request, currentUserId));
+
+        verify(verificationRepository, never()).save(any());
+    }
+
+    @Test
+    void sendIdentityOtp_sessionAboutToExpire_throws400() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setCreatedAt(LocalDateTime.now().minusMinutes(12)); // còn 3 phút < 5 phút của một OTP
+        stubAccessibleVault();
+        stubPendingSession(session);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+
+        verify(emailSender, never()).sendEmail(any(), any());
+    }
+
+    @Test
+    void sendIdentityOtp_success_auditsOtpSent() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(otpGenerator.generate()).thenReturn("123456");
+
+        beneficiaryService.sendIdentityOtp(request, currentUserId);
+
+        verify(auditLogService).log(eq(AuditAction.IDENTITY_OTP_SENT), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), isNull());
+    }
+
+    @Test
+    void verifyIdentity_wrong_auditsVerifyFailedWithAttempt() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
+
+        verify(auditLogService).log(eq(AuditAction.IDENTITY_VERIFY_FAILED), eq(AuditResult.FAILURE),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), contains("attempt=1"));
+    }
+
+    @Test
+    void verifyIdentity_lock_auditsIdentityLocked() {
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(5);
+
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.verifyIdentity(
+                        verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
+
+        verify(auditLogService).log(eq(AuditAction.IDENTITY_LOCKED), eq(AuditResult.FAILURE),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), contains("attempts=5"));
+    }
+
+    @Test
+    void getInheritedAssetDetail_success_auditsAssetViewed() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt(any())).thenReturn("plain");
+
+        beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+
+        verify(auditLogService).log(eq(AuditAction.ASSET_VIEWED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("DigitalAsset"), eq(assetId.toString()), isNull());
+    }
+
+    @Test
+    void getInheritedAssetDetail_decryptFails_doesNotAuditAssetViewed() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt(any())).thenThrow(new RuntimeException("boom"));
+
+        expectError(HttpStatus.INTERNAL_SERVER_ERROR,
+                () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
+
+        verify(auditLogService, never()).log(eq(AuditAction.ASSET_VIEWED),
+                any(), any(), any(), any(), any(), any());
     }
 
 }

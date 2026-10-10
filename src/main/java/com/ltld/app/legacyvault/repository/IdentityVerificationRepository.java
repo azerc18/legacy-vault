@@ -44,7 +44,11 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     @Query("SELECT COALESCE(v.attemptCount, 0) FROM IdentityVerification v WHERE v.id = :id")
     int findAttemptCountById(@Param("id") UUID id);
 
-    // FR-17: tổng lượt thử của các phiên PENDING khác trong 24h gần nhất (chống lách bằng phiên mới)
+    /**
+     * FR-17: cộng lượt thử của các phiên PENDING khác (cùng vault, beneficiary) tạo trong 24h gần nhất,
+     * để tạo phiên mới không reset được giới hạn. Thực tế là giới hạn 5 lần sai / 24h,
+     * không phải khóa vĩnh viễn ngay từ lần đầu. Chấp nhận với OTP 6 số.
+     */
     @Query("SELECT COALESCE(SUM(v.attemptCount), 0) FROM IdentityVerification v " +
             "WHERE v.vault.id = :vaultId AND v.beneficiary.id = :beneficiaryId " +
             "AND v.status = com.ltld.app.legacyvault.enums.VerificationStatus.PENDING " +

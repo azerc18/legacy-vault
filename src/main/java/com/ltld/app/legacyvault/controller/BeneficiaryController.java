@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.security.Principal;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/beneficiaries")
+@PreAuthorize("hasRole('BENEFICIARY')")
 @RequiredArgsConstructor
 public class BeneficiaryController {
 
@@ -75,6 +77,7 @@ public class BeneficiaryController {
     }
 
     // FR-17: Chi tiết một tài sản đã giải mã tạm thời. Không cho trình duyệt/proxy cache dữ liệu nhạy cảm
+    @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping("/vaults/{vaultId}/assets/{assetId}")
     public ResponseEntity<ApiResponse<InheritedAssetDetailResponse>> getInheritedAssetDetail(
             Principal principal,
@@ -93,7 +96,7 @@ public class BeneficiaryController {
         try {
             return UUID.fromString(principal.getName());
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new BeneficiaryException("Unauthorized", HttpStatus.UNAUTHORIZED);
+            throw new BeneficiaryException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
         }
     }
 }

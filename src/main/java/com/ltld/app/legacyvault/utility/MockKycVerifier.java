@@ -15,6 +15,11 @@ public class MockKycVerifier {
     @Value("${app.kyc.mock.enabled:false}")
     private boolean enabled;
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    // Giữ "enabled &&" làm lớp phòng thủ thứ hai (fail-closed), dù service đã chặn từ trước
     public boolean verify(String idNumber) {
         return enabled && idNumber != null && idNumber.matches("\\d{12}");
     }

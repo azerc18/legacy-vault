@@ -11,7 +11,13 @@ import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationMethod;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -120,6 +126,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException("Thời hạn yêu cầu nhận tài sản đã kết thúc.", HttpStatus.GONE);
         }
 
+        if (request.getVerificationMethod() == VerificationMethod.EKYC_MOCK && !mockKycVerifier.isEnabled()) {
+            throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
+        }
+
         // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
         IdentityVerification verification = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
@@ -161,6 +171,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 findPendingSession(vault.getId(), currentUserId, VerificationMethod.OTP);
 
         LocalDateTime now = LocalDateTime.now();
+
+        // Không gửi OTP khi phiên không còn đủ thời gian cho một OTP trọn vẹn
+        LocalDateTime sessionEnd = verification.getCreatedAt().plusMinutes(VERIFICATION_TTL_MINUTES);
+        if (now.plusMinutes(OTP_TTL_MINUTES).isAfter(sessionEnd)) {
+            throw new BeneficiaryException(
+                    "Phiên xác thực sắp hết hạn. Vui lòng khởi tạo lại yêu cầu nhận tài sản.", HttpStatus.BAD_REQUEST);
+        }
 
         // Chặn gửi lại quá nhanh, dựa vào thời điểm gửi lần trước được lưu tường minh
         if (verification.getOtpSentAt() != null
@@ -208,8 +225,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 throw new BeneficiaryException(
                         "OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP.", HttpStatus.BAD_REQUEST);
             }
-        } else if (request.getKycIdNumber() == null) {
-            throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
+        } else {
+            if (!mockKycVerifier.isEnabled()) {
+                throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
+            }
+            if (request.getKycIdNumber() == null) {
+                throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
+            }
         }
 
         // 2. GIỮ CHỖ một lượt thử TRƯỚC khi chấm đáp án. UPDATE khóa dòng nên các request song song

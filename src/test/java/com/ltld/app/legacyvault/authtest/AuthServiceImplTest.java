@@ -66,7 +66,7 @@ public class AuthServiceImplTest {
 
 
     private Role ownerRole;
-
+    private Role beneficiaryRole;
     private User user;
 
     private ResetPasswordRequest resetRequest(String otp) {
@@ -76,7 +76,7 @@ public class AuthServiceImplTest {
     @BeforeEach
     void setUp() {
         ownerRole = Role.builder().code("OWNER").build();
-
+        beneficiaryRole = Role.builder().code("BENEFICIARY").build();
         user = User.builder()
                 .id(UUID.randomUUID())
                 .email("test@example.com")
@@ -110,6 +110,7 @@ public class AuthServiceImplTest {
 
         when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
         when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
         when(passwordEncoder.encode(request.getPassword())).thenReturn("hashed-password");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
@@ -126,7 +127,7 @@ public class AuthServiceImplTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@example.com");
         assertThat(savedUser.getFullName()).isEqualTo(request.getFullName());
         assertThat(savedUser.getPasswordHash()).isEqualTo("hashed-password");
-        assertThat(savedUser.getRoles()).containsExactly(ownerRole);
+        assertThat(savedUser.getRoles()).containsExactlyInAnyOrder(ownerRole, beneficiaryRole);
 
         verify(verificationTokenService).issueOtp(savedUser, TokenType.EMAIL_VERIFICATION);
         verify(auditLogService).success(AuditAction.REGISTER, savedUser.getId(), "test@example.com");
@@ -139,6 +140,7 @@ public class AuthServiceImplTest {
 
         when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
         when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
         when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
