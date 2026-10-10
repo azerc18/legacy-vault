@@ -9,6 +9,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -21,10 +22,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/beneficiaries")
@@ -89,6 +94,26 @@ public class BeneficiaryController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(detail));
+    }
+
+    // FR-18: Tải xuống thông tin tài sản đã giải mã dưới dạng tệp. Không cho cache dữ liệu nhạy cảm.
+    @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
+    @GetMapping("/vaults/{vaultId}/assets/{assetId}/download")
+    public ResponseEntity<byte[]> downloadInheritedAsset(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        AssetDownloadResponse file =
+                beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId(principal));
+
+        return ResponseEntity.ok()
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.getFileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(file.getContent());
     }
 
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController

@@ -29,6 +29,7 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -309,6 +311,50 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     @Transactional(readOnly = true)
     public InheritedAssetDetailResponse getInheritedAssetDetail(UUID vaultId, UUID assetId, UUID currentUserId) {
+        DecryptedAsset decrypted = loadDecryptedAsset(vaultId, assetId, currentUserId);
+        DigitalAsset asset = decrypted.asset();
+
+        InheritedAssetDetailResponse response = InheritedAssetDetailResponse.builder()
+                .id(asset.getId())
+                .assetType(asset.getAssetType())
+                .assetName(asset.getAssetName())
+                .secret(decrypted.secret())
+                .notes(decrypted.notes())
+                .build();
+
+        // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
+        auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
+                decrypted.vault().getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
+        return response;
+    }
+
+    // FR-18: tải xuống thông tin tài sản đã giải mã dưới dạng tệp .txt
+    @Override
+    @Transactional(readOnly = true)
+    public AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId) {
+        // Kiểm tra lại phiên xác thực còn hiệu lực (SRS FR-18 bước 2) nằm trong loadDecryptedAsset
+        DecryptedAsset decrypted = loadDecryptedAsset(vaultId, assetId, currentUserId);
+        DigitalAsset asset = decrypted.asset();
+
+        String content = buildDownloadContent(decrypted);
+
+        // SRS FR-18 bước 5: ghi log tải xuống, chỉ sau khi giải mã thành công, không đưa dữ liệu rõ vào log
+        auditLogService.log(AuditAction.ASSET_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
+                decrypted.vault().getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
+
+        return AssetDownloadResponse.builder()
+                .fileName(toSafeFileName(asset.getAssetName()) + ".txt")
+                .content(content.getBytes(StandardCharsets.UTF_8))
+                .build();
+    }
+
+
+    // Kết quả đã giải mã, dùng chung cho xem chi tiết (FR-17) và tải xuống (FR-18)
+    private record DecryptedAsset(Vault vault, DigitalAsset asset, String secret, String notes) {
+    }
+
+    // Kiểm tra quyền, trạng thái, khóa, phiên xem rồi giải mã trong bộ nhớ
+    private DecryptedAsset loadDecryptedAsset(UUID vaultId, UUID assetId, UUID currentUserId) {
         Vault vault = loadAccessibleVault(vaultId, currentUserId);
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
@@ -317,28 +363,50 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
                 .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
 
-        InheritedAssetDetailResponse response;
         try {
             // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
-            response = InheritedAssetDetailResponse.builder()
-                    .id(asset.getId())
-                    .assetType(asset.getAssetType())
-                    .assetName(asset.getAssetName())
-                    .secret(cryptoService.decrypt(asset.getEncryptedSecret()))
-                    .notes(cryptoService.decrypt(asset.getNotesEncrypted()))
-                    .build();
+            return new DecryptedAsset(vault, asset,
+                    cryptoService.decrypt(asset.getEncryptedSecret()),
+                    cryptoService.decrypt(asset.getNotesEncrypted()));
         } catch (Exception e) {
             // Không log dữ liệu đã giải mã, chỉ log id tài sản
             log.error("Decrypt failed for asset {}", asset.getId(), e);
             throw new BeneficiaryException(
                     "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
-        // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
-        auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
-        return response;
     }
+
+    private String buildDownloadContent(DecryptedAsset decrypted) {
+        DigitalAsset asset = decrypted.asset();
+        String notes = decrypted.notes() == null || decrypted.notes().isBlank()
+                ? "(không có)" : decrypted.notes();
+
+        return "LegacyVault - Thông tin tài sản thừa kế\n"
+                + "========================================\n"
+                + "Tên tài sản: " + asset.getAssetName() + "\n"
+                + "Loại tài sản: " + asset.getAssetType() + "\n"
+                + "Thông tin truy cập: " + decrypted.secret() + "\n"
+                + "Ghi chú: " + notes + "\n"
+                + "Xuất lúc: " + LocalDateTime.now().withNano(0) + "\n"
+                + "\n"
+                + "Vui lòng lưu giữ thông tin này an toàn và xóa tệp sau khi đã lưu.\n";
+    }
+
+    // Tên tài sản do người dùng nhập nên phải làm sạch trước khi đặt tên tệp (chống header injection, ký tự cấm)
+    private String toSafeFileName(String assetName) {
+        String base = (assetName == null ? "" : assetName)
+                .replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_")
+                .trim();
+        if (base.isEmpty()) {
+            return "asset";
+        }
+        // Cắt tối đa 80 ký tự theo code point để không làm hỏng ký tự đặc biệt
+        return base.codePoints()
+                .limit(80)
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
+                .toString();
+    }
+
 
     // ===================== Helper dùng chung cho FR-17 =====================
 

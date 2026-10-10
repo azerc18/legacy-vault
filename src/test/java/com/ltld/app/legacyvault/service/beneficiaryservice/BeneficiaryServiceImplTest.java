@@ -13,6 +13,7 @@ import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -963,6 +965,133 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
 
         verify(auditLogService, never()).log(eq(AuditAction.ASSET_VIEWED),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    // ===================== FR-18: tải xuống =====================
+
+    private void stubDownloadableAsset(UUID assetId, String name) throws Exception {
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, name, AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt("enc-secret")).thenReturn("my-secret");
+        when(cryptoService.decrypt("enc-notes")).thenReturn("my-notes");
+    }
+
+    @Test
+    void downloadInheritedAsset_success_returnsDecryptedTextFile() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubDownloadableAsset(assetId, "Vietcombank");
+
+        AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        String content = new String(file.getContent(), StandardCharsets.UTF_8);
+        assertThat(file.getFileName()).isEqualTo("Vietcombank.txt");
+        assertThat(content).contains("Vietcombank").contains("my-secret").contains("my-notes");
+    }
+
+    @Test
+    void downloadInheritedAsset_noNotes_showsPlaceholder() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        DigitalAsset noNotes = asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT);
+        noNotes.setNotesEncrypted(null);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(noNotes));
+        when(cryptoService.decrypt("enc-secret")).thenReturn("my-secret");
+
+        AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        assertThat(new String(file.getContent(), StandardCharsets.UTF_8)).contains("(không có)");
+    }
+
+    @Test
+    void downloadInheritedAsset_dangerousAssetName_fileNameIsSanitized() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubDownloadableAsset(assetId, "../etc/passwd\r\nX-Evil: 1");
+
+        AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        assertThat(file.getFileName()).doesNotContain("/", "\\", "\r", "\n", ":").endsWith(".txt");
+    }
+
+    @Test
+    void downloadInheritedAsset_veryLongName_isTruncated() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubDownloadableAsset(assetId, "A".repeat(200));
+
+        AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        assertThat(file.getFileName()).hasSize(84); // 80 ký tự + ".txt"
+    }
+
+    @Test
+    void downloadInheritedAsset_blankName_usesDefaultFileName() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubDownloadableAsset(assetId, "   ");
+
+        AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        assertThat(file.getFileName()).isEqualTo("asset.txt");
+    }
+
+    @Test
+    void downloadInheritedAsset_success_auditsDownloadNotView() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubDownloadableAsset(assetId, "Vietcombank");
+
+        beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        verify(auditLogService).log(eq(AuditAction.ASSET_DOWNLOADED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("DigitalAsset"), eq(assetId.toString()), isNull());
+        verify(auditLogService, never()).log(eq(AuditAction.ASSET_VIEWED),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void downloadInheritedAsset_noViewSession_throws403AndTouchesNothing() {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        verifyNoInteractions(digitalAssetRepository);
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void downloadInheritedAsset_assetNotInVault_throws404() {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        expectError(HttpStatus.NOT_FOUND,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        verifyNoInteractions(cryptoService);
+    }
+
+    @Test
+    void downloadInheritedAsset_decryptFails_throws500AndDoesNotAudit() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt(any())).thenThrow(new RuntimeException("boom"));
+
+        BeneficiaryException ex = expectError(HttpStatus.INTERNAL_SERVER_ERROR,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        assertThat(ex.getMessage()).doesNotContain("enc-secret").doesNotContain("boom");
+        verify(auditLogService, never()).log(eq(AuditAction.ASSET_DOWNLOADED),
                 any(), any(), any(), any(), any(), any());
     }
 
