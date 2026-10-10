@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,42 @@ class BeneficiaryControllerSecurityTest {
     @Test
     void detail_beneficiaryWithAssetDownload_returns200() throws Exception {
         mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}", UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void download_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}/download",
+                        UUID.randomUUID(), UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void download_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).downloadInheritedAsset(any(), any(), any());
+    }
+
+    @Test
+    void download_beneficiaryWithoutAssetDownload_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).downloadInheritedAsset(any(), any(), any());
+    }
+
+    @Test
+    void download_beneficiaryWithAssetDownload_returns200() throws Exception {
+        when(beneficiaryService.downloadInheritedAsset(any(), any(), any())).thenReturn(
+                AssetDownloadResponse.builder().fileName("a.txt").content("data".getBytes()).build());
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
                         .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
                 .andExpect(status().isOk());
     }
