@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
@@ -44,4 +45,13 @@ public interface BeneficiaryService {
      * Yêu cầu phiên xác thực SUCCESS còn trong thời gian xem, nếu không trả 403.
      */
     InheritedAssetDetailResponse getInheritedAssetDetail(UUID vaultId, UUID assetId, UUID currentUserId);
+
+    /**
+     * FR-18: Tải xuống thông tin truy cập của một tài sản (đã giải mã) dưới dạng tệp văn bản.
+     * Kiểm tra lại phiên xác thực: hết hạn thì trả 403 và yêu cầu xác thực lại.
+     * Lỗi: 404 (không phải beneficiary hoặc không có tài sản), 423 (đã bị khóa),
+     * 400/409/410 (vault hoặc claim không hợp lệ), 500 (giải mã thất bại).
+     * Ghi audit ASSET_DOWNLOADED sau khi giải mã thành công.
+     */
+    AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId);
 }

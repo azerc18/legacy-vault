@@ -1,27 +1,16 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
@@ -89,6 +78,27 @@ public class BeneficiaryController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(detail));
+    }
+
+    // FR-18: Tải xuống thông tin tài sản đã giải mã dưới dạng tệp. Không cho cache dữ liệu nhạy cảm.
+    @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
+    @GetMapping(value = "/vaults/{vaultId}/assets/{assetId}/download",
+            produces = {MediaType.TEXT_PLAIN_VALUE, MediaType.APPLICATION_JSON_VALUE})
+    public ResponseEntity<byte[]> downloadInheritedAsset(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        AssetDownloadResponse file =
+                beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId(principal));
+
+        return ResponseEntity.ok()
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.getFileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(file.getContent());
     }
 
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController

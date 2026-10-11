@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -32,6 +33,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.error("Forbidden"));
     }
 
@@ -80,6 +82,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BeneficiaryException.class)
     public ResponseEntity<ApiResponse<Void>> handleBeneficiaryException(BeneficiaryException e) {
         return ResponseEntity.status(e.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(ApiResponse.error(e.getMessage()));
     }
 

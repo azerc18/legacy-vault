@@ -14,17 +14,20 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.UUID;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -33,6 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @WebMvcTest(BeneficiaryController.class)
 public class BeneficiaryControllerTest {
@@ -305,6 +309,104 @@ public class BeneficiaryControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verify(beneficiaryService, never()).sendIdentityOtp(any(), any());
+    }
+
+    // ===================== FR-18 =====================
+
+    @Test
+    void downloadInheritedAsset_success_returnsFileWithSafeHeaders() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadInheritedAsset(vaultId, assetId, userId)).thenReturn(
+                AssetDownloadResponse.builder()
+                        .fileName("Tai-khoan.txt")
+                        .content("noi dung da giai ma".getBytes(StandardCharsets.UTF_8))
+                        .build());
+
+        MvcResult result = mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download", vaultId, assetId)
+                                .principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("attachment").contains("Tai-khoan.txt");
+        assertThat(result.getResponse().getContentType()).startsWith("text/plain");
+        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .isEqualTo("noi dung da giai ma");
+    }
+
+    @Test
+    void downloadInheritedAsset_vietnameseName_contentDispositionUsesRfc5987() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadInheritedAsset(vaultId, assetId, userId)).thenReturn(
+                AssetDownloadResponse.builder()
+                        .fileName("Tài khoản Vietcombank.txt")
+                        .content("x".getBytes(StandardCharsets.UTF_8))
+                        .build());
+
+        MvcResult result = mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download", vaultId, assetId)
+                                .principal(principal))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("attachment")
+                .contains("filename*=UTF-8''T%C3%A0i");
+    }
+
+    @Test
+    void downloadInheritedAsset_acceptTextPlain_errorStillReadable() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID assetId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadInheritedAsset(vaultId, assetId, userId))
+                .thenThrow(new BeneficiaryException("Không tìm thấy", HttpStatus.NOT_FOUND));
+
+        mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download", vaultId, assetId)
+                                .principal(principal)
+                                .accept(MediaType.TEXT_PLAIN))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void downloadInheritedAsset_noViewSession_returns403Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.downloadInheritedAsset(any(), any(), any()))
+                .thenThrow(new BeneficiaryException("Cần xác thực danh tính trước khi xem tài sản.",
+                        HttpStatus.FORBIDDEN));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .principal(principal))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void downloadInheritedAsset_assetNotFound_returns404Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.downloadInheritedAsset(any(), any(), any()))
+                .thenThrow(new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .principal(principal))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
 }
