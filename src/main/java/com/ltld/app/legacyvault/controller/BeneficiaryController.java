@@ -101,6 +101,17 @@ public class BeneficiaryController {
                 .body(file.getContent());
     }
 
+    // FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault
+    @PostMapping("/vaults/{vaultId}/close")
+    public ResponseEntity<ApiResponse<CloseVaultResponse>> closeVault(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @Valid @RequestBody CloseVaultRequest request) {
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, request, currentUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Đã đóng hồ sơ nhận bàn giao.", response));
+    }
+
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController
     private UUID currentUserId(Principal principal) {
         try {

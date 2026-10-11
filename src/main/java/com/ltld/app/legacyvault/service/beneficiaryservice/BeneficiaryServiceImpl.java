@@ -51,6 +51,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
+    private static final String CONFIRM_REQUIRED_MSG = "Cần xác nhận lần cuối để đóng hồ sơ nhận bàn giao.";
+    private static final String NOT_ACCESSED_MSG = "Bạn cần xem hoặc tải xuống tài sản trước khi xác nhận đã nhận bàn giao.";
 
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
@@ -298,7 +300,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public InheritedAssetDetailResponse getInheritedAssetDetail(UUID vaultId, UUID assetId, UUID currentUserId) {
         DecryptedAsset decrypted = loadDecryptedAsset(vaultId, assetId, currentUserId);
         DigitalAsset asset = decrypted.asset();
@@ -319,7 +321,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // FR-18: tải xuống thông tin tài sản đã giải mã dưới dạng tệp .txt
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId) {
         // Kiểm tra lại phiên xác thực còn hiệu lực (SRS FR-18 bước 2) nằm trong loadDecryptedAsset
         DecryptedAsset decrypted = loadDecryptedAsset(vaultId, assetId, currentUserId);
@@ -337,6 +339,50 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // ===================== FR-19 =====================
+
+    @Override
+    @Transactional
+    public CloseVaultResponse closeVault(UUID vaultId, CloseVaultRequest request, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId);
+        assertNotLocked(vault.getId(), currentUserId);
+
+        // SRS FR-19 3a: chưa xác nhận lần cuối thì giữ nguyên trạng thái
+        if (!Boolean.TRUE.equals(request.getConfirmed())) {
+            throw new BeneficiaryException(CONFIRM_REQUIRED_MSG, HttpStatus.BAD_REQUEST);
+        }
+
+        // Đóng hồ sơ không hoàn tác được và khóa nội dung, nên yêu cầu phiên xác thực còn hiệu lực
+        assertViewSession(vault.getId(), currentUserId);
+
+        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId())
+                .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
+
+        // Precondition SRS FR-19: đã xem hoặc tải xuống tài sản. Vault không có tài sản thì được miễn.
+        boolean hasAssets = !digitalAssetRepository
+                .findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).isEmpty();
+        if (hasAssets && claim.getFirstAccessedAt() == null) {
+            throw new BeneficiaryException(NOT_ACCESSED_MSG, HttpStatus.BAD_REQUEST);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        claim.setStatus(ClaimStatus.CLAIMED);
+        claim.setClaimedAt(now);
+        vault.setStatus(VaultStatus.CLAIMED);
+        claimRepository.save(claim);
+        vaultRepository.save(vault);
+
+        auditLogService.log(AuditAction.CLAIM_COMPLETED, AuditResult.SUCCESS, currentUserId,
+                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
+
+        return CloseVaultResponse.builder()
+                .vaultId(vault.getId())
+                .vaultStatus(vault.getStatus())
+                .claimStatus(claim.getStatus())
+                .claimedAt(claim.getClaimedAt())
+                .build();
+    }
+
     // Kết quả đã giải mã, dùng chung cho xem chi tiết (FR-17) và tải xuống (FR-18)
     private record DecryptedAsset(Vault vault, DigitalAsset asset, String secret, String notes) {
     }
@@ -351,9 +397,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
                 .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
 
+        DecryptedAsset decrypted;
         try {
             // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
-            return new DecryptedAsset(vault, asset,
+            decrypted = new DecryptedAsset(vault, asset,
                     cryptoService.decrypt(asset.getEncryptedSecret()),
                     cryptoService.decrypt(asset.getNotesEncrypted()));
         } catch (Exception e) {
@@ -362,6 +409,20 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(
                     "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
+
+        // Chỉ ghi nhận khi giải mã thành công (điều kiện đóng hồ sơ ở FR-19)
+        markContentAccessed(vault.getId());
+        return decrypted;
+    }
+
+    // FR-19: ghi lại LẦN ĐẦU Beneficiary xem chi tiết hoặc tải xuống nội dung tài sản
+    private void markContentAccessed(UUID vaultId) {
+        claimRepository.findByVaultId(vaultId).ifPresent(claim -> {
+            if (claim.getFirstAccessedAt() == null) {
+                claim.setFirstAccessedAt(LocalDateTime.now());
+                claimRepository.save(claim);
+            }
+        });
     }
 
     private String buildDownloadContent(DecryptedAsset decrypted) {

@@ -1,20 +1,12 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.enums.VerificationMethod;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
-import com.ltld.app.legacyvault.enums.AssetType;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpStatus;
@@ -406,6 +398,75 @@ public class BeneficiaryControllerTest {
                         UUID.randomUUID(), UUID.randomUUID())
                         .principal(principal))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    // ===================== FR-19 =====================
+
+    @Test
+    void closeVault_success_passesPrincipalIdAndReturnsStatus() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.closeVault(eq(vaultId), any(), eq(userId))).thenReturn(
+                CloseVaultResponse.builder()
+                        .vaultId(vaultId)
+                        .vaultStatus(VaultStatus.CLAIMED)
+                        .claimStatus(ClaimStatus.CLAIMED)
+                        .claimedAt(LocalDateTime.now())
+                        .build());
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", vaultId)
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.vaultStatus").value("CLAIMED"))
+                .andExpect(jsonPath("$.data.claimStatus").value("CLAIMED"));
+    }
+
+    @Test
+    void closeVault_missingConfirmed_returns400() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(beneficiaryService, never()).closeVault(any(), any(), any());
+    }
+
+    @Test
+    void closeVault_contentNotAccessed_returns400Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.closeVault(any(), any(), any()))
+                .thenThrow(new BeneficiaryException(
+                        "Bạn cần xem hoặc tải xuống tài sản trước khi xác nhận đã nhận bàn giao.",
+                        HttpStatus.BAD_REQUEST));
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void closeVault_alreadyClaimed_returns409() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.closeVault(any(), any(), any()))
+                .thenThrow(new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT));
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
+                .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
     }
 

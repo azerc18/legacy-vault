@@ -1,12 +1,14 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -20,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -108,6 +111,36 @@ class BeneficiaryControllerSecurityTest {
         mockMvc.perform(get("/api/beneficiaries/vaults/{v}/assets/{a}/download",
                         UUID.randomUUID(), UUID.randomUUID())
                         .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void close_noToken_returns401() throws Exception {
+        mockMvc.perform(post("/api/beneficiaries/vaults/{v}/close", UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void close_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(post("/api/beneficiaries/vaults/{v}/close", UUID.randomUUID())
+                        .with(token("ROLE_OWNER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).closeVault(any(), any(), any());
+    }
+
+    @Test
+    void close_beneficiary_returns200() throws Exception {
+        when(beneficiaryService.closeVault(any(), any(), any())).thenReturn(
+                CloseVaultResponse.builder().build());
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{v}/close", UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true}"))
                 .andExpect(status().isOk());
     }
 }

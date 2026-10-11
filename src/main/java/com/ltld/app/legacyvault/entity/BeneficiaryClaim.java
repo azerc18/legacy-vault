@@ -42,4 +42,8 @@ public class BeneficiaryClaim {
 
     @Column(name = "claimed_at")
     private LocalDateTime claimedAt;
+
+    // FR-19: lần đầu Beneficiary xem chi tiết hoặc tải xuống nội dung tài sản (điều kiện để đóng hồ sơ)
+    @Column(name = "first_accessed_at")
+    private LocalDateTime firstAccessedAt;
 }

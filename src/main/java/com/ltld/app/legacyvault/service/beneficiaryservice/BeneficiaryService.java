@@ -1,12 +1,6 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -54,4 +48,13 @@ public interface BeneficiaryService {
      * Ghi audit ASSET_DOWNLOADED sau khi giải mã thành công.
      */
     AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId);
+
+    /**
+     * FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault (vault và claim chuyển CLAIMED).
+     * Yêu cầu: vault UNLOCKED, claim còn hạn, không bị khóa, confirmed = true, còn phiên xác thực,
+     * và đã xem chi tiết hoặc tải xuống ít nhất một tài sản (vault không có tài sản thì được miễn).
+     * Lỗi: 404 (không phải beneficiary), 400 (chưa xác nhận hoặc chưa xem tài sản),
+     * 403 (hết phiên xác thực), 409 (đã nhận), 410 (quá hạn), 423 (đã bị khóa).
+     */
+    CloseVaultResponse closeVault(UUID vaultId, CloseVaultRequest request, UUID currentUserId);
 }
