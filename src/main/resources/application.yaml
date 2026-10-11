@@ -45,3 +45,7 @@ app:
     # Thư mục lưu file upload. Khi deploy production, override bằng biến môi trường:
     # APP_STORAGE_UPLOAD_DIR=/data/legacyvault/uploads
     upload-dir: uploads/
+  security:
+    crypto:
+      master-key: ${CRYPTO_MASTER_KEY}
+

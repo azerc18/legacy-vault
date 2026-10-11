@@ -4,50 +4,77 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.SecureRandom;
 import java.util.Base64;
 
 @Service
 public class CryptoServiceImpl implements CryptoService {
 
-    // Lấy khóa Master Key (32 ký tự = 256 bits). Nếu trong application.yml bạn không cài đặt, nó sẽ lấy chuỗi dự phòng phía sau.
-    @Value("${app.security.crypto.master-key:12345678901234567890123456789012}")
-    private String masterKey;
+    private static final byte VERSION = 1;
+    private static final String TRANSFORMATION = "AES/GCM/NoPadding";
+    private static final int IV_LEN = 12;
+    private static final int TAG_BITS = 128;
+    private static final int HEADER_LEN = 1 + IV_LEN;
 
-    private static final String ALGORITHM = "AES";
+    private final SecretKeySpec key;
+    private final SecureRandom random = new SecureRandom();
+
+    // Không có giá trị mặc định: thiếu key thì app dừng ngay khi khởi động (fail-fast)
+    public CryptoServiceImpl(@Value("${app.security.crypto.master-key}") String base64Key) {
+        byte[] raw;
+        try {
+            raw = Base64.getDecoder().decode(base64Key.trim());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("app.security.crypto.master-key phải là chuỗi Base64", e);
+        }
+        if (raw.length != 32) {
+            throw new IllegalStateException("Master key phải đúng 32 byte (AES-256), hiện là " + raw.length);
+        }
+        this.key = new SecretKeySpec(raw, "AES");
+    }
 
     @Override
     public String encrypt(String plainText) throws Exception {
         if (plainText == null) return null;
-        // 1. Chuyển String thành byte -> 2. Mã hóa AES -> 3. Đổi mảng byte mã hóa ra Base64 String để lưu DB cho dễ
-        byte[] encrypted = encryptBytes(plainText.getBytes());
-        return Base64.getEncoder().encodeToString(encrypted);
+        return Base64.getEncoder().encodeToString(encryptBytes(plainText.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Override
     public String decrypt(String cipherText) throws Exception {
         if (cipherText == null) return null;
-        // 1. Chuyển Base64 String về lại byte -> 2. Giải mã AES -> 3. Đổi về dạng text
-        byte[] decrypted = decryptBytes(Base64.getDecoder().decode(cipherText));
-        return new String(decrypted);
+        return new String(decryptBytes(Base64.getDecoder().decode(cipherText)), StandardCharsets.UTF_8);
     }
 
     @Override
     public byte[] encryptBytes(byte[] plainBytes) throws Exception {
         if (plainBytes == null) return null;
-        SecretKeySpec key = new SecretKeySpec(masterKey.getBytes(), ALGORITHM);
-        Cipher cipher = Cipher.getInstance(ALGORITHM);
-        cipher.init(Cipher.ENCRYPT_MODE, key);
-        return cipher.doFinal(plainBytes);
+        byte[] iv = new byte[IV_LEN];
+        random.nextBytes(iv);                                   // IV mới cho MỖI lần mã hóa
+
+        Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+        cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, iv));
+        byte[] ct = cipher.doFinal(plainBytes);
+
+        return ByteBuffer.allocate(HEADER_LEN + ct.length)
+                .put(VERSION).put(iv).put(ct)
+                .array();
     }
 
     @Override
-    public byte[] decryptBytes(byte[] cipherBytes) throws Exception {
-        if (cipherBytes == null) return null;
-        SecretKeySpec key = new SecretKeySpec(masterKey.getBytes(), ALGORITHM);
-        Cipher cipher = Cipher.getInstance(ALGORITHM);
-        cipher.init(Cipher.DECRYPT_MODE, key);
-        return cipher.doFinal(cipherBytes);
+    public byte[] decryptBytes(byte[] data) throws Exception {
+        if (data == null) return null;
+        if (data.length < HEADER_LEN + TAG_BITS / 8 || data[0] != VERSION) {
+            throw new GeneralSecurityException("Bản mã không đúng định dạng hoặc phiên bản");
+        }
+        Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, data, 1, IV_LEN));
+        // Sai key hoặc dữ liệu bị sửa thì doFinal ném AEADBadTagException
+        return cipher.doFinal(data, HEADER_LEN, data.length - HEADER_LEN);
     }
 }
 

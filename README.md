@@ -46,6 +46,17 @@ Mở `.env` và điền giá trị thật:
 | `JWT_SECRET` | Khoá ký JWT - **không có giá trị mặc định**, bắt buộc phải set | chuỗi ngẫu nhiên dài, xem lệnh bên dưới |
 | `JWT_ACCESS_TOKEN_TTL_SECONDS` | Thời hạn access token (giây) | `900` (15 phút) |
 | `JWT_REFRESH_TOKEN_TTL_SECONDS` | Thời hạn refresh token (giây) | `604800` (7 ngày) |
+| `CRYPTO_MASTER_KEY` | Khóa AES-256 mã hóa secret và tài liệu (Base64, 32 byte), **bắt buộc**, không có mặc định | *(xem lệnh bên dưới)* |
+
+Sinh `CRYPTO_MASTER_KEY`:
+```bash
+openssl rand -base64 32
+```
+Windows PowerShell:
+```powershell
+$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
+```
+> Mất key này = mất toàn bộ dữ liệu đã mã hóa. Mỗi môi trường (dev/prod) dùng key riêng.
 
 Sinh nhanh một `JWT_SECRET` an toàn:
 ```bash

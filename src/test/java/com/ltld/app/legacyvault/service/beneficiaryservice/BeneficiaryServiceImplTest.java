@@ -1,50 +1,69 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
+import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationMethod;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
+import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.MockKycVerifier;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
-import com.ltld.app.legacyvault.utility.EmailSender;
-import com.ltld.app.legacyvault.utility.MockKycVerifier;
-import com.ltld.app.legacyvault.utility.OtpGenerator;
-import org.junit.jupiter.api.function.Executable;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class BeneficiaryServiceImplTest {
@@ -68,6 +87,8 @@ public class BeneficiaryServiceImplTest {
     @Mock private AuditLogService auditLogService;
     @InjectMocks
     private BeneficiaryServiceImpl beneficiaryService;
+    @Mock
+    private AssetAccessRecordRepository assetAccessRecordRepository;
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -1128,6 +1149,303 @@ public class BeneficiaryServiceImplTest {
 
         verifyNoInteractions(cryptoService);
         verifyNoInteractions(auditLogService);
+    }
+
+    // ===================== FR-19 =====================
+
+    // Vault UNLOCKED + claim còn hạn + chưa bị khóa; trả về claim để test kiểm tra thay đổi
+    private BeneficiaryClaim stubClaimForClose() {
+        BeneficiaryClaim claim = claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5));
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(claim));
+        stubLocked(false);
+        return claim;
+    }
+
+    private CloseVaultRequest closeRequest(Boolean confirmed) {
+        return closeRequest(confirmed, null);
+    }
+
+    private CloseVaultRequest closeRequest(Boolean confirmed, Boolean acknowledgeUnviewed) {
+        CloseVaultRequest r = new CloseVaultRequest();
+        r.setConfirmed(confirmed);
+        r.setAcknowledgeUnviewed(acknowledgeUnviewed);
+        return r;
+    }
+
+    private void stubDecryptableAsset(UUID assetId) throws Exception {
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt(any())).thenReturn("plain");
+    }
+
+    @Test
+    void closeVault_allViewed_closesWithoutAcknowledge() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        assertThat(claim.getClaimedAt()).isNotNull();
+        assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(response.getClaimStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        assertThat(response.getClaimedAt()).isEqualTo(claim.getClaimedAt());
+        verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()),
+                eq("unviewedCount=0, unviewedAssetIds=[]"));
+    }
+
+    @Test
+    void closeVault_notConfirmed_throws400AndChangesNothing() {
+        BeneficiaryClaim claim = stubClaimForClose();
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(false), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_noViewSession_throws403AndChangesNothing() {
+        stubClaimForClose();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_unviewedWithoutAcknowledge_throws409WithCount_andChangesNothing() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
+
+        BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(ex.getMessage()).contains("Còn 1 tài sản chưa xem");
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_unviewedAcknowledgeFalse_throws409() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true, false), currentUserId));
+
+        verify(claimRepository, never()).markClaimed(any(), any());
+    }
+
+    @Test
+    void closeVault_unviewedAcknowledged_closes_andAuditsUnviewedCountAndIds() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        UUID unviewedId = UUID.randomUUID();
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(asset(unviewedId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), detail.capture());
+        assertThat(detail.getValue()).contains("unviewedCount=1").contains(unviewedId.toString());
+    }
+
+    @Test
+    void closeVault_vaultWithoutAssets_closesWithoutAcknowledge() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
+    }
+
+    @Test
+    void closeVault_concurrent_secondCallGets409() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        // Request song song kia đã chuyển claim sang CLAIMED trước: câu UPDATE có điều kiện không khớp dòng nào
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(0);
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(vaultRepository, never()).save(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    // ----- FR-19: xem trước khi đóng hồ sơ -----
+
+    @Test
+    void previewClose_returnsTotalViewedAndUnviewedList_withoutDecrypting() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset a1 = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset a2 = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        DigitalAsset a3 = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(a1, a2, a3));
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(a2));
+
+        CloseVaultPreviewResponse preview = beneficiaryService.previewClose(vaultId, currentUserId);
+
+        assertThat(preview.getTotalAssets()).isEqualTo(3);
+        assertThat(preview.getViewedCount()).isEqualTo(2);
+        assertThat(preview.getUnviewedCount()).isEqualTo(1);
+        assertThat(preview.getUnviewedAssets()).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Ví Binance");
+        verifyNoInteractions(cryptoService);
+    }
+
+    @Test
+    void previewClose_noViewSession_throws403() {
+        stubClaimForClose();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.previewClose(vaultId, currentUserId));
+
+        verifyNoInteractions(digitalAssetRepository);
+        verifyNoInteractions(cryptoService);
+    }
+
+    @Test
+    void closeVault_locked_throws423() {
+        stubVaultAndClaim();
+        stubLocked(true);
+
+        expectError(HttpStatus.LOCKED,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_wrongBeneficiary_throws404() {
+        User other = new User();
+        other.setId(UUID.randomUUID());
+        unlockedVault.setBeneficiary(other);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.NOT_FOUND,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+    }
+
+    @Test
+    void closeVault_alreadyClaimedVault_throws409() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+    }
+
+    @Test
+    void closeVault_claimPastDeadline_throws410() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+                claim(ClaimStatus.PENDING, LocalDateTime.now().minusMinutes(1))));
+
+        expectError(HttpStatus.GONE,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+    }
+
+    // ----- Ghi nhận xem/tải xuống theo từng tài sản (FR-17, FR-18) -----
+
+    @Test
+    void getInheritedAssetDetail_firstAccess_recordsAccessForThatAsset() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubDecryptableAsset(assetId);
+
+        beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+
+        verify(assetAccessRecordRepository).insertIfAbsent(
+                any(UUID.class), eq(claim.getId()), eq(assetId), any(LocalDateTime.class));
+    }
+
+    @Test
+    void downloadInheritedAsset_firstAccess_recordsAccess() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubDecryptableAsset(assetId);
+
+        beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
+
+        verify(assetAccessRecordRepository).insertIfAbsent(
+                any(UUID.class), eq(claim.getId()), eq(assetId), any(LocalDateTime.class));
+    }
+
+    @Test
+    void getInheritedAssetDetail_secondAccessSameAsset_delegatesDedupToDatabase() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubDecryptableAsset(assetId);
+
+        beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+        beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+
+        // Service luôn gọi INSERT IGNORE cho cùng cặp (claim, asset); DB giữ đúng 1 dòng
+        // (đã kiểm chứng ở test repository), nên request thứ hai không lỗi và không ghi đè thời điểm đầu.
+        verify(assetAccessRecordRepository, times(2)).insertIfAbsent(
+                any(UUID.class), eq(claim.getId()), eq(assetId), any(LocalDateTime.class));
+    }
+
+    @Test
+    void getInheritedAssetDetail_decryptFails_doesNotRecordAccess() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(cryptoService.decrypt(any())).thenThrow(new RuntimeException("boom"));
+
+        expectError(HttpStatus.INTERNAL_SERVER_ERROR,
+                () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
+
+        verifyNoInteractions(assetAccessRecordRepository);
+    }
+
+    @Test
+    void getInheritedAssets_list_doesNotRecordAccess() {
+        stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of());
+
+        beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        verifyNoInteractions(assetAccessRecordRepository);
     }
 
 }
