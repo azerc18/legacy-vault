@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
@@ -141,6 +142,30 @@ class BeneficiaryControllerSecurityTest {
                         .with(token("ROLE_BENEFICIARY"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"confirmed\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void closePreview_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/close-preview", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void closePreview_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/close-preview", UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).previewClose(any(), any());
+    }
+
+    @Test
+    void closePreview_beneficiary_returns200() throws Exception {
+        when(beneficiaryService.previewClose(any(), any())).thenReturn(
+                CloseVaultPreviewResponse.builder().build());
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/close-preview", UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY")))
                 .andExpect(status().isOk());
     }
 }

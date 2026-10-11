@@ -1,13 +1,25 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ltld.app.legacyvault.dto.beneficiarydto.*;
-import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationMethod;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -15,20 +27,24 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.assertj.core.api.Assertions.assertThat;
 
 @WebMvcTest(BeneficiaryController.class)
 public class BeneficiaryControllerTest {
@@ -441,18 +457,70 @@ public class BeneficiaryControllerTest {
     }
 
     @Test
-    void closeVault_contentNotAccessed_returns400Json() throws Exception {
+    void closeVault_unviewedWithoutAcknowledge_returns409WithCount() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.closeVault(any(), any(), any()))
                 .thenThrow(new BeneficiaryException(
-                        "Bạn cần xem hoặc tải xuống tài sản trước khi xác nhận đã nhận bàn giao.",
-                        HttpStatus.BAD_REQUEST));
+                        "Còn 2 tài sản chưa xem. Sau khi đóng hồ sơ bạn sẽ không xem được nữa.",
+                        HttpStatus.CONFLICT));
 
         mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
                         .principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"confirmed\":true}"))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Còn 2 tài sản")));
+    }
+
+    @Test
+    void closeVault_acknowledgeUnviewed_isPassedToService() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+        when(beneficiaryService.closeVault(any(), any(), eq(userId)))
+                .thenReturn(CloseVaultResponse.builder().vaultStatus(VaultStatus.CLAIMED).build());
+
+        mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirmed\":true,\"acknowledgeUnviewed\":true}"))
+                .andExpect(status().isOk());
+
+        org.mockito.ArgumentCaptor<CloseVaultRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(CloseVaultRequest.class);
+        verify(beneficiaryService).closeVault(any(), captor.capture(), eq(userId));
+        assertThat(captor.getValue().getAcknowledgeUnviewed()).isTrue();
+    }
+
+    @Test
+    void previewClose_success_passesPrincipalIdAndDisablesCache() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+        when(beneficiaryService.previewClose(vaultId, userId)).thenReturn(
+                CloseVaultPreviewResponse.builder()
+                        .totalAssets(3).viewedCount(2).unviewedCount(1)
+                        .unviewedAssets(List.of()).build());
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/close-preview", vaultId)
+                        .principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$.data.totalAssets").value(3))
+                .andExpect(jsonPath("$.data.viewedCount").value(2))
+                .andExpect(jsonPath("$.data.unviewedCount").value(1));
+    }
+
+    @Test
+    void previewClose_noViewSession_returns403Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.previewClose(any(), any()))
+                .thenThrow(new BeneficiaryException(
+                        "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/close-preview", UUID.randomUUID())
+                        .principal(principal))
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
