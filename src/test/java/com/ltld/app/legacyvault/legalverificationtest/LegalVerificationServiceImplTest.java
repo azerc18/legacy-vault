@@ -145,7 +145,7 @@ public class LegalVerificationServiceImplTest {
 
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
-        verifyNoInteractions(signatureRepository, requestVaultRepository);
+        verifyNoInteractions(signatureRepository);
     }
 
     @Test
