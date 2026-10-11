@@ -109,6 +109,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(VerificationNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationNotFound(VerificationNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidAttachmentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidAttachment(InvalidAttachmentException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error("Malformed request body"));
