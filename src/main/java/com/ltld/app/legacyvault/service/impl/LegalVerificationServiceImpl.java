@@ -22,9 +22,12 @@ import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.service.LegalVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +36,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LegalVerificationServiceImpl implements LegalVerificationService {
@@ -45,6 +49,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final DigitalSignatureRepository signatureRepository;
     private final VerificationRequestVaultRepository requestVaultRepository;
     private final AuditLogService auditLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // UC12: danh sách hồ sơ đang chờ duyệt
     @Override
@@ -203,6 +208,11 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 verifierId, null,
                 "LegalVerificationRequest", requestId.toString(),
                 "signatureId=" + signature.getId());
+
+        // FR-14 bước 6: Bắn sự kiện mở khóa để module FR-16/FR-07 thông báo cho Beneficiary & Executor
+        List<UUID> unlockedVaultIds = links.stream().map(l -> l.getVault().getId()).toList();
+        eventPublisher.publishEvent(new VaultsUnlockedEvent(requestId, unlockedVaultIds));
+        log.info("FR-14: Published VaultsUnlockedEvent for request {} with vaults {}", requestId, unlockedVaultIds);
 
         return toDto(request);
     }

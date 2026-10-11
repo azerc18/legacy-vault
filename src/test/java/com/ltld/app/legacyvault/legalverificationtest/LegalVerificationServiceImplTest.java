@@ -56,6 +56,9 @@ public class LegalVerificationServiceImplTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private LegalVerificationServiceImpl service;
 
