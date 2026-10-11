@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // Mỗi test chạy trong một transaction và tự rollback, nên không cần dọn dữ liệu.
 @SpringBootTest(properties = {
         "security.jwt.secret=integration-test-secret-key-at-least-32-bytes!!",
+        "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
         "spring.jpa.hibernate.ddl-auto=create-drop"

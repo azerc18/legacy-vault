@@ -37,3 +37,6 @@ security:
 app:
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
+  security:
+    crypto:
+      master-key: ${CRYPTO_MASTER_KEY}
