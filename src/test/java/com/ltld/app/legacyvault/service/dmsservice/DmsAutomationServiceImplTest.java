@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -124,6 +125,7 @@ class DmsAutomationServiceImplTest {
         assertThat(response.getAcknowledgedAt()).isEqualTo(primary.getAcknowledgedAt());
         assertThat(response.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(activation.getStatus()).isEqualTo(NotificationStatus.READ);
+        verify(executorAssignmentRepository).save(primary);
         ArgumentCaptor<AuditLog> audit = ArgumentCaptor.forClass(AuditLog.class);
         verify(auditLogRepository).save(audit.capture());
         assertThat(audit.getValue().getAction()).isEqualTo(AuditAction.EXECUTOR_ACKNOWLEDGED_ACTIVATION);
@@ -195,5 +197,16 @@ class DmsAutomationServiceImplTest {
         assertThat(backup.getAcknowledgedAt()).isNotNull();
         verify(notificationRepository).findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
                 eq(backupUserId), eq(NotificationType.EXECUTOR_ACTIVATED), eq("dms_config"), eq(config.getId()));
+    }
+
+    @Test
+    @DisplayName("Không có DMS quá hạn -> processOverdueDms không làm gì, processor.trigger() không được gọi")
+    void processOverdueDms_emptyList_doesNothing() {
+        when(dmsConfigRepository.findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.ACTIVE, now))
+                .thenReturn(Collections.emptyList());
+
+        service.processOverdueDms(now);
+
+        verify(processor, never()).trigger(any(), any());
     }
 }

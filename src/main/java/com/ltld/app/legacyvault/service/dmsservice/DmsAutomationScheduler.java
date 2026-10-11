@@ -21,13 +21,14 @@ public class DmsAutomationScheduler {
     private final DmsAutomationService dmsAutomationService;
 
     // Quét DMS quá hạn check-in (FR-07 bước 1-3).
-    @Scheduled(fixedDelayString = "${app.digital-executor.dms-scan-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${app.digital-executor.dms-trigger-scan-delay-ms:60000}")
     public void processOverdueDms() {
         dmsAutomationService.processOverdueDms(LocalDateTime.now());
     }
 
     // Leo thang Backup sau thời gian chờ cấu hình (BR-03, mặc định 14 ngày) và gửi lại thông báo lỗi.
-    @Scheduled(fixedDelayString = "${app.digital-executor.dms-scan-delay-ms:60000}")
+    // Chạy ít thường xuyên hơn trigger vì chỉ cần kiểm tra sau N ngày chờ.
+    @Scheduled(fixedDelayString = "${app.digital-executor.dms-escalate-scan-delay-ms:300000}")
     public void activateBackupAfterTimeout() {
         dmsAutomationService.activateBackupForUnacknowledgedPrimary(LocalDateTime.now());
     }

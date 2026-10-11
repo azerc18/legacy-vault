@@ -42,6 +42,12 @@ public class DmsActivationProcessor {
     public static final String DMS_REFERENCE_TYPE = "dms_config";
     private static final String CHANNEL_EMAIL = "EMAIL"; // hiện chỉ triển khai kênh email (SRS/contract: EMAIL)
 
+    // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
+    private static final String MSG_PRIMARY_ACTIVATED =
+            "Quy trình bàn giao LegacyVault đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
+    private static final String MSG_BACKUP_ACTIVATED =
+            "Quyền Digital Executor của bạn đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
+
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
@@ -74,15 +80,14 @@ public class DmsActivationProcessor {
                 .channel(CHANNEL_EMAIL)
                 .occurredAt(now)
                 .build());
+        // actor = null: sự kiện do scheduler tự động kích hoạt, không có user nào thực hiện hành động.
         saveAudit(null, AuditAction.DMS_TRIGGERED, "DmsConfig", config.getId(), ownerMap(ownerId));
 
         Optional<ExecutorAssignment> primary = executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY)
                 .filter(a -> a.getStatus() != ExecutorStatus.REVOKED);
         if (primary.isPresent()) {
-            activate(config, primary.get(), AuditAction.PRIMARY_EXECUTOR_ACTIVATED,
-                    "Quy trình bàn giao LegacyVault đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.",
-                    now);
+            activate(config, primary.get(), AuditAction.PRIMARY_EXECUTOR_ACTIVATED, MSG_PRIMARY_ACTIVATED, now);
             return;
         }
 
@@ -91,13 +96,12 @@ public class DmsActivationProcessor {
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP)
                 .filter(a -> a.getStatus() == ExecutorStatus.INACTIVE);
         if (backup.isPresent()) {
-            activate(config, backup.get(), AuditAction.BACKUP_EXECUTOR_ACTIVATED,
-                    "Quyền Digital Executor của bạn đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.",
-                    now);
+            activate(config, backup.get(), AuditAction.BACKUP_EXECUTOR_ACTIVATED, MSG_BACKUP_ACTIVATED, now);
             return;
         }
 
         log.warn("FR-07: dmsConfig {} triggered but owner {} has no usable executor", config.getId(), ownerId);
+        // actor = null: sự kiện do scheduler tự động kích hoạt, không có user nào thực hiện hành động.
         saveAudit(null, AuditAction.DMS_TRIGGERED_NO_EXECUTOR, "DmsConfig", config.getId(), ownerMap(ownerId));
     }
 
@@ -151,10 +155,9 @@ public class DmsActivationProcessor {
                 "revokedPrimaryId", primary.getId().toString(),
                 "activatedBackupId", backup.getId().toString()
         );
+        // actor = null: sự kiện do scheduler tự động kích hoạt, không có user nào thực hiện hành động.
         saveAudit(null, AuditAction.PRIMARY_EXECUTOR_REVOKED, "ExecutorAssignment", primary.getId(), metadata);
-        activate(config, backup, AuditAction.BACKUP_EXECUTOR_ACTIVATED,
-                "Quyền Digital Executor của bạn đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.",
-                now);
+        activate(config, backup, AuditAction.BACKUP_EXECUTOR_ACTIVATED, MSG_BACKUP_ACTIVATED, now);
     }
 
     private void activate(DmsConfig config, ExecutorAssignment assignment, AuditAction auditAction,
