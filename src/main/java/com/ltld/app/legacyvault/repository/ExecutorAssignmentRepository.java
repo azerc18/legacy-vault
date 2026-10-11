@@ -18,4 +18,10 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
 
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorTypeAndStatus(
             UUID ownerId, ExecutorType executorType, ExecutorStatus status);
+
+    List<ExecutorAssignment> findAllByExecutorUserId(UUID executorUserId);
+
+    Optional<ExecutorAssignment> findFirstByExecutorUserIdAndStatus(UUID executorUserId, ExecutorStatus status);
+
+    Optional<ExecutorAssignment> findFirstByExecutorUserEmailAndStatus(String email, ExecutorStatus status);
 }
