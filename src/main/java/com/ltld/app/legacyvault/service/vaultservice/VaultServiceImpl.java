@@ -87,13 +87,16 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        String ownerEmail = vault.getOwner().getEmail();
-
         // 2. Bảo mật: Két của ai người nấy xóa
         if (!vault.getOwner().getId().equals(ownerId)) {
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, ownerEmail, "Unauthorized: You don't own this vault");
+            // Tra cứu email của kẻ gọi (caller/stranger), không lấy nhầm email của chủ két
+            String callerEmail = userRepository.findById(ownerId)
+                    .map(User::getEmail).orElse("unknown");
+            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, callerEmail, "Unauthorized: You don't own this vault");
             throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
         }
+
+        String ownerEmail = vault.getOwner().getEmail();
 
         // 3. Nghiệp vụ: Trạng thái không phải ACTIVE thì từ chối xóa
         if (vault.getStatus() != VaultStatus.ACTIVE) {

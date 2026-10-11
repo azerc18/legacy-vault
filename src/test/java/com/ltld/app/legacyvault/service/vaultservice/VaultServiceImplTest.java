@@ -130,9 +130,11 @@ class VaultServiceImplTest {
 
         User otherUser = new User();
         otherUser.setId(UUID.randomUUID());
+        otherUser.setEmail("victim@example.com");
         vault.setOwner(otherUser); // Vault thuộc về người khác
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
         // Bắt lỗi phải là VaultException
         Exception exception = assertThrows(VaultException.class, () -> {
@@ -143,6 +145,13 @@ class VaultServiceImplTest {
         assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
+        // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
+        verify(auditLogService).failure(
+                com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED,
+                ownerId,
+                mockOwner.getEmail(),
+                "Unauthorized: You don't own this vault"
+        );
     }
 
     @Test

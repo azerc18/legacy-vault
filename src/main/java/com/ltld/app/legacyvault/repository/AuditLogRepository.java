@@ -17,7 +17,8 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
                 "LEFT JOIN FETCH u.roles " +
                 "WHERE a.vaultId = :vaultId " +
                 "AND a.createdAt >= :startDate " +
-                "AND a.createdAt <= :endDate",
+                "AND a.createdAt <= :endDate " +
+                "ORDER BY a.createdAt DESC",
         countQuery = "SELECT COUNT(a) FROM AuditLog a " +
                      "WHERE a.vaultId = :vaultId " +
                      "AND a.createdAt >= :startDate " +
