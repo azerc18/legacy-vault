@@ -92,7 +92,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         // Log thành công kèm targetType và targetId
         auditLogService.log(AuditAction.DOCUMENT_UPLOADED, AuditResult.SUCCESS,
-                ownerId, vault.getOwner().getEmail(),
+                ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "Vault", vault.getId().toString(), "Document ID: " + saved.getId().toString());
         return saved;
     }

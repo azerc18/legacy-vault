@@ -20,7 +20,7 @@ public class AuditLogServiceImpl implements AuditLogService {
     private final ApplicationEventPublisher publisher;
 
     @Override
-    public void log(AuditAction action, AuditResult result, UUID userId, String email,
+    public void log(AuditAction action, AuditResult result, UUID userId, String email, UUID vaultId,
                     String targetType, String targetId, String detail) {
         HttpServletRequest req = currentRequest();
 
@@ -31,7 +31,7 @@ public class AuditLogServiceImpl implements AuditLogService {
         if (req != null)    meta.put("userAgent", truncate(req.getHeader(HttpHeaders.USER_AGENT), 255));
 
         publisher.publishEvent(new AuditEvent(
-                action, userId, targetType,
+                action, userId, vaultId, targetType,
                 targetId == null ? null : UUID.fromString(targetId),
                 req != null ? req.getRemoteAddr() : null,
                 meta));

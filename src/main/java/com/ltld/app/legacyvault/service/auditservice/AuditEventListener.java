@@ -22,6 +22,7 @@ public class AuditEventListener {
         repository.save(AuditLog.builder()
                 .actor(e.actorId() == null ? null : userRepository.getReferenceById(e.actorId()))
                 .action(e.action())
+                .vaultId(e.vaultId())
                 .entityType(e.entityType())
                 .entityId(e.entityId())
                 .ipAddress(e.ipAddress())

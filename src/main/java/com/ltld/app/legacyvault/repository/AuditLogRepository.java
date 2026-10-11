@@ -12,11 +12,16 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
     Page<AuditLog> findByActor_IdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
 
     @org.springframework.data.jpa.repository.Query(
-        "SELECT a FROM AuditLog a " +
-        "WHERE a.entityType = 'Vault' AND a.entityId = :vaultId " +
-        "AND (cast(:startDate as timestamp) IS NULL OR a.createdAt >= :startDate) " +
-        "AND (cast(:endDate as timestamp) IS NULL OR a.createdAt <= :endDate) " +
-        "ORDER BY a.createdAt DESC"
+        value = "SELECT DISTINCT a FROM AuditLog a " +
+                "LEFT JOIN FETCH a.actor u " +
+                "LEFT JOIN FETCH u.roles " +
+                "WHERE a.vaultId = :vaultId " +
+                "AND a.createdAt >= :startDate " +
+                "AND a.createdAt <= :endDate",
+        countQuery = "SELECT COUNT(a) FROM AuditLog a " +
+                     "WHERE a.vaultId = :vaultId " +
+                     "AND a.createdAt >= :startDate " +
+                     "AND a.createdAt <= :endDate"
     )
     Page<AuditLog> findVaultActivity(
         @org.springframework.data.repository.query.Param("vaultId") UUID vaultId,

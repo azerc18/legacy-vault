@@ -21,7 +21,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -71,7 +74,7 @@ public class VaultServiceImpl implements VaultService {
         }
 
         auditLogService.log(AuditAction.VAULT_CREATED, AuditResult.SUCCESS, 
-                ownerId, owner.getEmail(), 
+                ownerId, owner.getEmail(), vault.getId(),
                 "Vault", vault.getId().toString(), null);
         return vault;
     }
@@ -79,42 +82,51 @@ public class VaultServiceImpl implements VaultService {
     @Override
     @Transactional
     public void deleteVault(UUID vaultId, UUID ownerId) throws Exception {
-        // Find owner to get email for logging
-        User user = userRepository.findById(ownerId).orElse(null);
-        String email = (user != null) ? user.getEmail() : "unknown";
-
-        // 1. Tìm Vault
+        // 1. Tìm Vault — dùng vault.getOwner() để lấy email, tránh query UserRepository thừa (#16)
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
+        String ownerEmail = vault.getOwner().getEmail();
+
         // 2. Bảo mật: Két của ai người nấy xóa
         if (!vault.getOwner().getId().equals(ownerId)) {
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, email, "Unauthorized: You don't own this vault");
+            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, ownerEmail, "Unauthorized: You don't own this vault");
             throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
         }
 
         // 3. Nghiệp vụ: Trạng thái không phải ACTIVE thì từ chối xóa
         if (vault.getStatus() != VaultStatus.ACTIVE) {
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, email, "Cannot delete vault that is not in active state");
+            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, ownerEmail, "Cannot delete vault that is not in active state");
             throw new VaultException("Cannot delete vault that is not in active state");
         }
 
-        // 4. Phải xóa các tài sản (DigitalAsset) bên trong két trước
-        digitalAssetRepository.findByVaultId(vaultId).forEach(digitalAssetRepository::delete);
-        
-        // Cần xóa cả tài liệu (LegalDocument) vì ràng buộc FK
-        legalDocumentRepository.findByVaultId(vaultId).forEach(doc -> {
-            // Xóa file vật lý trên đĩa
-            fileStorageService.deleteFile(doc.getFileUrlEncrypted());
-            // Xóa record trong database
-            legalDocumentRepository.delete(doc);
-        });
+        // 4. Thu thập đường dẫn file TRƯỚC khi xóa DB — N1 fix
+        List<LegalDocument> docs = legalDocumentRepository.findByVaultId(vaultId);
+        List<String> filesToDelete = docs.stream().map(LegalDocument::getFileUrlEncrypted).toList();
 
-        // 5. Sau đó mới đập cái két (Vault)
+        // Xóa DB bằng batch (nhanh hơn forEach) — ràng buộc FK theo thứ tự
+        legalDocumentRepository.deleteAllInBatch(docs);
+        digitalAssetRepository.deleteAllInBatch(digitalAssetRepository.findByVaultId(vaultId));
+
+        // 5. Đập cái két (Vault)
         vaultRepository.delete(vault);
-        
-        auditLogService.log(AuditAction.VAULT_DELETED, AuditResult.SUCCESS, 
-                ownerId, email, 
+
+        // N1: Chỉ xóa file vật lý SAU KHI DB commit thành công
+        // Nếu bước trên rollback → file vẫn còn nguyên, không mất dữ liệu pháp lý
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    filesToDelete.forEach(fileStorageService::deleteFile);
+                }
+            });
+        } else {
+            // Khi chạy ngoài Spring transaction (ví dụ: trong unit test)
+            filesToDelete.forEach(fileStorageService::deleteFile);
+        }
+
+        auditLogService.log(AuditAction.VAULT_DELETED, AuditResult.SUCCESS,
+                ownerId, ownerEmail, vault.getId(),
                 "Vault", vaultId.toString(), null);
     }
 }

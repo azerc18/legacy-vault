@@ -110,4 +110,43 @@ class DocumentServiceImplTest {
         // Và đương nhiên file không bao giờ được phép đem đi mã hóa hay lưu
         verify(cryptoService, never()).encryptBytes(any());
     }
+
+    @Test
+    void uploadDocument_EmptyFile_ThrowsException() {
+        MockMultipartFile emptyFile = new MockMultipartFile("file", "empty.pdf", "application/pdf", new byte[0]);
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, emptyFile))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("File cannot be empty");
+    }
+
+    @Test
+    void uploadDocument_Exceeds10MB_ThrowsException() {
+        byte[] largeBytes = new byte[10 * 1024 * 1024 + 1];
+        MockMultipartFile largeFile = new MockMultipartFile("file", "large.pdf", "application/pdf", largeBytes);
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, largeFile))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("exceeds 10MB limit");
+    }
+
+    @Test
+    void uploadDocument_InvalidContentType_ThrowsException() {
+        MockMultipartFile invalidFile = new MockMultipartFile(
+                "file", "script.sh", "application/x-sh", "echo hello".getBytes());
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, invalidFile))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Invalid file format");
+    }
+
+    @Test
+    void uploadDocument_VaultNotActive_ThrowsException() {
+        mockVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Cannot upload document to vault in ARCHIVED_LOCKED state");
+    }
 }
