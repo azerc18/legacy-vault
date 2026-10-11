@@ -174,7 +174,7 @@ public class LegalVerificationServiceImplTest {
     private SignVerificationRequestDto signDto() {
         SignVerificationRequestDto dto = new SignVerificationRequestDto();
         dto.setMethod(SignatureMethod.MOCK_OTP);
-        dto.setCode("123456");
+        dto.setCode("000000");
         return dto;
     }
 
@@ -194,7 +194,7 @@ public class LegalVerificationServiceImplTest {
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(vault).build();
 
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         service.sign(requestId, verifierId, signDto());
@@ -209,9 +209,25 @@ public class LegalVerificationServiceImplTest {
     }
 
     @Test
+    void sign_wrongCode_throwsAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        SignVerificationRequestDto badDto = new SignVerificationRequestDto();
+        badDto.setMethod(SignatureMethod.MOCK_OTP);
+        badDto.setCode("111111");
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
+                .isInstanceOf(RequestNotApprovedException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
     void sign_requestNotApproved_throwsAndDoesNotSignOrUnlock() {
         // pendingRequest đang PENDING, chưa được duyệt
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
                 .isInstanceOf(RequestNotApprovedException.class);
@@ -223,7 +239,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_differentVerifier_throwsNotAssignedAndDoesNotSign() {
         approvedByVerifier();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.sign(requestId, UUID.randomUUID(), signDto()))
                 .isInstanceOf(NotAssignedVerifierException.class);
@@ -235,7 +251,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_alreadySigned_throwsAndDoesNotSignAgain() {
         approvedByVerifier();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(signatureRepository.existsByRequestId(requestId)).thenReturn(true);
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -250,7 +266,7 @@ public class LegalVerificationServiceImplTest {
         Vault archived = vaultOf(VaultStatus.ARCHIVED_LOCKED);
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(archived).build();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -267,7 +283,7 @@ public class LegalVerificationServiceImplTest {
                 .owner(User.builder().id(UUID.randomUUID()).build()).build();
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(foreign).build();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -279,7 +295,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_noVaultLinked_throwsConflict() {
         approvedByVerifier();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
