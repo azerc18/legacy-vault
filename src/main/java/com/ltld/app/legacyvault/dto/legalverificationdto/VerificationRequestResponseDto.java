@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -18,7 +19,8 @@ public class VerificationRequestResponseDto {
     private String ownerName;
     private String executorName;
     private LegalVerificationStatus status;
-    private String deathCertificateFileUrlEncrypted;
+    private boolean hasDeathCertificate;   // true/false thay vì lộ URL nội bộ
+    private List<UUID> vaultIds;           // verifier biết sẽ mở khóa vault nào
     private String rejectionReason;
     private LocalDateTime decidedAt;
     private LocalDateTime createdAt;
