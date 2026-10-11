@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,7 +52,7 @@ public class VaultServiceImpl implements VaultService {
                         .assetName(assetDto.getAssetName())
                         // ĐÂY LÀ CHỖ QUAN TRỌNG NHẤT: Gọi CryptoService để mã hóa chữ gốc thành loằng ngoằng
                         .encryptedSecret(cryptoService.encrypt(assetDto.getSecret()))
-                        .encryptionKeyRef("default-master-key")
+                        .encryptionKeyRef(CryptoServiceImpl.CURRENT_KEY_REF)
                         .notesEncrypted(assetDto.getNotes() != null ? cryptoService.encrypt(assetDto.getNotes()) : null)
                         .status(AssetStatus.ACTIVE)
                         .build();
