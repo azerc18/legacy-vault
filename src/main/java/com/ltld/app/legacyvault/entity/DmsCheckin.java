@@ -1,0 +1,36 @@
+package com.ltld.app.legacyvault.entity;
+
+import com.ltld.app.legacyvault.enums.DmsCheckinType;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "dms_checkins")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class DmsCheckin {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dms_config_id", nullable = false)
+    private DmsConfig dmsConfig;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "checkin_type", nullable = false)
+    private DmsCheckinType checkinType;
+
+    @Column(length = 50)
+    private String channel;
+
+    @Column(name = "occurred_at", nullable = false, updatable = false)
+    private LocalDateTime occurredAt;
+}
