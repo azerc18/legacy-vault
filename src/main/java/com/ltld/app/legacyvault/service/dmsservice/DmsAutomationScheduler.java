@@ -9,8 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.time.LocalDateTime;
 
 /**
- * Chạy FR-07 định kỳ. Mặc định BẬT; tắt bằng app.digital-executor.scheduler.enabled=false
- * (profile dev tắt để tự điều khiển thời gian từ test console).
+ * Chạy FR-07 định kỳ. Mặc định BẬT; tắt bằng app.digital-executor.scheduler.enabled=false.
  */
 @Configuration
 @EnableScheduling

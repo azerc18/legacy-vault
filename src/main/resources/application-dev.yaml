@@ -1,6 +1,0 @@
-# Profile dev: chạy kèm local ->  SPRING_PROFILES_ACTIVE=local,dev ./mvnw spring-boot:run
-# Mở console test FR-07 tại http://localhost:8084/dev/fr07
-app:
-  digital-executor:
-    scheduler:
-      enabled: false   # tự điều khiển lượt quét + đồng hồ giả lập từ console
