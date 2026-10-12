@@ -18,6 +18,14 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Query("SELECT r FROM LegalVerificationRequest r JOIN FETCH r.owner JOIN FETCH r.executor WHERE r.status = :status")
     List<LegalVerificationRequest> findByStatusFetch(@Param("status") LegalVerificationStatus status);
 
+    // Q23-b + N6: Loại hồ sơ mà verifier gọi là Owner hoặc Executor
+    @Query("""
+        SELECT r FROM LegalVerificationRequest r JOIN FETCH r.owner o JOIN FETCH r.executor e
+        WHERE r.status = :status AND o.id <> :verifierId AND e.id <> :verifierId
+    """)
+    List<LegalVerificationRequest> findPendingVisibleTo(@Param("status") LegalVerificationStatus status,
+                                                        @Param("verifierId") UUID verifierId);
+
     List<LegalVerificationRequest> findByVerifierIdOrderByDecidedAtDesc(UUID verifierId);
 
     // Khóa bi quan khi ký: tránh 2 request ký song song → lỗi 500

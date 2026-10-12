@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.legalverificationtest;
+package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
@@ -23,15 +23,19 @@ import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
-import com.ltld.app.legacyvault.service.impl.LegalVerificationServiceImpl;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,6 +45,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,22 +64,22 @@ public class LegalVerificationServiceImplTest {
     private VerificationRequestVaultRepository requestVaultRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private AuditLogService auditLogService;
 
     @Mock
-    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
-    private com.ltld.app.legacyvault.repository.UserRepository userRepository;
+    private OtpGenerator otpGenerator;
 
     @Mock
-    private com.ltld.app.legacyvault.utility.OtpGenerator otpGenerator;
+    private OtpHasher otpHasher;
 
     @Mock
-    private com.ltld.app.legacyvault.utility.OtpHasher otpHasher;
-
-    @Mock
-    private com.ltld.app.legacyvault.utility.EmailSender emailSender;
+    private EmailSender emailSender;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -103,7 +111,9 @@ public class LegalVerificationServiceImplTest {
         RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
         dto.setReason("Giấy chứng tử không hợp lệ");
 
+        User verifierUser = User.builder().id(verifierId).build();
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -151,7 +161,9 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void approve_success_setsApprovedWithoutSigningOrUnlocking() {
+        User verifierUser = User.builder().id(verifierId).build();
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -198,7 +210,7 @@ public class LegalVerificationServiceImplTest {
     }
 
     private Vault vaultOf(VaultStatus status) {
-        return Vault.builder().status(status).owner(pendingRequest.getOwner()).build();
+        return Vault.builder().id(UUID.randomUUID()).status(status).owner(pendingRequest.getOwner()).build();
     }
 
     @Test
@@ -211,7 +223,9 @@ public class LegalVerificationServiceImplTest {
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(vault).build();
 
+        User verifierUser = User.builder().id(verifierId).build();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
@@ -223,7 +237,7 @@ public class LegalVerificationServiceImplTest {
         verify(signatureRepository, times(1)).save(any());
         verify(auditLogService, times(1)).log(
                 eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
-                isNull(), eq("Vault"), isNull(), anyString());
+                isNull(), eq("Vault"), eq(vault.getId().toString()), anyString());
     }
 
     @Test
@@ -280,7 +294,6 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void sign_requestNotApproved_throwsAndDoesNotSignOrUnlock() {
-        // pendingRequest đang PENDING, chưa được duyệt
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -340,7 +353,7 @@ public class LegalVerificationServiceImplTest {
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
-        Vault foreign = Vault.builder().status(VaultStatus.ACTIVE)
+        Vault foreign = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.ACTIVE)
                 .owner(User.builder().id(UUID.randomUUID()).build()).build();
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(foreign).build();
@@ -370,14 +383,13 @@ public class LegalVerificationServiceImplTest {
         verify(signatureRepository, never()).save(any());
     }
 
-    // ---------- UC13: verifyDocument ----------
+    // ---------- UC13: verifyDocument (với kiểm tra N6) ----------
 
     @Test
     void verifyDocument_supportedFormat_returnsValid() {
-        // pendingRequest dùng "enc://test.pdf"
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
-        DocumentVerificationResponseDto result = service.verifyDocument(requestId);
+        DocumentVerificationResponseDto result = service.verifyDocument(requestId, verifierId);
 
         assertThat(result.isValid()).isTrue();
     }
@@ -387,14 +399,31 @@ public class LegalVerificationServiceImplTest {
         pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.exe");
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
-        assertThat(service.verifyDocument(requestId).isValid()).isFalse();
+        assertThat(service.verifyDocument(requestId, verifierId).isValid()).isFalse();
     }
 
     @Test
     void verifyDocument_requestNotFound_throwsNotFoundException() {
         when(requestRepository.findById(requestId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.verifyDocument(requestId))
+        assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    // N6: Xung đột lợi ích khi xem chi tiết hoặc verifyDocument -> 404
+    @Test
+    void getById_verifierIsOwner_throwsNotFoundException() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.getById(requestId, ownerId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    @Test
+    void verifyDocument_verifierIsExecutor_throwsNotFoundException() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.verifyDocument(requestId, pendingRequest.getExecutor().getId()))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
     }
 
@@ -467,6 +496,6 @@ public class LegalVerificationServiceImplTest {
         LocalDate to = LocalDate.of(2026, 10, 5);
 
         assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to))
-                .isInstanceOf(com.ltld.app.legacyvault.exception.InvalidDateRangeException.class);
+                .isInstanceOf(InvalidDateRangeException.class);
     }
 }

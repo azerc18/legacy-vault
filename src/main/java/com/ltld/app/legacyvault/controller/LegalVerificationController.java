@@ -5,7 +5,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationReque
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
-import com.ltld.app.legacyvault.service.LegalVerificationService;
+import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +27,11 @@ public class LegalVerificationController {
 
     private final LegalVerificationService service;
 
-    // UC12: danh sách hồ sơ đang chờ duyệt
+    // UC12: danh sách hồ sơ đang chờ duyệt (lọc bỏ hồ sơ có xung đột lợi ích)
     @GetMapping
-    public ResponseEntity<ApiResponse<List<VerificationRequestResponseDto>>> getPending() {
-        return ResponseEntity.ok(ApiResponse.success(service.getPendingRequests()));
+    public ResponseEntity<ApiResponse<List<VerificationRequestResponseDto>>> getPending(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(service.getPendingRequests(verifierId(jwt))));
     }
 
     // UC15: lịch sử hồ sơ đã xác minh (lọc tùy chọn)
@@ -44,16 +45,20 @@ public class LegalVerificationController {
                 service.getHistory(verifierId(jwt), status, from, to)));
     }
 
-    // UC12: xem chi tiết 1 hồ sơ
+    // UC12: xem chi tiết 1 hồ sơ (trả 404 nếu xung đột lợi ích)
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(service.getById(id)));
+    public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> getById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(service.getById(id, verifierId(jwt))));
     }
 
-    // UC13: xác thực tài liệu (mock)
+    // UC13: xác thực tài liệu (mock) (trả 404 nếu xung đột lợi ích)
     @GetMapping("/{id}/document/verify")
-    public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(service.verifyDocument(id)));
+    public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(service.verifyDocument(id, verifierId(jwt))));
     }
 
     // UC12: phê duyệt (không cần body)

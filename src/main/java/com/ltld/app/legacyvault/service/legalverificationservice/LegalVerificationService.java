@@ -1,20 +1,25 @@
-package com.ltld.app.legacyvault.service;
+package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
-import java.time.LocalDate;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
 public interface LegalVerificationService {
 
-    List<VerificationRequestResponseDto> getPendingRequests();
+    // UC12: danh sách hồ sơ đang chờ duyệt (loại trừ xung đột lợi ích)
+    List<VerificationRequestResponseDto> getPendingRequests(UUID verifierId);
 
-    VerificationRequestResponseDto getById(UUID requestId);
+    // UC12: xem chi tiết hồ sơ (404 nếu xung đột lợi ích)
+    VerificationRequestResponseDto getById(UUID requestId, UUID verifierId);
+
+    // UC13: xác thực tài liệu (mock, 404 nếu xung đột lợi ích)
+    DocumentVerificationResponseDto verifyDocument(UUID requestId, UUID verifierId);
 
     // UC12: phê duyệt hồ sơ (chưa mở khóa Vault)
     VerificationRequestResponseDto approve(UUID requestId, UUID verifierId);
@@ -22,16 +27,13 @@ public interface LegalVerificationService {
     // UC12: từ chối hồ sơ
     VerificationRequestResponseDto reject(UUID requestId, UUID verifierId, RejectVerificationRequestDto dto);
 
-    // UC13: xác thực tài liệu (mock)
-    DocumentVerificationResponseDto verifyDocument(UUID requestId);
-
-    // UC14: gửi OTP ký xác nhận mở khóa Vault
+    // UC14: gửi OTP ký xác nhận mở khóa Vault qua email của verifier
     void sendSignOtp(UUID requestId, UUID verifierId);
 
     // UC14: ký xác nhận, mở khóa Vault
     VerificationRequestResponseDto sign(UUID requestId, UUID verifierId, SignVerificationRequestDto dto);
 
-    // UC15
+    // UC15: xem lịch sử các hồ sơ đã xử lý
     List<VerificationRequestResponseDto> getHistory(
             UUID verifierId, LegalVerificationStatus status, LocalDate from, LocalDate to);
 }

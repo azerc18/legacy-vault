@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.service.impl;
+package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
@@ -26,7 +27,6 @@ import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
-import com.ltld.app.legacyvault.service.LegalVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
@@ -61,22 +61,41 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final OtpHasher otpHasher;
     private final EmailSender emailSender;
 
-    // UC12: danh sách hồ sơ đang chờ duyệt
+    // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
     @Transactional(readOnly = true)
-    public List<VerificationRequestResponseDto> getPendingRequests() {
-        return requestRepository.findByStatusFetch(LegalVerificationStatus.PENDING)
+    public List<VerificationRequestResponseDto> getPendingRequests(UUID verifierId) {
+        return requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId)
                 .stream().map(this::toDto).toList();
     }
 
-    // UC12: xem chi tiết 1 hồ sơ
+    // UC12: xem chi tiết 1 hồ sơ (N6: trả 404 nếu verifier là owner hoặc executor để không lộ thông tin)
     @Override
     @Transactional(readOnly = true)
-    public VerificationRequestResponseDto getById(UUID requestId) {
-        return toDto(findRequestOrThrow(requestId));
+    public VerificationRequestResponseDto getById(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = findRequestOrThrow(requestId);
+        assertNotConflictOfInterestForRead(request, verifierId);
+        return toDto(request);
     }
 
-    // UC12: phê duyệt – chỉ đổi trạng thái, chưa ký và chưa mở khóa Vault
+    // UC13: xác thực tài liệu (mock) (N6: trả 404 nếu xung đột lợi ích)
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentVerificationResponseDto verifyDocument(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = findRequestOrThrow(requestId);
+        assertNotConflictOfInterestForRead(request, verifierId);
+        boolean valid = mockVerifyDocument(request.getDeathCertificateFileUrlEncrypted());
+
+        return DocumentVerificationResponseDto.builder()
+                .requestId(requestId)
+                .valid(valid)
+                .message(valid
+                        ? "Tài liệu hợp lệ"
+                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .png)")
+                .build();
+    }
+
+    // UC12: phê duyệt hồ sơ (chưa mở khóa Vault)
     @Override
     @Transactional
     public VerificationRequestResponseDto approve(UUID requestId, UUID verifierId) {
@@ -85,8 +104,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         assertNoConflictOfInterest(request, verifierId);
 
         request.setStatus(LegalVerificationStatus.APPROVED);
+        request.setVerifier(userRepository.getReferenceById(verifierId)); // M5: dùng getReferenceById
         request.setDecidedAt(LocalDateTime.now());
-        request.setVerifier(User.builder().id(verifierId).build());
         requestRepository.save(request);
 
         auditLogService.log(AuditAction.LEGAL_REQUEST_APPROVED, AuditResult.SUCCESS,
@@ -100,39 +119,22 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Override
     @Transactional
     public VerificationRequestResponseDto reject(UUID requestId, UUID verifierId,
-                                                  RejectVerificationRequestDto dto) {
+                                                RejectVerificationRequestDto dto) {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
 
         request.setStatus(LegalVerificationStatus.REJECTED);
+        request.setVerifier(userRepository.getReferenceById(verifierId)); // M5: dùng getReferenceById
         request.setRejectionReason(dto.getReason());
         request.setDecidedAt(LocalDateTime.now());
-        request.setVerifier(User.builder().id(verifierId).build());
         requestRepository.save(request);
 
         auditLogService.log(AuditAction.LEGAL_REQUEST_REJECTED, AuditResult.SUCCESS,
                 verifierId, null,
-                "LegalVerificationRequest", requestId.toString(),
-                "reason=" + dto.getReason());
+                "LegalVerificationRequest", requestId.toString(), "reason=" + dto.getReason());
 
         return toDto(request);
-    }
-
-    // UC13: mock kiểm tra tài liệu
-    @Override
-    @Transactional(readOnly = true)
-    public DocumentVerificationResponseDto verifyDocument(UUID requestId) {
-        LegalVerificationRequest request = findRequestOrThrow(requestId);
-        boolean valid = mockVerifyDocument(request.getDeathCertificateFileUrlEncrypted());
-
-        return DocumentVerificationResponseDto.builder()
-                .requestId(requestId)
-                .valid(valid)
-                .message(valid
-                        ? "Tài liệu hợp lệ"
-                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .png)")
-                .build();
     }
 
     // UC14: gửi OTP ký số qua email của Legal Verifier đã duyệt hồ sơ
@@ -171,6 +173,11 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Transactional(noRollbackFor = InvalidSignCodeException.class)
     public VerificationRequestResponseDto sign(UUID requestId, UUID verifierId,
                                                SignVerificationRequestDto dto) {
+        // N4: Chỉ chấp nhận method MOCK_OTP
+        if (dto.getMethod() != SignatureMethod.MOCK_OTP) {
+            throw new InvalidSignCodeException("Phương thức ký hiện tại chỉ hỗ trợ MOCK_OTP.");
+        }
+
         // PESSIMISTIC_WRITE: khóa row, tránh 2 request ký song song gây lỗi 500
         LegalVerificationRequest request = requestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException(
@@ -235,10 +242,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                             + invalid.stream().map(v -> String.valueOf(v.getId())).toList());
         }
 
-        // Tạo chữ ký số (mock SHA-256)
+        // Tạo chữ ký số (M5: dùng getReferenceById)
         DigitalSignature signature = DigitalSignature.builder()
                 .request(request)
-                .verifier(User.builder().id(verifierId).build())
+                .verifier(userRepository.getReferenceById(verifierId))
                 .signatureMethod(dto.getMethod())
                 .signatureHash(SignatureHasher.hash(
                         requestId, verifierId, dto.getMethod(),
@@ -254,10 +261,11 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             vault.setUnlockedAt(now);
             vault.setClaimDeadlineAt(now.plusDays(CLAIM_TIMEOUT_DAYS));
 
+            // N5 / M4: Vault hợp lệ luôn có ID
             auditLogService.log(AuditAction.VAULT_UNLOCK, AuditResult.SUCCESS,
                     verifierId, null,
                     "Vault",
-                    vault.getId() == null ? null : vault.getId().toString(),
+                    vault.getId().toString(),
                     "unlocked by legal verifier, request " + requestId);
         }
 
@@ -290,7 +298,6 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         }
 
         LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
-        // "to" tính trọn ngày, lấy đầu ngày kế tiếp làm mốc
         LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
 
         return requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId).stream()
@@ -324,11 +331,22 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // Verifier không được xử lý hồ sơ của chính mình (là owner hoặc executor)
     private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
-        if (verifierId.equals(request.getOwner().getId())
-                || verifierId.equals(request.getExecutor().getId())) {
+        if (isConflict(request, verifierId)) {
             throw new ConflictOfInterestException(
                     "Bạn không được xử lý hồ sơ có liên quan đến chính mình.");
         }
+    }
+
+    // N6 / Q23-b: Khi đọc chi tiết/kiểm tra tài liệu, nếu xung đột lợi ích thì trả 404 để không lộ sự tồn tại
+    private void assertNotConflictOfInterestForRead(LegalVerificationRequest request, UUID verifierId) {
+        if (isConflict(request, verifierId)) {
+            throw new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + request.getId());
+        }
+    }
+
+    private boolean isConflict(LegalVerificationRequest request, UUID verifierId) {
+        return (request.getOwner() != null && verifierId.equals(request.getOwner().getId()))
+                || (request.getExecutor() != null && verifierId.equals(request.getExecutor().getId()));
     }
 
     private VerificationRequestResponseDto toDto(LegalVerificationRequest r) {
@@ -346,7 +364,6 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .vaultIds(vaultIds)
                 .rejectionReason(r.getRejectionReason())
                 .decidedAt(r.getDecidedAt())
-                .createdAt(r.getCreatedAt())
                 .build();
     }
 }
