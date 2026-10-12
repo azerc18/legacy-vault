@@ -2,14 +2,17 @@ package com.ltld.app.legacyvault.verificationtokentest;
 
 import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenServiceImpl;
@@ -24,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,6 +51,9 @@ public class VerificationTokenServiceImplTest {
 
     @Mock
     private AuditLogService auditLogService;
+
+    @Mock
+    private VaultRepository vaultRepository;
 
     @InjectMocks
     private VerificationTokenServiceImpl tokenService;
@@ -360,6 +367,48 @@ public class VerificationTokenServiceImplTest {
 
         verify(tokenRepository, times(1)).saveAndFlush(token);
         verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    void verifyEmail_correctOtp_linksPendingBeneficiaryVaults() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("test@example.com");
+        request.setOtp("123456");
+        User user = pendingUser();
+        VerificationToken token = tokenFor(user, "123456", 0, Instant.now().plusSeconds(100));
+        Vault pendingVault = Vault.builder().id(UUID.randomUUID()).beneficiaryEmail("test@example.com").build();
+
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+        when(tokenRepository.findTopByUserAndTypeAndIsUsedFalseOrderByCreatedAtDesc(user, TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(token));
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com"))
+                .thenReturn(List.of(pendingVault));
+
+        tokenService.verifyEmail(request);
+
+        assertThat(pendingVault.getBeneficiary()).isSameAs(user);
+        assertThat(pendingVault.getBeneficiaryEmail()).isNull();
+        verify(vaultRepository).saveAll(List.of(pendingVault));
+        verify(auditLogService).log(AuditAction.BENEFICIARY_LINKED, AuditResult.SUCCESS, user.getId(),
+                "test@example.com", "Vault", pendingVault.getId().toString(), null);
+    }
+
+    @Test
+    void verifyEmail_wrongOtp_doesNotLinkVaults() {
+        VerifyOtpRequest request = new VerifyOtpRequest();
+        request.setEmail("test@example.com");
+        request.setOtp("000000");
+        User user = pendingUser();
+        VerificationToken token = tokenFor(user, "123456", 0, Instant.now().plusSeconds(100));
+
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
+        when(tokenRepository.findTopByUserAndTypeAndIsUsedFalseOrderByCreatedAtDesc(user, TokenType.EMAIL_VERIFICATION))
+                .thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> tokenService.verifyEmail(request))
+                .isInstanceOf(InvalidOtpException.class);
+
+        verifyNoInteractions(vaultRepository);
     }
 
     @Test

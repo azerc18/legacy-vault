@@ -79,6 +79,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(VaultException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultException(VaultException e) {
+        return ResponseEntity.status(e.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidRefreshToken(InvalidRefreshTokenException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
