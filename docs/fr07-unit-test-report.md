@@ -10,8 +10,6 @@ The FR-07 unit tests cover DMS timeout activation, Primary-to-Backup escalation,
 | `DmsAutomationServiceImplTest` | 9 | Passed |
 | **FR-07 total** | **23** | **Passed** |
 
-The latest full project test run recorded **63 tests, 0 failures, 0 errors, and 0 skipped** (`BUILD SUCCESS`).
-
 Run the FR-07 tests from the project root in PowerShell:
 
 ```powershell
