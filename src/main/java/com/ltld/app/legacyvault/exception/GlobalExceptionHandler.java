@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -132,5 +133,55 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Request conflict. Please try again."));
     }
 
+    @ExceptionHandler(VerificationRequestNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationRequestNotFound(
+            VerificationRequestNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 
+    @ExceptionHandler(RequestAlreadyReviewedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestAlreadyReviewed(
+            RequestAlreadyReviewedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(RequestNotApprovedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestNotApproved(
+            RequestNotApprovedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler({NotAssignedVerifierException.class, ConflictOfInterestException.class})
+    public ResponseEntity<ApiResponse<Void>> handleVerifierForbidden(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(VaultStateConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultStateConflict(VaultStateConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolation: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
+    }
+
+    @ExceptionHandler(InvalidSignCodeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidSignCode(InvalidSignCodeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidDateRange(InvalidDateRangeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
