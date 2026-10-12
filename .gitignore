@@ -34,3 +34,6 @@ build/
 
 ### .env ###
 .env
+
+### File upload (FR-04 / FR-09) ###
+uploads/

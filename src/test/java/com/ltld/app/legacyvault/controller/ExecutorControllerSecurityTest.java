@@ -3,15 +3,19 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.LegalVerificationSubmissionService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
@@ -24,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ExecutorController.class)
@@ -34,6 +39,7 @@ class ExecutorControllerSecurityTest {
     @MockitoBean private DmsAutomationService dmsAutomationService;
     @MockitoBean private ExecutorHandoverService executorHandoverService;
     @MockitoBean private VerificationExchangeService verificationExchangeService;
+    @MockitoBean private LegalVerificationSubmissionService legalVerificationSubmissionService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(String subject, String... authorities) {
@@ -66,5 +72,54 @@ class ExecutorControllerSecurityTest {
                         .with(token(subject, "ROLE_EXECUTOR")))
                 .andExpect(status().isOk());
         verify(executorHandoverService).getAssignedVaults(subject);
+    }
+
+    // FR-09: gửi yêu cầu xác minh pháp lý
+    private static MockMultipartHttpServletRequestBuilder submitLegalRequest() {
+        return (MockMultipartHttpServletRequestBuilder) multipart("/api/executors/legal-verification-requests")
+                .file(new MockMultipartFile("deathCertificate", "giay-chung-tu.pdf",
+                        MediaType.APPLICATION_PDF_VALUE, "%PDF-1.7".getBytes()))
+                .param("vaultIds", UUID.randomUUID().toString());
+    }
+
+    @Test
+    void submitLegalRequest_noToken_returns401() throws Exception {
+        mockMvc.perform(submitLegalRequest())
+                .andExpect(status().isUnauthorized());
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    void submitLegalRequest_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(submitLegalRequest()
+                        .with(token(UUID.randomUUID().toString(), "ROLE_OWNER", "VAULT_READ")))
+                .andExpect(status().isForbidden());
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    void submitLegalRequest_legalVerifier_returns403() throws Exception {
+        mockMvc.perform(submitLegalRequest()
+                        .with(token(UUID.randomUUID().toString(), "ROLE_LEGAL_VERIFIER", "LEGAL_REVIEW")))
+                .andExpect(status().isForbidden());
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    void submitLegalRequest_beneficiary_returns403() throws Exception {
+        mockMvc.perform(submitLegalRequest()
+                        .with(token(UUID.randomUUID().toString(), "ROLE_BENEFICIARY")))
+                .andExpect(status().isForbidden());
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    void submitLegalRequest_executor_returns201AndPassesJwtSubject() throws Exception {
+        String subject = UUID.randomUUID().toString();
+
+        mockMvc.perform(submitLegalRequest()
+                        .with(token(subject, "ROLE_EXECUTOR")))
+                .andExpect(status().isCreated());
+        verify(legalVerificationSubmissionService).submit(any(), eq(subject));
     }
 }

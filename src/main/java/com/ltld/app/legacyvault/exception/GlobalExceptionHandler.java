@@ -15,6 +15,7 @@ import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
@@ -190,6 +191,26 @@ public class GlobalExceptionHandler {
         log.warn("DataIntegrityViolation: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
+    }
+
+    // FR-09: Executor gửi yêu cầu xác minh pháp lý
+    @ExceptionHandler({InvalidDeathCertificateException.class, InvalidVerificationRequestException.class})
+    public ResponseEntity<ApiResponse<Void>> handleInvalidVerificationRequest(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateVerificationRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateVerificationRequest(
+            DuplicateVerificationRequestException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
+                .body(ApiResponse.error("Tệp tải lên vượt quá dung lượng cho phép (10MB)."));
     }
 
     @ExceptionHandler(Exception.class)

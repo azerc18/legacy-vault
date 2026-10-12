@@ -3,14 +3,19 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
+import com.ltld.app.legacyvault.dto.executordto.SubmitLegalVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.LegalVerificationSubmissionService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +32,7 @@ public class ExecutorController {
     private final DmsAutomationService dmsAutomationService;
     private final ExecutorHandoverService executorHandoverService;
     private final VerificationExchangeService verificationExchangeService;
+    private final LegalVerificationSubmissionService legalVerificationSubmissionService;
 
     // FR-07 bước 4: Executor xác nhận đã nhận thông báo kích hoạt.
     // Principal.getName() là định danh của phiên đăng nhập (email hoặc user id); Auth/JWT do module khác cung cấp.
@@ -46,6 +52,18 @@ public class ExecutorController {
 
         List<AssignedVaultResponse> response = executorHandoverService.getAssignedVaults(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Assigned vaults retrieved successfully", response));
+    }
+
+    // FR-09: Executor tải giấy chứng tử và gửi yêu cầu xác minh pháp lý để mở khóa các Vault được ủy quyền
+    @PostMapping(value = "/legal-verification-requests", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('EXECUTOR')")
+    public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> submitLegalVerificationRequest(
+            @Valid @ModelAttribute SubmitLegalVerificationRequest request, Principal principal) {
+
+        VerificationRequestResponseDto response =
+                legalVerificationSubmissionService.submit(request, principal.getName());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Đã gửi yêu cầu xác minh pháp lý", response));
     }
 
     // FR-10: Executor theo dõi tiến độ bàn giao từng tài sản / Vault theo assignment ID

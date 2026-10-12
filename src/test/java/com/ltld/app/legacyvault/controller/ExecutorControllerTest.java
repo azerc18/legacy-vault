@@ -6,24 +6,30 @@ import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.HandoverStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidAttachmentException;
+import com.ltld.app.legacyvault.exception.InvalidDeathCertificateException;
 import com.ltld.app.legacyvault.exception.VerificationNotFoundException;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.LegalVerificationSubmissionService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,9 +39,13 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,6 +66,9 @@ public class ExecutorControllerTest {
 
     @MockitoBean
     private VerificationExchangeService verificationExchangeService;
+
+    @MockitoBean
+    private LegalVerificationSubmissionService legalVerificationSubmissionService;
 
     @Test
     @DisplayName("GET /api/executors/{executorId}/handover-progress: trả về 200 và danh sách tiến độ")
@@ -325,5 +338,105 @@ public class ExecutorControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Identity verification request not found."));
+    }
+
+    private static MockMultipartFile deathCertificate() {
+        return new MockMultipartFile("deathCertificate", "giay-chung-tu.pdf",
+                MediaType.APPLICATION_PDF_VALUE, "%PDF-1.7 test".getBytes());
+    }
+
+    @Test
+    @DisplayName("POST /api/executors/legal-verification-requests: gửi yêu cầu thành công trả về 201")
+    void submitLegalVerificationRequest_success_returns201() throws Exception {
+        UUID vault1 = UUID.randomUUID();
+        UUID vault2 = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        String userEmail = "executor@example.com";
+        Principal mockPrincipal = () -> userEmail;
+
+        VerificationRequestResponseDto response = VerificationRequestResponseDto.builder()
+                .id(requestId)
+                .ownerName("Owner Test")
+                .executorName("Executor Test")
+                .status(LegalVerificationStatus.PENDING)
+                .hasDeathCertificate(true)
+                .vaultIds(List.of(vault1, vault2))
+                .build();
+
+        when(legalVerificationSubmissionService.submit(any(), eq(userEmail))).thenReturn(response);
+
+        mockMvc.perform(multipart("/api/executors/legal-verification-requests")
+                        .file(deathCertificate())
+                        .param("vaultIds", vault1.toString(), vault2.toString())
+                        .param("note", "Gửi kèm giấy chứng tử bản scan")
+                        .principal(mockPrincipal))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Đã gửi yêu cầu xác minh pháp lý"))
+                .andExpect(jsonPath("$.data.id").value(requestId.toString()))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.vaultIds[1]").value(vault2.toString()));
+
+        verify(legalVerificationSubmissionService).submit(argThat(r ->
+                r.getVaultIds().equals(List.of(vault1, vault2))
+                        && "giay-chung-tu.pdf".equals(r.getDeathCertificate().getOriginalFilename())
+                        && "Gửi kèm giấy chứng tử bản scan".equals(r.getNote())), eq(userEmail));
+    }
+
+    @Test
+    @DisplayName("POST /api/executors/legal-verification-requests: thiếu danh sách Vault trả về 400")
+    void submitLegalVerificationRequest_missingVaultIds_returns400() throws Exception {
+        mockMvc.perform(multipart("/api/executors/legal-verification-requests")
+                        .file(deathCertificate())
+                        .principal(() -> "executor@example.com"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.data.vaultIds").value("Vui lòng chọn ít nhất một Vault cần mở khóa"));
+
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /api/executors/legal-verification-requests: thiếu tệp giấy chứng tử trả về 400")
+    void submitLegalVerificationRequest_missingFile_returns400() throws Exception {
+        mockMvc.perform(multipart("/api/executors/legal-verification-requests")
+                        .param("vaultIds", UUID.randomUUID().toString())
+                        .principal(() -> "executor@example.com"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.deathCertificate").value("Vui lòng tải lên giấy chứng tử"));
+
+        verify(legalVerificationSubmissionService, never()).submit(any(), any());
+    }
+
+    @Test
+    @DisplayName("POST /api/executors/legal-verification-requests: tệp sai định dạng trả về 400")
+    void submitLegalVerificationRequest_invalidFile_returns400() throws Exception {
+        when(legalVerificationSubmissionService.submit(any(), any()))
+                .thenThrow(new InvalidDeathCertificateException(
+                        "Định dạng tệp không hợp lệ. Chỉ chấp nhận .pdf, .jpg, .png."));
+
+        mockMvc.perform(multipart("/api/executors/legal-verification-requests")
+                        .file(new MockMultipartFile("deathCertificate", "scan.docx",
+                                MediaType.APPLICATION_OCTET_STREAM_VALUE, "abc".getBytes()))
+                        .param("vaultIds", UUID.randomUUID().toString())
+                        .principal(() -> "executor@example.com"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Định dạng tệp không hợp lệ. Chỉ chấp nhận .pdf, .jpg, .png."));
+    }
+
+    @Test
+    @DisplayName("POST /api/executors/legal-verification-requests: Vault đã có yêu cầu đang chờ trả về 409")
+    void submitLegalVerificationRequest_duplicate_returns409() throws Exception {
+        when(legalVerificationSubmissionService.submit(any(), any()))
+                .thenThrow(new DuplicateVerificationRequestException(
+                        "Đã tồn tại yêu cầu xác minh pháp lý đang chờ xử lý cho Vault được chọn."));
+
+        mockMvc.perform(multipart("/api/executors/legal-verification-requests")
+                        .file(deathCertificate())
+                        .param("vaultIds", UUID.randomUUID().toString())
+                        .principal(() -> "executor@example.com"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }
