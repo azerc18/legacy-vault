@@ -12,6 +12,8 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
+import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -31,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 
@@ -66,6 +69,7 @@ class ExecutorManagementServiceImplTest {
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ExecutorManagementServiceImpl service;
@@ -162,7 +166,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.CONFLICT);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
         assertThat(candidate.getRoles()).isEmpty();
     }
 
@@ -175,7 +179,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @ParameterizedTest
@@ -188,6 +192,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.UNPROCESSABLE_ENTITY);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(eventPublisher);
         assertThat(candidate.getRoles()).isEmpty();
     }
 
@@ -200,6 +205,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.BAD_REQUEST);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     @Test
@@ -212,7 +218,7 @@ class ExecutorManagementServiceImplTest {
 
         assertThat(response.getAssignmentId()).isEqualTo(current.getId());
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService, roleRepository);
+        verifyNoInteractions(auditLogService, roleRepository, eventPublisher);
         assertThat(candidate.getRoles()).isEmpty();
     }
 
@@ -225,7 +231,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.CONFLICT);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
@@ -249,7 +255,7 @@ class ExecutorManagementServiceImplTest {
 
         assertThat(current.getExecutorUser()).isSameAs(previous);
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
@@ -341,7 +347,7 @@ class ExecutorManagementServiceImplTest {
         assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, false)),
                 HttpStatus.CONFLICT);
 
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
@@ -353,6 +359,7 @@ class ExecutorManagementServiceImplTest {
                 HttpStatus.NOT_FOUND);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(eventPublisher);
     }
 
     // ---------- DELETE: thu hồi ----------
@@ -402,7 +409,7 @@ class ExecutorManagementServiceImplTest {
         assertStatus(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY), HttpStatus.NOT_FOUND);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
@@ -413,7 +420,7 @@ class ExecutorManagementServiceImplTest {
         assertStatus(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY), HttpStatus.NOT_FOUND);
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
@@ -427,7 +434,64 @@ class ExecutorManagementServiceImplTest {
 
         assertThat(current.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    // ---------- FR-06 bước 5: event gửi mail ----------
+
+    @Test
+    @DisplayName("Mail: gán mới -> chỉ người được chỉ định nhận mail ASSIGNED, event publish sau khi flush")
+    void mail_newAssignment_notifiesCandidateOnly() {
+        service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, false));
+
+        InOrder order = inOrder(executorAssignmentRepository, eventPublisher);
+        order.verify(executorAssignmentRepository).saveAndFlush(any());
+        order.verify(eventPublisher).publishEvent(any(Object.class));
+        assertThat(publishedMails()).containsExactly(
+                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY));
+    }
+
+    @Test
+    @DisplayName("Mail: dùng lại dòng REVOKED -> chỉ người mới nhận ASSIGNED, người bị thu hồi trước đó không nhận")
+    void mail_reuseRevokedRow_notifiesCandidateOnly() {
+        User previous = user(UUID.randomUUID(), "old@example.test", UserStatus.ACTIVE);
+        assignment(ExecutorType.BACKUP, previous, ExecutorStatus.REVOKED);
+
+        service.assignExecutor(ownerId, ExecutorType.BACKUP, request(CANDIDATE_EMAIL, false));
+
+        assertThat(publishedMails()).containsExactly(
+                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.BACKUP));
+    }
+
+    @Test
+    @DisplayName("Mail: thay người -> người mới nhận ASSIGNED, người cũ nhận REVOKED, trong cùng một event")
+    void mail_replace_notifiesNewAndPrevious() {
+        User previous = user(UUID.randomUUID(), "old@example.test", UserStatus.ACTIVE);
+        assignment(ExecutorType.PRIMARY, previous, ExecutorStatus.INACTIVE);
+
+        service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true));
+
+        assertThat(publishedMails()).containsExactly(
+                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY),
+                ExecutorMail.revoked("old@example.test", owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY));
+    }
+
+    @Test
+    @DisplayName("Mail: thu hồi -> chỉ người bị thu hồi nhận REVOKED")
+    void mail_revoke_notifiesRevokedExecutor() {
+        assignment(ExecutorType.BACKUP, candidate, ExecutorStatus.INACTIVE);
+
+        service.revokeExecutor(ownerId, ExecutorType.BACKUP);
+
+        assertThat(publishedMails()).containsExactly(
+                ExecutorMail.revoked(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.BACKUP));
+    }
+
+    private List<ExecutorMail> publishedMails() {
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue()).isInstanceOf(ExecutorAssignmentChangedEvent.class);
+        return ((ExecutorAssignmentChangedEvent) captor.getValue()).mails();
     }
 
     // ---------- GET: danh sách ----------
@@ -453,7 +517,7 @@ class ExecutorManagementServiceImplTest {
         assertThat(result.get(0).getAssignedAt()).isEqualTo(primary.getAssignedAt());
         assertThat(result.get(1).getStatus()).isEqualTo(ExecutorStatus.REVOKED);
         assertThat(result.get(1).getRevokedAt()).isEqualTo(backup.getRevokedAt());
-        verifyNoInteractions(dmsConfigRepository, auditLogService);
+        verifyNoInteractions(dmsConfigRepository, auditLogService, eventPublisher);
     }
 
     @Test

@@ -11,6 +11,8 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
+import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -20,12 +22,14 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -53,6 +57,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final AuditLogService auditLogService;
+    // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -123,6 +129,14 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 + (previous != null ? ", previousExecutorUserId=" + previous.getId() : "");
         audit(previous != null ? AuditAction.EXECUTOR_REPLACED : AuditAction.EXECUTOR_ASSIGNED, owner, saved, detail);
 
+        // FR-06 bước 5: người mới được báo chỉ định; khi thay người thì người cũ được báo bị thu hồi.
+        List<ExecutorMail> mails = new ArrayList<>();
+        mails.add(ExecutorMail.assigned(candidate.getEmail(), owner.getFullName(), owner.getEmail(), type));
+        if (previous != null) {
+            mails.add(ExecutorMail.revoked(previous.getEmail(), owner.getFullName(), owner.getEmail(), type));
+        }
+        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(mails));
+
         return toResponse(saved);
     }
 
@@ -148,6 +162,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         // reason=OWNER: phân biệt với reason=BR03_TIMEOUT khi FR-07 tự thu hồi Primary.
         audit(AuditAction.EXECUTOR_REVOKE, owner, saved, "ownerId=" + ownerId
                 + ", executorType=" + type + ", executorUserId=" + executor.getId() + ", reason=OWNER");
+
+        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(
+                ExecutorMail.revoked(executor.getEmail(), owner.getFullName(), owner.getEmail(), type))));
 
         return toResponse(saved);
     }
