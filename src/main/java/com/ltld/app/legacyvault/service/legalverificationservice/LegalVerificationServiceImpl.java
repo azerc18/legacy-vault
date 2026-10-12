@@ -35,14 +35,20 @@ import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -53,6 +59,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private static final int SIGN_OTP_EXPIRE_MINUTES = 5;
     private static final int MAX_SIGN_ATTEMPTS = 5;
     private static final long SIGN_OTP_RESEND_COOLDOWN_SECONDS = 60;
+    private static final int MAX_HISTORY_PAGE_SIZE = 100;
+    private static final LocalDateTime HISTORY_MIN_TIME = LocalDateTime.of(1970, 1, 1, 0, 0);
+    private static final LocalDateTime HISTORY_MAX_TIME = LocalDateTime.of(9999, 1, 1, 0, 0);
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
@@ -68,8 +77,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Override
     @Transactional(readOnly = true)
     public List<VerificationRequestResponseDto> getPendingRequests(UUID verifierId) {
-        return requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId)
-                .stream().map(this::toDto).toList();
+        return toDtos(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId));
     }
 
     // UC12: xem chi tiết 1 hồ sơ (N6: trả 404 nếu verifier là owner hoặc executor để không lộ thông tin)
@@ -106,13 +114,14 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
 
+        User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
         request.setStatus(LegalVerificationStatus.APPROVED);
-        request.setVerifier(userRepository.getReferenceById(verifierId)); // M5: dùng getReferenceById
+        request.setVerifier(verifier);
         request.setDecidedAt(LocalDateTime.now());
         requestRepository.save(request);
 
         auditLogService.log(AuditAction.LEGAL_REQUEST_APPROVED, AuditResult.SUCCESS,
-                verifierId, null,
+                verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), null);
 
         return toDto(request);
@@ -127,14 +136,15 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
 
+        User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
         request.setStatus(LegalVerificationStatus.REJECTED);
-        request.setVerifier(userRepository.getReferenceById(verifierId)); // M5: dùng getReferenceById
+        request.setVerifier(verifier);
         request.setRejectionReason(dto.getReason());
         request.setDecidedAt(LocalDateTime.now());
         requestRepository.save(request);
 
         auditLogService.log(AuditAction.LEGAL_REQUEST_REJECTED, AuditResult.SUCCESS,
-                verifierId, null,
+                verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), "reason=" + dto.getReason());
 
         return toDto(request);
@@ -176,8 +186,17 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         request.setSignAttempts(0); // reset lượt thử khi sinh mã mới
         requestRepository.save(request);
 
-        emailSender.sendEmail(verifier.getEmail(), otp);
-        log.info("Sent sign OTP to verifier {} for request {}", verifier.getEmail(), requestId);
+        // N3: ghi audit việc gửi mã ký
+        auditLogService.log(AuditAction.LEGAL_SIGN_OTP_SENT, AuditResult.SUCCESS,
+                verifierId, verifier.getEmail(),
+                "LegalVerificationRequest", requestId.toString(), null);
+
+        // N2: chỉ gửi email SAU KHI transaction commit, tránh gửi mã không dùng được nếu commit lỗi
+        String email = verifier.getEmail();
+        runAfterCommit(() -> {
+            emailSender.sendEmail(email, otp);
+            log.info("Sent sign OTP to verifier {} for request {}", email, requestId);
+        });
     }
 
     // UC14: ký xác nhận – hồ sơ phải APPROVED, đúng verifier, đúng mã OTP, chưa ký
@@ -220,7 +239,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             request.setSignOtpHash(null); // buộc yêu cầu mã mới
             requestRepository.save(request);
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
-                    verifierId, null,
+                    verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
             throw new InvalidSignCodeException("Sai quá số lần cho phép. Vui lòng yêu cầu mã mới.");
         }
@@ -228,7 +247,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
             requestRepository.save(request);
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
-                    verifierId, null,
+                    verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
             throw new InvalidSignCodeException("Mã xác nhận không đúng.");
         }
@@ -266,6 +285,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         signatureRepository.save(signature);
 
         // Mở khóa từng Vault, đặt hạn nhận 60 ngày (BR-04), ghi audit mỗi vault
+        String verifierEmail = emailOf(verifierId);
         LocalDateTime now = LocalDateTime.now();
         for (VerificationRequestVault link : links) {
             Vault vault = link.getVault();
@@ -275,7 +295,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
             // N5 / M4: Vault hợp lệ luôn có ID
             auditLogService.log(AuditAction.VAULT_UNLOCK, AuditResult.SUCCESS,
-                    verifierId, null,
+                    verifierId, verifierEmail,
                     "Vault",
                     vault.getId().toString(),
                     "unlocked by legal verifier, request " + requestId);
@@ -286,7 +306,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         requestRepository.save(request);
 
         auditLogService.log(AuditAction.LEGAL_REQUEST_SIGNED, AuditResult.SUCCESS,
-                verifierId, null,
+                verifierId, verifierEmail,
                 "LegalVerificationRequest", requestId.toString(),
                 "signatureId=" + signature.getId());
 
@@ -303,23 +323,23 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Transactional(readOnly = true)
     public List<VerificationRequestResponseDto> getHistory(
             UUID verifierId, LegalVerificationStatus status,
-            LocalDate from, LocalDate to) {
+            LocalDate from, LocalDate to, int page, int size) {
 
         if (from != null && to != null && from.isAfter(to)) {
             throw new InvalidDateRangeException("'from' phải trước hoặc bằng 'to'.");
         }
 
-        LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
-        LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
+        LocalDateTime fromTime = from == null ? HISTORY_MIN_TIME : from.atStartOfDay();
+        LocalDateTime toTime = to == null ? HISTORY_MAX_TIME : to.plusDays(1).atStartOfDay();
+        Collection<LegalVerificationStatus> statuses = status == null
+                ? List.of(LegalVerificationStatus.values())
+                : List.of(status);
 
-        return requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId).stream()
-                .filter(r -> status == null || r.getStatus() == status)
-                .filter(r -> fromTime == null
-                        || (r.getDecidedAt() != null && !r.getDecidedAt().isBefore(fromTime)))
-                .filter(r -> toTime == null
-                        || (r.getDecidedAt() != null && r.getDecidedAt().isBefore(toTime)))
-                .map(this::toDto)
-                .toList();
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_HISTORY_PAGE_SIZE);
+
+        return toDtos(requestRepository.findHistory(
+                verifierId, statuses, fromTime, toTime, PageRequest.of(safePage, safeSize)));
     }
 
     // Mock FR-13: hợp lệ nếu đường dẫn kết thúc bằng .pdf, .jpg hoặc .png
@@ -361,12 +381,51 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 || (request.getExecutor() != null && verifierId.equals(request.getExecutor().getId()));
     }
 
+    // Gửi/ghi sau khi transaction commit; ngoài transaction (unit test) thì chạy ngay
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
+    }
+
+    // M3: lấy email người thao tác để ghi audit
+    private String emailOf(UUID userId) {
+        User user = userRepository.getReferenceById(userId);
+        return user == null ? null : user.getEmail();
+    }
+
+    // 1 hồ sơ: lấy vault riêng
     private VerificationRequestResponseDto toDto(LegalVerificationRequest r) {
         List<UUID> vaultIds = requestVaultRepository.findByRequestId(r.getId())
                 .stream()
                 .map(rv -> rv.getVault().getId())
                 .toList();
+        return toDto(r, vaultIds);
+    }
 
+    // M1: nhiều hồ sơ: lấy vault của tất cả trong 1 query
+    private List<VerificationRequestResponseDto> toDtos(List<LegalVerificationRequest> requests) {
+        if (requests.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = requests.stream().map(LegalVerificationRequest::getId).toList();
+        Map<UUID, List<UUID>> vaultIdsByRequest = requestVaultRepository.findByRequestIdIn(ids).stream()
+                .collect(Collectors.groupingBy(
+                        rv -> rv.getRequest().getId(),
+                        Collectors.mapping(rv -> rv.getVault().getId(), Collectors.toList())));
+        return requests.stream()
+                .map(r -> toDto(r, vaultIdsByRequest.getOrDefault(r.getId(), List.of())))
+                .toList();
+    }
+
+    private VerificationRequestResponseDto toDto(LegalVerificationRequest r, List<UUID> vaultIds) {
         return VerificationRequestResponseDto.builder()
                 .id(r.getId())
                 .ownerName(r.getOwner().getFullName())

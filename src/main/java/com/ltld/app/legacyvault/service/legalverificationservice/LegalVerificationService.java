@@ -33,7 +33,8 @@ public interface LegalVerificationService {
     // UC14: ký xác nhận, mở khóa Vault
     VerificationRequestResponseDto sign(UUID requestId, UUID verifierId, SignVerificationRequestDto dto);
 
-    // UC15: xem lịch sử các hồ sơ đã xử lý
+    // UC15: xem lịch sử các hồ sơ đã xử lý (lọc + phân trang trong DB)
     List<VerificationRequestResponseDto> getHistory(
-            UUID verifierId, LegalVerificationStatus status, LocalDate from, LocalDate to);
+            UUID verifierId, LegalVerificationStatus status, LocalDate from, LocalDate to,
+            int page, int size);
 }

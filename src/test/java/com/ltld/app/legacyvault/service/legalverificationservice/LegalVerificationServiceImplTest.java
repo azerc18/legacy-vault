@@ -37,6 +37,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,6 +49,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -162,7 +165,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void approve_success_setsApprovedWithoutSigningOrUnlocking() {
-        User verifierUser = User.builder().id(verifierId).build();
+        User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
@@ -173,6 +176,10 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
         verifyNoInteractions(signatureRepository);
+        // M3: audit phải có email người duyệt
+        verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_APPROVED), eq(AuditResult.SUCCESS),
+                eq(verifierId), eq("verifier@test.com"),
+                eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
     }
 
     @Test
@@ -275,6 +282,60 @@ public class LegalVerificationServiceImplTest {
         verify(signatureRepository, never()).save(any());
     }
 
+    // T2: sai quá 5 lần -> hủy mã + audit "Too many sign attempts"
+    @Test
+    void sign_tooManyAttempts_invalidatesOtpAndAudits() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+        pendingRequest.setSignAttempts(5); // lần thứ 6 vượt giới hạn
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(InvalidSignCodeException.class);
+
+        assertThat(pendingRequest.getSignOtpHash()).isNull();
+        verify(auditLogService).log(eq(AuditAction.LEGAL_SIGN_FAILED), eq(AuditResult.FAILURE),
+                eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()),
+                eq("Too many sign attempts"));
+        verify(signatureRepository, never()).save(any());
+    }
+
+    // T4: sendSignOtp chưa APPROVED / sai verifier / đã ký -> bị chặn, không gửi email
+    @Test
+    void sendSignOtp_notApproved_throwsAndDoesNotSendEmail() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sendSignOtp(requestId, verifierId))
+                .isInstanceOf(RequestNotApprovedException.class);
+
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    void sendSignOtp_differentVerifier_throwsNotAssignedAndDoesNotSendEmail() {
+        approvedByVerifier();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sendSignOtp(requestId, UUID.randomUUID()))
+                .isInstanceOf(NotAssignedVerifierException.class);
+
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    void sendSignOtp_alreadySigned_throwsAndDoesNotSendEmail() {
+        approvedByVerifier();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(signatureRepository.existsByRequestId(requestId)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.sendSignOtp(requestId, verifierId))
+                .isInstanceOf(RequestAlreadyReviewedException.class);
+
+        verifyNoInteractions(emailSender);
+    }
+
     // T5: method = MOCK_PIN bị từ chối (N4)
     @Test
     void sign_methodMockPin_throwsInvalidSignCode() {
@@ -304,6 +365,10 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getSignOtpExpiresAt()).isNotNull();
         assertThat(pendingRequest.getSignAttempts()).isEqualTo(0);
         verify(emailSender, times(1)).sendEmail("verifier@test.com", "123456");
+        // N3: có audit việc gửi mã ký
+        verify(auditLogService).log(eq(AuditAction.LEGAL_SIGN_OTP_SENT), eq(AuditResult.SUCCESS),
+                eq(verifierId), eq("verifier@test.com"),
+                eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
     }
 
     // T4: gửi lại OTP trong 60 giây bị chặn (N1)
@@ -468,29 +533,59 @@ public class LegalVerificationServiceImplTest {
                 .isEqualTo(LocalDateTime.of(2026, 10, 1, 9, 0));
     }
 
-    // T7: danh sách PENDING phải dùng query đã loại Owner/Executor (N6)
+    // T7: danh sách PENDING dùng query đã loại Owner/Executor (N6) và lấy vault theo lô (M1)
     @Test
-    void getPendingRequests_usesVisibleToQuery() {
+    void getPendingRequests_usesVisibleToQuery_andLoadsVaultsInOneBatch() {
         when(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
                 .thenReturn(List.of(pendingRequest));
-        when(requestVaultRepository.findByRequestId(requestId)).thenReturn(List.of());
 
         List<VerificationRequestResponseDto> result = service.getPendingRequests(verifierId);
 
         assertThat(result).hasSize(1);
         verify(requestRepository).findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId);
-        verify(requestRepository, never()).findByStatusFetch(any());
+        verify(requestVaultRepository, times(1)).findByRequestIdIn(anyCollection());
+        verify(requestVaultRepository, never()).findByRequestId(any());
     }
 
-    // ---------- UC15: getHistory ----------
+    // M1: mỗi hồ sơ nhận đúng vault của mình dù chỉ 1 query
+    @Test
+    void getPendingRequests_mapsVaultIdsPerRequest() {
+        LegalVerificationRequest second = LegalVerificationRequest.builder()
+                .id(UUID.randomUUID())
+                .owner(User.builder().id(UUID.randomUUID()).fullName("Owner 2").build())
+                .executor(User.builder().id(UUID.randomUUID()).fullName("Executor 2").build())
+                .deathCertificateFileUrlEncrypted("enc://second.pdf")
+                .status(LegalVerificationStatus.PENDING)
+                .build();
+        UUID vault1 = UUID.randomUUID();
+        UUID vault2 = UUID.randomUUID();
+        VerificationRequestVault link1 = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(Vault.builder().id(vault1).build()).build();
+        VerificationRequestVault link2 = VerificationRequestVault.builder()
+                .request(second).vault(Vault.builder().id(vault2).build()).build();
+
+        when(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
+                .thenReturn(List.of(pendingRequest, second));
+        when(requestVaultRepository.findByRequestIdIn(anyCollection())).thenReturn(List.of(link1, link2));
+
+        List<VerificationRequestResponseDto> result = service.getPendingRequests(verifierId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getVaultIds()).containsExactly(vault1);
+        assertThat(result.get(1).getVaultIds()).containsExactly(vault2);
+        verify(requestVaultRepository, never()).findByRequestId(any());
+    }
+
+    // ---------- UC15: getHistory (lọc + phân trang trong DB) ----------
 
     @Test
     void getHistory_noFilter_returnsAllRequestsHandledByVerifier() {
         pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
-        when(requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId))
+        when(requestRepository.findHistory(eq(verifierId), anyCollection(),
+                any(LocalDateTime.class), any(LocalDateTime.class), any(Pageable.class)))
                 .thenReturn(List.of(pendingRequest));
 
-        List<VerificationRequestResponseDto> result = service.getHistory(verifierId, null, null, null);
+        List<VerificationRequestResponseDto> result = service.getHistory(verifierId, null, null, null, 0, 20);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
@@ -498,51 +593,54 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void getHistory_noHandledRequests_returnsEmptyList() {
-        when(requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId)).thenReturn(List.of());
+        when(requestRepository.findHistory(eq(verifierId), anyCollection(),
+                any(LocalDateTime.class), any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(List.of());
 
-        assertThat(service.getHistory(verifierId, null, null, null)).isEmpty();
+        assertThat(service.getHistory(verifierId, null, null, null, 0, 20)).isEmpty();
+        verifyNoInteractions(requestVaultRepository);
     }
 
     @Test
-    void getHistory_filterByStatus_returnsOnlyMatchingStatus() {
-        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
-        LegalVerificationRequest rejected = LegalVerificationRequest.builder()
-                .id(UUID.randomUUID())
-                .owner(User.builder().fullName("Test Owner").build())
-                .executor(User.builder().fullName("Test Executor").build())
-                .deathCertificateFileUrlEncrypted("enc://other.pdf")
-                .status(LegalVerificationStatus.REJECTED)
-                .build();
-        when(requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId))
-                .thenReturn(List.of(pendingRequest, rejected));
+    void getHistory_filterByStatus_passesOnlyThatStatusToQuery() {
+        pendingRequest.setStatus(LegalVerificationStatus.REJECTED);
+        when(requestRepository.findHistory(eq(verifierId), eq(List.of(LegalVerificationStatus.REJECTED)),
+                any(LocalDateTime.class), any(LocalDateTime.class), any(Pageable.class)))
+                .thenReturn(List.of(pendingRequest));
 
         List<VerificationRequestResponseDto> result =
-                service.getHistory(verifierId, LegalVerificationStatus.REJECTED, null, null);
+                service.getHistory(verifierId, LegalVerificationStatus.REJECTED, null, null, 0, 20);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
     }
 
     @Test
-    void getHistory_filterByDateRange_returnsOnlyRequestsInsideRange() {
+    void getHistory_filterByDateRange_passesFullDayBoundsToQuery() {
         pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
         pendingRequest.setDecidedAt(LocalDateTime.of(2026, 10, 5, 10, 0));
-        LegalVerificationRequest older = LegalVerificationRequest.builder()
-                .id(UUID.randomUUID())
-                .owner(User.builder().fullName("Test Owner").build())
-                .executor(User.builder().fullName("Test Executor").build())
-                .deathCertificateFileUrlEncrypted("enc://old.pdf")
-                .status(LegalVerificationStatus.APPROVED)
-                .decidedAt(LocalDateTime.of(2026, 9, 1, 10, 0))
-                .build();
-        when(requestRepository.findByVerifierIdOrderByDecidedAtDesc(verifierId))
-                .thenReturn(List.of(pendingRequest, older));
+        // to = 31/10 tính trọn ngày -> cận trên là 00:00 ngày 01/11
+        when(requestRepository.findHistory(eq(verifierId), anyCollection(),
+                eq(LocalDateTime.of(2026, 10, 1, 0, 0)),
+                eq(LocalDateTime.of(2026, 11, 1, 0, 0)),
+                any(Pageable.class)))
+                .thenReturn(List.of(pendingRequest));
 
         List<VerificationRequestResponseDto> result = service.getHistory(
-                verifierId, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31));
+                verifierId, null, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), 0, 20);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDecidedAt()).isEqualTo(LocalDateTime.of(2026, 10, 5, 10, 0));
+    }
+
+    @Test
+    void getHistory_invalidPageAndSize_areClamped() {
+        // page < 0 -> 0; size > 100 -> 100
+        when(requestRepository.findHistory(eq(verifierId), anyCollection(),
+                any(LocalDateTime.class), any(LocalDateTime.class), eq(PageRequest.of(0, 100))))
+                .thenReturn(List.of());
+
+        assertThat(service.getHistory(verifierId, null, null, null, -5, 1000)).isEmpty();
     }
 
     @Test
@@ -550,7 +648,7 @@ public class LegalVerificationServiceImplTest {
         LocalDate from = LocalDate.of(2026, 10, 10);
         LocalDate to = LocalDate.of(2026, 10, 5);
 
-        assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to))
+        assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to, 0, 20))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
 }

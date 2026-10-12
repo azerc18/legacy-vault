@@ -40,9 +40,11 @@ public class LegalVerificationController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) LegalVerificationStatus status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
-                service.getHistory(verifierId(jwt), status, from, to)));
+                service.getHistory(verifierId(jwt), status, from, to, page, size)));
     }
 
     // UC12: xem chi tiết 1 hồ sơ (trả 404 nếu xung đột lợi ích)
