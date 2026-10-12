@@ -25,6 +25,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,6 +48,10 @@ public class DmsActivationProcessor {
             "Quy trình bàn giao LegacyVault đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
     private static final String MSG_BACKUP_ACTIVATED =
             "Quyền Digital Executor của bạn đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
+
+    // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), cách nhau ít nhất RETRY_INTERVAL.
+    static final int MAX_ATTEMPTS = 24;
+    static final Duration RETRY_INTERVAL = Duration.ofHours(1);
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -122,10 +127,13 @@ public class DmsActivationProcessor {
 
         Notification activation = findActivationNotification(
                 config, primary.getExecutorUser().getId()).orElse(null);
-        // Đồng hồ 14 ngày chỉ bắt đầu khi thông báo đã gửi thành công.
-        if (activation == null || activation.getStatus() == NotificationStatus.FAILED
-                || activation.getSentAt() == null
-                || activation.getSentAt().plusDays(config.getBackupActivationWaitDays()).isAfter(now)) {
+        // BR-03 (B2): đồng hồ bắt đầu từ lúc gửi thành công nếu có; nếu mail chưa bao giờ gửi được
+        // thì từ lúc kích hoạt, để Primary không liên lạc được vẫn bị leo thang sang Backup.
+        LocalDateTime clockStart = activation != null && activation.getSentAt() != null
+                ? activation.getSentAt()
+                : primary.getActivatedAt();
+        if (clockStart == null
+                || clockStart.plusDays(config.getBackupActivationWaitDays()).isAfter(now)) {
             return;
         }
 
@@ -173,16 +181,21 @@ public class DmsActivationProcessor {
     private void retryFailedNotification(DmsConfig config, ExecutorAssignment assignment, LocalDateTime now) {
         User recipient = assignment.getExecutorUser();
         findActivationNotification(config, recipient.getId())
-                .filter(n -> n.getStatus() == NotificationStatus.FAILED)
+                .filter(n -> n.getStatus() == NotificationStatus.FAILED
+                        && n.getAttemptCount() < MAX_ATTEMPTS
+                        && (n.getLastAttemptAt() == null || n.getLastAttemptAt().plus(RETRY_INTERVAL).isBefore(now)))
                 .ifPresent(n -> {
+                    n.setAttemptCount(n.getAttemptCount() + 1);
+                    n.setLastAttemptAt(now);
                     try {
                         executorNotificationService.send(recipient.getEmail(), n.getContent());
                         n.setStatus(NotificationStatus.SENT);
                         n.setSentAt(now);
-                        notificationRepository.save(n);
                     } catch (RuntimeException e) {
-                        log.warn("FR-07: retry sending notification {} failed: {}", n.getId(), e.getMessage());
+                        log.warn("FR-07: retry {} of notification {} failed: {}", n.getAttemptCount(), n.getId(),
+                                e.getMessage());
                     }
+                    notificationRepository.save(n);
                 });
     }
 
@@ -213,6 +226,8 @@ public class DmsActivationProcessor {
                 .content(content)
                 .status(status)
                 .sentAt(sentAt)
+                .attemptCount(1)
+                .lastAttemptAt(now)
                 .build());
     }
 

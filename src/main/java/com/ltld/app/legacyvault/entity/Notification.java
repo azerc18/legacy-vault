@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -56,4 +57,14 @@ public class Notification {
 
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
+
+    // B2: số lần đã thử gửi và lần thử gần nhất, để giới hạn gửi lại thông báo FAILED.
+    // DEFAULT 0 để ddl-auto: update thêm cột vào bảng đã có dữ liệu mà không vi phạm NOT NULL.
+    @Column(name = "attempt_count", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private Integer attemptCount = 0;
+
+    @Column(name = "last_attempt_at")
+    private LocalDateTime lastAttemptAt;
 }

@@ -199,6 +199,8 @@ class DmsActivationProcessorTest {
         verify(notificationRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(NotificationStatus.FAILED);
         assertThat(captor.getValue().getSentAt()).isNull();
+        assertThat(captor.getValue().getAttemptCount()).isEqualTo(1);
+        assertThat(captor.getValue().getLastAttemptAt()).isEqualTo(now);
     }
 
     @Test
@@ -306,6 +308,8 @@ class DmsActivationProcessorTest {
 
         assertThat(failed.getStatus()).isEqualTo(NotificationStatus.SENT);
         assertThat(failed.getSentAt()).isEqualTo(now);
+        assertThat(failed.getAttemptCount()).isEqualTo(1);
+        assertThat(failed.getLastAttemptAt()).isEqualTo(now);
         verify(notificationRepository).save(failed);
         assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
@@ -323,7 +327,84 @@ class DmsActivationProcessorTest {
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
         assertThat(failed.getStatus()).isEqualTo(NotificationStatus.FAILED);
+        assertThat(failed.getAttemptCount()).isEqualTo(1);
+        assertThat(failed.getLastAttemptAt()).isEqualTo(now);
+        verify(notificationRepository).save(failed);
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+    }
+
+    // ---------- B2: đồng hồ BR-03 khi mail lỗi + giới hạn gửi lại ----------
+
+    private Notification primaryNeverDelivered(LocalDateTime activatedAt) {
+        config.setStatus(DmsStatus.TRIGGERED);
+        primary.setStatus(ExecutorStatus.ACTIVE);
+        primary.setActivatedAt(activatedAt);
+        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).send(anyString(), anyString());
+        return activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED, NotificationStatus.FAILED, null);
+    }
+
+    @Test
+    @DisplayName("B2/T2: mail Primary lỗi suốt 14 ngày kể từ kích hoạt -> vẫn leo thang sang Backup")
+    void escalate_neverDelivered_stillEscalatesAfterWaitFromActivation() {
+        primaryNeverDelivered(now.minusDays(14));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("B2: mail Primary lỗi, mới 13 ngày kể từ kích hoạt -> chưa leo thang")
+    void escalate_neverDelivered_doesNothingBeforeWaitFromActivation() {
+        primaryNeverDelivered(now.minusDays(13));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("B2/T3: thông báo FAILED vừa thử 10 phút trước -> chưa gửi lại")
+    void escalate_doesNotRetryWithinRetryInterval() {
+        Notification failed = primaryNeverDelivered(now.minusDays(1));
+        failed.setAttemptCount(3);
+        failed.setLastAttemptAt(now.minusMinutes(10));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(notificationRepository, never()).save(any());
+        assertThat(failed.getAttemptCount()).isEqualTo(3);
+        assertThat(failed.getLastAttemptAt()).isEqualTo(now.minusMinutes(10));
+    }
+
+    @Test
+    @DisplayName("B2/T3: đã thử đủ MAX_ATTEMPTS lần -> không gửi lại nữa")
+    void escalate_doesNotRetryAfterMaxAttempts() {
+        Notification failed = primaryNeverDelivered(now.minusDays(1));
+        failed.setAttemptCount(DmsActivationProcessor.MAX_ATTEMPTS);
+        failed.setLastAttemptAt(now.minusDays(1));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        assertThat(failed.getAttemptCount()).isEqualTo(DmsActivationProcessor.MAX_ATTEMPTS);
+    }
+
+    @Test
+    @DisplayName("B2: lần thử trước đã quá 1 giờ và chưa đủ MAX_ATTEMPTS -> gửi lại, tăng attemptCount")
+    void escalate_retriesAfterRetryInterval() {
+        Notification failed = primaryNeverDelivered(now.minusDays(1));
+        failed.setAttemptCount(DmsActivationProcessor.MAX_ATTEMPTS - 1);
+        failed.setLastAttemptAt(now.minusHours(1).minusMinutes(1));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        verify(executorNotificationService).send(anyString(), anyString());
+        assertThat(failed.getAttemptCount()).isEqualTo(DmsActivationProcessor.MAX_ATTEMPTS);
+        assertThat(failed.getLastAttemptAt()).isEqualTo(now);
     }
 
     @Test
