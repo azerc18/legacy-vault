@@ -10,4 +10,23 @@ import java.util.UUID;
 public interface AuditLogRepository extends Repository<AuditLog, UUID> {
     AuditLog save(AuditLog log);
     Page<AuditLog> findByActor_IdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
+
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT a FROM AuditLog a " +
+                "LEFT JOIN FETCH a.actor " +
+                "WHERE a.vaultId = :vaultId " +
+                "AND a.createdAt >= :startDate " +
+                "AND a.createdAt <= :endDate " +
+                "ORDER BY a.createdAt DESC, a.id DESC",
+        countQuery = "SELECT COUNT(a) FROM AuditLog a " +
+                     "WHERE a.vaultId = :vaultId " +
+                     "AND a.createdAt >= :startDate " +
+                     "AND a.createdAt <= :endDate"
+    )
+    Page<AuditLog> findVaultActivity(
+        @org.springframework.data.repository.query.Param("vaultId") UUID vaultId,
+        @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate,
+        @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
+        Pageable pageable
+    );
 }
