@@ -50,4 +50,14 @@ public class LegalVerificationRequest {
     @Version
     @Column(name = "version")
     private Long version;
+
+    @Column(name = "sign_otp_hash", length = 64)
+    private String signOtpHash;
+
+    @Column(name = "sign_otp_expires_at")
+    private LocalDateTime signOtpExpiresAt;
+
+    @Column(name = "sign_attempts", nullable = false)
+    @Builder.Default
+    private int signAttempts = 0;
 }

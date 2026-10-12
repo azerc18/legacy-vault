@@ -25,6 +25,9 @@ public interface LegalVerificationService {
     // UC13: xác thực tài liệu (mock)
     DocumentVerificationResponseDto verifyDocument(UUID requestId);
 
+    // UC14: gửi OTP ký xác nhận mở khóa Vault
+    void sendSignOtp(UUID requestId, UUID verifierId);
+
     // UC14: ký xác nhận, mở khóa Vault
     VerificationRequestResponseDto sign(UUID requestId, UUID verifierId, SignVerificationRequestDto dto);
 

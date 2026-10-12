@@ -172,4 +172,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
     }
+
+    @ExceptionHandler(InvalidSignCodeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidSignCode(InvalidSignCodeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidDateRange(InvalidDateRangeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }

@@ -14,6 +14,8 @@ import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
+import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
@@ -58,6 +60,18 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private com.ltld.app.legacyvault.repository.UserRepository userRepository;
+
+    @Mock
+    private com.ltld.app.legacyvault.utility.OtpGenerator otpGenerator;
+
+    @Mock
+    private com.ltld.app.legacyvault.utility.OtpHasher otpHasher;
+
+    @Mock
+    private com.ltld.app.legacyvault.utility.EmailSender emailSender;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -190,11 +204,15 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_success_savesSignatureUnlocksVaultAndSetsClaimDeadline() {
         approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
         Vault vault = vaultOf(VaultStatus.ACTIVE);
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(vault).build();
 
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         service.sign(requestId, verifierId, signDto());
@@ -209,19 +227,55 @@ public class LegalVerificationServiceImplTest {
     }
 
     @Test
-    void sign_wrongCode_throwsAndDoesNotSignOrUnlock() {
+    void sign_wrongCode_throwsInvalidSignCode_andDoesNotUnlock() {
         approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
         SignVerificationRequestDto badDto = new SignVerificationRequestDto();
         badDto.setMethod(SignatureMethod.MOCK_OTP);
         badDto.setCode("111111");
 
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "111111", "hashedOtp")).thenReturn(false);
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
-                .isInstanceOf(RequestNotApprovedException.class);
+                .isInstanceOf(InvalidSignCodeException.class);
 
         verify(signatureRepository, never()).save(any());
         verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
+    void sign_expiredOtp_throwsInvalidSignCode() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().minusMinutes(1)); // hết hạn
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(InvalidSignCodeException.class);
+
+        verify(signatureRepository, never()).save(any());
+    }
+
+    @Test
+    void sendSignOtp_success_generatesAndSendsOtp() {
+        approvedByVerifier();
+        User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
+
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifierUser));
+        when(otpGenerator.generate()).thenReturn("123456");
+        when(otpHasher.hash(requestId, "123456")).thenReturn("hashed123456");
+
+        service.sendSignOtp(requestId, verifierId);
+
+        assertThat(pendingRequest.getSignOtpHash()).isEqualTo("hashed123456");
+        assertThat(pendingRequest.getSignOtpExpiresAt()).isNotNull();
+        assertThat(pendingRequest.getSignAttempts()).isEqualTo(0);
+        verify(emailSender, times(1)).sendEmail("verifier@test.com", "123456");
     }
 
     @Test
@@ -263,10 +317,14 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultNotActive_throwsAndDoesNotSignOrUnlock() {
         approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
         Vault archived = vaultOf(VaultStatus.ARCHIVED_LOCKED);
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(archived).build();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -279,11 +337,15 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultOfAnotherOwner_throwsConflict() {
         approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
         Vault foreign = Vault.builder().status(VaultStatus.ACTIVE)
                 .owner(User.builder().id(UUID.randomUUID()).build()).build();
         VerificationRequestVault link = VerificationRequestVault.builder()
                 .request(pendingRequest).vault(foreign).build();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(link));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -295,7 +357,11 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_noVaultLinked_throwsConflict() {
         approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
@@ -393,5 +459,14 @@ public class LegalVerificationServiceImplTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getDecidedAt()).isEqualTo(LocalDateTime.of(2026, 10, 5, 10, 0));
+    }
+
+    @Test
+    void getHistory_fromAfterTo_throwsInvalidDateRangeException() {
+        LocalDate from = LocalDate.of(2026, 10, 10);
+        LocalDate to = LocalDate.of(2026, 10, 5);
+
+        assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to))
+                .isInstanceOf(com.ltld.app.legacyvault.exception.InvalidDateRangeException.class);
     }
 }

@@ -75,6 +75,15 @@ public class LegalVerificationController {
                 "Đã từ chối", service.reject(id, verifierId(jwt), dto)));
     }
 
+    // UC14: gửi OTP ký xác nhận mở khóa Vault qua email verifier
+    @PostMapping("/{id}/sign/otp")
+    public ResponseEntity<ApiResponse<Void>> sendSignOtp(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.sendSignOtp(id, verifierId(jwt));
+        return ResponseEntity.ok(ApiResponse.success("Mã xác nhận đã được gửi đến email của bạn."));
+    }
+
     // UC14: ký xác nhận, mở khóa Vault
     @PostMapping("/{id}/sign")
     public ResponseEntity<ApiResponse<VerificationRequestResponseDto>> sign(

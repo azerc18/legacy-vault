@@ -13,7 +13,10 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
+import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
@@ -21,10 +24,13 @@ import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
-import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.service.LegalVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,14 +48,18 @@ import java.util.UUID;
 public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     private static final int CLAIM_TIMEOUT_DAYS = 60; // BR-04
-    // Mock OTP cố định cho demo – FR-17 đã có OtpGenerator, sau này dùng lại
-    private static final String MOCK_OTP_CODE = "000000";
+    private static final int SIGN_OTP_EXPIRE_MINUTES = 5;
+    private static final int MAX_SIGN_ATTEMPTS = 5;
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
     private final VerificationRequestVaultRepository requestVaultRepository;
+    private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final OtpGenerator otpGenerator;
+    private final OtpHasher otpHasher;
+    private final EmailSender emailSender;
 
     // UC12: danh sách hồ sơ đang chờ duyệt
     @Override
@@ -125,9 +135,40 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
     }
 
-    // UC14: ký xác nhận – hồ sơ phải APPROVED, đúng verifier, đúng mã OTP, chưa ký
+    // UC14: gửi OTP ký số qua email của Legal Verifier đã duyệt hồ sơ
     @Override
     @Transactional
+    public void sendSignOtp(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = findRequestOrThrow(requestId);
+
+        if (request.getStatus() != LegalVerificationStatus.APPROVED) {
+            throw new RequestNotApprovedException("Hồ sơ phải được phê duyệt trước khi yêu cầu mã ký.");
+        }
+        if (request.getVerifier() == null || !verifierId.equals(request.getVerifier().getId())) {
+            throw new NotAssignedVerifierException("Chỉ Legal Verifier đã phê duyệt hồ sơ mới được yêu cầu mã ký.");
+        }
+        if (signatureRepository.existsByRequestId(requestId)) {
+            throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó.");
+        }
+
+        User verifier = userRepository.findById(verifierId)
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy thông tin verifier."));
+
+        String otp = otpGenerator.generate();
+        LocalDateTime now = LocalDateTime.now();
+
+        request.setSignOtpHash(otpHasher.hash(requestId, otp));
+        request.setSignOtpExpiresAt(now.plusMinutes(SIGN_OTP_EXPIRE_MINUTES));
+        request.setSignAttempts(0); // reset lượt thử khi sinh mã mới
+        requestRepository.save(request);
+
+        emailSender.sendEmail(verifier.getEmail(), otp);
+        log.info("Sent sign OTP to verifier {} for request {}", verifier.getEmail(), requestId);
+    }
+
+    // UC14: ký xác nhận – hồ sơ phải APPROVED, đúng verifier, đúng mã OTP, chưa ký
+    @Override
+    @Transactional(noRollbackFor = InvalidSignCodeException.class)
     public VerificationRequestResponseDto sign(UUID requestId, UUID verifierId,
                                                SignVerificationRequestDto dto) {
         // PESSIMISTIC_WRITE: khóa row, tránh 2 request ký song song gây lỗi 500
@@ -148,13 +189,33 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó");
         }
 
-        // FR-14 bước 3: xác thực mock OTP (demo dùng mã "000000")
-        if (!MOCK_OTP_CODE.equals(dto.getCode())) {
+        // FR-14 bước 3: xác thực OTP ký số
+        if (request.getSignOtpHash() == null
+                || request.getSignOtpExpiresAt() == null
+                || LocalDateTime.now().isAfter(request.getSignOtpExpiresAt())) {
+            throw new InvalidSignCodeException("Mã xác nhận đã hết hạn hoặc chưa được tạo. Vui lòng yêu cầu mã mới.");
+        }
+
+        request.setSignAttempts(request.getSignAttempts() + 1);
+        if (request.getSignAttempts() > MAX_SIGN_ATTEMPTS) {
+            request.setSignOtpHash(null); // buộc yêu cầu mã mới
+            requestRepository.save(request);
+            auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
+                    verifierId, null,
+                    "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
+            throw new InvalidSignCodeException("Sai quá số lần cho phép. Vui lòng yêu cầu mã mới.");
+        }
+
+        if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
+            requestRepository.save(request);
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
                     verifierId, null,
                     "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
-            throw new RequestNotApprovedException("Mã xác nhận không đúng. (Dùng 000000 để test)");
+            throw new InvalidSignCodeException("Mã xác nhận không đúng.");
         }
+
+        // Xác thực thành công: hủy mã OTP đã dùng
+        request.setSignOtpHash(null);
 
         // Mọi Vault phải ACTIVE và thuộc đúng chủ sở hữu; sai 1 cái hủy cả lô
         List<VerificationRequestVault> links =
@@ -225,7 +286,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             LocalDate from, LocalDate to) {
 
         if (from != null && to != null && from.isAfter(to)) {
-            throw new IllegalArgumentException("'from' phải trước hoặc bằng 'to'.");
+            throw new InvalidDateRangeException("'from' phải trước hoặc bằng 'to'.");
         }
 
         LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
