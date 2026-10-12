@@ -458,6 +458,16 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VerificationRequestNotFoundException.class);
     }
 
+    // R1: toDto phải trả đúng createdAt
+    @Test
+    void getById_returnsCreatedAt() {
+        pendingRequest.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 0));
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThat(service.getById(requestId, verifierId).getCreatedAt())
+                .isEqualTo(LocalDateTime.of(2026, 10, 1, 9, 0));
+    }
+
     // T7: danh sách PENDING phải dùng query đã loại Owner/Executor (N6)
     @Test
     void getPendingRequests_usesVisibleToQuery() {

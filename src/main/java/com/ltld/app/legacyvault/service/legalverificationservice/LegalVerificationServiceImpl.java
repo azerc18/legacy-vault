@@ -376,6 +376,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .vaultIds(vaultIds)
                 .rejectionReason(r.getRejectionReason())
                 .decidedAt(r.getDecidedAt())
+                .createdAt(r.getCreatedAt()) // R1: không để mất createdAt
                 .build();
     }
 }
