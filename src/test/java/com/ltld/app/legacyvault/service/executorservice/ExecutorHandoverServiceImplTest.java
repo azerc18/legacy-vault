@@ -1,10 +1,14 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
+import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
@@ -38,7 +42,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -319,5 +326,148 @@ class ExecutorHandoverServiceImplTest {
 
         assertThatThrownBy(() -> handoverService.getHandoverProgress(executor.getEmail()))
                 .isInstanceOf(ExecutorNotActiveException.class);
+    }
+
+    // ===== FR-08: danh sách Vault được ủy quyền =====
+
+    @Test
+    @DisplayName("FR-08: trả về Vault của mọi Owner có assignment ACTIVE, giữ cả CLAIMED / ARCHIVED_LOCKED")
+    void getAssignedVaults_multipleOwners_returnsAllVaultsWithStatus() {
+        User owner2 = User.builder()
+                .id(UUID.randomUUID())
+                .email("owner2@example.com")
+                .fullName("Owner Two")
+                .build();
+        ExecutorAssignment backupAssignment = ExecutorAssignment.builder()
+                .id(UUID.randomUUID())
+                .owner(owner2)
+                .executorUser(executor)
+                .executorType(ExecutorType.BACKUP)
+                .status(ExecutorStatus.ACTIVE)
+                .activatedAt(LocalDateTime.now().minusHours(3))
+                .build();
+
+        Vault claimedVault = Vault.builder()
+                .id(UUID.randomUUID())
+                .owner(owner)
+                .beneficiary(beneficiary)
+                .name("Vault Claimed")
+                .status(VaultStatus.CLAIMED)
+                .build();
+        Vault archivedVault = Vault.builder()
+                .id(UUID.randomUUID())
+                .owner(owner2)
+                .name("Vault Archived")
+                .status(VaultStatus.ARCHIVED_LOCKED)
+                .build();
+
+        when(userRepository.findByEmail(executor.getEmail())).thenReturn(Optional.of(executor));
+        when(executorAssignmentRepository.findAllByExecutorUserIdAndStatus(executor.getId(), ExecutorStatus.ACTIVE))
+                .thenReturn(List.of(activeAssignment, backupAssignment));
+        when(vaultRepository.findAllByOwnerIdIn(argThat(ids -> ids.containsAll(List.of(owner.getId(), owner2.getId())))))
+                .thenReturn(List.of(claimedVault, archivedVault));
+        when(digitalAssetRepository.findByVaultIdAndStatus(claimedVault.getId(), AssetStatus.ACTIVE))
+                .thenReturn(List.of(
+                        DigitalAsset.builder().assetType(AssetType.BANK_ACCOUNT).build(),
+                        DigitalAsset.builder().assetType(AssetType.BANK_ACCOUNT).build(),
+                        DigitalAsset.builder().assetType(AssetType.CRYPTO_WALLET).build()));
+        when(digitalAssetRepository.findByVaultIdAndStatus(archivedVault.getId(), AssetStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+
+        List<AssignedVaultResponse> responses = handoverService.getAssignedVaults(executor.getEmail());
+
+        assertThat(responses).hasSize(2);
+
+        AssignedVaultResponse claimed = responses.get(0);
+        assertThat(claimed.getVaultId()).isEqualTo(claimedVault.getId());
+        assertThat(claimed.getVaultStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claimed.getOwnerId()).isEqualTo(owner.getId());
+        assertThat(claimed.getOwnerName()).isEqualTo("Owner Test");
+        assertThat(claimed.getAssetCount()).isEqualTo(3);
+        assertThat(claimed.getAssetTypes()).containsExactly(AssetType.BANK_ACCOUNT, AssetType.CRYPTO_WALLET);
+        assertThat(claimed.getBeneficiaryEmailMasked()).isEqualTo("b***@example.com");
+        assertThat(claimed.getBeneficiaryNameMasked()).isEqualTo("N*** V*** A***");
+        assertThat(claimed.getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
+
+        AssignedVaultResponse archived = responses.get(1);
+        assertThat(archived.getVaultStatus()).isEqualTo(VaultStatus.ARCHIVED_LOCKED);
+        assertThat(archived.getOwnerId()).isEqualTo(owner2.getId());
+        assertThat(archived.getAssetCount()).isZero();
+        assertThat(archived.getAssetTypes()).isEmpty();
+        assertThat(archived.getBeneficiaryEmailMasked()).isNull();
+        assertThat(archived.getExecutorType()).isEqualTo(ExecutorType.BACKUP);
+        assertThat(archived.getActivatedAt()).isEqualTo(backupAssignment.getActivatedAt());
+    }
+
+    @Test
+    @DisplayName("FR-08: Executor vừa PRIMARY vừa BACKUP của cùng Owner -> chỉ truy vấn Owner một lần")
+    void getAssignedVaults_sameOwnerTwice_deduplicatesOwners() {
+        ExecutorAssignment backupForSameOwner = ExecutorAssignment.builder()
+                .id(UUID.randomUUID())
+                .owner(owner)
+                .executorUser(executor)
+                .executorType(ExecutorType.BACKUP)
+                .status(ExecutorStatus.ACTIVE)
+                .build();
+
+        when(userRepository.findByEmail(executor.getEmail())).thenReturn(Optional.of(executor));
+        when(executorAssignmentRepository.findAllByExecutorUserIdAndStatus(executor.getId(), ExecutorStatus.ACTIVE))
+                .thenReturn(List.of(activeAssignment, backupForSameOwner));
+        when(vaultRepository.findAllByOwnerIdIn(any())).thenReturn(Collections.emptyList());
+
+        handoverService.getAssignedVaults(executor.getEmail());
+
+        verify(vaultRepository).findAllByOwnerIdIn(argThat(ids -> ids.size() == 1 && ids.contains(owner.getId())));
+    }
+
+    @Test
+    @DisplayName("FR-08: login là user id (JWT subject) vẫn tìm được Executor")
+    void getAssignedVaults_loginIsUserId_resolvesUser() {
+        String login = executor.getId().toString();
+        when(userRepository.findByEmail(login)).thenReturn(Optional.empty());
+        when(userRepository.findById(executor.getId())).thenReturn(Optional.of(executor));
+        when(executorAssignmentRepository.findAllByExecutorUserIdAndStatus(executor.getId(), ExecutorStatus.ACTIVE))
+                .thenReturn(List.of(activeAssignment));
+        when(vaultRepository.findAllByOwnerIdIn(any())).thenReturn(Collections.emptyList());
+
+        assertThat(handoverService.getAssignedVaults(login)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("FR-08: không tìm thấy user -> 404")
+    void getAssignedVaults_userNotFound_throwsNotFound() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> handoverService.getAssignedVaults("ghost@example.com"))
+                .isInstanceOf(ExecutorAssignmentNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("FR-08: user chưa từng được phân công -> 404")
+    void getAssignedVaults_noAssignments_throwsNotFound() {
+        when(userRepository.findByEmail(executor.getEmail())).thenReturn(Optional.of(executor));
+        when(executorAssignmentRepository.findAllByExecutorUserIdAndStatus(executor.getId(), ExecutorStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+        when(executorAssignmentRepository.findAllByExecutorUserId(executor.getId()))
+                .thenReturn(Collections.emptyList());
+
+        assertThatThrownBy(() -> handoverService.getAssignedVaults(executor.getEmail()))
+                .isInstanceOf(ExecutorAssignmentNotFoundException.class);
+        verify(vaultRepository, never()).findAllByOwnerIdIn(any());
+    }
+
+    @Test
+    @DisplayName("FR-08: chỉ có assignment INACTIVE / REVOKED -> 403")
+    void getAssignedVaults_noActiveAssignment_throwsNotActive() {
+        activeAssignment.setStatus(ExecutorStatus.REVOKED);
+        when(userRepository.findByEmail(executor.getEmail())).thenReturn(Optional.of(executor));
+        when(executorAssignmentRepository.findAllByExecutorUserIdAndStatus(executor.getId(), ExecutorStatus.ACTIVE))
+                .thenReturn(Collections.emptyList());
+        when(executorAssignmentRepository.findAllByExecutorUserId(executor.getId()))
+                .thenReturn(List.of(activeAssignment));
+
+        assertThatThrownBy(() -> handoverService.getAssignedVaults(executor.getEmail()))
+                .isInstanceOf(ExecutorNotActiveException.class);
+        verify(vaultRepository, never()).findAllByOwnerIdIn(any());
     }
 }

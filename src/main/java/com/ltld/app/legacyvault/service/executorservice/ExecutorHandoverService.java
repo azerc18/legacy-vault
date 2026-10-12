@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 
 import java.util.List;
@@ -26,4 +27,12 @@ public interface ExecutorHandoverService {
      * @return danh sách tiến độ bàn giao từng Vault
      */
     List<VaultHandoverProgressResponse> getHandoverProgress(String executorLogin);
+
+    /**
+     * FR-08: Lấy danh sách Vault thuộc mọi Owner đã phân công Executor (assignment ACTIVE).
+     *
+     * @param executorLogin email hoặc id của Executor đang đăng nhập
+     * @return danh sách Vault được ủy quyền (metadata, chưa giải mã)
+     */
+    List<AssignedVaultResponse> getAssignedVaults(String executorLogin);
 }

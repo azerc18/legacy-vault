@@ -1,10 +1,14 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
+import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.HandoverStatus;
@@ -24,12 +28,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * Triển khai nghiệp vụ FR-10: Theo dõi tiến độ bàn giao từng tài sản / Vault.
+ * Triển khai nghiệp vụ FR-10: Theo dõi tiến độ bàn giao từng tài sản / Vault,
+ * và FR-08: Xem danh sách Vault được ủy quyền quản lý.
  */
 @Slf4j
 @Service
@@ -72,6 +81,61 @@ public class ExecutorHandoverServiceImpl implements ExecutorHandoverService {
 
         // Reuse helper directly to avoid redundant findById + isSameUser DB calls
         return fetchVaultProgress(activeAssignment.getOwner().getId());
+    }
+
+    // FR-08: Executor xem danh sách Vault thuộc mọi Owner đã phân công mình (assignment ACTIVE)
+    @Override
+    public List<AssignedVaultResponse> getAssignedVaults(String executorLogin) {
+        User user = findUserByLogin(executorLogin)
+                .orElseThrow(() -> new ExecutorAssignmentNotFoundException("Executor assignment not found."));
+
+        List<ExecutorAssignment> activeAssignments =
+                executorAssignmentRepository.findAllByExecutorUserIdAndStatus(user.getId(), ExecutorStatus.ACTIVE);
+
+        if (activeAssignments.isEmpty()) {
+            // Phân biệt: chưa từng được phân công (404) với đã phân công nhưng chưa kích hoạt / bị thu hồi (403)
+            if (executorAssignmentRepository.findAllByExecutorUserId(user.getId()).isEmpty()) {
+                throw new ExecutorAssignmentNotFoundException("Executor assignment not found.");
+            }
+            throw new ExecutorNotActiveException("Access denied. Executor has not been activated yet.");
+        }
+
+        // Một Executor có thể vừa là PRIMARY vừa là BACKUP của cùng Owner: giữ một assignment/Owner để không trùng Vault
+        Map<UUID, ExecutorAssignment> assignmentByOwner = activeAssignments.stream()
+                .collect(Collectors.toMap(a -> a.getOwner().getId(), Function.identity(),
+                        (first, second) -> first, LinkedHashMap::new));
+
+        // Không lọc theo trạng thái Vault: CLAIMED / ARCHIVED_LOCKED vẫn trả về kèm vaultStatus
+        return vaultRepository.findAllByOwnerIdIn(assignmentByOwner.keySet()).stream()
+                .map(vault -> mapToAssignedVaultResponse(vault, assignmentByOwner.get(vault.getOwner().getId())))
+                .toList();
+    }
+
+    private AssignedVaultResponse mapToAssignedVaultResponse(Vault vault, ExecutorAssignment assignment) {
+        List<DigitalAsset> activeAssets =
+                digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
+        List<AssetType> assetTypes = activeAssets.stream()
+                .map(DigitalAsset::getAssetType)
+                .distinct()
+                .toList();
+
+        User owner = vault.getOwner();
+        User beneficiary = vault.getBeneficiary();
+
+        return AssignedVaultResponse.builder()
+                .vaultId(vault.getId())
+                .vaultName(vault.getName())
+                .description(vault.getDescription())
+                .vaultStatus(vault.getStatus())
+                .ownerId(owner.getId())
+                .ownerName(owner.getFullName())
+                .assetCount(activeAssets.size())
+                .assetTypes(assetTypes)
+                .beneficiaryEmailMasked(maskEmail(beneficiary != null ? beneficiary.getEmail() : null))
+                .beneficiaryNameMasked(maskName(beneficiary != null ? beneficiary.getFullName() : null))
+                .executorType(assignment.getExecutorType())
+                .activatedAt(assignment.getActivatedAt())
+                .build();
     }
 
     /**

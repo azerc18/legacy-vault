@@ -1,14 +1,17 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.HandoverStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidAttachmentException;
@@ -131,6 +134,77 @@ public class ExecutorControllerTest {
                 .thenThrow(new ExecutorNotActiveException("Access denied. Executor has not been activated yet."));
 
         mockMvc.perform(get("/api/executors/{executorId}/handover-progress", assignmentId)
+                        .principal(mockPrincipal))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Access denied. Executor has not been activated yet."));
+    }
+
+    @Test
+    @DisplayName("GET /api/executors/assigned-vaults: trả về 200 và danh sách Vault được ủy quyền")
+    void getAssignedVaults_returns200() throws Exception {
+        UUID vaultId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        String userEmail = "executor@example.com";
+        Principal mockPrincipal = () -> userEmail;
+
+        AssignedVaultResponse item = AssignedVaultResponse.builder()
+                .vaultId(vaultId)
+                .vaultName("Family Assets")
+                .description("Vault bảo mật gia đình")
+                .vaultStatus(VaultStatus.ARCHIVED_LOCKED)
+                .ownerId(ownerId)
+                .ownerName("Owner Test")
+                .assetCount(2L)
+                .assetTypes(List.of(AssetType.BANK_ACCOUNT, AssetType.DOCUMENT))
+                .beneficiaryEmailMasked("b***@example.com")
+                .beneficiaryNameMasked("N*** V*** A***")
+                .executorType(ExecutorType.PRIMARY)
+                .activatedAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        when(executorHandoverService.getAssignedVaults(eq(userEmail))).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/executors/assigned-vaults")
+                        .principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Assigned vaults retrieved successfully"))
+                .andExpect(jsonPath("$.data[0].vaultId").value(vaultId.toString()))
+                .andExpect(jsonPath("$.data[0].vaultName").value("Family Assets"))
+                .andExpect(jsonPath("$.data[0].vaultStatus").value("ARCHIVED_LOCKED"))
+                .andExpect(jsonPath("$.data[0].ownerId").value(ownerId.toString()))
+                .andExpect(jsonPath("$.data[0].assetCount").value(2))
+                .andExpect(jsonPath("$.data[0].assetTypes[0]").value("BANK_ACCOUNT"))
+                .andExpect(jsonPath("$.data[0].assetTypes[1]").value("DOCUMENT"))
+                .andExpect(jsonPath("$.data[0].beneficiaryEmailMasked").value("b***@example.com"))
+                .andExpect(jsonPath("$.data[0].executorType").value("PRIMARY"));
+    }
+
+    @Test
+    @DisplayName("GET /api/executors/assigned-vaults: không có assignment trả về 404")
+    void getAssignedVaults_notFound_returns404() throws Exception {
+        Principal mockPrincipal = () -> "executor@example.com";
+
+        when(executorHandoverService.getAssignedVaults(any()))
+                .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
+
+        mockMvc.perform(get("/api/executors/assigned-vaults")
+                        .principal(mockPrincipal))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Executor assignment not found."));
+    }
+
+    @Test
+    @DisplayName("GET /api/executors/assigned-vaults: Executor chưa kích hoạt trả về 403")
+    void getAssignedVaults_notActive_returns403() throws Exception {
+        Principal mockPrincipal = () -> "executor@example.com";
+
+        when(executorHandoverService.getAssignedVaults(any()))
+                .thenThrow(new ExecutorNotActiveException("Access denied. Executor has not been activated yet."));
+
+        mockMvc.perform(get("/api/executors/assigned-vaults")
                         .principal(mockPrincipal))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))

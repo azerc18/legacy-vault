@@ -21,6 +21,9 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
 
     List<ExecutorAssignment> findAllByExecutorUserId(UUID executorUserId);
 
+    // FR-08: các assignment đang ACTIVE của Executor (có thể thuộc nhiều Owner khác nhau)
+    List<ExecutorAssignment> findAllByExecutorUserIdAndStatus(UUID executorUserId, ExecutorStatus status);
+
     Optional<ExecutorAssignment> findFirstByExecutorUserIdAndStatus(UUID executorUserId, ExecutorStatus status);
 
     Optional<ExecutorAssignment> findFirstByExecutorUserEmailAndStatus(String email, ExecutorStatus status);

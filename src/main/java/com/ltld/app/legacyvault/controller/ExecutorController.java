@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.executordto.AssignedVaultResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
@@ -11,6 +12,7 @@ import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Principal;
@@ -35,6 +37,15 @@ public class ExecutorController {
         ExecutorActivationResponse response =
                 dmsAutomationService.acknowledgeActivation(executorId, principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Activation acknowledged", response));
+    }
+
+    // FR-08: Executor xem danh sách Vault được ủy quyền quản lý theo phiên đăng nhập hiện tại
+    @GetMapping("/assigned-vaults")
+    @PreAuthorize("hasRole('EXECUTOR')")
+    public ResponseEntity<ApiResponse<List<AssignedVaultResponse>>> getAssignedVaults(Principal principal) {
+
+        List<AssignedVaultResponse> response = executorHandoverService.getAssignedVaults(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Assigned vaults retrieved successfully", response));
     }
 
     // FR-10: Executor theo dõi tiến độ bàn giao từng tài sản / Vault theo assignment ID
