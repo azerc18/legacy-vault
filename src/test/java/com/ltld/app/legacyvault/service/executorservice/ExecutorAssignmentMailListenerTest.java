@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.LegacyVaultApplication;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
@@ -11,9 +12,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -71,14 +75,15 @@ class ExecutorAssignmentMailListenerTest {
     }
 
     @Test
-    @DisplayName("Listener chỉ chạy AFTER_COMMIT (rollback thì không gửi mail)")
-    void listensAfterCommitOnly() throws NoSuchMethodException {
-        TransactionalEventListener annotation = ExecutorAssignmentMailListener.class
-                .getMethod("on", ExecutorAssignmentChangedEvent.class)
-                .getAnnotation(TransactionalEventListener.class);
+    @DisplayName("Listener chỉ chạy AFTER_COMMIT (rollback thì không gửi mail) và @Async (không chặn request)")
+    void listensAfterCommitOnlyAndAsync() throws NoSuchMethodException {
+        Method on = ExecutorAssignmentMailListener.class.getMethod("on", ExecutorAssignmentChangedEvent.class);
+        TransactionalEventListener annotation = on.getAnnotation(TransactionalEventListener.class);
 
         assertThat(annotation).isNotNull();
         assertThat(annotation.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
         assertThat(annotation.fallbackExecution()).isFalse();
+        assertThat(on.isAnnotationPresent(Async.class)).isTrue();
+        assertThat(LegacyVaultApplication.class.isAnnotationPresent(EnableAsync.class)).isTrue();
     }
 }

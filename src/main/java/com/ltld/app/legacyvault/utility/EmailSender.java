@@ -28,7 +28,7 @@ public class EmailSender {
                         + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
-    // FR-06: gửi đồng bộ (gọi từ listener AFTER_COMMIT, lỗi do listener bắt và log).
+    // FR-06: method đồng bộ; bản thân listener AFTER_COMMIT đã chạy @Async, lỗi do listener bắt và log.
     // Không nêu tên Executor còn lại của Owner.
     public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
         String role = type == ExecutorType.PRIMARY ? "Executor chính (PRIMARY)" : "Executor dự phòng (BACKUP)";
