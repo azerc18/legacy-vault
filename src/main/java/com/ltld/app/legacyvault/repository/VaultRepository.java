@@ -8,4 +8,6 @@ import java.util.UUID;
 
 @Repository
 public interface VaultRepository extends JpaRepository<Vault, UUID> {
+    // FR-03: Owner phải có ít nhất 1 Vault mới được cấu hình DMS.
+    boolean existsByOwnerId(UUID ownerId);
 }
