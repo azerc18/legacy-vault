@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
+import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
@@ -274,6 +275,19 @@ public class LegalVerificationServiceImplTest {
         verify(signatureRepository, never()).save(any());
     }
 
+    // T5: method = MOCK_PIN bị từ chối (N4)
+    @Test
+    void sign_methodMockPin_throwsInvalidSignCode() {
+        SignVerificationRequestDto dto = new SignVerificationRequestDto();
+        dto.setMethod(SignatureMethod.MOCK_PIN);
+        dto.setCode("123456");
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, dto))
+                .isInstanceOf(InvalidSignCodeException.class);
+
+        verifyNoInteractions(signatureRepository, eventPublisher);
+    }
+
     @Test
     void sendSignOtp_success_generatesAndSendsOtp() {
         approvedByVerifier();
@@ -290,6 +304,23 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getSignOtpExpiresAt()).isNotNull();
         assertThat(pendingRequest.getSignAttempts()).isEqualTo(0);
         verify(emailSender, times(1)).sendEmail("verifier@test.com", "123456");
+    }
+
+    // T4: gửi lại OTP trong 60 giây bị chặn (N1)
+    @Test
+    void sendSignOtp_resendWithin60Seconds_throwsTooManyRequests() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpSentAt(LocalDateTime.now().minusSeconds(10));
+        User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
+
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifierUser));
+        when(otpGenerator.generate()).thenReturn("123456");
+
+        assertThatThrownBy(() -> service.sendSignOtp(requestId, verifierId))
+                .isInstanceOf(TooManyOtpRequestsException.class);
+
+        verifyNoInteractions(emailSender);
     }
 
     @Test
@@ -425,6 +456,20 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.verifyDocument(requestId, pendingRequest.getExecutor().getId()))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    // T7: danh sách PENDING phải dùng query đã loại Owner/Executor (N6)
+    @Test
+    void getPendingRequests_usesVisibleToQuery() {
+        when(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
+                .thenReturn(List.of(pendingRequest));
+        when(requestVaultRepository.findByRequestId(requestId)).thenReturn(List.of());
+
+        List<VerificationRequestResponseDto> result = service.getPendingRequests(verifierId);
+
+        assertThat(result).hasSize(1);
+        verify(requestRepository).findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId);
+        verify(requestRepository, never()).findByStatusFetch(any());
     }
 
     // ---------- UC15: getHistory ----------

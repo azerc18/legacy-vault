@@ -57,6 +57,9 @@ public class LegalVerificationRequest {
     @Column(name = "sign_otp_expires_at")
     private LocalDateTime signOtpExpiresAt;
 
+    @Column(name = "sign_otp_sent_at")
+    private LocalDateTime signOtpSentAt;
+
     @Column(name = "sign_attempts", nullable = false)
     @Builder.Default
     private int signAttempts = 0;

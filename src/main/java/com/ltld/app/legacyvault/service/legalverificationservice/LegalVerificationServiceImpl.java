@@ -21,6 +21,7 @@ import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
 import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
+import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
@@ -37,6 +38,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,6 +52,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private static final int CLAIM_TIMEOUT_DAYS = 60; // BR-04
     private static final int SIGN_OTP_EXPIRE_MINUTES = 5;
     private static final int MAX_SIGN_ATTEMPTS = 5;
+    private static final long SIGN_OTP_RESEND_COOLDOWN_SECONDS = 60;
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
@@ -119,7 +122,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Override
     @Transactional
     public VerificationRequestResponseDto reject(UUID requestId, UUID verifierId,
-                                                RejectVerificationRequestDto dto) {
+                                                 RejectVerificationRequestDto dto) {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
@@ -159,6 +162,15 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         String otp = otpGenerator.generate();
         LocalDateTime now = LocalDateTime.now();
 
+        // N1: cooldown 60 giây giữa 2 lần gửi mã
+        if (request.getSignOtpSentAt() != null) {
+            long elapsed = Duration.between(request.getSignOtpSentAt(), now).getSeconds();
+            if (elapsed < SIGN_OTP_RESEND_COOLDOWN_SECONDS) {
+                throw new TooManyOtpRequestsException(SIGN_OTP_RESEND_COOLDOWN_SECONDS - elapsed);
+            }
+        }
+
+        request.setSignOtpSentAt(now);
         request.setSignOtpHash(otpHasher.hash(requestId, otp));
         request.setSignOtpExpiresAt(now.plusMinutes(SIGN_OTP_EXPIRE_MINUTES));
         request.setSignAttempts(0); // reset lượt thử khi sinh mã mới
