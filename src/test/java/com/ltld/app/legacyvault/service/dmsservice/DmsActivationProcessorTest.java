@@ -1,20 +1,21 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
-import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,9 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,7 +52,7 @@ class DmsActivationProcessorTest {
     @Mock private DmsCheckinRepository dmsCheckinRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private NotificationRepository notificationRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
 
     @InjectMocks
@@ -92,10 +96,10 @@ class DmsActivationProcessorTest {
     private Notification activationNotification(UUID recipientId, NotificationType type, NotificationStatus status,
                                                 LocalDateTime sentAt) {
         Notification n = Notification.builder().type(type).status(status).sentAt(sentAt)
-                .content("content").referenceType("dms_config").referenceId(config.getId()).build();
+                .content("content").referenceType("DmsConfig").referenceId(config.getId()).build();
         when(notificationRepository
                 .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
-                        recipientId, type, "dms_config", config.getId()))
+                        recipientId, type, "DmsConfig", config.getId()))
                 .thenReturn(Optional.of(n));
         return n;
     }
@@ -103,13 +107,15 @@ class DmsActivationProcessorTest {
     private void primaryActiveAndNotified(NotificationStatus status, LocalDateTime sentAt) {
         config.setStatus(DmsStatus.TRIGGERED);
         primary.setStatus(ExecutorStatus.ACTIVE);
-        activationNotification(primaryUserId, NotificationType.DMS_TRIGGERED, status, sentAt);
+        activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED, status, sentAt);
     }
 
+    // Audit của scheduler: actor/email null, vaultId null (DMS gắn với Owner, không với Vault).
     private List<String> auditActions() {
-        ArgumentCaptor<AuditLog> captor = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository, org.mockito.Mockito.atLeast(0)).save(captor.capture());
-        return captor.getAllValues().stream().map(a -> a.getAction() == null ? null : a.getAction().name()).toList();
+        ArgumentCaptor<AuditAction> captor = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService, org.mockito.Mockito.atLeast(0)).log(captor.capture(), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), isNull(), anyString(), anyString(), anyString());
+        return captor.getAllValues().stream().map(Enum::name).toList();
     }
 
     // ---------- trigger ----------
@@ -128,10 +134,14 @@ class DmsActivationProcessorTest {
         verify(executorNotificationService).send(anyString(), anyString());
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
-        assertThat(captor.getValue().getType()).isEqualTo(NotificationType.DMS_TRIGGERED);
+        assertThat(captor.getValue().getType()).isEqualTo(NotificationType.EXECUTOR_ACTIVATED);
+        assertThat(captor.getValue().getReferenceType()).isEqualTo("DmsConfig");
         assertThat(captor.getValue().getStatus()).isEqualTo(NotificationStatus.SENT);
         assertThat(captor.getValue().getSentAt()).isEqualTo(now);
-        assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "PRIMARY_EXECUTOR_ACTIVATED");
+        assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "EXECUTOR_ACTIVATED");
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACTIVATED), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), isNull(), eq("ExecutorAssignment"), eq(primary.getId().toString()),
+                contains("executorType=PRIMARY"));
     }
 
     @Test
@@ -174,7 +184,7 @@ class DmsActivationProcessorTest {
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo(NotificationType.EXECUTOR_ACTIVATED);
-        assertThat(auditActions()).contains("BACKUP_EXECUTOR_ACTIVATED");
+        assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "EXECUTOR_ACTIVATED");
     }
 
     @Test
@@ -216,7 +226,10 @@ class DmsActivationProcessorTest {
         assertThat(backup.getActivatedAt()).isEqualTo(now);
         verify(executorAssignmentRepository).save(primary);
         verify(executorAssignmentRepository).save(backup);
-        assertThat(auditActions()).containsExactly("PRIMARY_EXECUTOR_REVOKED", "BACKUP_EXECUTOR_ACTIVATED");
+        assertThat(auditActions()).containsExactly("EXECUTOR_REVOKE", "EXECUTOR_ACTIVATED");
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_REVOKE), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), isNull(), eq("ExecutorAssignment"), eq(primary.getId().toString()),
+                contains("executorType=PRIMARY, reason=BR03_TIMEOUT"));
     }
 
     @Test
@@ -252,7 +265,7 @@ class DmsActivationProcessorTest {
     void escalate_retriesFailedNotificationAndRestartsClock() {
         config.setStatus(DmsStatus.TRIGGERED);
         primary.setStatus(ExecutorStatus.ACTIVE);
-        Notification failed = activationNotification(primaryUserId, NotificationType.DMS_TRIGGERED,
+        Notification failed = activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED,
                 NotificationStatus.FAILED, null);
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
@@ -269,7 +282,7 @@ class DmsActivationProcessorTest {
     void escalate_keepsFailedWhenRetryFails() {
         config.setStatus(DmsStatus.TRIGGERED);
         primary.setStatus(ExecutorStatus.ACTIVE);
-        Notification failed = activationNotification(primaryUserId, NotificationType.DMS_TRIGGERED,
+        Notification failed = activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED,
                 NotificationStatus.FAILED, null);
         doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).send(anyString(), anyString());
 

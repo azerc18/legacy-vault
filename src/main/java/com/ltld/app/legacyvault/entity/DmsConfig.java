@@ -1,7 +1,7 @@
 package com.ltld.app.legacyvault.entity;
 
-import com.ltld.app.legacyvault.enums.DmsNotificationChannel;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -39,7 +39,7 @@ public class DmsConfig {
     @Enumerated(EnumType.STRING)
     @Column(name = "notification_channel", nullable = false)
     @Builder.Default
-    private DmsNotificationChannel notificationChannel = DmsNotificationChannel.EMAIL;
+    private NotificationChannel notificationChannel = NotificationChannel.EMAIL;
 
     @Column(name = "backup_activation_wait_days", nullable = false)
     @Builder.Default

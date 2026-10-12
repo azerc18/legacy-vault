@@ -27,7 +27,7 @@ public class DmsAutomationScheduler {
     // Leo thang Backup sau thời gian chờ cấu hình (BR-03, mặc định 14 ngày) và gửi lại thông báo lỗi.
     // Chạy ít thường xuyên hơn trigger vì chỉ cần kiểm tra sau N ngày chờ.
     @Scheduled(fixedDelayString = "${app.dms.escalate-scan-delay:PT5M}")
-    public void activateBackupAfterTimeout() {
-        dmsAutomationService.activateBackupForUnacknowledgedPrimary(LocalDateTime.now());
+    public void escalateUnresponsivePrimaries() {
+        dmsAutomationService.escalateUnresponsivePrimaries(LocalDateTime.now());
     }
 }

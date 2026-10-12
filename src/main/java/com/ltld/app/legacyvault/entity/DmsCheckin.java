@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.entity;
 
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,8 +29,9 @@ public class DmsCheckin {
     @Column(name = "checkin_type", nullable = false)
     private DmsCheckinType checkinType;
 
-    @Column(length = 50)
-    private String channel;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private NotificationChannel channel;
 
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private LocalDateTime occurredAt;

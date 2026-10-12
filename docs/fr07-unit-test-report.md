@@ -26,13 +26,13 @@ Run the complete test suite:
 
 | # | Test context | Expected behavior verified |
 |---:|---|---|
-| 1 | An Owner's DMS check-in is overdue and a valid Primary exists. | DMS becomes `TRIGGERED`; Primary becomes `ACTIVE`; Backup remains `INACTIVE`; check-in, `DMS_TRIGGERED` notification, and audit entries are recorded. |
+| 1 | An Owner's DMS check-in is overdue and a valid Primary exists. | DMS becomes `TRIGGERED`; Primary becomes `ACTIVE`; Backup remains `INACTIVE`; check-in, `EXECUTOR_ACTIVATED` notification, and audit entries are recorded. |
 | 2 | At processing time, the Owner is no longer overdue or the DMS is no longer `ACTIVE`. | Activation is skipped and no notification is sent. |
 | 3 | Sending the Primary activation notification fails. | DMS remains `TRIGGERED` and Primary remains `ACTIVE`; notification is recorded as `FAILED` without `sentAt`. |
 | 4 | No valid Primary exists, but a Backup does. | Backup is activated directly; an `EXECUTOR_ACTIVATED` notification and audit entry are recorded. |
 | 5 | Primary was already `REVOKED` when the overdue DMS is processed. | Primary remains revoked and Backup is activated. |
 | 6 | Neither Primary nor Backup exists. | DMS becomes `TRIGGERED` without throwing; no notification is sent and an audit warning is recorded. |
-| 7 | Primary has not acknowledged and exactly 14 days have elapsed. | Primary becomes `REVOKED`, Backup becomes `ACTIVE`, and assignment updates and audit entries are recorded. |
+| 7 | Primary has not acknowledged and exactly 14 days have elapsed. | Primary becomes `REVOKED`, Backup becomes `ACTIVE`, and assignment updates and audit entries (`EXECUTOR_REVOKE` with reason `BR03_TIMEOUT`, then `EXECUTOR_ACTIVATED`) are recorded. |
 | 8 | Primary has not acknowledged, but only 13 days have elapsed. | No escalation occurs; Primary stays `ACTIVE` and Backup stays `INACTIVE`. |
 | 9 | Primary acknowledged, even though more than 14 days elapsed. | No escalation occurs; Primary stays `ACTIVE` and Backup stays `INACTIVE`. |
 | 10 | The DMS configuration sets the wait period to 3 days. | The configured duration is used; escalation occurs at 3 days. |
@@ -57,4 +57,4 @@ Run the complete test suite:
 
 ## Scope and limitations
 
-These are unit tests using Mockito mocks. They validate service/processor behavior and interactions, but do not start the web console, connect to MySQL, or send real email. The development profile's console scenarios are separate from this JUnit test suite.
+These are unit tests using Mockito mocks. They validate service/processor behavior and interactions, but do not connect to MySQL or send real email.
