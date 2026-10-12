@@ -8,4 +8,7 @@ public interface FileStorageService {
     
     // Xóa file vật lý trên đĩa
     void deleteFile(String filePath);
+
+    // Đọc nội dung (vẫn ở dạng đã mã hóa) của một file đã lưu. Chỉ đọc trong thư mục upload.
+    byte[] readFile(String filePath) throws Exception;
 }

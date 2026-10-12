@@ -6,13 +6,16 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
+import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
@@ -20,6 +23,7 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -28,9 +32,11 @@ import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
+import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
@@ -46,6 +52,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -89,6 +96,10 @@ public class BeneficiaryServiceImplTest {
     private BeneficiaryServiceImpl beneficiaryService;
     @Mock
     private AssetAccessRecordRepository assetAccessRecordRepository;
+    @Mock
+    private LegalDocumentRepository legalDocumentRepository;
+    @Mock
+    private FileStorageService fileStorageService;
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -1446,6 +1457,213 @@ public class BeneficiaryServiceImplTest {
         beneficiaryService.getInheritedAssets(vaultId, currentUserId);
 
         verifyNoInteractions(assetAccessRecordRepository);
+    }
+
+    // ===================== FR-18 phần 2: tài liệu pháp lý =====================
+
+    private LegalDocument legalDocument(UUID id, String fileName) {
+        return LegalDocument.builder()
+                .id(id).vault(unlockedVault).documentType(DocumentType.WILL)
+                .fileName(fileName).fileUrlEncrypted("uploads/stored.bin")
+                .uploadedAt(LocalDateTime.now()).build();
+    }
+
+    private void stubDownloadableDocument(UUID docId, String fileName) throws Exception {
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+                .thenReturn(Optional.of(legalDocument(docId, fileName)));
+        when(fileStorageService.readFile("uploads/stored.bin")).thenReturn(new byte[]{1, 2, 3});
+        when(cryptoService.decryptBytes(any(byte[].class))).thenReturn("noi-dung-goc".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void getVaultDocuments_withViewSession_returnsSummariesWithoutDecrypting() {
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(List.of(
+                legalDocument(UUID.randomUUID(), "di-chuc.pdf"),
+                legalDocument(UUID.randomUUID(), "so-do.png")));
+
+        List<LegalDocumentSummaryResponse> result = beneficiaryService.getVaultDocuments(vaultId, currentUserId);
+
+        assertThat(result).extracting(LegalDocumentSummaryResponse::getFileName)
+                .containsExactly("di-chuc.pdf", "so-do.png");
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(fileStorageService);
+    }
+
+    @Test
+    void getVaultDocuments_noViewSession_throws403() {
+        stubAccessibleVault();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN, () -> beneficiaryService.getVaultDocuments(vaultId, currentUserId));
+
+        verifyNoInteractions(legalDocumentRepository);
+    }
+
+    @Test
+    void getVaultDocuments_locked_throws423() {
+        stubVaultAndClaim();
+        stubLocked(true);
+
+        expectError(HttpStatus.LOCKED, () -> beneficiaryService.getVaultDocuments(vaultId, currentUserId));
+
+        verifyNoInteractions(legalDocumentRepository);
+    }
+
+    @Test
+    void downloadVaultDocument_success_returnsDecryptedFileWithContentType() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "dichuc_2026.pdf");
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).isEqualTo("dichuc_2026.pdf");
+        assertThat(file.getContentType()).isEqualTo("application/pdf");
+        assertThat(new String(file.getContent(), StandardCharsets.UTF_8)).isEqualTo("noi-dung-goc");
+    }
+
+    @Test
+    void downloadVaultDocument_dangerousName_fileNameIsSanitizedAndKeepsExtension() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "../etc/passwd\r\nX-Evil: 1.pdf");
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).doesNotContain("/", "\\", "\r", "\n", ":").endsWith(".pdf");
+    }
+
+    @Test
+    void downloadVaultDocument_noExtension_usesOctetStream() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "scan");
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).isEqualTo("scan");
+        assertThat(file.getContentType()).isEqualTo("application/octet-stream");
+    }
+
+    @Test
+    void downloadVaultDocument_blankName_usesDefaultName() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "   ");
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).isEqualTo("document");
+    }
+
+    @Test
+    void downloadVaultDocument_success_auditsDocumentDownloadedOnly() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "di-chuc.pdf");
+
+        beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        verify(auditLogService).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("LegalDocument"), eq(docId.toString()), isNull());
+        verify(auditLogService, never()).log(eq(AuditAction.ASSET_DOWNLOADED),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void downloadVaultDocument_noViewSession_throws403AndTouchesNothing() {
+        stubAccessibleVault();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, UUID.randomUUID(), currentUserId));
+
+        verifyNoInteractions(legalDocumentRepository);
+        verifyNoInteractions(fileStorageService);
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void downloadVaultDocument_documentNotInVault_throws404() {
+        UUID docId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.empty());
+
+        expectError(HttpStatus.NOT_FOUND,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
+
+        verifyNoInteractions(fileStorageService);
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void downloadVaultDocument_readFails_throws500WithoutLeakingPathAndDoesNotAudit() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+                .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
+        when(fileStorageService.readFile(any())).thenThrow(new IOException("/secret/server/path"));
+
+        BeneficiaryException ex = expectError(HttpStatus.INTERNAL_SERVER_ERROR,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
+
+        assertThat(ex.getMessage()).doesNotContain("/secret").doesNotContain("stored.bin");
+        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void downloadVaultDocument_decryptFails_throws500AndDoesNotAudit() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+                .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
+        when(fileStorageService.readFile(any())).thenReturn(new byte[]{1});
+        when(cryptoService.decryptBytes(any(byte[].class))).thenThrow(new RuntimeException("boom"));
+
+        BeneficiaryException ex = expectError(HttpStatus.INTERNAL_SERVER_ERROR,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
+
+        assertThat(ex.getMessage()).doesNotContain("boom");
+        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void downloadVaultDocument_wrongBeneficiary_throws404() {
+        User other = new User();
+        other.setId(UUID.randomUUID());
+        unlockedVault.setBeneficiary(other);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.NOT_FOUND,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, UUID.randomUUID(), currentUserId));
+
+        verifyNoInteractions(legalDocumentRepository);
+    }
+
+    @Test
+    void downloadVaultDocument_vaultClaimed_throws409() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, UUID.randomUUID(), currentUserId));
+
+        verifyNoInteractions(fileStorageService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void documentDownloadResponse_toString_doesNotContainContent() {
+        DocumentDownloadResponse r = DocumentDownloadResponse.builder()
+                .fileName("a.pdf").contentType("application/pdf")
+                .content("my-secret".getBytes(StandardCharsets.UTF_8)).build();
+        assertThat(r.toString()).doesNotContain("content=").doesNotContain("my-secret").contains("a.pdf");
     }
 
 }

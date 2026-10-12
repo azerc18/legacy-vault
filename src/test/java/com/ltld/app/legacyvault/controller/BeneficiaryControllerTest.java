@@ -7,12 +7,15 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -535,6 +538,77 @@ public class BeneficiaryControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"confirmed\":true}"))
                 .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    // ===================== FR-18 phần 2: tài liệu pháp lý =====================
+
+    @Test
+    void getVaultDocuments_success_returnsSummariesAndDisablesCache() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+        when(beneficiaryService.getVaultDocuments(vaultId, userId)).thenReturn(List.of(
+                LegalDocumentSummaryResponse.builder()
+                        .id(UUID.randomUUID()).documentType(DocumentType.WILL)
+                        .fileName("di-chuc.pdf").uploadedAt(LocalDateTime.now()).build()));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/documents", vaultId).principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.data[0].fileName").value("di-chuc.pdf"))
+                .andExpect(jsonPath("$.data[0].documentType").value("WILL"));
+    }
+
+    @Test
+    void downloadVaultDocument_success_returnsFileWithSafeHeaders() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+        when(beneficiaryService.downloadVaultDocument(vaultId, documentId, userId)).thenReturn(
+                DocumentDownloadResponse.builder()
+                        .fileName("di-chuc.pdf").contentType("application/pdf")
+                        .content("PDF-DATA".getBytes(StandardCharsets.UTF_8)).build());
+
+        MvcResult result = mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/documents/{documentId}/download", vaultId, documentId)
+                                .principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("attachment").contains("di-chuc.pdf");
+        assertThat(result.getResponse().getContentType()).startsWith("application/pdf");
+        assertThat(result.getResponse().getContentAsString(StandardCharsets.UTF_8)).isEqualTo("PDF-DATA");
+    }
+
+    @Test
+    void downloadVaultDocument_noViewSession_returns403Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.downloadVaultDocument(any(), any(), any()))
+                .thenThrow(new BeneficiaryException(
+                        "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .principal(principal))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void downloadVaultDocument_notFound_returns404Json() throws Exception {
+        Principal principal = () -> UUID.randomUUID().toString();
+        when(beneficiaryService.downloadVaultDocument(any(), any(), any()))
+                .thenThrow(new BeneficiaryException("Không tìm thấy tài liệu.", HttpStatus.NOT_FOUND));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .principal(principal))
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }
 
