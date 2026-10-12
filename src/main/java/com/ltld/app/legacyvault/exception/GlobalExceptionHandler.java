@@ -8,11 +8,13 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -22,6 +24,13 @@ import java.util.Map;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooLarge(MaxUploadSizeExceededException e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error("Tệp vượt quá dung lượng cho phép (10MB)."));
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException e) {
@@ -79,13 +88,6 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
-    @ExceptionHandler(VaultException.class)
-    public ResponseEntity<ApiResponse<Void>> handleVaultException(VaultException e) {
-        return ResponseEntity.status(e.getStatus())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(e.getMessage()));
-    }
-
     @ExceptionHandler(InvalidRefreshTokenException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidRefreshToken(InvalidRefreshTokenException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -102,6 +104,12 @@ public class GlobalExceptionHandler {
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(Map.of("message", "Please try again later " + ex.getRetryAfterSeconds() + " seconds"));
     }
+    @ExceptionHandler(VaultException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultException(VaultException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -125,5 +133,55 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Request conflict. Please try again."));
     }
 
+    @ExceptionHandler(VerificationRequestNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationRequestNotFound(
+            VerificationRequestNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 
+    @ExceptionHandler(RequestAlreadyReviewedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestAlreadyReviewed(
+            RequestAlreadyReviewedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(RequestNotApprovedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRequestNotApproved(
+            RequestNotApprovedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler({NotAssignedVerifierException.class, ConflictOfInterestException.class})
+    public ResponseEntity<ApiResponse<Void>> handleVerifierForbidden(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(VaultStateConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVaultStateConflict(VaultStateConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolation: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
+    }
+
+    @ExceptionHandler(InvalidSignCodeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidSignCode(InvalidSignCodeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidDateRange(InvalidDateRangeException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }

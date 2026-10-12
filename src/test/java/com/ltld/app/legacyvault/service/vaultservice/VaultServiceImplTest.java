@@ -8,15 +8,15 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.springframework.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,12 +26,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ltld.app.legacyvault.enums.AuditResult;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,11 +45,15 @@ class VaultServiceImplTest {
     @Mock
     private DigitalAssetRepository digitalAssetRepository;
     @Mock
+    private LegalDocumentRepository legalDocumentRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private CryptoService cryptoService;
     @Mock
-    private AuditLogService auditLogService;
+    private FileStorageService fileStorageService;
+    @Mock
+    private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
     @Mock
     private EmailSender emailSender;
 
@@ -63,6 +69,7 @@ class VaultServiceImplTest {
         ownerId = UUID.randomUUID();
         mockOwner = new User();
         mockOwner.setId(ownerId);
+        mockOwner.setEmail("owner@test.com");
     }
 
     // Kịch bản 1: Tạo Vault và tài sản số thành công (Mô phỏng FR-01)
@@ -112,11 +119,14 @@ class VaultServiceImplTest {
         vault.setStatus(VaultStatus.ACTIVE);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(digitalAssetRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
+        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
 
         vaultService.deleteVault(vaultId, ownerId);
 
-        // Đảm bảo phải tìm tài sản để xóa trước, rồi mới xóa vault sau
+        // Đảm bảo phải tìm tài sản và tài liệu để xóa trước, rồi mới xóa vault sau
         verify(digitalAssetRepository, times(1)).findByVaultId(vaultId);
+        verify(legalDocumentRepository, times(1)).findByVaultId(vaultId);
         verify(vaultRepository, times(1)).delete(vault);
     }
 
@@ -129,18 +139,87 @@ class VaultServiceImplTest {
 
         User otherUser = new User();
         otherUser.setId(UUID.randomUUID());
+        otherUser.setEmail("victim@example.com");
         vault.setOwner(otherUser); // Vault thuộc về người khác
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Bắt lỗi phải là RuntimeException
-        Exception exception = assertThrows(RuntimeException.class, () -> {
+        // Bắt lỗi phải là VaultException
+        Exception exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 
         // Nội dung lỗi phải chuẩn xác
         assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
+        verify(vaultRepository, never()).delete(any());
+        // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
+        // và phải bao gồm vaultId để nhật ký có đủ context (N2)
+        verify(auditLogService).log(
+                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditResult.FAILURE),
+                eq(ownerId),
+                eq(mockOwner.getEmail()),
+                eq(vaultId),
+                eq("Vault"),
+                eq(vaultId.toString()),
+                eq("Unauthorized: You don't own this vault")
+        );
+    }
+
+    @Test
+    void deleteVault_Success_WithDocumentsAndAssets() throws Exception {
+        UUID vaultId = UUID.randomUUID();
+        Vault vault = new Vault();
+        vault.setId(vaultId);
+        vault.setOwner(mockOwner);
+        vault.setStatus(VaultStatus.ACTIVE);
+
+        DigitalAsset asset = new DigitalAsset();
+        asset.setId(UUID.randomUUID());
+
+        com.ltld.app.legacyvault.entity.LegalDocument doc = new com.ltld.app.legacyvault.entity.LegalDocument();
+        doc.setId(UUID.randomUUID());
+        doc.setFileUrlEncrypted("uploads/test-file.pdf");
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(digitalAssetRepository.findByVaultId(vaultId)).thenReturn(List.of(asset));
+        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(List.of(doc));
+
+        vaultService.deleteVault(vaultId, ownerId);
+
+        verify(legalDocumentRepository).deleteAllInBatch(List.of(doc));
+        verify(digitalAssetRepository).deleteAllInBatch(List.of(asset));
+        verify(vaultRepository).delete(vault);
+        verify(fileStorageService).deleteFile("uploads/test-file.pdf");
+        verify(auditLogService).log(
+                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETED),
+                eq(com.ltld.app.legacyvault.enums.AuditResult.SUCCESS),
+                eq(ownerId),
+                eq(mockOwner.getEmail()),
+                eq(vaultId),
+                eq("Vault"),
+                eq(vaultId.toString()),
+                isNull()
+        );
+    }
+
+    @Test
+    void deleteVault_NotActive_ThrowsException() {
+        UUID vaultId = UUID.randomUUID();
+        Vault vault = new Vault();
+        vault.setId(vaultId);
+        vault.setOwner(mockOwner);
+        vault.setStatus(VaultStatus.ARCHIVED_LOCKED);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+
+        Exception exception = assertThrows(VaultException.class, () -> {
+            vaultService.deleteVault(vaultId, ownerId);
+        });
+
+        assertEquals("Cannot delete vault that is not in active state", exception.getMessage());
         verify(vaultRepository, never()).delete(any());
     }
 
@@ -193,7 +272,7 @@ class VaultServiceImplTest {
         verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "ben@example.com", false);
         verify(emailSender, never()).sendBeneficiaryInvitation(any(), any(), any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_ASSIGNED), eq(AuditResult.SUCCESS), eq(ownerId),
-                any(), eq("Vault"), eq(vault.getId().toString()), any());
+                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
     }
 
     @Test
@@ -246,7 +325,7 @@ class VaultServiceImplTest {
 
         verify(vaultRepository, never()).save(any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_ASSIGN_DENIED), eq(AuditResult.FAILURE),
-                eq(otherUserId), any(), eq("Vault"), eq(vault.getId().toString()), eq("not owner"));
+                eq(otherUserId), any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), eq("not owner"));
     }
 
     @Test
@@ -311,7 +390,7 @@ class VaultServiceImplTest {
         assertEquals("new@example.com", vault.getBeneficiaryEmail());
         assertTrue(response.isReplaced());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REPLACED), eq(AuditResult.SUCCESS), eq(ownerId),
-                any(), eq("Vault"), eq(vault.getId().toString()), contains("previous=old@example.com"));
+                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), contains("previous=old@example.com"));
     }
 
     @Test
