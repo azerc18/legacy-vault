@@ -30,6 +30,9 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     boolean existsByVaultIdAndBeneficiaryIdAndStatus(
             UUID vaultId, UUID beneficiaryId, VerificationStatus status);
 
+    // FR-10: kiểm tra vault đã có phiên xác thực thành công hay chưa
+    boolean existsByVaultIdAndStatus(UUID vaultId, VerificationStatus status);
+
     // FR-17: còn phiên xem hợp lệ không (SUCCESS và verified_at sau mốc thời gian)
     boolean existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
             UUID vaultId, UUID beneficiaryId, VerificationStatus status, LocalDateTime verifiedAfter);

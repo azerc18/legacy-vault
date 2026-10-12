@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import org.springframework.security.access.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -36,39 +36,45 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(e.getMessage()));
     }
-    @ExceptionHandler({ExpiredOtpException.class, InvalidOtpException.class, OtpNotFoundException.class} )
+
+    @ExceptionHandler({ExpiredOtpException.class, InvalidOtpException.class, OtpNotFoundException.class})
     public ResponseEntity<ApiResponse<Void>> handleOtpErrors(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
     @ExceptionHandler(TooManyAttemptsException.class)
     public ResponseEntity<ApiResponse<Void>> handleTooManyAttempts(TooManyAttemptsException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationErrors(MethodArgumentNotValidException e) {
         Map<String, String> errors = new HashMap<>();
 
-        for(FieldError error: e.getBindingResult().getFieldErrors()) {
+        for (FieldError error : e.getBindingResult().getFieldErrors()) {
             errors.put(error.getField(), error.getDefaultMessage());
         }
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Validation error", errors));
     }
+
     @ExceptionHandler(InvalidCredentialException.class)
-    public ResponseEntity<ApiResponse<Void>> handleInvalidCredential(InvalidCredentialException e){
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredential(InvalidCredentialException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
     @ExceptionHandler(LockedAccountException.class)
-    public ResponseEntity<ApiResponse<Void>> handleLockedAccount(LockedAccountException e){
+    public ResponseEntity<ApiResponse<Void>> handleLockedAccount(LockedAccountException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
     @ExceptionHandler(NotActiveUserException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNotActiveUser(NotActiveUserException e){
+    public ResponseEntity<ApiResponse<Void>> handleNotActiveUser(NotActiveUserException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error(e.getMessage()));
     }
@@ -86,16 +92,48 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(ExecutorAssignmentNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExecutorAssignmentNotFound(ExecutorAssignmentNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(ExecutorNotActiveException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExecutorNotActive(ExecutorNotActiveException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(DmsNotTriggeredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDmsNotTriggered(DmsNotTriggeredException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(VerificationNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationNotFound(VerificationNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidAttachmentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidAttachment(InvalidAttachmentException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error("Malformed request body"));
     }
+
     @ExceptionHandler(TooManyOtpRequestsException.class)
     public ResponseEntity<?> handleTooManyOtpRequest(TooManyOtpRequestsException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
                 .body(Map.of("message", "Please try again later " + ex.getRetryAfterSeconds() + " seconds"));
     }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -107,12 +145,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(ApiResponse.error("Method not allowed"));
     }
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {
-        log.error("Unhandled exception", ex);          // quan trọng: để thấy lỗi thật
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Internal server error"));   // sửa luôn chính tả "sever"
-    }
+
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
@@ -157,5 +190,12 @@ public class GlobalExceptionHandler {
         log.warn("DataIntegrityViolation: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {
+        log.error("Unhandled exception", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Internal server error"));
     }
 }
