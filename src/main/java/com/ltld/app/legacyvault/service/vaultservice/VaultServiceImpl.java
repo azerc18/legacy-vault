@@ -92,7 +92,9 @@ public class VaultServiceImpl implements VaultService {
             // Tra cứu email của kẻ gọi (caller/stranger), không lấy nhầm email của chủ két
             String callerEmail = userRepository.findById(ownerId)
                     .map(User::getEmail).orElse("unknown");
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, callerEmail, "Unauthorized: You don't own this vault");
+            auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
+                    ownerId, callerEmail, vaultId, "Vault", vaultId.toString(),
+                    "Unauthorized: You don't own this vault");
             throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
         }
 

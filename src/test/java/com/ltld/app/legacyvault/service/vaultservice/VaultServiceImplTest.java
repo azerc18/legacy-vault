@@ -25,8 +25,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ltld.app.legacyvault.enums.AuditResult;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -146,11 +147,16 @@ class VaultServiceImplTest {
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
-        verify(auditLogService).failure(
-                com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED,
-                ownerId,
-                mockOwner.getEmail(),
-                "Unauthorized: You don't own this vault"
+        // và phải bao gồm vaultId để nhật ký có đủ context (N2)
+        verify(auditLogService).log(
+                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditResult.FAILURE),
+                eq(ownerId),
+                eq(mockOwner.getEmail()),
+                eq(vaultId),
+                eq("Vault"),
+                eq(vaultId.toString()),
+                eq("Unauthorized: You don't own this vault")
         );
     }
 

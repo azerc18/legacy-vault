@@ -20,7 +20,7 @@ import java.util.UUID;
 @Table(name = "audit_logs", indexes = {
         @Index(name = "idx_audit_actor",   columnList = "actor_id"),
         @Index(name = "idx_audit_action",  columnList = "action"),
-        @Index(name = "idx_audit_vault",   columnList = "vault_id"),
+        @Index(name = "idx_audit_vault_created", columnList = "vault_id, created_at"),
         @Index(name = "idx_audit_entity",  columnList = "entity_type, entity_id"),
         @Index(name = "idx_audit_created", columnList = "created_at")})
 @Getter
