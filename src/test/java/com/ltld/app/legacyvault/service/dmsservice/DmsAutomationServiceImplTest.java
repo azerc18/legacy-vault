@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +43,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -127,11 +129,22 @@ class DmsAutomationServiceImplTest {
         assertThat(response.getAcknowledgedAt()).isEqualTo(primary.getAcknowledgedAt());
         assertThat(response.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(activation.getStatus()).isEqualTo(NotificationStatus.READ);
-        verify(executorAssignmentRepository).save(primary);
+        verify(executorAssignmentRepository).saveAndFlush(primary);
         // actor = Executor; vaultId null vì DMS gắn với Owner, không với Vault.
         verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), eq(AuditResult.SUCCESS),
                 eq(primaryUserId), eq("primary@example.test"), isNull(),
                 eq("ExecutorAssignment"), eq(primary.getId().toString()), contains("ownerId=" + ownerId));
+    }
+
+    @Test
+    @DisplayName("B1: lưu acknowledgedAt bằng saveAndFlush trước khi ghi audit")
+    void acknowledge_flushesBeforeAudit() {
+        service.acknowledgeActivation(primary.getId(), "primary@example.test");
+
+        InOrder order = inOrder(executorAssignmentRepository, auditLogService);
+        order.verify(executorAssignmentRepository).saveAndFlush(primary);
+        order.verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), any(), any(), any(), any(),
+                any(), any(), any());
     }
 
     @Test

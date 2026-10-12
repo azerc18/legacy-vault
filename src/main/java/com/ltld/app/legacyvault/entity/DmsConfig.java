@@ -63,4 +63,9 @@ public class DmsConfig {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // B1: khóa lạc quan, chống ghi đè khi scheduler và người dùng sửa cùng lúc.
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

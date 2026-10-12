@@ -75,7 +75,8 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
         if (assignment.getAcknowledgedAt() == null) {
             LocalDateTime now = LocalDateTime.now();
             assignment.setAcknowledgedAt(now);
-            executorAssignmentRepository.save(assignment);
+            // B1: flush ngay để xung đột @Version với lượt leo thang nổ ra trước khi ghi audit (audit vẫn lưu khi rollback).
+            executorAssignmentRepository.saveAndFlush(assignment);
 
             notificationRepository
                     .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(

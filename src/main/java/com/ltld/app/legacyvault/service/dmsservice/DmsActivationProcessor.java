@@ -75,22 +75,20 @@ public class DmsActivationProcessor {
                 .channel(NotificationChannel.EMAIL)
                 .occurredAt(now)
                 .build());
-        audit(AuditAction.DMS_TRIGGERED, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
 
         Optional<ExecutorAssignment> primary = executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY)
                 .filter(a -> a.getStatus() != ExecutorStatus.REVOKED);
-        if (primary.isPresent()) {
-            activate(config, primary.get(), MSG_PRIMARY_ACTIVATED, now);
-            return;
-        }
-
         // Không có Primary hợp lệ (chưa chỉ định hoặc đã bị thu hồi): kích hoạt thẳng Backup để không bị kẹt.
-        Optional<ExecutorAssignment> backup = executorAssignmentRepository
+        Optional<ExecutorAssignment> target = primary.isPresent() ? primary : executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP)
                 .filter(a -> a.getStatus() == ExecutorStatus.INACTIVE);
-        if (backup.isPresent()) {
-            activate(config, backup.get(), MSG_BACKUP_ACTIVATED, now);
+        target.ifPresent(a -> markActive(a, now));
+
+        flushBeforeSideEffects();
+        audit(AuditAction.DMS_TRIGGERED, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
+        if (target.isPresent()) {
+            notifyActivated(config, target.get(), primary.isPresent() ? MSG_PRIMARY_ACTIVATED : MSG_BACKUP_ACTIVATED, now);
             return;
         }
 
@@ -143,15 +141,30 @@ public class DmsActivationProcessor {
         primary.setStatus(ExecutorStatus.REVOKED);
         primary.setRevokedAt(now);
         executorAssignmentRepository.save(primary);
+        markActive(backup, now);
+
+        flushBeforeSideEffects();
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
-        activate(config, backup, MSG_BACKUP_ACTIVATED, now);
+        notifyActivated(config, backup, MSG_BACKUP_ACTIVATED, now);
     }
 
-    private void activate(DmsConfig config, ExecutorAssignment assignment, String content, LocalDateTime now) {
+    private void markActive(ExecutorAssignment assignment, LocalDateTime now) {
         assignment.setStatus(ExecutorStatus.ACTIVE);
         assignment.setActivatedAt(now);
         executorAssignmentRepository.save(assignment);
+    }
+
+    /**
+     * B1: flush mọi thay đổi trạng thái (DmsConfig, ExecutorAssignment) để lỗi @Version nổ ra ngay tại đây,
+     * TRƯỚC khi gửi mail và ghi audit. Audit được ghi AFTER_COMPLETION + REQUIRES_NEW nên vẫn lưu kể cả khi
+     * transaction rollback; nếu flush muộn (lúc commit) sẽ để lại audit cho thay đổi không xảy ra.
+     */
+    private void flushBeforeSideEffects() {
+        executorAssignmentRepository.flush();
+    }
+
+    private void notifyActivated(DmsConfig config, ExecutorAssignment assignment, String content, LocalDateTime now) {
         sendNotification(assignment.getExecutorUser(), config.getId(), content, now);
         audit(AuditAction.EXECUTOR_ACTIVATED, ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId(),
                 ownerDetail(config.getOwner().getId()) + ", executorType=" + assignment.getExecutorType());

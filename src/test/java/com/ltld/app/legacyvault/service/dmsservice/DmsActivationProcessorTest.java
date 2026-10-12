@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,8 +41,10 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -145,6 +148,32 @@ class DmsActivationProcessorTest {
     }
 
     @Test
+    @DisplayName("B1: flush trạng thái trước khi gửi mail và ghi audit (lỗi @Version nổ ra trước audit)")
+    void trigger_flushesBeforeMailAndAudit() {
+        processor.trigger(config.getId(), now);
+
+        InOrder order = inOrder(executorAssignmentRepository, executorNotificationService, auditLogService);
+        order.verify(executorAssignmentRepository).save(primary);
+        order.verify(executorAssignmentRepository).flush();
+        order.verify(executorNotificationService).send(anyString(), anyString());
+        order.verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACTIVATED), any(), any(), any(), any(),
+                any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("B1: flush lỗi (xung đột @Version) -> không gửi mail, không ghi audit")
+    void trigger_flushConflictStopsBeforeSideEffects() {
+        doThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(ExecutorAssignment.class, primary.getId()))
+                .when(executorAssignmentRepository).flush();
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> processor.trigger(config.getId(), now))
+                .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
+
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
     @DisplayName("trigger bỏ qua nếu Owner vừa check-in (không còn quá hạn) hoặc DMS không còn ACTIVE")
     void trigger_skipsWhenNoLongerOverdueOrNotActive() {
         config.setNextCheckinDueAt(now.plusDays(1));
@@ -226,6 +255,11 @@ class DmsActivationProcessorTest {
         assertThat(backup.getActivatedAt()).isEqualTo(now);
         verify(executorAssignmentRepository).save(primary);
         verify(executorAssignmentRepository).save(backup);
+        InOrder order = inOrder(executorAssignmentRepository, auditLogService);
+        order.verify(executorAssignmentRepository).save(backup);
+        order.verify(executorAssignmentRepository).flush();
+        order.verify(auditLogService).log(eq(AuditAction.EXECUTOR_REVOKE), any(), any(), any(), any(),
+                any(), any(), any());
         assertThat(auditActions()).containsExactly("EXECUTOR_REVOKE", "EXECUTOR_ACTIVATED");
         verify(auditLogService).log(eq(AuditAction.EXECUTOR_REVOKE), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), isNull(), eq("ExecutorAssignment"), eq(primary.getId().toString()),
@@ -309,5 +343,31 @@ class DmsActivationProcessorTest {
         processor.escalateIfPrimaryUnresponsive(config.getId(), now); // config đang ACTIVE
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
         verify(executorNotificationService, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("T8: Backup đã xác nhận sau leo thang, lượt quét tiếp theo không đổi gì và không ghi audit mới")
+    void scanAfterEscalationAndBackupAcknowledged_isNoOp() {
+        config.setStatus(DmsStatus.TRIGGERED);
+        primary.setStatus(ExecutorStatus.REVOKED);
+        primary.setRevokedAt(now.minusDays(1));
+        backup.setStatus(ExecutorStatus.ACTIVE);
+        backup.setActivatedAt(now.minusDays(1));
+        LocalDateTime acknowledgedAt = now.minusHours(2);
+        backup.setAcknowledgedAt(acknowledgedAt);
+        activationNotification(backupUserId, NotificationType.EXECUTOR_ACTIVATED, NotificationStatus.READ,
+                now.minusDays(1));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+        processor.trigger(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(backup.getAcknowledgedAt()).isEqualTo(acknowledgedAt);
+        verify(executorAssignmentRepository, never()).save(any());
+        verify(dmsConfigRepository, never()).save(any());
+        verify(notificationRepository, never()).save(any());
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verifyNoInteractions(auditLogService);
     }
 }
