@@ -18,4 +18,7 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
 
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorTypeAndStatus(
             UUID ownerId, ExecutorType executorType, ExecutorStatus status);
+
+    // FR-06: user còn giữ assignment nào khác (của bất kỳ Owner nào) chưa bị thu hồi không.
+    boolean existsByExecutorUserIdAndStatusNotAndIdNot(UUID executorUserId, ExecutorStatus status, UUID excludedId);
 }
