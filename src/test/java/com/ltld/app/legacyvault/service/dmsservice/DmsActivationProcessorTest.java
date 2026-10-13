@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
+import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -15,11 +16,14 @@ import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -29,6 +33,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +48,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -55,6 +61,7 @@ class DmsActivationProcessorTest {
     @Mock private DmsCheckinRepository dmsCheckinRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private NotificationRepository notificationRepository;
+    @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
 
@@ -67,6 +74,7 @@ class DmsActivationProcessorTest {
     private DmsConfig config;
     private ExecutorAssignment primary;
     private ExecutorAssignment backup;
+    private Role executorRole;
     private LocalDateTime now;
 
     @BeforeEach
@@ -76,11 +84,15 @@ class DmsActivationProcessorTest {
         backupUserId = UUID.randomUUID();
         now = LocalDateTime.of(2026, 10, 1, 12, 0);
 
-        User owner = User.builder().id(ownerId).build();
+        User owner = User.builder().id(ownerId).fullName("Nguyễn Văn A").email("owner@example.test").build();
         config = DmsConfig.builder().id(UUID.randomUUID()).owner(owner).status(DmsStatus.ACTIVE)
                 .nextCheckinDueAt(now.minusDays(1)).backupActivationWaitDays(14).build();
         primary = assignment(owner, primaryUserId, "primary@example.test", ExecutorType.PRIMARY);
         backup = assignment(owner, backupUserId, "backup@example.test", ExecutorType.BACKUP);
+
+        executorRole = new Role();
+        executorRole.setCode("EXECUTOR");
+        when(roleRepository.findByCode("EXECUTOR")).thenReturn(Optional.of(executorRole));
 
         when(dmsConfigRepository.findById(config.getId())).thenReturn(Optional.of(config));
         when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY))
@@ -366,18 +378,18 @@ class DmsActivationProcessorTest {
     }
 
     @Test
-    @DisplayName("B2/T3: thông báo FAILED vừa thử 10 phút trước -> chưa gửi lại")
+    @DisplayName("B2/T3: đã thử 3 lần (chờ 4 giờ), lần cuối mới 3 giờ 59 phút trước -> chưa gửi lại")
     void escalate_doesNotRetryWithinRetryInterval() {
         Notification failed = primaryNeverDelivered(now.minusDays(1));
         failed.setAttemptCount(3);
-        failed.setLastAttemptAt(now.minusMinutes(10));
+        failed.setLastAttemptAt(now.minusHours(4).plusMinutes(1));
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
         verify(executorNotificationService, never()).send(anyString(), anyString());
         verify(notificationRepository, never()).save(any());
         assertThat(failed.getAttemptCount()).isEqualTo(3);
-        assertThat(failed.getLastAttemptAt()).isEqualTo(now.minusMinutes(10));
+        assertThat(failed.getLastAttemptAt()).isEqualTo(now.minusHours(4).plusMinutes(1));
     }
 
     @Test
@@ -394,11 +406,11 @@ class DmsActivationProcessorTest {
     }
 
     @Test
-    @DisplayName("B2: lần thử trước đã quá 1 giờ và chưa đủ MAX_ATTEMPTS -> gửi lại, tăng attemptCount")
+    @DisplayName("B2: chưa đủ MAX_ATTEMPTS và đã chờ đúng 24 giờ kể từ lần thử trước -> gửi lại, tăng attemptCount")
     void escalate_retriesAfterRetryInterval() {
-        Notification failed = primaryNeverDelivered(now.minusDays(1));
+        Notification failed = primaryNeverDelivered(now.minusDays(2));
         failed.setAttemptCount(DmsActivationProcessor.MAX_ATTEMPTS - 1);
-        failed.setLastAttemptAt(now.minusHours(1).minusMinutes(1));
+        failed.setLastAttemptAt(now.minusHours(24));
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
@@ -450,5 +462,93 @@ class DmsActivationProcessorTest {
         verify(notificationRepository, never()).save(any());
         verify(executorNotificationService, never()).send(anyString(), anyString());
         verifyNoInteractions(auditLogService);
+    }
+
+    // ---------- C2/T7: role EXECUTOR ----------
+
+    @Test
+    @DisplayName("C2/T7: trigger -> user của Primary được kích hoạt có role EXECUTOR, Backup thì chưa")
+    void trigger_grantsExecutorRoleToActivatedUser() {
+        processor.trigger(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).containsExactly(executorRole);
+        assertThat(backup.getExecutorUser().getRoles()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("C2/T7: kích hoạt hai lần -> role EXECUTOR không bị trùng, chỉ tra RoleRepository một lần")
+    void trigger_executorRoleIsIdempotent() {
+        processor.trigger(config.getId(), now);
+        // Lượt kích hoạt thứ hai trên cùng user (ví dụ user là Executor của nhiều Owner).
+        config.setStatus(DmsStatus.ACTIVE);
+        primary.setStatus(ExecutorStatus.INACTIVE);
+        processor.trigger(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).hasSize(1);
+        verify(roleRepository, times(1)).findByCode("EXECUTOR");
+    }
+
+    @Test
+    @DisplayName("C2/T7: leo thang sang Backup -> user của Backup có role EXECUTOR")
+    void escalate_grantsExecutorRoleToBackup() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(backup.getExecutorUser().getRoles()).containsExactly(executorRole);
+    }
+
+    // ---------- C3/T8: lịch gửi lại ----------
+
+    @ParameterizedTest(name = "attemptCount={0} -> chờ {1} giờ")
+    @CsvSource({"0, 1", "1, 1", "2, 2", "3, 4", "4, 8", "5, 16", "6, 24", "7, 24", "19, 24"})
+    @DisplayName("C3/T8: retryDelay giãn 1h, 2h, 4h, 8h, 16h rồi giữ 24h")
+    void retryDelay_followsBackoffTable(int attemptCount, long expectedHours) {
+        assertThat(DmsActivationProcessor.retryDelay(attemptCount)).isEqualTo(Duration.ofHours(expectedHours));
+    }
+
+    @Test
+    @DisplayName("C3/T8: MAX_ATTEMPTS = 20 lần gửi trải dài đủ 14 ngày chờ của BR-03")
+    void retrySchedule_coversFourteenDayWait() {
+        assertThat(DmsActivationProcessor.MAX_ATTEMPTS).isEqualTo(20);
+        Duration span = Duration.ZERO;
+        // Cộng khoảng chờ sau mỗi lần thử 1..19, tức từ lần gửi đầu đến lần thử thứ 20.
+        for (int attempt = 1; attempt < DmsActivationProcessor.MAX_ATTEMPTS; attempt++) {
+            span = span.plus(DmsActivationProcessor.retryDelay(attempt));
+        }
+        assertThat(span).isGreaterThanOrEqualTo(Duration.ofDays(14));
+    }
+
+    // ---------- C4/T9: nội dung mail kích hoạt ----------
+
+    @Test
+    @DisplayName("C4/T9: nội dung thông báo nêu tên + email Owner, loại Executor và mã assignment")
+    void trigger_notificationContentNamesOwnerTypeAndAssignment() {
+        processor.trigger(config.getId(), now);
+
+        ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
+        verify(executorNotificationService).send(eq("primary@example.test"), sent.capture());
+        assertThat(sent.getValue())
+                .contains("Nguyễn Văn A (owner@example.test)")
+                .contains("Executor Primary")
+                .contains(primary.getId().toString());
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(saved.capture());
+        assertThat(saved.getValue().getContent()).isEqualTo(sent.getValue());
+    }
+
+    @Test
+    @DisplayName("C4/T9: Owner không có tên -> chỉ in email, không in chữ null; Backup ghi đúng loại")
+    void activationMessage_withoutOwnerName_doesNotPrintNull() {
+        User owner = User.builder().id(ownerId).email("owner@example.test").build();
+
+        String content = DmsActivationProcessor.activationMessage(owner, backup);
+
+        assertThat(content)
+                .contains("Dead Man's Switch của owner@example.test đã được kích hoạt")
+                .contains("Executor Backup")
+                .contains(backup.getId().toString())
+                .doesNotContain("null");
     }
 }
