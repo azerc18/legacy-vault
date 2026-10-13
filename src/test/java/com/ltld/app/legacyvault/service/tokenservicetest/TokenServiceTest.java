@@ -148,7 +148,6 @@ public class TokenServiceTest {
 
         assertThatThrownBy(() -> tokenService.refreshAccessToken(RAW_TOKEN, IP, USER_AGENT))
                 .isInstanceOf(LockedAccountException.class);
-
         verify(refreshTokenRepository, never()).revokeAllActiveByUserId(any(), any(), any());
     }
 
