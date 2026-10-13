@@ -42,4 +42,9 @@ public class BeneficiaryClaim {
 
     @Column(name = "claimed_at")
     private LocalDateTime claimedAt;
+
+    // FR-16: số lần đã thử gửi thông báo bàn giao (tối đa MAX_NOTIFY_ATTEMPTS ở BeneficiaryNotificationListener)
+    @Builder.Default
+    @Column(name = "notify_attempts", nullable = false, columnDefinition = "int default 0")
+    private int notifyAttempts = 0;
 }

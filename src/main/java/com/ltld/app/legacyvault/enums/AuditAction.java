@@ -18,6 +18,4 @@ public enum AuditAction {
     DOCUMENT_DOWNLOADED,
     // FR-16: thông báo bàn giao cho Beneficiary
     BENEFICIARY_NOTIFIED, BENEFICIARY_NOTIFY_FAILED
-
-
 }
