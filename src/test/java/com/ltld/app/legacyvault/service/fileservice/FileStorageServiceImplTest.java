@@ -61,4 +61,18 @@ class FileStorageServiceImplTest {
     void readFile_emptyPath_throwsIllegalArgument() {
         assertThatThrownBy(() -> service.readFile("  ")).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void readFile_symlinkEscapingUploadDir_isRejected(@TempDir Path elsewhere) throws Exception {
+        Path secret = Files.writeString(elsewhere.resolve("secret.txt"), "x");
+        Path link = uploadDir.resolve("link.bin");
+        try {
+            Files.createSymbolicLink(link, secret);
+        } catch (UnsupportedOperationException | java.io.IOException e) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(false, "Symlink not supported here");
+        }
+
+        assertThatThrownBy(() -> service.readFile(link.toString()))
+                .isInstanceOf(SecurityException.class);
+    }
 }

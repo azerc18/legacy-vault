@@ -586,6 +586,31 @@ public class BeneficiaryControllerTest {
     }
 
     @Test
+    void downloadVaultDocument_vietnameseFileName_isUtf8EncodedInHeader() throws Exception {
+        UUID vaultId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        when(beneficiaryService.downloadVaultDocument(vaultId, documentId, userId)).thenReturn(
+                DocumentDownloadResponse.builder()
+                        .fileName("Di chúc.pdf")
+                        .contentType("application/pdf")
+                        .content("x".getBytes(StandardCharsets.UTF_8))
+                        .build());
+
+        MvcResult result = mockMvc.perform(
+                        get("/api/beneficiaries/vaults/{vaultId}/documents/{documentId}/download", vaultId, documentId)
+                                .principal(principal))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .startsWith("attachment")
+                .contains("filename*=UTF-8''Di%20ch%C3%BAc.pdf");
+    }
+
+    @Test
     void downloadVaultDocument_noViewSession_returns403Json() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadVaultDocument(any(), any(), any()))

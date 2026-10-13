@@ -15,4 +15,7 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
 
     // FR-18 (phần 2): lấy 1 tài liệu, bắt buộc thuộc đúng vault để không tải nhầm tài liệu của vault khác
     Optional<LegalDocument> findByIdAndVaultId(UUID id, UUID vaultId);
+
+    // FR-18 (phần 2): danh sách có thứ tự ổn định (mới nhất trước)
+    List<LegalDocument> findByVaultIdOrderByUploadedAtDescIdDesc(UUID vaultId);
 }

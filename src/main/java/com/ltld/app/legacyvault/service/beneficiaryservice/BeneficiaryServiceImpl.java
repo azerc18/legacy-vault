@@ -52,6 +52,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -78,6 +79,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
     private static final String CONFIRM_REQUIRED_MSG = "Cần xác nhận lần cuối để đóng hồ sơ nhận bàn giao.";
+    // Dùng chung cho tên tệp và Content-Type; khớp các loại FR-04 cho phép (PDF, DOC/DOCX, JPG/PNG)
+    private static final Map<String, String> DOCUMENT_TYPES = Map.of(
+            "pdf", "application/pdf",
+            "doc", "application/msword",
+            "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png");
 
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
@@ -344,7 +353,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
-                decrypted.vault().getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
+                decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
+                "DigitalAsset", asset.getId().toString(), null);
         return response;
     }
 
@@ -360,7 +370,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // SRS FR-18 bước 5: ghi log tải xuống, chỉ sau khi giải mã thành công, không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
-                decrypted.vault().getBeneficiary().getEmail(), "DigitalAsset", asset.getId().toString(), null);
+                decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
+                "DigitalAsset", asset.getId().toString(), null);
 
         return AssetDownloadResponse.builder()
                 .fileName(toSafeFileName(asset.getAssetName()) + ".txt")
@@ -376,7 +387,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
-        return legalDocumentRepository.findByVaultId(vault.getId()).stream()
+        return legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vault.getId()).stream()
                 .map(doc -> LegalDocumentSummaryResponse.builder()
                         .id(doc.getId())
                         .documentType(doc.getDocumentType())
@@ -388,7 +399,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // FR-18 (phần 2): tải xuống một tài liệu pháp lý đã giải mã
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public DocumentDownloadResponse downloadVaultDocument(UUID vaultId, UUID documentId, UUID currentUserId) {
         // Kiểm tra lại phiên xác thực còn hiệu lực (SRS FR-18 bước 2)
         Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
@@ -404,17 +415,20 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             // Đọc bản mã hóa từ đĩa rồi giải mã trong bộ nhớ, không lưu lại bản rõ
             plain = cryptoService.decryptBytes(fileStorageService.readFile(document.getFileUrlEncrypted()));
         } catch (Exception e) {
-            // Không log nội dung, chỉ log id tài liệu
             log.error("Document read/decrypt failed for document {}", document.getId(), e);
+            // Giải mã thất bại có thể là dấu hiệu tệp bị sửa hoặc sai khóa, nên cần nằm trong audit
+            auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.FAILURE, currentUserId,
+                    vault.getBeneficiary().getEmail(), vault.getId(),
+                    "LegalDocument", document.getId().toString(), "Read or decrypt failed");
             throw new BeneficiaryException(
                     "Không thể giải mã tài liệu. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         String fileName = toSafeDocumentFileName(document.getFileName());
 
-        // SRS FR-18 bước 5: ghi log tải xuống, chỉ sau khi giải mã thành công
         auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), "LegalDocument", document.getId().toString(), null);
+                vault.getBeneficiary().getEmail(), vault.getId(),
+                "LegalDocument", document.getId().toString(), null);
 
         return DocumentDownloadResponse.builder()
                 .fileName(fileName)
@@ -564,7 +578,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     private String toSafeFileName(String name, String fallback) {
         String base = (name == null ? "" : name)
-                .replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_")
+                .replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}\\p{Cf}]", "_")
                 .trim()
                 .replaceAll("[. ]+$", "");
         if (base.isEmpty()) {
@@ -580,32 +594,27 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // Tên tệp tài liệu do Owner đặt: làm sạch phần tên, giữ lại phần mở rộng ngắn hợp lệ để mở đúng ứng dụng
     private String toSafeDocumentFileName(String originalName) {
         String name = originalName == null ? "" : originalName;
-        String base = name;
-        String ext = "";
         int dot = name.lastIndexOf('.');
-        if (dot > 0 && dot < name.length() - 1) {
-            String candidate = name.substring(dot + 1).toLowerCase(Locale.ROOT);
-            if (candidate.matches("[a-z0-9]{1,5}")) {
-                ext = candidate;
-                base = name.substring(0, dot);
-            }
+        String candidate = (dot > 0 && dot < name.length() - 1)
+                ? name.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
+
+        String base;
+        String ext = "";
+        if (DOCUMENT_TYPES.containsKey(candidate)) {
+            ext = candidate;
+            base = name.substring(0, dot);
+        } else {
+            // Phần mở rộng không nằm trong danh sách cho phép: bỏ dấu chấm để tên không còn đuôi (x.exe -> x_exe)
+            base = name.replace('.', '_');
         }
         String safeBase = toSafeFileName(base, "document");
         return ext.isEmpty() ? safeBase : safeBase + "." + ext;
     }
 
-    // Loại nội dung suy ra từ phần mở rộng (các loại FR-04 cho phép); loại khác thì tải như tệp nhị phân
     private String contentTypeOf(String fileName) {
         int dot = fileName.lastIndexOf('.');
         String ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
-        return switch (ext) {
-            case "pdf" -> "application/pdf";
-            case "doc" -> "application/msword";
-            case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            case "jpg", "jpeg" -> "image/jpeg";
-            case "png" -> "image/png";
-            default -> "application/octet-stream";
-        };
+        return DOCUMENT_TYPES.getOrDefault(ext, "application/octet-stream");
     }
     // ===================== Helper dùng chung cho FR-17 =====================
 

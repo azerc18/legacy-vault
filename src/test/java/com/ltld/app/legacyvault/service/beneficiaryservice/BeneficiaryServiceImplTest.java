@@ -45,6 +45,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -981,7 +983,7 @@ public class BeneficiaryServiceImplTest {
         beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
 
         verify(auditLogService).log(eq(AuditAction.ASSET_VIEWED), eq(AuditResult.SUCCESS),
-                eq(currentUserId), any(), eq("DigitalAsset"), eq(assetId.toString()), isNull());
+                eq(currentUserId), any(), eq(vaultId), eq("DigitalAsset"), eq(assetId.toString()), isNull());
     }
 
     @Test
@@ -997,7 +999,7 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
 
         verify(auditLogService, never()).log(eq(AuditAction.ASSET_VIEWED),
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     // ===================== FR-18: tải xuống =====================
@@ -1077,9 +1079,9 @@ public class BeneficiaryServiceImplTest {
         beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
 
         verify(auditLogService).log(eq(AuditAction.ASSET_DOWNLOADED), eq(AuditResult.SUCCESS),
-                eq(currentUserId), any(), eq("DigitalAsset"), eq(assetId.toString()), isNull());
+                eq(currentUserId), any(), eq(vaultId), eq("DigitalAsset"), eq(assetId.toString()), isNull());
         verify(auditLogService, never()).log(eq(AuditAction.ASSET_VIEWED),
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1124,7 +1126,7 @@ public class BeneficiaryServiceImplTest {
 
         assertThat(ex.getMessage()).doesNotContain("enc-secret").doesNotContain("boom");
         verify(auditLogService, never()).log(eq(AuditAction.ASSET_DOWNLOADED),
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1481,7 +1483,7 @@ public class BeneficiaryServiceImplTest {
     void getVaultDocuments_withViewSession_returnsSummariesWithoutDecrypting() {
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(List.of(
+        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(
                 legalDocument(UUID.randomUUID(), "di-chuc.pdf"),
                 legalDocument(UUID.randomUUID(), "so-do.png")));
 
@@ -1564,9 +1566,9 @@ public class BeneficiaryServiceImplTest {
         beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
 
         verify(auditLogService).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.SUCCESS),
-                eq(currentUserId), any(), eq("LegalDocument"), eq(docId.toString()), isNull());
+                eq(currentUserId), any(), eq(vaultId), eq("LegalDocument"), eq(docId.toString()), isNull());
         verify(auditLogService, never()).log(eq(AuditAction.ASSET_DOWNLOADED),
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -1599,7 +1601,7 @@ public class BeneficiaryServiceImplTest {
     }
 
     @Test
-    void downloadVaultDocument_readFails_throws500WithoutLeakingPathAndDoesNotAudit() throws Exception {
+    void downloadVaultDocument_readFails_throws500WithoutLeakingPathAndAuditsFailure() throws Exception {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
@@ -1611,12 +1613,15 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
 
         assertThat(ex.getMessage()).doesNotContain("/secret").doesNotContain("stored.bin");
-        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED),
+        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.SUCCESS),
                 any(), any(), any(), any(), any(), any());
+        verify(auditLogService).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.FAILURE),
+                eq(currentUserId), any(), eq(vaultId), eq("LegalDocument"), any(),
+                eq("Read or decrypt failed"));
     }
 
     @Test
-    void downloadVaultDocument_decryptFails_throws500AndDoesNotAudit() throws Exception {
+    void downloadVaultDocument_decryptFails_throws500AndAuditsFailure() throws Exception {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
@@ -1629,8 +1634,11 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
 
         assertThat(ex.getMessage()).doesNotContain("boom");
-        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED),
+        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.SUCCESS),
                 any(), any(), any(), any(), any(), any());
+        verify(auditLogService).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.FAILURE),
+                eq(currentUserId), any(), eq(vaultId), eq("LegalDocument"), any(),
+                eq("Read or decrypt failed"));
     }
 
     @Test
@@ -1656,6 +1664,41 @@ public class BeneficiaryServiceImplTest {
 
         verifyNoInteractions(fileStorageService);
         verifyNoInteractions(auditLogService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"x.exe", "x.html", "x.svg", ".exe"})
+    void downloadVaultDocument_disallowedExtension_isNeutralizedAndOctetStream(String name) throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, name);
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).doesNotContain(".");
+        assertThat(file.getContentType()).isEqualTo("application/octet-stream");
+    }
+
+    @Test
+    void downloadVaultDocument_rtlOverrideInName_isReplaced() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubDownloadableDocument(docId, "hop-dong\u202Efdp.png");
+
+        DocumentDownloadResponse file = beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId);
+
+        assertThat(file.getFileName()).doesNotContain("\u202E").endsWith(".png");
+    }
+
+    @Test
+    void getVaultDocuments_wrongBeneficiary_throws404() {
+        User other = new User();
+        other.setId(UUID.randomUUID());
+        unlockedVault.setBeneficiary(other);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.NOT_FOUND,
+                () -> beneficiaryService.getVaultDocuments(vaultId, currentUserId));
+
+        verifyNoInteractions(legalDocumentRepository);
     }
 
     @Test
