@@ -9,13 +9,13 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.InvalidOtpException;
 import com.ltld.app.legacyvault.exception.OtpNotFoundException;
 import com.ltld.app.legacyvault.exception.TooManyAttemptsException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.RefreshTokenRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +45,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=create"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class OtpConcurrencyIntegrationTest {
@@ -71,6 +71,8 @@ class OtpConcurrencyIntegrationTest {
     private RefreshTokenRepository refreshTokenRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private OtpHasher otpHasher;
 
     private static final String EMAIL = "race@example.com";
     private static final String OTP = "123456";
@@ -88,7 +90,7 @@ class OtpConcurrencyIntegrationTest {
                 .build());
 
         tokenId = tokenRepository.save(VerificationToken.builder()
-                .otpCode(OTP)
+                .otpCode(otpHasher.hash(user.getId(), OTP))
                 .expiresAt(Instant.now().plusSeconds(300))
                 .createdAt(Instant.now())
                 .type(TokenType.PASSWORD_RESET)

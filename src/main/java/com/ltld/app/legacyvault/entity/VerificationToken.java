@@ -20,7 +20,7 @@ public class VerificationToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(name = "otp_code", nullable = false, length = 6)
+    @Column(name = "otp_code", nullable = false, length = 64)
     private String otpCode;
 
     @Column(name = "expires_at", nullable = false)
