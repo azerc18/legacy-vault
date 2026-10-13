@@ -39,7 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
-        "spring.jpa.hibernate.ddl-auto=create"
+        "spring.jpa.hibernate.ddl-auto=create",
+        "app.dms.scheduler.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
