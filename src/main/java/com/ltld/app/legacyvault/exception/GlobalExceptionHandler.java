@@ -94,6 +94,24 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(ExecutorAssignmentNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExecutorAssignmentNotFound(ExecutorAssignmentNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(ExecutorNotActiveException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExecutorNotActive(ExecutorNotActiveException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(DmsNotTriggeredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDmsNotTriggered(DmsNotTriggeredException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error("Malformed request body"));
