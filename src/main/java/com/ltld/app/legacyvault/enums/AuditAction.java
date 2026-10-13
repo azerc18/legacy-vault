@@ -14,4 +14,6 @@ public enum AuditAction {
     LEGAL_SIGN_OTP_SENT,
     // FR-07: kích hoạt DMS và Executor
     DMS_TRIGGERED, DMS_TRIGGERED_NO_EXECUTOR, EXECUTOR_ACTIVATED, EXECUTOR_ACKNOWLEDGED
+    // FR-18 (phần 2): tải tài liệu pháp lý
+    DOCUMENT_DOWNLOADED
 }
