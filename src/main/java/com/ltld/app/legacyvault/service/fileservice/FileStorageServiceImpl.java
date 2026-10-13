@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,6 +43,28 @@ public class FileStorageServiceImpl implements FileStorageService {
 
         // 4. Trả về đường dẫn của file để lát nữa chúng ta lưu vào Database
         return targetLocation.toString();
+    }
+
+    @Override
+    public byte[] readFile(String filePath) throws IOException {
+        if (filePath == null || filePath.trim().isEmpty()) {
+            throw new IllegalArgumentException("File path is empty.");
+        }
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path target = Paths.get(filePath).toAbsolutePath().normalize();
+
+        // Chỉ cho đọc file nằm trong thư mục upload, tránh đọc file hệ thống qua đường dẫn bị chỉnh sửa
+        if (!target.startsWith(uploadPath)) {
+            throw new SecurityException("Security Error: Cannot read file outside the upload directory.");
+        }
+        if (!Files.isRegularFile(target)) {
+            throw new java.io.FileNotFoundException("Stored file not found.");
+        }
+        // Chặn symlink nằm trong thư mục upload nhưng trỏ ra ngoài
+        if (!target.toRealPath().startsWith(uploadPath.toRealPath())) {
+            throw new SecurityException("Security Error: Cannot read file outside the upload directory.");
+        }
+        return Files.readAllBytes(target);
     }
 
     @Override
