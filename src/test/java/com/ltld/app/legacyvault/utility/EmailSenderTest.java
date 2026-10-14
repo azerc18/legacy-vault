@@ -33,7 +33,7 @@ class EmailSenderTest {
     @BeforeEach
     void setUp() {
         originalZone = TimeZone.getDefault();
-        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
     }
 
     @AfterEach
@@ -56,7 +56,7 @@ class EmailSenderTest {
         String text = message.getText();
         assertTrue(message.getTo()[0].equals("an@example.com"));
         assertTrue(text.contains("Hồ sơ \"Hồ sơ A\" của Bình"));
-        assertTrue(text.contains("31/12/2026 10:30 (GMT+7)"));
+        assertTrue(text.contains("31/12/2026 17:30 (GMT+7)"));
         assertFalse(text.contains("chưa được kích hoạt"));
         assertFalse(text.contains("Mã có hiệu lực"));
     }

@@ -33,6 +33,13 @@ public class EmailSender {
                         + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
+    /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
+    public static String formatDeadline(LocalDateTime claimDeadlineAt) {
+        return claimDeadlineAt.atZone(ZoneId.systemDefault())
+                .withZoneSameInstant(VN_ZONE)
+                .format(DEADLINE_FORMAT);
+    }
+
     /**
      * FR-16: thông báo cho Beneficiary khi Vault được mở khóa.
      * Cố ý KHÔNG dùng @Async: người gọi cần biết gửi thành công hay không (lỗi gửi ném MailException)
@@ -41,10 +48,7 @@ public class EmailSender {
      */
     public void sendVaultUnlockedNotification(String email, String fullName, String ownerName, String vaultName,
                                               LocalDateTime claimDeadlineAt, boolean accountActive) {
-        // claimDeadlineAt là LocalDateTime theo múi giờ máy chủ; đổi sang GMT+7 để ghi rõ trong mail
-        String deadline = claimDeadlineAt.atZone(ZoneId.systemDefault())
-                .withZoneSameInstant(VN_ZONE)
-                .format(DEADLINE_FORMAT);
+        String deadline = formatDeadline(claimDeadlineAt);
 
         StringBuilder body = new StringBuilder()
                 .append("Xin chào ").append(fullName == null ? "" : fullName).append(",\n\n")
@@ -64,7 +68,7 @@ public class EmailSender {
                 .append("Sau thời hạn này, hồ sơ sẽ bị khóa lưu trữ và bạn không thể truy cập nội dung tài sản.\n\n")
                 .append("Vui lòng không chia sẻ email này với bất kỳ ai.");
 
-        sendPlain(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
+        sendWithoutOtpFooter(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
     }
 
     private void send(String to, String subject, String body) {
@@ -78,7 +82,7 @@ public class EmailSender {
     }
 
     // Gửi email thường, không gắn câu về thời hạn OTP như send()
-    private void sendPlain(String to, String subject, String body) {
+    private void sendWithoutOtpFooter(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
         message.setSubject(subject);
