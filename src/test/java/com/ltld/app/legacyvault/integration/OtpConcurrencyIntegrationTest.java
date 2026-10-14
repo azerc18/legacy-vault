@@ -46,7 +46,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
         "spring.jpa.hibernate.ddl-auto=create",
-        "app.dms.scheduler.enabled=false"
+        "app.dms.scheduler.enabled=false",
+        "app.beneficiary.notify-retry.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class OtpConcurrencyIntegrationTest {
