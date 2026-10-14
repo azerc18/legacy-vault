@@ -17,5 +17,7 @@ public enum AuditAction {
     // FR-18 (phần 2): tải tài liệu pháp lý
     DOCUMENT_DOWNLOADED,
     // FR-16: thông báo bàn giao cho Beneficiary
-    BENEFICIARY_NOTIFIED, BENEFICIARY_NOTIFY_FAILED, BENEFICIARY_NOTIFY_GAVE_UP
+    BENEFICIARY_NOTIFIED, BENEFICIARY_NOTIFY_FAILED, BENEFICIARY_NOTIFY_GAVE_UP,
+    // FR-08: nộp yêu cầu xác minh cái chết
+    LEGAL_VERIFICATION_REQUESTED
 }

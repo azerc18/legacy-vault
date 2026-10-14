@@ -202,4 +202,25 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
+    // FR-08: Xử lý ngoại lệ nộp trùng yêu cầu xác minh cái chết (409 Conflict)
+    @ExceptionHandler(DuplicateVerificationRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateVerificationRequest(DuplicateVerificationRequestException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    // FR-08: Xử lý ngoại lệ file chứng tử không hợp lệ hoặc không đúng định dạng (400 Bad Request)
+    @ExceptionHandler(InvalidVerificationDocumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidVerificationDocument(InvalidVerificationDocumentException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    // FR-08: Xử lý ngoại lệ khi thiếu part trong multipart request (400 Bad Request)
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPart(org.springframework.web.multipart.support.MissingServletRequestPartException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Missing required request part: " + e.getRequestPartName()));
+    }
 }
