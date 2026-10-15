@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -58,6 +59,8 @@ class VaultServiceImplTest {
     private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
     @Mock
     private EmailSender emailSender;
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -362,6 +365,42 @@ class VaultServiceImplTest {
 
         verify(vaultRepository, never()).save(any());
         // T8: không gửi email, không ghi audit nào (kể cả SUCCESS)
+        verifyNoInteractions(emailSender, auditLogService);
+    }
+
+    @Test
+    void assignBeneficiary_emailIsOwnersExecutor_returns409() {
+        Vault vault = activeVault();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, "exec@example.com")).thenReturn(true);
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest(" Exec@Example.com ", null)));
+
+        // Q26: Executor của Owner không được đồng thời là người thụ hưởng
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals("Người này đang là Digital Executor của bạn, không thể đồng thời là người thụ hưởng.",
+                ex.getMessage());
+        assertNull(vault.getBeneficiary());
+        assertNull(vault.getBeneficiaryEmail());
+        verify(vaultRepository, never()).save(any());
+        verifyNoInteractions(emailSender, auditLogService);
+    }
+
+    @Test
+    void assignBeneficiary_currentBeneficiaryIsNowExecutor_returns409() {
+        // Q26 đứng TRƯỚC nhánh no-op "gán lại đúng người hiện tại": không được trả về im lặng
+        Vault vault = activeVault();
+        User ben = userWith("ben@example.com", UserStatus.ACTIVE);
+        vault.setBeneficiary(ben);
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, "ben@example.com")).thenReturn(true);
+
+        assertVaultError(HttpStatus.CONFLICT,
+                () -> vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("ben@example.com", null)));
+
+        assertSame(ben, vault.getBeneficiary());
+        verify(vaultRepository, never()).save(any());
         verifyNoInteractions(emailSender, auditLogService);
     }
 

@@ -14,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -35,7 +36,7 @@ class VaultControllerSecurityTest {
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(String... authorities) {
-        SimpleGrantedAuthority[] granted = java.util.Arrays.stream(authorities)
+        SimpleGrantedAuthority[] granted = Arrays.stream(authorities)
                 .map(SimpleGrantedAuthority::new).toArray(SimpleGrantedAuthority[]::new);
         return jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(granted);
     }

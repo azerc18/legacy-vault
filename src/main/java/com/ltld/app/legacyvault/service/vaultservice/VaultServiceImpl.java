@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -44,6 +45,7 @@ public class VaultServiceImpl implements VaultService {
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
     private final EmailSender emailSender;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     @Override
     @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
@@ -167,6 +169,13 @@ public class VaultServiceImpl implements VaultService {
         String email = request.getEmail().trim().toLowerCase();
         if (email.equals(owner.getEmail())) {
             throw new VaultException("Không thể tự chỉ định chính mình làm người thụ hưởng", HttpStatus.BAD_REQUEST);
+        }
+
+        // Q26: Executor (chưa bị thu hồi) của Owner không được đồng thời là người thụ hưởng.
+        // Đặt trước bước "gán lại đúng người" để cả trường hợp người thụ hưởng hiện tại vừa trở thành Executor cũng bị chặn.
+        if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, email)) {
+            throw new VaultException("Người này đang là Digital Executor của bạn, không thể đồng thời là người thụ hưởng.",
+                    HttpStatus.CONFLICT);
         }
 
         String currentEmail = vault.getBeneficiary() != null

@@ -1,11 +1,11 @@
 package com.ltld.app.legacyvault.dto.vaultdto;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 
 import java.util.UUID;
 
-@Data
+@Getter
 @Builder
 public class AssignBeneficiaryResponse {
     private UUID vaultId;
