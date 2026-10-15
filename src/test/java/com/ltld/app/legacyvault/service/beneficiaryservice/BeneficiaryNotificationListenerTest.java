@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -9,6 +10,8 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
@@ -22,6 +25,7 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -403,5 +407,62 @@ class BeneficiaryNotificationListenerTest {
             total = total.plus(BeneficiaryNotificationListener.retryDelay(attempts));
         }
         assertTrue(total.compareTo(Duration.ofDays(7)) >= 0);
+    }
+
+    @Test
+    void firstAttempt_mailOk_createsInAppNotification() {   // T1
+        User user = beneficiary(UserStatus.ACTIVE);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, user)));
+        stubNewClaimPersistence();
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification n = captor.getValue();
+        assertEquals(NotificationChannel.IN_APP, n.getChannel());
+        assertEquals(NotificationType.VAULT_UNLOCKED, n.getType());
+        assertEquals(vaultId, n.getReferenceId());
+        assertEquals(user, n.getRecipient());
+    }
+
+    @Test
+    void firstAttempt_mailFails_stillCreatesInApp() {        // T2 (chốt M1)
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, beneficiary(UserStatus.ACTIVE))));
+        stubNewClaimPersistence();
+        mailFails();
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    void retryAttempt_doesNotCreateAnotherInApp() {          // T3
+        User user = beneficiary(UserStatus.ACTIVE);
+        Vault vault = unlockedVault(vaultId, user);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        // đã thử 1 lần, cách đây 2h (> retryDelay(1) = 1h) nên lượt này được phép chạy
+        stubExistingClaim(claim(vault, user, 1, null, LocalDateTime.now().minusHours(2)));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        assertEquals(2, storedClaim.getNotifyAttempts());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void firstAttempt_inAppAlreadyExists_notDuplicated() {   // T4
+        User user = beneficiary(UserStatus.ACTIVE);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, user)));
+        stubNewClaimPersistence();
+        when(notificationRepository
+                .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
+                        user.getId(), NotificationType.VAULT_UNLOCKED, "Vault", vaultId))
+                .thenReturn(Optional.of(new Notification()));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository, never()).save(any(Notification.class));
     }
 }

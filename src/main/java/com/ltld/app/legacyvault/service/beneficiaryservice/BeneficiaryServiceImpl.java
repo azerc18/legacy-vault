@@ -153,13 +153,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Transactional(readOnly = true)
     public List<BeneficiaryNotificationResponse> listMyNotifications(UUID currentUserId) {
         return notificationRepository
-                .findAllByRecipientIdAndChannelOrderByCreatedAtDesc(currentUserId, NotificationChannel.IN_APP)
+                .findTop50ByRecipientIdAndChannelOrderByCreatedAtDesc(currentUserId, NotificationChannel.IN_APP)
                 .stream()
                 .map(n -> BeneficiaryNotificationResponse.builder()
                         .id(n.getId())
                         .type(n.getType())
                         .content(n.getContent())
-                        .vaultId(n.getReferenceId())
+                        .vaultId("Vault".equals(n.getReferenceType()) ? n.getReferenceId() : null)
                         .read(n.getStatus() == NotificationStatus.READ)
                         .createdAt(n.getCreatedAt())
                         .build())

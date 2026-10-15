@@ -74,6 +74,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(beneficiaryService.listMyNotifications(currentUserId(principal))));
     }
 
+    // FR-16: đánh dấu thông báo đã đọc
     @PatchMapping("/notifications/{notificationId}/read")
     public ResponseEntity<ApiResponse<Void>> markNotificationRead(
             Principal principal, @PathVariable UUID notificationId) {

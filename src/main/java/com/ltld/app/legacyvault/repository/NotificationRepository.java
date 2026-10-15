@@ -17,8 +17,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     Optional<Notification> findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
             UUID recipientId, NotificationType type, String referenceType, UUID referenceId);
 
-    // Thông báo trong hệ thống của một người dùng, mới nhất trước
-    List<Notification> findAllByRecipientIdAndChannelOrderByCreatedAtDesc(UUID recipientId, NotificationChannel channel);
+    // FR-16: 50 thông báo trong hệ thống mới nhất của người dùng
+    List<Notification> findTop50ByRecipientIdAndChannelOrderByCreatedAtDesc(UUID recipientId, NotificationChannel channel);
 
     Optional<Notification> findByIdAndRecipientIdAndChannel(UUID id, UUID recipientId, NotificationChannel channel);
 }

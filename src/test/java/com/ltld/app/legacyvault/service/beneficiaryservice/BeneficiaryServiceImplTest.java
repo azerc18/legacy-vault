@@ -1830,7 +1830,7 @@ public class BeneficiaryServiceImplTest {
                 .channel(NotificationChannel.IN_APP).referenceType("Vault").referenceId(UUID.randomUUID())
                 .content("Hồ sơ B đã được bàn giao").status(NotificationStatus.READ)
                 .createdAt(LocalDateTime.now().minusDays(1)).build();
-        when(notificationRepository.findAllByRecipientIdAndChannelOrderByCreatedAtDesc(
+        when(notificationRepository.findTop50ByRecipientIdAndChannelOrderByCreatedAtDesc(
                 currentUserId, NotificationChannel.IN_APP)).thenReturn(List.of(unread, read));
 
         List<BeneficiaryNotificationResponse> result = beneficiaryService.listMyNotifications(currentUserId);

@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -255,5 +256,32 @@ class BeneficiaryControllerSecurityTest {
         when(beneficiaryService.listMyVaults(any())).thenReturn(List.of());
         mockMvc.perform(get("/api/beneficiaries/vaults").with(token("ROLE_BENEFICIARY")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void notifications_noToken_returns401() throws Exception {      // T5
+        mockMvc.perform(get("/api/beneficiaries/notifications"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void notifications_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/notifications").with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).listMyNotifications(any());
+    }
+
+    @Test
+    void markRead_noToken_returns401() throws Exception {
+        mockMvc.perform(patch("/api/beneficiaries/notifications/{id}/read", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void markRead_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(patch("/api/beneficiaries/notifications/{id}/read", UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).markNotificationRead(any(), any());
     }
 }
