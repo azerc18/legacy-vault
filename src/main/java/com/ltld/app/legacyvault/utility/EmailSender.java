@@ -37,6 +37,37 @@ public class EmailSender {
                         + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
+    // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
+    @Async
+    public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
+        sendWithoutOtpFooter(email,
+                "Lời mời trở thành người thụ hưởng - LegacyVault",
+                ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
+                        + "\nVui lòng đăng ký tài khoản (hoặc hoàn tất xác minh email nếu đã đăng ký) bằng chính địa chỉ email này"
+                        + " để được liên kết với Vault.");
+    }
+
+    // FR-02: thông báo cho người thụ hưởng đã có tài khoản
+    @Async
+    public void sendBeneficiaryAssignedNotice(String email, String ownerName, String vaultName) {
+        sendWithoutOtpFooter(email,
+                "Bạn được chỉ định là người thụ hưởng - LegacyVault",
+                ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
+                        + "\nBạn sẽ nhận được thông báo khi Vault được mở khóa để bàn giao.");
+    }
+
+    // FR-02 (bước 7): xác nhận cho Owner
+    @Async
+    public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
+                                                      String beneficiaryEmail, boolean pendingRegistration) {
+        sendWithoutOtpFooter(ownerEmail,
+                "Xác nhận chỉ định người thụ hưởng - LegacyVault",
+                "Bạn đã chỉ định " + beneficiaryEmail + " là người thụ hưởng của Vault \"" + vaultName + "\"."
+                        + (pendingRegistration
+                        ? "\nNgười này chưa có tài khoản đã xác minh; hệ thống đã gửi lời mời đăng ký."
+                        : ""));
+    }
+
     /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
     public static String formatDeadline(LocalDateTime claimDeadlineAt) {
         return claimDeadlineAt.atZone(ZoneId.systemDefault())

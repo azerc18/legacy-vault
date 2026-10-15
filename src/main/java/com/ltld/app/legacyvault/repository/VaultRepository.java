@@ -2,9 +2,11 @@ package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,12 +14,24 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface VaultRepository extends JpaRepository<Vault, UUID> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from Vault v where v.id = :id")
+    Optional<Vault> findByIdForUpdate(@Param("id") UUID id);
+
+    // FR-02: các Vault đang chờ người thụ hưởng (theo email) đăng ký/xác minh tài khoản
+    List<Vault> findByBeneficiaryEmailAndBeneficiaryIsNull(String beneficiaryEmail);
+
     // FR-03: Owner phải có ít nhất 1 Vault mới được cấu hình DMS.
     boolean existsByOwnerId(UUID ownerId);
+
+    // FR-08: Vault của Owner kèm Beneficiary (LEFT JOIN FETCH tránh N+1)
+    @Query("SELECT v FROM Vault v LEFT JOIN FETCH v.beneficiary WHERE v.owner.id = :ownerId ORDER BY v.createdAt ASC, v.id ASC")
+    List<Vault> findByOwnerIdWithBeneficiary(@Param("ownerId") UUID ownerId);
 
     // FR-16: Vault UNLOCKED có Beneficiary, còn hạn nhận, mà chưa gửi được thông báo
     // (chưa có claim, hoặc claim chưa có notifiedAt, còn lượt thử và đã qua khoảng chờ tối thiểu).

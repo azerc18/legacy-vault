@@ -34,6 +34,11 @@ public class Vault {
     @JoinColumn(name = "beneficiary_id")
     private User beneficiary;
 
+    // FR-02: email người thụ hưởng đang chờ đăng ký/xác minh tài khoản.
+    // Chỉ khác NULL khi beneficiary còn NULL; được liên kết tự động khi email đó xác minh xong.
+    @Column(name = "beneficiary_email")
+    private String beneficiaryEmail;
+
     @Column(nullable = false)
     private String name; //[cite: 9]
 
