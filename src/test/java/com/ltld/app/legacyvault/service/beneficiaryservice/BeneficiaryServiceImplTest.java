@@ -1290,6 +1290,40 @@ public class BeneficiaryServiceImplTest {
     }
 
     @Test
+    void closeVault_noAssetViewedYet_throws400EvenWhenAcknowledged() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset only = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(only));
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(only));
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_someAssetViewed_acknowledged_closes() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset viewed = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset unviewed = asset(UUID.randomUUID(), "Techcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(unviewed));
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(viewed, unviewed));
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
+    }
+
+    @Test
     void closeVault_vaultWithoutAssets_closesWithoutAcknowledge() {
         BeneficiaryClaim claim = stubClaimForClose();
         stubViewSession(true);
