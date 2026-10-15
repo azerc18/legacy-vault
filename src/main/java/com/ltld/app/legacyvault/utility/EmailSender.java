@@ -144,6 +144,13 @@ public class EmailSender {
                         + "\nĐây là lần nhắc thứ " + reminderNumber + " trên tổng số " + reminderCount + " lần.");
     }
 
+    public void sendVerificationMessageNotification(String email, UUID requestId) {
+        sendWithoutOtpFooter(email,
+                "Tin nhắn mới trong hồ sơ xác minh - LegacyVault",
+                "Có tin nhắn hoặc tệp bổ sung mới trong hồ sơ xác minh. Mã hồ sơ: " + requestId
+                        + "\nVui lòng đăng nhập để xem chi tiết.");
+    }
+
     private void send(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
