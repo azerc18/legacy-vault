@@ -221,4 +221,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(ApiResponse.error("Missing required request part: " + e.getRequestPartName()));
     }
+
+    @ExceptionHandler(DmsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDmsException(DmsException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }

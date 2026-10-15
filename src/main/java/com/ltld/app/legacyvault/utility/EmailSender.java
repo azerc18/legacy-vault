@@ -18,7 +18,6 @@ public class EmailSender {
     private final int OTP_EXPIRE_SECONDS = 300;
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-
     @Async
     public void sendEmail(String email, String otp) {
         send(email,
@@ -77,6 +76,22 @@ public class EmailSender {
                 "Hồ sơ xác minh mới - LegacyVault",
                 "Có hồ sơ xác minh mới cần xử lý. Mã hồ sơ: " + requestId
                         + "\nVui lòng đăng nhập để xem chi tiết.");
+    }
+
+    /**
+     * FR-03: nhắc Owner check-in Dead Man's Switch. Không @Async: người gọi gửi sau khi transaction đã commit
+     * và cần biết gửi lỗi để trả lại lần nhắc. Giờ hiển thị đổi sang giờ Việt Nam qua formatDeadline.
+     */
+    public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
+                                       int reminderNumber, int reminderCount) {
+        sendWithoutOtpFooter(email,
+                "Nhắc check-in Dead Man's Switch (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
+                "Bạn chưa check-in Dead Man's Switch trên LegacyVault."
+                        + "\nHạn check-in: " + formatDeadline(checkinDueAt) + " (giờ Việt Nam)"
+                        + "\nNếu bạn không phản hồi, hệ thống sẽ kích hoạt quy trình bàn giao vào lúc "
+                        + formatDeadline(triggerAt) + " (giờ Việt Nam) và gửi thông báo cho Digital Executor của bạn."
+                        + "\n\nĐể check-in, hãy đăng nhập LegacyVault và chọn \"Check-in\" trong mục Cài đặt Dead Man's Switch."
+                        + "\nĐây là lần nhắc thứ " + reminderNumber + " trên tổng số " + reminderCount + " lần.");
     }
 
     private void send(String to, String subject, String body) {

@@ -25,4 +25,8 @@ public interface DmsConfigRepository extends JpaRepository<DmsConfig, UUID> {
     List<DmsConfig> findAllByStatus(DmsStatus status);
 
     List<DmsConfig> findAllByStatusAndNextCheckinDueAtBefore(DmsStatus status, LocalDateTime deadline);
+
+    // FR-03: id các DMS đã tới lần nhắc check-in kế tiếp (dùng index status, next_reminder_at).
+    @Query("select c.id from DmsConfig c where c.status = :status and c.nextReminderAt <= :now")
+    List<UUID> findIdsDueForReminder(@Param("status") DmsStatus status, @Param("now") LocalDateTime now);
 }
