@@ -227,4 +227,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(e.getStatus())
                 .body(ApiResponse.error(e.getMessage()));
     }
+
+    @ExceptionHandler(VerificationRequestClosedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationRequestClosed(VerificationRequestClosedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }
