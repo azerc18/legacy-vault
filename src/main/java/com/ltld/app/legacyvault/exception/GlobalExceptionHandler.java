@@ -202,4 +202,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
+    @ExceptionHandler(DmsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDmsException(DmsException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
 }

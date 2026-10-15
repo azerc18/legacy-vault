@@ -16,6 +16,8 @@ import java.util.UUID;
 
 @Repository
 public interface VaultRepository extends JpaRepository<Vault, UUID> {
+    // FR-03: Owner phải có ít nhất 1 Vault mới được cấu hình DMS.
+    boolean existsByOwnerId(UUID ownerId);
 
     // FR-16: Vault UNLOCKED có Beneficiary, còn hạn nhận, mà chưa gửi được thông báo
     // (chưa có claim, hoặc claim chưa có notifiedAt, còn lượt thử và đã qua khoảng chờ tối thiểu).
