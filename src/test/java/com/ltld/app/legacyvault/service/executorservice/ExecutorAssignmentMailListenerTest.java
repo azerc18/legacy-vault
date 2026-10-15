@@ -22,6 +22,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,7 +48,7 @@ class ExecutorAssignmentMailListenerTest {
         verify(emailSender).sendExecutorRevokedNotice(
                 "old@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
         verify(emailSender, never()).sendExecutorRevokedNotice(
-                any(), any(), any(), org.mockito.ArgumentMatchers.eq(ExecutorType.BACKUP));
+                any(), any(), any(), eq(ExecutorType.BACKUP));
     }
 
     @Test

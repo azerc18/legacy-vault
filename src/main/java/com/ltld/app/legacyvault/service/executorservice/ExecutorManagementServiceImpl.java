@@ -3,7 +3,6 @@ package com.ltld.app.legacyvault.service.executorservice;
 import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
-import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -15,7 +14,6 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
-import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -53,12 +51,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutorManagementServiceImpl implements ExecutorManagementService {
 
-    static final String ROLE_EXECUTOR = "EXECUTOR";
-
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
     private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
+    private final ExecutorRoleManager executorRoleManager;
     private final VaultRepository vaultRepository;
     private final AuditLogService auditLogService;
     // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
@@ -132,9 +128,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setRevokedAt(null);
 
         lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
-        grantExecutorRole(candidate);
+        executorRoleManager.grant(candidate);
         if (previous != null) {
-            revokeExecutorRoleIfUnused(previous, assignment.getId());
+            executorRoleManager.revokeIfUnused(previous, assignment.getId());
         }
 
         ExecutorAssignment saved = saveAndFlush(assignment, type);
@@ -172,7 +168,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setRevokedAt(LocalDateTime.now());
         User executor = assignment.getExecutorUser();
         lockUsersInOrder(executor.getId());
-        revokeExecutorRoleIfUnused(executor, assignment.getId());
+        executorRoleManager.revokeIfUnused(executor, assignment.getId());
 
         ExecutorAssignment saved = saveAndFlush(assignment, type);
 
@@ -236,24 +232,6 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .distinct()
                 .sorted()
                 .forEach(userRepository::findByIdForUpdate);
-    }
-
-    private void grantExecutorRole(User user) {
-        boolean hasRole = user.getRoles().stream().anyMatch(r -> ROLE_EXECUTOR.equals(r.getCode()));
-        if (!hasRole) {
-            Role role = roleRepository.findByCode(ROLE_EXECUTOR)
-                    .orElseThrow(() -> new IllegalStateException("Role not found: " + ROLE_EXECUTOR));
-            user.getRoles().add(role);
-        }
-    }
-
-    // assignmentId là dòng vừa bị thu hồi/thay người, loại ra vì trạng thái mới của nó chưa được flush.
-    private void revokeExecutorRoleIfUnused(User user, UUID assignmentId) {
-        boolean stillAssigned = executorAssignmentRepository
-                .existsByExecutorUserIdAndStatusNotAndIdNot(user.getId(), ExecutorStatus.REVOKED, assignmentId);
-        if (!stillAssigned) {
-            user.getRoles().removeIf(r -> ROLE_EXECUTOR.equals(r.getCode()));
-        }
     }
 
     /**

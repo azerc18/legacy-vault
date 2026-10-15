@@ -118,6 +118,20 @@ class OwnerExecutorControllerTest {
     }
 
     @Test
+    void assign_emailTooLong_returns400() throws Exception {
+        // Đúng cú pháp email (local 64 ký tự, các nhãn domain 63 ký tự) nhưng dài 260 ký tự: chỉ vi phạm @Size(max = 255).
+        String email = "a".repeat(64) + "@" + "b".repeat(63) + "." + "c".repeat(63) + "." + "d".repeat(63) + ".com";
+
+        mockMvc.perform(put("/api/owner/executors/{type}", "BACKUP")
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.email").value("Email tối đa 255 ký tự"));
+        verify(executorManagementService, never()).assignExecutor(any(), any(), any());
+    }
+
+    @Test
     void assign_unknownType_returns400() throws Exception {
         mockMvc.perform(put("/api/owner/executors/{type}", "TERTIARY")
                         .principal(principal)

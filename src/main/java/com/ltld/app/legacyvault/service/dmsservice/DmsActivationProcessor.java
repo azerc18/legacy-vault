@@ -4,7 +4,6 @@ import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
-import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
@@ -19,8 +18,8 @@ import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
-import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,9 +44,6 @@ public class DmsActivationProcessor {
     public static final String ENTITY_DMS_CONFIG = "DmsConfig";
     public static final String ENTITY_EXECUTOR_ASSIGNMENT = "ExecutorAssignment";
 
-    // Mã role Executor, trùng với DataInitializer.
-    static final String ROLE_EXECUTOR = "EXECUTOR";
-
     // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
     // Tham số: Owner (tên + email), loại Executor (Primary/Backup), mã ExecutorAssignment.
     private static final String MSG_EXECUTOR_ACTIVATED =
@@ -61,7 +57,7 @@ public class DmsActivationProcessor {
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final NotificationRepository notificationRepository;
-    private final RoleRepository roleRepository;
+    private final ExecutorRoleManager executorRoleManager;
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
 
@@ -166,17 +162,7 @@ public class DmsActivationProcessor {
         assignment.setStatus(ExecutorStatus.ACTIVE);
         assignment.setActivatedAt(now);
         executorAssignmentRepository.save(assignment);
-        ensureExecutorRole(assignment.getExecutorUser());
-    }
-
-    /** Executor được kích hoạt cần role EXECUTOR; idempotent, User là entity managed nên lưu khi flush. */
-    private void ensureExecutorRole(User user) {
-        if (user.getRoles().stream().anyMatch(r -> ROLE_EXECUTOR.equals(r.getCode()))) {
-            return;
-        }
-        Role executorRole = roleRepository.findByCode(ROLE_EXECUTOR)
-                .orElseThrow(() -> new IllegalStateException("Role not found: " + ROLE_EXECUTOR));
-        user.getRoles().add(executorRole);
+        executorRoleManager.grant(assignment.getExecutorUser());
     }
 
     /**

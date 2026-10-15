@@ -28,7 +28,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -73,7 +72,6 @@ class ExecutorManagementServiceImplTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
-    @InjectMocks
     private ExecutorManagementServiceImpl service;
 
     private UUID ownerId;
@@ -83,6 +81,11 @@ class ExecutorManagementServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository/executorAssignmentRepository giữ nguyên.
+        service = new ExecutorManagementServiceImpl(executorAssignmentRepository, dmsConfigRepository, userRepository,
+                new ExecutorRoleManager(roleRepository, executorAssignmentRepository), vaultRepository,
+                auditLogService, eventPublisher);
+
         ownerId = UUID.randomUUID();
         owner = user(ownerId, OWNER_EMAIL, UserStatus.ACTIVE);
         candidate = user(UUID.randomUUID(), CANDIDATE_EMAIL, UserStatus.ACTIVE);

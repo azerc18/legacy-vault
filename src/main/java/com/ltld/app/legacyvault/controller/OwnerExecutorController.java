@@ -24,7 +24,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-/** FR-06: Owner quản lý Executor chính (PRIMARY) và dự phòng (BACKUP) của mình. */
+/**
+ * FR-06: Owner quản lý Executor chính (PRIMARY) và dự phòng (BACKUP) của mình.
+ * <p>Mail báo chỉ định/thu hồi chỉ mang tính thông tin: gửi sau commit, gửi lỗi chỉ log warn và không gửi lại, nên FE không được hứa "Executor chắc chắn đã nhận được email".
+ */
 @RestController
 @RequestMapping("/api/owner/executors")
 @RequiredArgsConstructor
