@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
@@ -18,6 +19,12 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BeneficiaryService {
+    /** FR-16: thông báo trong hệ thống của Beneficiary đang đăng nhập, mới nhất trước. */
+    List<BeneficiaryNotificationResponse> listMyNotifications(UUID currentUserId);
+
+    /** Đánh dấu đã đọc; thông báo của người khác trả 404. */
+    void markNotificationRead(UUID notificationId, UUID currentUserId);
+
     /**
      * FR-16/FR-17 bước 1: danh sách vault được bàn giao cho Beneficiary đang đăng nhập
      * (UNLOCKED, CLAIMED, ARCHIVED_LOCKED), mới mở khóa trước. Chỉ trả vault của chính người gọi.

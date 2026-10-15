@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -63,6 +64,7 @@ class BeneficiaryNotificationListenerTest {
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private NotificationRepository notificationRepository;
 
     private BeneficiaryNotificationListener listener;
 
@@ -79,7 +81,7 @@ class BeneficiaryNotificationListenerTest {
     void setUp() {
         listener = new BeneficiaryNotificationListener(vaultRepository, claimRepository,
                 executorAssignmentRepository, emailSender, executorNotificationService,
-                auditLogService, transactionManager);
+                auditLogService, notificationRepository, transactionManager);
     }
 
     private User beneficiary(UserStatus status) {

@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
@@ -17,12 +18,15 @@ import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.LegalDocument;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -32,6 +36,7 @@ import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
@@ -105,6 +110,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
     private final AuditLogService auditLogService;
+    private final NotificationRepository notificationRepository;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -141,6 +147,36 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     .claimedAt(claim != null ? claim.getClaimedAt() : null)
                     .build();
         }).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BeneficiaryNotificationResponse> listMyNotifications(UUID currentUserId) {
+        return notificationRepository
+                .findAllByRecipientIdAndChannelOrderByCreatedAtDesc(currentUserId, NotificationChannel.IN_APP)
+                .stream()
+                .map(n -> BeneficiaryNotificationResponse.builder()
+                        .id(n.getId())
+                        .type(n.getType())
+                        .content(n.getContent())
+                        .vaultId(n.getReferenceId())
+                        .read(n.getStatus() == NotificationStatus.READ)
+                        .createdAt(n.getCreatedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void markNotificationRead(UUID notificationId, UUID currentUserId) {
+        // Thông báo của người khác trả 404 để không lộ sự tồn tại
+        Notification notification = notificationRepository
+                .findByIdAndRecipientIdAndChannel(notificationId, currentUserId, NotificationChannel.IN_APP)
+                .orElseThrow(() -> new BeneficiaryException("Không tìm thấy thông báo.", HttpStatus.NOT_FOUND));
+        if (notification.getStatus() != NotificationStatus.READ) {
+            notification.setStatus(NotificationStatus.READ);
+            notificationRepository.save(notification);
+        }
     }
 
     // ===================== FR-16 =====================

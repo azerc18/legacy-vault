@@ -1,17 +1,22 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -55,6 +60,8 @@ public class BeneficiaryNotificationListener {
 
     private static final String ENTITY_VAULT = "Vault";
     private static final String OWNER_FALLBACK = "chủ hồ sơ";
+    // Tham số: tên Vault, tên Owner, hạn nhận
+    private static final String MSG_IN_APP = "Hồ sơ \"%s\" của %s đã được bàn giao cho bạn. Hạn nhận tài sản: %s (GMT+7).";
 
     // Tham số: tên Vault, tên Owner, email Beneficiary, số lần đã thử, hạn nhận
     private static final String MSG_GAVE_UP =
@@ -68,6 +75,7 @@ public class BeneficiaryNotificationListener {
     private final EmailSender emailSender;
     private final ExecutorNotificationService executorNotificationService;
     private final AuditLogService auditLogService;
+    private final NotificationRepository notificationRepository;
     private final TransactionTemplate requiresNewTx;
 
     public BeneficiaryNotificationListener(VaultRepository vaultRepository,
@@ -76,6 +84,7 @@ public class BeneficiaryNotificationListener {
                                            EmailSender emailSender,
                                            ExecutorNotificationService executorNotificationService,
                                            AuditLogService auditLogService,
+                                           NotificationRepository notificationRepository,
                                            PlatformTransactionManager transactionManager) {
         this.vaultRepository = vaultRepository;
         this.claimRepository = claimRepository;
@@ -83,6 +92,7 @@ public class BeneficiaryNotificationListener {
         this.emailSender = emailSender;
         this.executorNotificationService = executorNotificationService;
         this.auditLogService = auditLogService;
+        this.notificationRepository = notificationRepository;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -129,9 +139,8 @@ public class BeneficiaryNotificationListener {
         }
 
         // Pha 3: gửi thành công mới ghi notifiedAt
-        final UUID claimId = mail.claimId();
         try {
-            requiresNewTx.executeWithoutResult(status -> markNotified(claimId));
+            requiresNewTx.executeWithoutResult(status -> markNotified(mail));
         } catch (RuntimeException e) {
             recordFailure(vaultId, "recipient=" + mail.email()
                     + ", mail sent but notifiedAt not saved: " + e.getClass().getSimpleName(), e);
@@ -249,11 +258,25 @@ public class BeneficiaryNotificationListener {
                 .toList();
     }
 
-    // Pha 3
-    private void markNotified(UUID claimId) {
-        claimRepository.findById(claimId).ifPresent(claim -> {
-            claim.setNotifiedAt(LocalDateTime.now());
+    // Pha 3: set notifiedAt và ghi thông báo trong hệ thống cùng một giao dịch
+    private void markNotified(MailData mail) {
+        claimRepository.findById(mail.claimId()).ifPresent(claim -> {
+            LocalDateTime sentAt = LocalDateTime.now();
+            claim.setNotifiedAt(sentAt);
             claimRepository.save(claim);
+            if (claim.getBeneficiary() != null) {
+                notificationRepository.save(Notification.builder()
+                        .recipient(claim.getBeneficiary())
+                        .type(NotificationType.VAULT_UNLOCKED)
+                        .channel(NotificationChannel.IN_APP)
+                        .referenceType(ENTITY_VAULT)
+                        .referenceId(mail.vaultId())
+                        .content(String.format(MSG_IN_APP, mail.vaultName(), mail.ownerName(),
+                                EmailSender.formatDeadline(mail.claimDeadlineAt())))
+                        .status(NotificationStatus.SENT)
+                        .sentAt(sentAt)
+                        .build());
+            }
         });
     }
 
