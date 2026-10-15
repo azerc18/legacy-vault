@@ -1246,7 +1246,7 @@ public class BeneficiaryServiceImplTest {
         stubViewSession(true);
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
-
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
 
@@ -1263,7 +1263,7 @@ public class BeneficiaryServiceImplTest {
         stubViewSession(true);
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
-
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true, false), currentUserId));
 
@@ -1277,6 +1277,7 @@ public class BeneficiaryServiceImplTest {
         UUID unviewedId = UUID.randomUUID();
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(unviewedId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
 
         beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
@@ -1287,6 +1288,55 @@ public class BeneficiaryServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
                 eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), detail.capture());
         assertThat(detail.getValue()).contains("unviewedCount=1").contains(unviewedId.toString());
+    }
+
+    @Test
+    void closeVault_noAssetViewedYet_throws400EvenWhenAcknowledged() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset only = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(only));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(1L);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_noAssetViewedYet_withoutAcknowledge_throws400WithPreconditionMessage() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset only = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(only));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(1L);
+
+        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(ex.getMessage()).contains("ít nhất một tài sản");
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_someAssetViewed_acknowledged_closes() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset viewed = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset unviewed = asset(UUID.randomUUID(), "Techcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(unviewed));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
     }
 
     @Test
