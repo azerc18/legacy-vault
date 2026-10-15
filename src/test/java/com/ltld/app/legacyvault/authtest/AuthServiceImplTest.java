@@ -230,7 +230,8 @@ public class AuthServiceImplTest {
         assertThatThrownBy(() -> authService.login(request, IP, USER_AGENT))
                 .isInstanceOf(InvalidCredentialException.class);
 
-        verifyNoInteractions(passwordEncoder, tokenService);
+        verify(passwordEncoder).matches(eq(request.getPassword()), anyString());
+        verifyNoInteractions(tokenService);
         verify(userRepository, never()).save(any());
         verify(auditLogService).failure(AuditAction.LOGIN_FAILED, null,
                 "nobody@example.com", "unknown email");

@@ -24,11 +24,12 @@ public class JwtConfig {
     private final JwtProperties jwtProperties;
     public static final String ISSUER = "legacyvault-auth";
     public static final String AUDIENCE = "legacyvault-api";
+    private static final int MIN_SECRET_BYTES = 32;
 
     @Bean
     public JwtEncoder jwtEncoder(){
-        SecretKeySpec secretKey = new SecretKeySpec(
-                jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8),"HmacSHA256");
+        SecretKeySpec secretKey = hmacKey();
+
         JWKSource<SecurityContext> jwkSource = new ImmutableSecret<>(secretKey);
         return new NimbusJwtEncoder(jwkSource);
     }
@@ -36,8 +37,8 @@ public class JwtConfig {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        SecretKeySpec key = new SecretKeySpec(
-                jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        SecretKeySpec key = hmacKey();
+
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256).build();
 
@@ -50,5 +51,13 @@ public class JwtConfig {
 
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(issuer, audience));
         return decoder;
+    }
+
+    private SecretKeySpec hmacKey() {
+        byte[] raw = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
+        if (raw.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("JWT_SECRET phải dài tối thiểu 32 byte (HS256), hiện là " + raw.length);
+        }
+        return new SecretKeySpec(raw, "HmacSHA256");
     }
 }

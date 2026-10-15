@@ -1,11 +1,11 @@
 package com.ltld.app.legacyvault.verificationtokentest;
 
 import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
+import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
+import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationToken;
-import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
-import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.TokenType;
@@ -18,13 +18,17 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenServiceImpl;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.util.List;
@@ -55,18 +59,23 @@ public class VerificationTokenServiceImplTest {
     @Mock
     private VaultRepository vaultRepository;
 
+    @Spy
+    private OtpHasher otpHasher = new OtpHasher();
+
     @InjectMocks
     private VerificationTokenServiceImpl tokenService;
 
     private User pendingUser() {
         return User.builder()
                 .email("test@example.com")
+                .id(UUID.randomUUID())
                 .status(UserStatus.PENDING)
                 .build();
     }
 
     private User activeUser() {
         return User.builder()
+                .id(UUID.randomUUID())
                 .email("test@example.com")
                 .status(UserStatus.ACTIVE)
                 .build();
@@ -74,7 +83,7 @@ public class VerificationTokenServiceImplTest {
 
     private VerificationToken tokenFor(User user, String otp, int attemptCount, Instant expiresAt) {
         return VerificationToken.builder()
-                .otpCode(otp)
+                .otpCode(otpHasher.hash(user.getId(), otp))
                 .isUsed(false)
                 .attemptCount(attemptCount)
                 .createdAt(Instant.now())
@@ -135,7 +144,8 @@ public class VerificationTokenServiceImplTest {
         ArgumentCaptor<VerificationToken> tokenCaptor = ArgumentCaptor.forClass(VerificationToken.class);
         verify(tokenRepository, times(2)).save(tokenCaptor.capture());
         VerificationToken newToken = tokenCaptor.getAllValues().get(1);
-        assertThat(newToken.getOtpCode()).isEqualTo("654321");
+        assertThat(otpHasher.matches(user.getId(), "654321", newToken.getOtpCode())).isTrue();
+        assertThat(newToken.getOtpCode()).hasSize(64).isNotEqualTo("654321");
         assertThat(newToken.getUser()).isEqualTo(user);
         assertThat(newToken.getType()).isEqualTo(TokenType.EMAIL_VERIFICATION);
 
@@ -447,7 +457,10 @@ public class VerificationTokenServiceImplTest {
         ArgumentCaptor<VerificationToken> captor = ArgumentCaptor.forClass(VerificationToken.class);
         verify(tokenRepository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo(TokenType.PASSWORD_RESET);
-        assertThat(captor.getValue().getOtpCode()).isEqualTo("777777");
+
+        String stored = captor.getValue().getOtpCode();
+        assertThat(otpHasher.matches(user.getId(), "777777", stored)).isTrue();
+        assertThat(stored).hasSize(64).isNotEqualTo("777777");
 
         verify(emailSender).sendPasswordResetEmail("test@example.com", "777777");
         verify(emailSender, never()).sendEmail(anyString(), anyString());
@@ -562,6 +575,23 @@ public class VerificationTokenServiceImplTest {
 
         verify(userRepository, never()).save(any());
         verify(auditLogService, never()).success(eq(AuditAction.EMAIL_VERIFIED), any(), any());
+    }
+
+    @Test
+    void issueOtp_insideTransaction_sendsEmailOnlyAfterCommit() {
+        User user = pendingUser();
+        when(otpGenerator.generate()).thenReturn("123456");
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            tokenService.issueOtp(user, TokenType.EMAIL_VERIFICATION);
+            verify(emailSender, never()).sendEmail(anyString(), anyString());
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+            verify(emailSender).sendEmail("test@example.com", "123456");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
 }

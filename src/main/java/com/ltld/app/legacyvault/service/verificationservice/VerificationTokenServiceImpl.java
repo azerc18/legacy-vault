@@ -17,9 +17,12 @@ import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,6 +38,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
     private final EmailSender emailSender;
     private final AuditLogService auditLogService;
     private final VaultRepository vaultRepository;
+    private final OtpHasher otpHasher;
 
     private static final int MAX_ATTEMPTS = 5;
     private static final int OTP_TTL = 300;
@@ -81,7 +85,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
 
         String otp = otpGenerator.generate();
         tokenRepository.save(VerificationToken.builder()
-                .otpCode(otp)
+                .otpCode(otpHasher.hash(user.getId(), otp))
                 .expiresAt(Instant.now().plusSeconds(OTP_TTL))
                 .isUsed(false)
                 .attemptCount(0)
@@ -90,14 +94,15 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
                 .type(type)
                 .build());
 
-        if (type == TokenType.PASSWORD_RESET) {
-            auditLogService.success(AuditAction.OTP_SENT, user.getId(), user.getEmail());
-            emailSender.sendPasswordResetEmail(user.getEmail(), otp);
-        }
-        else {
-            auditLogService.success(AuditAction.OTP_SENT, user.getId(), user.getEmail());
-            emailSender.sendEmail(user.getEmail(), otp);
-        }
+        auditLogService.success(AuditAction.OTP_SENT, user.getId(), user.getEmail());
+        String email = user.getEmail();
+        runAfterCommit(() -> {
+            if (type == TokenType.PASSWORD_RESET) {
+                emailSender.sendPasswordResetEmail(email, otp);
+            } else {
+                emailSender.sendEmail(email, otp);
+            }
+        });
     }
 
     @Override
@@ -140,7 +145,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
             throw new ExpiredOtpException("OTP expired for user");
         }
 
-        if (!token.getOtpCode().equals(otp)) {
+        if (!otpHasher.matches(user.getId(), otp, token.getOtpCode())) {
             token.setAttemptCount(token.getAttemptCount() + 1);
             tokenRepository.saveAndFlush(token);
             auditLogService.failure(failAction, user.getId(), email,
@@ -189,5 +194,18 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
                     "Vault", vault.getId().toString(), null);
         }
         vaultRepository.saveAll(pendingVaults);
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 }

@@ -80,6 +80,7 @@ public class AuthServiceImpl implements AuthService{
 
         User user = userRepository.findByEmailForUpdate(email).orElse(null);
         if (user == null) {
+            passwordEncoder.matches(request.getPassword(), DUMMY_HASH);
             auditLogService.failure(AuditAction.LOGIN_FAILED, null, email, "unknown email");
             throw new InvalidCredentialException();
         }

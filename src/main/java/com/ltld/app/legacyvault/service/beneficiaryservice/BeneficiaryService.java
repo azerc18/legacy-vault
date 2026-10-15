@@ -6,8 +6,10 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 
@@ -57,6 +59,21 @@ public interface BeneficiaryService {
      * Ghi audit ASSET_DOWNLOADED sau khi giải mã thành công.
      */
     AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId);
+
+    /**
+     * FR-18 (phần 2): Danh sách tài liệu pháp lý của Vault (chỉ thông tin tóm tắt, không giải mã).
+     * Yêu cầu phiên xác thực còn hiệu lực, nếu không trả 403. Cùng quy tắc truy cập với FR-17.
+     */
+    List<LegalDocumentSummaryResponse> getVaultDocuments(UUID vaultId, UUID currentUserId);
+
+    /**
+     * FR-18 (phần 2): Tải xuống một tài liệu pháp lý của Vault ở dạng đã giải mã.
+     * Kiểm tra lại phiên xác thực: hết hạn thì trả 403 và yêu cầu xác thực lại.
+     * Lỗi: 404 (không phải beneficiary hoặc không có tài liệu), 423 (đã bị khóa),
+     * 400/409/410 (vault hoặc claim không hợp lệ), 500 (đọc hoặc giải mã thất bại).
+     * Ghi audit DOCUMENT_DOWNLOADED sau khi giải mã thành công.
+     */
+    DocumentDownloadResponse downloadVaultDocument(UUID vaultId, UUID documentId, UUID currentUserId);
 
     /**
      * FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault (vault và claim chuyển CLAIMED).
