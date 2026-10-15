@@ -6,12 +6,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 @Repository
 public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID> {
     List<DigitalAsset> findByVaultId(UUID vaultId);
+
+    // FR-08: tài sản của nhiều Vault trong một truy vấn (tránh N+1)
+    @Query("SELECT a FROM DigitalAsset a WHERE a.vault.id IN :vaultIds AND a.status = :status")
+    List<DigitalAsset> findByVaultIdInAndStatus(@Param("vaultIds") Collection<UUID> vaultIds, @Param("status") AssetStatus status);
+
+    // FR-19: đếm tài sản đang hoạt động của Vault (precondition đóng hồ sơ)
+    long countByVaultIdAndStatus(UUID vaultId, AssetStatus status);
 
     // FR-17: chỉ lấy tài sản còn hiệu lực (loại REVOKED)
     List<DigitalAsset> findByVaultIdAndStatus(UUID vaultId, AssetStatus status);

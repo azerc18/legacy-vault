@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
@@ -179,8 +180,9 @@ public class BeneficiaryServiceImplTest {
     }
 
     private void stubLocked(boolean locked) {
-        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
-                vaultId, currentUserId, VerificationStatus.FAILED)).thenReturn(locked);
+        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+                eq(vaultId), eq(currentUserId), eq(VerificationStatus.FAILED), any(LocalDateTime.class)))
+                .thenReturn(locked);
     }
 
     // Vault hợp lệ, claim còn hạn, chưa bị khóa
@@ -1245,7 +1247,7 @@ public class BeneficiaryServiceImplTest {
         stubViewSession(true);
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
-
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
 
@@ -1262,7 +1264,7 @@ public class BeneficiaryServiceImplTest {
         stubViewSession(true);
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
-
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true, false), currentUserId));
 
@@ -1276,6 +1278,7 @@ public class BeneficiaryServiceImplTest {
         UUID unviewedId = UUID.randomUUID();
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
                 .thenReturn(List.of(asset(unviewedId, "Vietcombank", AssetType.BANK_ACCOUNT)));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
         when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
 
         beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
@@ -1286,6 +1289,55 @@ public class BeneficiaryServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
                 eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), detail.capture());
         assertThat(detail.getValue()).contains("unviewedCount=1").contains(unviewedId.toString());
+    }
+
+    @Test
+    void closeVault_noAssetViewedYet_throws400EvenWhenAcknowledged() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset only = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(only));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(1L);
+
+        expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId));
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_noAssetViewedYet_withoutAcknowledge_throws400WithPreconditionMessage() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset only = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(only));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(1L);
+
+        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(ex.getMessage()).contains("ít nhất một tài sản");
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void closeVault_someAssetViewed_acknowledged_closes() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset viewed = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset unviewed = asset(UUID.randomUUID(), "Techcombank", AssetType.BANK_ACCOUNT);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(unviewed));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true, true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.CLAIMED);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
     }
 
     @Test
@@ -1707,6 +1759,55 @@ public class BeneficiaryServiceImplTest {
                 .fileName("a.pdf").contentType("application/pdf")
                 .content("my-secret".getBytes(StandardCharsets.UTF_8)).build();
         assertThat(r.toString()).doesNotContain("content=").doesNotContain("my-secret").contains("a.pdf");
+    }
+
+    @Test
+    void listMyVaults_returnsHandedOverVaultsWithClaimInfo() {
+        User owner = new User();
+        owner.setFullName("Bình");
+        UUID id1 = UUID.randomUUID();
+        UUID id2 = UUID.randomUUID();
+        LocalDateTime unlockedAt = LocalDateTime.now().minusDays(3);
+        LocalDateTime deadline = unlockedAt.plusDays(60);
+
+        Vault v1 = Vault.builder().id(id1).name("Hồ sơ A").owner(owner).beneficiary(currentBeneficiary)
+                .status(VaultStatus.UNLOCKED).unlockedAt(unlockedAt).claimDeadlineAt(deadline).build();
+        Vault v2 = Vault.builder().id(id2).name("Hồ sơ B").owner(owner).beneficiary(currentBeneficiary)
+                .status(VaultStatus.ARCHIVED_LOCKED).build();
+        BeneficiaryClaim c1 = BeneficiaryClaim.builder().id(UUID.randomUUID()).vault(v1)
+                .status(ClaimStatus.PENDING).claimDeadlineAt(deadline).build();
+
+        when(vaultRepository.findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(eq(currentUserId),
+                eq(List.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED, VaultStatus.ARCHIVED_LOCKED))))
+                .thenReturn(List.of(v1, v2));
+        when(claimRepository.findByVaultIdIn(List.of(id1, id2))).thenReturn(List.of(c1));
+
+        List<BeneficiaryVaultSummaryResponse> result = beneficiaryService.listMyVaults(currentUserId);
+
+        assertEquals(2, result.size());
+        BeneficiaryVaultSummaryResponse first = result.get(0);
+        assertEquals(id1, first.getVaultId());
+        assertEquals("Hồ sơ A", first.getVaultName());
+        assertEquals("Bình", first.getOwnerName());
+        assertEquals(VaultStatus.UNLOCKED, first.getVaultStatus());
+        assertEquals(ClaimStatus.PENDING, first.getClaimStatus());
+        assertEquals(unlockedAt, first.getUnlockedAt());
+        assertEquals(deadline, first.getClaimDeadlineAt());
+
+        BeneficiaryVaultSummaryResponse second = result.get(1);
+        assertEquals(VaultStatus.ARCHIVED_LOCKED, second.getVaultStatus());
+        assertThat(second.getClaimStatus()).isNull();
+        assertThat(second.getClaimedAt()).isNull();
+    }
+
+    @Test
+    void listMyVaults_noVaults_returnsEmptyAndSkipsClaimQuery() {
+        when(vaultRepository.findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(eq(currentUserId), any()))
+                .thenReturn(List.of());
+
+        assertThat(beneficiaryService.listMyVaults(currentUserId)).isEmpty();
+
+        verify(claimRepository, never()).findByVaultIdIn(any());
     }
 
 }

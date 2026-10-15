@@ -118,7 +118,7 @@ public class BeneficiaryNotificationListener {
         // Pha 2: gửi mail ngoài mọi giao dịch
         try {
             emailSender.sendVaultUnlockedNotification(mail.email(), mail.fullName(), mail.ownerName(),
-                    mail.vaultName(), mail.claimDeadlineAt(), mail.accountActive());
+                    mail.vaultName(), mail.claimDeadlineAt(), mail.accountActive(), mail.vaultId());
         } catch (RuntimeException e) {
             recordFailure(vaultId, "recipient=" + mail.email() + ", send failed (attempt "
                     + mail.attempt() + "/" + MAX_NOTIFY_ATTEMPTS + "): " + e.getClass().getSimpleName(), e);

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,4 +25,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")
     Optional<User> findByIdForUpdate(@Param("id") UUID id);
+
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r.code = :roleCode AND u.status = com.ltld.app.legacyvault.enums.UserStatus.ACTIVE")
+    List<User> findActiveByRoleCode(@Param("roleCode") String roleCode);
 }

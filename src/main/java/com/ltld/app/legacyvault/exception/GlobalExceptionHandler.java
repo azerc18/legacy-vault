@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -209,9 +210,33 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(DuplicateVerificationRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateVerificationRequest(DuplicateVerificationRequestException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(InvalidVerificationDocumentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidVerificationDocument(InvalidVerificationDocumentException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPart(MissingServletRequestPartException e) {
+        return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Missing required request part: " + e.getRequestPartName()));
+    }
+
     @ExceptionHandler(DmsException.class)
     public ResponseEntity<ApiResponse<Void>> handleDmsException(DmsException e) {
         return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    @ExceptionHandler(VerificationRequestClosedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleVerificationRequestClosed(VerificationRequestClosedException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(e.getMessage()));
     }
 }
