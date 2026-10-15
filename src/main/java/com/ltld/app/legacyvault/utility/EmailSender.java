@@ -40,11 +40,13 @@ public class EmailSender {
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
     @Async
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
+        String link = registerLink();
         sendWithoutOtpFooter(email,
                 "Lời mời trở thành người thụ hưởng - LegacyVault",
                 ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
                         + "\nVui lòng đăng ký tài khoản (hoặc hoàn tất xác minh email nếu đã đăng ký) bằng chính địa chỉ email này"
-                        + " để được liên kết với Vault.");
+                        + " để được liên kết với Vault."
+                        + (link != null ? "\nĐăng ký tại: " + link : ""));
     }
 
     // FR-02: thông báo cho người thụ hưởng đã có tài khoản
@@ -93,7 +95,12 @@ public class EmailSender {
 
         if (!accountActive) {
             body.append("Tài khoản của bạn chưa được kích hoạt. ")
-                    .append("Vui lòng hoàn tất đăng ký và xác minh email trước, sau đó đăng nhập để nhận tài sản.\n\n");
+                    .append("Vui lòng hoàn tất đăng ký và xác minh email trước, sau đó đăng nhập để nhận tài sản.\n");
+            String registerLink = registerLink();
+            if (registerLink != null) {
+                body.append("Đăng ký tại: ").append(registerLink).append("\n");
+            }
+            body.append("\n");
         }
 
         String link = vaultLink(vaultId);
@@ -119,13 +126,22 @@ public class EmailSender {
                         + "\nVui lòng đăng nhập để xem chi tiết.");
     }
 
-    private String vaultLink(UUID vaultId) {
-        if (vaultId == null || frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
+    private String frontendBase() {
+        if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
             return null;
         }
-        String base = frontendBaseUrl.endsWith("/")
+        return frontendBaseUrl.endsWith("/")
                 ? frontendBaseUrl.substring(0, frontendBaseUrl.length() - 1) : frontendBaseUrl;
-        return base + "/beneficiary/vaults/" + vaultId;
+    }
+
+    private String vaultLink(UUID vaultId) {
+        String base = frontendBase();
+        return (vaultId == null || base == null) ? null : base + "/beneficiary/vaults/" + vaultId;
+    }
+
+    private String registerLink() {
+        String base = frontendBase();
+        return base == null ? null : base + "/register";
     }
 
     /**
