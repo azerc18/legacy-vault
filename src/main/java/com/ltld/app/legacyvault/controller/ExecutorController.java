@@ -6,8 +6,10 @@ import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
@@ -36,6 +38,7 @@ public class ExecutorController {
 
     private final DmsAutomationService dmsAutomationService;
     private final ExecutorAssetService executorAssetService;
+    private final ExecutorHandoverService executorHandoverService;
     private final ExecutorVerificationService executorVerificationService;
     private final VerificationExchangeService verificationExchangeService;
 
@@ -59,6 +62,16 @@ public class ExecutorController {
         ExecutorAssignedVaultsResponse response =
                 executorAssetService.getAssignedVaults(assignmentId, principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Assigned vaults retrieved", response));
+    }
+
+    // FR-10: Executor theo dõi tiến độ bàn giao các Vault trong yêu cầu xác minh mình đã gửi
+    @GetMapping("/{assignmentId}/handover-progress")
+    public ResponseEntity<ApiResponse<List<VaultHandoverProgressResponse>>> getHandoverProgress(
+            @PathVariable UUID assignmentId, Principal principal) {
+
+        List<VaultHandoverProgressResponse> response =
+                executorHandoverService.getHandoverProgress(assignmentId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Handover progress retrieved", response));
     }
 
     @PostMapping(value = "/{assignmentId}/verification-requests", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -24,6 +24,16 @@ public interface VerificationRequestVaultRepository extends JpaRepository<Verifi
     @Query("SELECT rv FROM VerificationRequestVault rv JOIN FETCH rv.vault v JOIN FETCH v.owner WHERE rv.request.id = :id")
     List<VerificationRequestVault> findByRequestIdFetchVault(@Param("id") UUID requestId);
 
+    // FR-10: Vault trong các yêu cầu xác minh do Executor gửi cho Owner, yêu cầu mới nhất trước (một truy vấn, không N+1)
+    @Query("""
+            SELECT rv FROM VerificationRequestVault rv
+            JOIN FETCH rv.vault v JOIN FETCH rv.request r
+            WHERE r.executor.id = :executorId AND r.owner.id = :ownerId
+            ORDER BY r.createdAt DESC, v.createdAt ASC, v.id ASC
+            """)
+    List<VerificationRequestVault> findProgressRows(@Param("executorId") UUID executorId,
+                                                    @Param("ownerId") UUID ownerId);
+
     @Query("SELECT DISTINCT rv.vault.id FROM VerificationRequestVault rv WHERE rv.vault.id IN :vaultIds AND rv.request.status IN :statuses")
     List<UUID> findVaultIdsWithOpenRequest(@Param("vaultIds") Collection<UUID> vaultIds,
                                            @Param("statuses") Collection<LegalVerificationStatus> statuses);
