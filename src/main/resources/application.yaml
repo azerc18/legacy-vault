@@ -43,7 +43,7 @@ app:
     allowed-origins: http://localhost:3000,http://localhost:5173
   # Địa chỉ frontend, dùng để tạo link trong email. Khi deploy, override: FRONTEND_BASE_URL=https://...
   frontend:
-    base-url: ${FRONTEND_BASE_URL:http://localhost:3000}
+    base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   storage:
     # Thư mục lưu file upload. Khi deploy production, override bằng biến môi trường:
     # APP_STORAGE_UPLOAD_DIR=/data/legacyvault/uploads
