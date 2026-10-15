@@ -3,7 +3,9 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
+import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,8 +25,10 @@ import java.util.UUID;
 public class ExecutorController {
 
     private final DmsAutomationService dmsAutomationService;
-    // FR-08: Service xử lý nộp yêu cầu xác minh cái chết
+    // FR-09: Service xử lý nộp yêu cầu xác minh cái chết
     private final ExecutorVerificationService executorVerificationService;
+    // FR-08: Service xử lý xem danh sách tài sản được ủy quyền quản lý
+    private final ExecutorAssetService executorAssetService;
 
     // FR-07 bước 4: Executor xác nhận đã nhận thông báo kích hoạt.
     // Principal.getName() là định danh của phiên đăng nhập (email hoặc user id); Auth/JWT do module khác cung cấp.
@@ -38,7 +42,17 @@ public class ExecutorController {
         return ResponseEntity.ok(ApiResponse.success("Activation acknowledged", response));
     }
 
-    // FR-08: Digital Executor nộp hồ sơ xác minh cái chết (Death Verification Request) kèm file chứng tử mã hóa
+    // FR-08: Xem danh sách tài sản được ủy quyền quản lý và hướng dẫn bàn giao
+    @GetMapping("/{assignmentId}/vaults")
+    public ResponseEntity<ApiResponse<ExecutorAssignedVaultsResponse>> getAssignedVaults(
+            @PathVariable UUID assignmentId, Principal principal) {
+
+        ExecutorAssignedVaultsResponse response =
+                executorAssetService.getAssignedVaults(assignmentId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Assigned vaults retrieved", response));
+    }
+
+    // FR-09: Digital Executor nộp hồ sơ xác minh cái chết (Death Verification Request) kèm file chứng tử mã hóa
     @PostMapping(value = "/{assignmentId}/verification-requests", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DeathVerificationResponse>> submitDeathVerification(
             @PathVariable UUID assignmentId,
