@@ -50,7 +50,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ExecutorVerificationServiceImplTest {
 
-    @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
+    @Mock private ExecutorAccessGuard executorAccessGuard;
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
     @Mock private VerificationRequestVaultRepository verificationRequestVaultRepository;
@@ -98,8 +98,8 @@ class ExecutorVerificationServiceImplTest {
     }
 
     private void stubActiveAssignment() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenReturn(assignment(ExecutorStatus.ACTIVE));
     }
 
     private void stubDmsTriggered() {
@@ -211,7 +211,7 @@ class ExecutorVerificationServiceImplTest {
         assertThrows(InvalidVerificationDocumentException.class,
                 () -> service.submit(assignmentId, LOGIN, pdf(), req));
 
-        verify(executorAssignmentRepository, never()).findById(any());
+        verifyNoInteractions(executorAccessGuard);
     }
 
     @Test
@@ -254,8 +254,8 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Inactive executor -> ExecutorNotActiveException (403)")
     void submit_inactiveExecutor_forbidden() throws Exception {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.INACTIVE)));
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
 
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), null);
         assertThrows(ExecutorNotActiveException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
@@ -333,7 +333,8 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Content is encrypted before the DMS row is locked")
     void submit_encryptsBeforeLockingDmsConfig() throws Exception {
-        when(executorAssignmentRepository.findById(assignmentId)).thenReturn(Optional.empty());
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
         when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
 
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), null);
@@ -346,7 +347,8 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Assignment not found -> ExecutorAssignmentNotFoundException (404)")
     void submit_assignmentNotFound_throws404() {
-        when(executorAssignmentRepository.findById(assignmentId)).thenReturn(Optional.empty());
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), "note");
         assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
     }
@@ -354,7 +356,8 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Caller is not assigned executor user -> ExecutorAssignmentNotFoundException (404)")
     void submit_callerMismatch_throws404() {
-        stubActiveAssignment();
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, "other-user-uuid"))
+                .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), "note");
         assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.submit(assignmentId, "other-user-uuid", pdf(), req));
     }

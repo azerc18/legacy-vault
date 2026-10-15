@@ -6,14 +6,11 @@ import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VerificationRequestSubmittedEvent;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
 import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
-import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
-import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.*;
@@ -43,7 +40,7 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
     private static final Set<LegalVerificationStatus> OPEN_REQUEST_STATUSES =
             EnumSet.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED);
 
-    private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final ExecutorAccessGuard executorAccessGuard;
     private final DmsConfigRepository dmsConfigRepository;
     private final LegalVerificationRequestRepository legalVerificationRequestRepository;
     private final VerificationRequestVaultRepository verificationRequestVaultRepository;
@@ -64,13 +61,7 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
         byte[] plain = readAndValidate(file);
         byte[] encryptedContent = encryptContent(plain);
 
-        ExecutorAssignment assignment = executorAssignmentRepository.findById(assignmentId)
-                .filter(a -> isSameUser(a.getExecutorUser(), executorLogin))
-                .orElseThrow(() -> new ExecutorAssignmentNotFoundException("Executor assignment not found."));
-
-        if (assignment.getStatus() != ExecutorStatus.ACTIVE) {
-            throw new ExecutorNotActiveException("Access denied. Executor has not been activated yet.");
-        }
+        ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
 
         UUID ownerId = assignment.getOwner().getId();
 
@@ -228,12 +219,5 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
             return ".jpg";
         }
         return null;
-    }
-
-    private static boolean isSameUser(User user, String login) {
-        if (user == null || login == null) {
-            return false;
-        }
-        return login.equalsIgnoreCase(user.getEmail()) || login.equals(String.valueOf(user.getId()));
     }
 }
