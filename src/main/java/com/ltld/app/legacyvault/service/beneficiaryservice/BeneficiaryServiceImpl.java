@@ -70,13 +70,15 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final int OTP_TTL_MINUTES = 5;
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
+    // FR-17 3b: khóa tạm; hết hạn sau LOCK_HOURS (cùng cửa sổ 24 giờ với bộ đếm lượt thử)
+    private static final int LOCK_HOURS = 24;
     private static final int VIEW_SESSION_MINUTES = 30;
 
     private static final String ALREADY_CLAIMED_MSG = "Tài sản này đã được nhận.";
     private static final String CLAIM_ENDED_MSG = "Thời hạn yêu cầu nhận tài sản đã kết thúc.";
     private static final String NOT_READY_MSG = "Tài sản chưa sẵn sàng để nhận.";
     private static final String NO_SESSION_MSG = "Chưa có phiên xác thực. Vui lòng khởi tạo yêu cầu nhận tài sản trước.";
-    private static final String LOCKED_MSG = "Truy cập đã bị tạm khóa do xác thực sai nhiều lần. Vui lòng liên hệ Admin để được hỗ trợ.";
+    private static final String LOCKED_MSG = "Truy cập đã bị tạm khóa do xác thực sai nhiều lần. Vui lòng thử lại sau 24 giờ hoặc liên hệ Admin để được hỗ trợ.";
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
@@ -686,10 +688,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         return new AccessContext(vault, claim);
     }
 
-    // Khóa theo (vault, beneficiary): đã có phiên FAILED thì không tạo phiên mới để lách
+    // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo
+    // phiên mới để lách; phiên FAILED cũ hơn mốc đó không còn khóa nữa.
     private void assertNotLocked(UUID vaultId, UUID currentUserId) {
-        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
-                vaultId, currentUserId, VerificationStatus.FAILED)) {
+        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+                vaultId, currentUserId, VerificationStatus.FAILED, LocalDateTime.now().minusHours(LOCK_HOURS))) {
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }
     }
