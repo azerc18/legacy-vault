@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
@@ -53,6 +54,14 @@ public class BeneficiaryController {
         BeneficiaryClaimResponse response =
                 beneficiaryService.initializeClaim(request, currentUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // FR-16/FR-17 bước 1: danh sách vault được bàn giao cho Beneficiary đang đăng nhập
+    @GetMapping("/vaults")
+    public ResponseEntity<ApiResponse<List<BeneficiaryVaultSummaryResponse>>> listMyVaults(Principal principal) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.listMyVaults(currentUserId(principal))));
     }
 
     // FR-17: Gửi OTP xác thực danh tính qua email

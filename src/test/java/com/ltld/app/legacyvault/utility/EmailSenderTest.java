@@ -11,9 +11,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.TimeZone;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,6 +28,7 @@ import static org.mockito.Mockito.verify;
 class EmailSenderTest {
 
     @Mock private JavaMailSender javaMailSender;
+    private static final UUID VAULT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     @InjectMocks private EmailSender emailSender;
 
     private TimeZone originalZone;
@@ -34,6 +37,7 @@ class EmailSenderTest {
     void setUp() {
         originalZone = TimeZone.getDefault();
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "http://localhost:3000/");
     }
 
     @AfterEach
@@ -50,7 +54,7 @@ class EmailSenderTest {
     @Test
     void unlockedNotification_mentionsOwnerVaultDeadlineAndTimezone() {
         emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
-                LocalDateTime.of(2026, 12, 31, 10, 30), true);
+                LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
 
         SimpleMailMessage message = sentMessage();
         String text = message.getText();
@@ -64,7 +68,7 @@ class EmailSenderTest {
     @Test
     void unlockedNotification_pendingAccount_addsRegistrationReminder() {
         emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
-                LocalDateTime.of(2026, 12, 31, 10, 30), false);
+                LocalDateTime.of(2026, 12, 31, 10, 30), false, VAULT_ID);
 
         assertTrue(sentMessage().getText().contains("Tài khoản của bạn chưa được kích hoạt"));
     }
@@ -74,6 +78,26 @@ class EmailSenderTest {
         doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(SimpleMailMessage.class));
 
         assertThrows(MailSendException.class, () -> emailSender.sendVaultUnlockedNotification(
-                "an@example.com", "An", "Bình", "Hồ sơ A", LocalDateTime.of(2026, 12, 31, 10, 30), true));
+                "an@example.com", "An", "Bình", "Hồ sơ A", LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID));
+    }
+
+    @Test
+    void unlockedNotification_containsLinkToTheVault_withoutDoubleSlash() {
+        emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
+                LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
+
+        String text = sentMessage().getText();
+        assertTrue(text.contains("Truy cập hồ sơ: http://localhost:3000/beneficiary/vaults/" + VAULT_ID));
+        assertFalse(text.contains("3000//"));
+    }
+
+    @Test
+    void unlockedNotification_withoutFrontendBaseUrl_hasNoLink() {
+        ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "");
+
+        emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
+                LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
+
+        assertFalse(sentMessage().getText().contains("Truy cập hồ sơ"));
     }
 }
