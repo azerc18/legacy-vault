@@ -236,4 +236,24 @@ class BeneficiaryControllerSecurityTest {
                         .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void myVaults_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void myVaults_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults").with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).listMyVaults(any());
+    }
+
+    @Test
+    void myVaults_beneficiary_returns200() throws Exception {
+        when(beneficiaryService.listMyVaults(any())).thenReturn(List.of());
+        mockMvc.perform(get("/api/beneficiaries/vaults").with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isOk());
+    }
 }

@@ -146,7 +146,7 @@ class BeneficiaryNotificationListenerTest {
 
     private void mailFails() {
         doThrow(new MailSendException("smtp down")).when(emailSender)
-                .sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+                .sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -165,7 +165,7 @@ class BeneficiaryNotificationListenerTest {
         // M1/m1: gửi mail trước, sau đó mới đọc lại claim để ghi notifiedAt
         InOrder order = inOrder(emailSender, claimRepository);
         order.verify(emailSender).sendVaultUnlockedNotification(
-                "an@example.com", "An", "Bình", "Hồ sơ A", deadline, true);
+                "an@example.com", "An", "Bình", "Hồ sơ A", deadline, true, vaultId);
         order.verify(claimRepository).findById(claimId);
 
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFIED), eq(AuditResult.SUCCESS),
@@ -202,7 +202,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, false);
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, false, vaultId);
     }
 
     @Test
@@ -216,7 +216,7 @@ class BeneficiaryNotificationListenerTest {
 
         assertEquals(3, storedClaim.getNotifyAttempts());
         assertNotNull(storedClaim.getNotifiedAt());
-        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true);
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true, vaultId);
     }
 
     @Test
@@ -228,7 +228,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
     }
 
     @Test
@@ -240,7 +240,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         assertEquals(MAX, storedClaim.getNotifyAttempts());
     }
 
@@ -250,7 +250,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(claimRepository, never()).save(any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
                 isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()), anyString());
@@ -264,7 +264,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(claimRepository, never()).save(any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
                 isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()), contains("claimDeadlineAt"));
@@ -278,7 +278,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.onVaultsUnlocked(event(vaultId));
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(claimRepository, never()).save(any());
     }
 
@@ -293,7 +293,7 @@ class BeneficiaryNotificationListenerTest {
 
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
                 isNull(), isNull(), eq(badVault), eq("Vault"), eq(badVault.toString()), contains("prepare failed"));
-        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true);
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true, vaultId);
     }
 
     @Test
@@ -305,7 +305,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.retryPendingNotifications(now);
 
-        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true);
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true, vaultId);
         assertNotNull(storedClaim.getNotifiedAt());
     }
 
@@ -323,7 +323,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.retryPendingNotifications(now);
 
-        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean());
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         assertEquals(3, storedClaim.getNotifyAttempts());
     }
 
@@ -338,7 +338,7 @@ class BeneficiaryNotificationListenerTest {
 
         listener.retryPendingNotifications(now);
 
-        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true);
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A", deadline, true, vaultId);
         assertEquals(4, storedClaim.getNotifyAttempts());
         assertEquals(now, storedClaim.getLastNotifyAttemptAt());
         assertNotNull(storedClaim.getNotifiedAt());

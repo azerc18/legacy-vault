@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -102,13 +104,41 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final OtpHasher otpHasher;
     private final AuditLogService auditLogService;
 
-
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
             return vault.getClaimDeadlineAt();
         }
         LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
         return base.plusDays(CLAIM_TIMEOUT_DAYS);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<BeneficiaryVaultSummaryResponse> listMyVaults(UUID currentUserId) {
+        // Luôn lọc theo người đang đăng nhập, không nhận beneficiaryId từ client
+        List<Vault> vaults = vaultRepository.findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(
+                currentUserId, List.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED, VaultStatus.ARCHIVED_LOCKED));
+        if (vaults.isEmpty()) {
+            return List.of();
+        }
+
+        Map<UUID, BeneficiaryClaim> claimsByVaultId = claimRepository
+                .findByVaultIdIn(vaults.stream().map(Vault::getId).toList()).stream()
+                .collect(Collectors.toMap(c -> c.getVault().getId(), c -> c));
+
+        return vaults.stream().map(v -> {
+            BeneficiaryClaim claim = claimsByVaultId.get(v.getId());
+            return BeneficiaryVaultSummaryResponse.builder()
+                    .vaultId(v.getId())
+                    .vaultName(v.getName())
+                    .ownerName(v.getOwner() != null ? v.getOwner().getFullName() : null)
+                    .vaultStatus(v.getStatus())
+                    .claimStatus(claim != null ? claim.getStatus() : null)
+                    .unlockedAt(v.getUnlockedAt())
+                    .claimDeadlineAt(v.getClaimDeadlineAt())
+                    .claimedAt(claim != null ? claim.getClaimedAt() : null)
+                    .build();
+        }).toList();
     }
 
     // ===================== FR-16 =====================
