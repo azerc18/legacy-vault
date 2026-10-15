@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -68,6 +69,7 @@ class ExecutorManagementServiceImplTest {
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private UserRepository userRepository;
     @Mock private RoleRepository roleRepository;
+    @Mock private VaultRepository vaultRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -564,6 +566,48 @@ class ExecutorManagementServiceImplTest {
                 candidate.getId(), ExecutorStatus.REVOKED, current.getId());
         order.verify(executorAssignmentRepository).saveAndFlush(current);
         verify(userRepository, times(1)).findByIdForUpdate(any());
+    }
+
+    // ---------- m2 (Q26): Executor ≠ người thụ hưởng ----------
+
+    @Test
+    @DisplayName("m2/Q26 (T3): email là người thụ hưởng đã liên kết của Owner -> 409, không lưu, không audit, không event, không thêm role")
+    void assign_candidateIsLinkedBeneficiary_conflict() {
+        when(vaultRepository.existsBeneficiaryWithEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
+
+        assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, false)),
+                HttpStatus.CONFLICT);
+
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verify(userRepository, never()).findByIdForUpdate(any());
+        verifyNoInteractions(auditLogService, eventPublisher, roleRepository);
+        assertThat(candidate.getRoles()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("m2/Q26 (T4): email là beneficiaryEmail đang chờ đăng ký -> 409; truy vấn nhận email đã trim + lowercase")
+    void assign_candidateIsPendingBeneficiaryEmail_conflict() {
+        when(vaultRepository.existsBeneficiaryWithEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
+
+        assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.BACKUP, request("  Exec@Example.TEST ", false)),
+                HttpStatus.CONFLICT);
+
+        verify(vaultRepository).existsBeneficiaryWithEmail(ownerId, CANDIDATE_EMAIL);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("m2/Q26 (T5): Executor hiện tại vừa trở thành người thụ hưởng, gán lại đúng người -> 409 thay vì no-op")
+    void assign_currentExecutorBecameBeneficiary_conflictInsteadOfNoOp() {
+        assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        when(vaultRepository.existsBeneficiaryWithEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
+
+        assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true)),
+                HttpStatus.CONFLICT);
+
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     // ---------- helpers ----------

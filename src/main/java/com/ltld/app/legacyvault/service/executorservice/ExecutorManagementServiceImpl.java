@@ -17,6 +17,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +59,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private final DmsConfigRepository dmsConfigRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final VaultRepository vaultRepository;
     private final AuditLogService auditLogService;
     // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
     private final ApplicationEventPublisher eventPublisher;
@@ -82,6 +84,14 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         if (candidate.getId().equals(ownerId)) {
             throw new ExecutorManagementException("Không thể tự chỉ định chính mình làm Executor.",
                     HttpStatus.BAD_REQUEST);
+        }
+
+        // Q26: người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Owner không được đồng thời là Executor.
+        // Đặt trước nhánh "cùng người" để cả trường hợp Executor hiện tại vừa trở thành người thụ hưởng cũng bị chặn.
+        if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
+            throw new ExecutorManagementException(
+                    "Người này đang là người thụ hưởng của bạn, không thể đồng thời là Digital Executor.",
+                    HttpStatus.CONFLICT);
         }
 
         ExecutorAssignment current = executorAssignmentRepository
