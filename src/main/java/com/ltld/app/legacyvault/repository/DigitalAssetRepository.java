@@ -18,6 +18,9 @@ public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID
     @Query("SELECT a FROM DigitalAsset a WHERE a.vault.id IN :vaultIds AND a.status = :status")
     List<DigitalAsset> findByVaultIdInAndStatus(@Param("vaultIds") Collection<UUID> vaultIds, @Param("status") AssetStatus status);
 
+    // FR-19: đếm tài sản đang hoạt động của Vault (precondition đóng hồ sơ)
+    long countByVaultIdAndStatus(UUID vaultId, AssetStatus status);
+
     // FR-17: chỉ lấy tài sản còn hiệu lực (loại REVOKED)
     List<DigitalAsset> findByVaultIdAndStatus(UUID vaultId, AssetStatus status);
 

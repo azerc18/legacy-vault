@@ -513,8 +513,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // Sau CLAIMED không giải mã được nữa (Q1), nên tài sản chưa xem sẽ mất quyền xem.
         List<DigitalAsset> unviewed = digitalAssetRepository.findUnaccessedAssets(vault.getId(), claim.getId());
-        // SRS FR-19 Precondition: hồ sơ có tài sản thì phải đã xem/tải ít nhất một tài sản
-        int totalAssets = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).size();
+        // FR-19 (SRS Precondition): Vault có tài sản thì Beneficiary phải xem/tải ít nhất một tài sản trước khi đóng
+        long totalAssets = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
         if (totalAssets > 0 && unviewed.size() == totalAssets) {
             throw new BeneficiaryException(
                     "Bạn cần xem hoặc tải xuống ít nhất một tài sản trước khi đóng hồ sơ.", HttpStatus.BAD_REQUEST);
