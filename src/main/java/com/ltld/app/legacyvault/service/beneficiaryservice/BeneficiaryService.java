@@ -1,22 +1,17 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 
 import java.util.List;
 import java.util.UUID;
 
 public interface BeneficiaryService {
+    /**
+     * FR-16/FR-17 bước 1: danh sách vault được bàn giao cho Beneficiary đang đăng nhập
+     * (UNLOCKED, CLAIMED, ARCHIVED_LOCKED), mới mở khóa trước. Chỉ trả vault của chính người gọi.
+     */
+    List<BeneficiaryVaultSummaryResponse> listMyVaults(UUID currentUserId);
+
     /**
      * Khởi tạo phiên xác thực danh tính để Beneficiary bắt đầu nhận tài sản.
      * Trả 404 nếu vault không tồn tại hoặc người gọi không phải beneficiary,

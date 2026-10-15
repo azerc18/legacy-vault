@@ -1,18 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.DocumentType;
@@ -635,6 +624,27 @@ public class BeneficiaryControllerTest {
                         .principal(principal))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void listMyVaults_success_returns200WithNoStore() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+        UUID vaultId = UUID.randomUUID();
+
+        when(beneficiaryService.listMyVaults(eq(userId))).thenReturn(List.of(
+                BeneficiaryVaultSummaryResponse.builder().vaultId(vaultId).vaultName("Hồ sơ A")
+                        .ownerName("Bình").vaultStatus(VaultStatus.UNLOCKED).build()));
+
+        mockMvc.perform(get("/api/beneficiaries/vaults").principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].vaultId").value(vaultId.toString()))
+                .andExpect(jsonPath("$.data[0].vaultName").value("Hồ sơ A"))
+                .andExpect(jsonPath("$.data[0].vaultStatus").value("UNLOCKED"));
+
+        verify(beneficiaryService).listMyVaults(eq(userId));
     }
 
 }

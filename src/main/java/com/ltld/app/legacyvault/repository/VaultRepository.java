@@ -1,13 +1,16 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,4 +38,10 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
                                     @Param("lastAttemptBefore") LocalDateTime lastAttemptBefore,
                                     @Param("maxAttempts") int maxAttempts,
                                     Pageable pageable);
+
+    // FR-16/FR-17: danh sách vault được bàn giao cho một Beneficiary (mới mở khóa trước).
+    // EntityGraph nạp luôn owner để hiển thị tên Owner mà không phát sinh thêm truy vấn cho từng vault.
+    @EntityGraph(attributePaths = {"owner"})
+    List<Vault> findByBeneficiaryIdAndStatusInOrderByUnlockedAtDesc(UUID beneficiaryId,
+                                                                    Collection<VaultStatus> statuses);
 }
