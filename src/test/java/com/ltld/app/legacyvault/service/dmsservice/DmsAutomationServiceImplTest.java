@@ -1,12 +1,12 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
-import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
@@ -15,15 +15,15 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,10 +39,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +56,7 @@ class DmsAutomationServiceImplTest {
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private NotificationRepository notificationRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
     @Mock private DmsActivationProcessor processor;
 
     @InjectMocks
@@ -97,12 +101,12 @@ class DmsAutomationServiceImplTest {
 
     @Test
     @DisplayName("Leo thang chạy cho mọi DMS TRIGGERED, lỗi một cái không chặn cái khác")
-    void activateBackup_runsForEveryTriggeredConfig() {
+    void escalateUnresponsivePrimaries_runsForEveryTriggeredConfig() {
         DmsConfig other = DmsConfig.builder().id(UUID.randomUUID()).build();
         when(dmsConfigRepository.findAllByStatus(DmsStatus.TRIGGERED)).thenReturn(List.of(config, other));
         doThrow(new IllegalStateException("boom")).when(processor).escalateIfPrimaryUnresponsive(config.getId(), now);
 
-        service.activateBackupForUnacknowledgedPrimary(now);
+        service.escalateUnresponsivePrimaries(now);
 
         verify(processor).escalateIfPrimaryUnresponsive(other.getId(), now);
     }
@@ -112,11 +116,11 @@ class DmsAutomationServiceImplTest {
     @Test
     @DisplayName("Primary xác nhận: set acknowledgedAt, thông báo READ, ghi audit với actor = Executor")
     void acknowledge_happyPath() {
-        Notification activation = Notification.builder().type(NotificationType.DMS_TRIGGERED)
+        Notification activation = Notification.builder().type(NotificationType.EXECUTOR_ACTIVATED)
                 .status(NotificationStatus.SENT).build();
         when(notificationRepository
                 .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
-                        primaryUserId, NotificationType.DMS_TRIGGERED, "dms_config", config.getId()))
+                        primaryUserId, NotificationType.EXECUTOR_ACTIVATED, "DmsConfig", config.getId()))
                 .thenReturn(Optional.of(activation));
 
         ExecutorActivationResponse response = service.acknowledgeActivation(primary.getId(), "PRIMARY@example.test");
@@ -125,11 +129,22 @@ class DmsAutomationServiceImplTest {
         assertThat(response.getAcknowledgedAt()).isEqualTo(primary.getAcknowledgedAt());
         assertThat(response.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(activation.getStatus()).isEqualTo(NotificationStatus.READ);
-        verify(executorAssignmentRepository).save(primary);
-        ArgumentCaptor<AuditLog> audit = ArgumentCaptor.forClass(AuditLog.class);
-        verify(auditLogRepository).save(audit.capture());
-        assertThat(audit.getValue().getAction()).isEqualTo(AuditAction.EXECUTOR_ACKNOWLEDGED_ACTIVATION);
-        assertThat(audit.getValue().getActor()).isSameAs(primary.getExecutorUser());
+        verify(executorAssignmentRepository).saveAndFlush(primary);
+        // actor = Executor; vaultId null vì DMS gắn với Owner, không với Vault.
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), eq(AuditResult.SUCCESS),
+                eq(primaryUserId), eq("primary@example.test"), isNull(),
+                eq("ExecutorAssignment"), eq(primary.getId().toString()), contains("ownerId=" + ownerId));
+    }
+
+    @Test
+    @DisplayName("B1: lưu acknowledgedAt bằng saveAndFlush trước khi ghi audit")
+    void acknowledge_flushesBeforeAudit() {
+        service.acknowledgeActivation(primary.getId(), "primary@example.test");
+
+        InOrder order = inOrder(executorAssignmentRepository, auditLogService);
+        order.verify(executorAssignmentRepository).saveAndFlush(primary);
+        order.verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), any(), any(), any(), any(),
+                any(), any(), any());
     }
 
     @Test
@@ -141,7 +156,7 @@ class DmsAutomationServiceImplTest {
         ExecutorActivationResponse response = service.acknowledgeActivation(primary.getId(), "primary@example.test");
 
         assertThat(response.getAcknowledgedAt()).isEqualTo(first);
-        verify(auditLogRepository, never()).save(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
@@ -160,7 +175,7 @@ class DmsAutomationServiceImplTest {
                 .isInstanceOf(ExecutorAssignmentNotFoundException.class);
         assertThatThrownBy(() -> service.acknowledgeActivation(primary.getId(), null))
                 .isInstanceOf(ExecutorAssignmentNotFoundException.class);
-        verify(auditLogRepository, never()).save(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
@@ -180,7 +195,7 @@ class DmsAutomationServiceImplTest {
         config.setStatus(DmsStatus.ACTIVE);
         assertThatThrownBy(() -> service.acknowledgeActivation(primary.getId(), "primary@example.test"))
                 .isInstanceOf(DmsNotTriggeredException.class);
-        verify(auditLogRepository, never()).save(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
@@ -196,7 +211,7 @@ class DmsAutomationServiceImplTest {
 
         assertThat(backup.getAcknowledgedAt()).isNotNull();
         verify(notificationRepository).findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
-                eq(backupUserId), eq(NotificationType.EXECUTOR_ACTIVATED), eq("dms_config"), eq(config.getId()));
+                eq(backupUserId), eq(NotificationType.EXECUTOR_ACTIVATED), eq("DmsConfig"), eq(config.getId()));
     }
 
     @Test

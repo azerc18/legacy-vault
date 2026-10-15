@@ -1,28 +1,28 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
-import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -33,7 +33,7 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
     private final DmsConfigRepository dmsConfigRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final NotificationRepository notificationRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final DmsActivationProcessor processor;
 
     // Không @Transactional ở đây: mỗi Owner chạy trong transaction riêng của processor,
@@ -48,7 +48,7 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
     }
 
     @Override
-    public void activateBackupForUnacknowledgedPrimary(LocalDateTime now) {
+    public void escalateUnresponsivePrimaries(LocalDateTime now) {
         for (DmsConfig config : dmsConfigRepository.findAllByStatus(DmsStatus.TRIGGERED)) {
             UUID configId = config.getId();
             runIsolated("escalate", configId, () -> processor.escalateIfPrimaryUnresponsive(configId, now));
@@ -75,25 +75,26 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
         if (assignment.getAcknowledgedAt() == null) {
             LocalDateTime now = LocalDateTime.now();
             assignment.setAcknowledgedAt(now);
-            executorAssignmentRepository.save(assignment);
+            // B1: flush ngay để xung đột @Version với lượt leo thang nổ ra trước khi ghi audit (audit vẫn lưu khi rollback).
+            executorAssignmentRepository.saveAndFlush(assignment);
 
             notificationRepository
                     .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
                             assignment.getExecutorUser().getId(),
-                            DmsActivationProcessor.activationNotificationType(assignment.getExecutorType()),
-                            DmsActivationProcessor.DMS_REFERENCE_TYPE, config.getId())
+                            NotificationType.EXECUTOR_ACTIVATED,
+                            DmsActivationProcessor.ENTITY_DMS_CONFIG, config.getId())
                     .ifPresent(n -> {
                         n.setStatus(NotificationStatus.READ);
                         notificationRepository.save(n);
                     });
 
-            auditLogRepository.save(AuditLog.builder()
-                    .actor(assignment.getExecutorUser())
-                    .action(AuditAction.EXECUTOR_ACKNOWLEDGED_ACTIVATION)
-                    .entityType("ExecutorAssignment")
-                    .entityId(assignment.getId())
-                    .metadata(Map.of("ownerId", assignment.getOwner().getId().toString()))
-                    .build());
+            // vaultId = null: DMS gắn với Owner, không với một Vault cụ thể.
+            User executor = assignment.getExecutorUser();
+            auditLogService.log(AuditAction.EXECUTOR_ACKNOWLEDGED, AuditResult.SUCCESS,
+                    executor.getId(), executor.getEmail(), null,
+                    DmsActivationProcessor.ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId().toString(),
+                    DmsActivationProcessor.ownerDetail(assignment.getOwner().getId())
+                            + ", executorType=" + assignment.getExecutorType());
         }
 
         return ExecutorActivationResponse.builder()

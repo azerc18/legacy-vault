@@ -1,30 +1,22 @@
 package com.ltld.app.legacyvault.dto.executordto;
 
 import com.ltld.app.legacyvault.enums.HandoverStatus;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/**
- * DTO đại diện thông tin tổng quan tiến độ bàn giao từng Vault (FR-10).
- * Tuyệt đối không chứa secret/mật khẩu hay dữ liệu nhạy cảm của tài sản số.
- */
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class VaultHandoverProgressResponse {
-    private UUID vaultId;
-    private String vaultName;
-    private String description;
-    private HandoverStatus handoverStatus;
-    private long assetCount;
-    private LocalDateTime claimDeadlineAt;
-    private LocalDateTime unlockedAt;
-    private String beneficiaryNameMasked;
-    private String beneficiaryEmailMasked;
+    private final UUID vaultId;
+    private final String vaultName;
+    private final HandoverStatus handoverStatus;
+    private final UUID requestId;
+    private final LocalDateTime requestedAt;
+    private final LocalDateTime decidedAt;
+    private final String rejectionReason;
+    private final LocalDateTime unlockedAt;
+    private final LocalDateTime claimDeadlineAt;
 }

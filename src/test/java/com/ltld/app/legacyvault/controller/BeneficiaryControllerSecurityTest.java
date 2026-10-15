@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import org.junit.jupiter.api.Test;
@@ -166,6 +167,93 @@ class BeneficiaryControllerSecurityTest {
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{v}/close-preview", UUID.randomUUID())
                         .with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void documents_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void documents_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents", UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).getVaultDocuments(any(), any());
+    }
+
+    @Test
+    void documents_beneficiaryWithoutAssetDownload_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents", UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).getVaultDocuments(any(), any());
+    }
+
+    @Test
+    void documents_beneficiaryWithAssetDownload_returns200() throws Exception {
+        when(beneficiaryService.getVaultDocuments(any(), any())).thenReturn(List.of());
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents", UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void documentDownload_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void documentDownload_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).downloadVaultDocument(any(), any(), any());
+    }
+
+    @Test
+    void documentDownload_beneficiaryWithoutAssetDownload_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).downloadVaultDocument(any(), any(), any());
+    }
+
+    @Test
+    void documentDownload_beneficiaryWithAssetDownload_returns200() throws Exception {
+        when(beneficiaryService.downloadVaultDocument(any(), any(), any())).thenReturn(
+                DocumentDownloadResponse.builder().fileName("a.pdf").contentType("application/pdf")
+                        .content("data".getBytes()).build());
+
+        mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
+                        UUID.randomUUID(), UUID.randomUUID())
+                        .with(token("ROLE_BENEFICIARY", "ASSET_DOWNLOAD")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void myVaults_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void myVaults_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/vaults").with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).listMyVaults(any());
+    }
+
+    @Test
+    void myVaults_beneficiary_returns200() throws Exception {
+        when(beneficiaryService.listMyVaults(any())).thenReturn(List.of());
+        mockMvc.perform(get("/api/beneficiaries/vaults").with(token("ROLE_BENEFICIARY")))
                 .andExpect(status().isOk());
     }
 }

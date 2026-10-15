@@ -27,7 +27,7 @@ cd legacy-vault
 
 ## 3. Cấu hình biến môi trường
 
-Dự án đọc cấu hình nhạy cảm (DB, JWT secret) từ file `.env` ở thư mục gốc. Spring Boot tự nạp file này khi chạy ứng dụng; Docker Compose cũng dùng file này để cấu hình MySQL. **Không commit `.env` thật lên Git** - chỉ dùng để chạy local.
+Dự án đọc cấu hình nhạy cảm (DB, JWT secret) từ file `.env` ở thư mục gốc. **Không commit `.env` thật lên Git** - chỉ dùng để chạy local.
 
 ```bash
 cp .env.example .env
@@ -93,32 +93,35 @@ docker compose logs -f mysql   # xem log nếu MySQL chưa "healthy"
 
 ## 5. Chạy ứng dụng Spring Boot
 
-Dự án có các profile Spring: `local`, `docker`, `prod`. Khi không chỉ định profile, ứng dụng mặc định dùng `local`, profile này đọc bộ biến `MYSQL_*` trong `.env` ở bước 3. Vì vậy có thể chạy trực tiếp từ Maven hoặc IntelliJ mà không cần tự nạp biến môi trường hay chọn profile.
+Dự án có 4 profile Spring: `default` (trong `application.yaml`), `local`, `docker`, `prod`. **Dùng profile `local` khi chạy trên máy cá nhân** - profile này đọc đúng theo bộ biến `MYSQL_*` trong `.env` ở bước 3.
 
 ### Cách A - dùng Maven Wrapper (khuyến nghị)
 
 Linux/macOS:
 ```bash
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 Windows:
 ```cmd
-mvnw.cmd spring-boot:run
+mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 ### Cách B - build jar rồi chạy
 
 ```bash
 ./mvnw clean package -DskipTests
-java -jar target/legacy-vault-0.0.1-SNAPSHOT.jar
+java -jar target/legacy-vault-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
 ```
 
 ### Cách C - chạy trong IntelliJ IDEA
 
 1. Mở project (File → Open → chọn thư mục `legacy-vault`), để IDE tự resolve Maven.
-2. Đặt **Working directory** của cấu hình chạy là thư mục gốc project để Spring Boot tìm thấy `.env`.
-3. Nhấn Run (▶) hoặc Debug (🐞); profile `local` và các biến trong `.env` được tự nạp.
+2. Vào **Run/Debug Configurations** của `LegacyVaultApplication`.
+3. Thêm:
+   - **Active profiles**: `local`
+   - **Environment variables**: dán nội dung `.env` vào (hoặc cài plugin *EnvFile* và trỏ tới file `.env` để IDE tự load).
+4. Nhấn Run (▶) hoặc Debug (🐞) như trong ảnh cấu hình dự án.
 
 Ứng dụng mặc định chạy ở cổng **8084** (`server.port: 8084` trong `application.yaml`).
 
@@ -148,7 +151,7 @@ Log console sẽ hiển thị `Tomcat started on port 8084` và `Started LegacyV
 ## 8. Xử lý sự cố thường gặp (Troubleshooting)
 
 - **App không start, báo lỗi thiếu `JWT_SECRET`**: biến này không có giá trị mặc định trong bất kỳ profile nào - bắt buộc phải khai báo trong `.env`.
-- **App start nhưng không kết nối được DB / báo sai username-password**: kiểm tra MySQL container đã chạy chưa, `DB_PORT` trong `.env` có đúng với cổng publish trong Docker Compose không, và working directory có trỏ tới thư mục gốc project để Spring Boot đọc `.env` không.
+- **App start nhưng không kết nối được DB / báo sai username-password**: kiểm tra bạn có đang chạy **đúng profile `local`** không. Profile `default` (không truyền `-Dspring-boot.run.profiles`) đọc các biến `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` - khác tên với `.env` hiện tại đang dùng `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD`. Nếu không set profile, Spring sẽ rơi về giá trị mặc định cứng trong code, không đọc từ `.env`, dễ gây nhầm lẫn.
 - **Lỗi `Port 8084 already in use`**: đổi `server.port` trong `application.yaml` hoặc tắt tiến trình đang chiếm cổng.
 - **Lỗi `Port 3306 already in use` khi `docker compose up`**: xem mục 4 - đổi cổng map trong `docker-compose.yml`.
 - **Build lỗi vì sai version Java**: chạy `java -version` xác nhận đang dùng JDK 25, không phải JDK 17/21 (bản mặc định trên nhiều máy/IDE).

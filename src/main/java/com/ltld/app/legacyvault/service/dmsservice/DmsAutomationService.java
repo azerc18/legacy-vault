@@ -11,7 +11,7 @@ public interface DmsAutomationService {
     void processOverdueDms(LocalDateTime now);
 
     /** Leo thang sang Backup nếu Primary không xác nhận sau thời gian chờ (FR-07 ngoại lệ 3a, BR-03). */
-    void activateBackupForUnacknowledgedPrimary(LocalDateTime now);
+    void escalateUnresponsivePrimaries(LocalDateTime now);
 
     /**
      * Executor xác nhận đã nhận thông báo kích hoạt (FR-07 bước 4).

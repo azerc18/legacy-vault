@@ -1,0 +1,16 @@
+package com.ltld.app.legacyvault.service.fileservice;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+public interface FileStorageService {
+    // Nhận 1 file gốc (để lấy tên file) và mảng byte đã được mã hóa để lưu xuống ổ cứng
+    String storeFile(MultipartFile originalFile, byte[] encryptedContent) throws Exception;
+    
+    // Xóa file vật lý trên đĩa
+    void deleteFile(String filePath);
+
+    // Đọc nội dung (vẫn ở dạng đã mã hóa) của một file đã lưu. Chỉ đọc trong thư mục upload.
+    byte[] readFile(String filePath) throws IOException;
+}

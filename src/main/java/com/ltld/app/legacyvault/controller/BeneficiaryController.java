@@ -3,11 +3,14 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
@@ -51,6 +54,14 @@ public class BeneficiaryController {
         BeneficiaryClaimResponse response =
                 beneficiaryService.initializeClaim(request, currentUserId(principal));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // FR-16/FR-17 bước 1: danh sách vault được bàn giao cho Beneficiary đang đăng nhập
+    @GetMapping("/vaults")
+    public ResponseEntity<ApiResponse<List<BeneficiaryVaultSummaryResponse>>> listMyVaults(Principal principal) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.listMyVaults(currentUserId(principal))));
     }
 
     // FR-17: Gửi OTP xác thực danh tính qua email
@@ -149,5 +160,37 @@ public class BeneficiaryController {
         } catch (IllegalArgumentException | NullPointerException e) {
             throw new BeneficiaryException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    // FR-18 (phần 2): Danh sách tài liệu pháp lý của vault (chỉ thông tin tóm tắt)
+    @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
+    @GetMapping("/vaults/{vaultId}/documents")
+    public ResponseEntity<ApiResponse<List<LegalDocumentSummaryResponse>>> getVaultDocuments(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.getVaultDocuments(vaultId, currentUserId(principal))));
+    }
+
+    // FR-18 (phần 2): Tải xuống tài liệu pháp lý đã giải mã. Không cho cache dữ liệu nhạy cảm.
+    @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
+    @GetMapping("/vaults/{vaultId}/documents/{documentId}/download")
+    public ResponseEntity<byte[]> downloadVaultDocument(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID documentId) {
+
+        DocumentDownloadResponse file =
+                beneficiaryService.downloadVaultDocument(vaultId, documentId, currentUserId(principal));
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(file.getFileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(file.getContent());
     }
 }
