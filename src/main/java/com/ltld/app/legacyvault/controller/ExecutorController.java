@@ -11,7 +11,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
@@ -23,7 +28,6 @@ import java.util.UUID;
 public class ExecutorController {
 
     private final DmsAutomationService dmsAutomationService;
-    // FR-08: Service xử lý nộp yêu cầu xác minh cái chết
     private final ExecutorVerificationService executorVerificationService;
 
     // FR-07 bước 4: Executor xác nhận đã nhận thông báo kích hoạt.
@@ -38,7 +42,6 @@ public class ExecutorController {
         return ResponseEntity.ok(ApiResponse.success("Activation acknowledged", response));
     }
 
-    // FR-08: Digital Executor nộp hồ sơ xác minh cái chết (Death Verification Request) kèm file chứng tử mã hóa
     @PostMapping(value = "/{assignmentId}/verification-requests", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DeathVerificationResponse>> submitDeathVerification(
             @PathVariable UUID assignmentId,

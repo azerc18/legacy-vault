@@ -2,8 +2,6 @@ server:
   port: 8084
 
 spring:
-  config:
-    import: "optional:file:.env[.properties]"
   servlet:
     multipart:
       max-file-size: 10MB
@@ -13,9 +11,9 @@ spring:
     properties:
       logging.level.org.springframework.security=DEBUG
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:${MYSQL_DATABASE:legacy_vault}}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
-    username: ${DB_USERNAME:${MYSQL_USER:legacy_vault_user}}
-    password: ${DB_PASSWORD:${MYSQL_PASSWORD:legacyvault_password}}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:legacyvault}
+    username: ${DB_USERNAME:legacy_vault_user}
+    password: ${DB_PASSWORD:legacyvault_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:

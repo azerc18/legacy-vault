@@ -4,11 +4,13 @@ import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.event.VerificationRequestSubmittedEvent;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
 import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
@@ -16,6 +18,7 @@ import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.*;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,17 +29,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
@@ -48,9 +55,10 @@ class ExecutorVerificationServiceImplTest {
     @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
     @Mock private VerificationRequestVaultRepository verificationRequestVaultRepository;
     @Mock private VaultRepository vaultRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
     @Mock private CryptoService cryptoService;
     @Mock private FileStorageService fileStorageService;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private ExecutorVerificationServiceImpl service;
 
     private static final String LOGIN = "executor@mail.com";
@@ -60,6 +68,7 @@ class ExecutorVerificationServiceImplTest {
     private User executor;
     private UUID assignmentId;
     private Vault vault1;
+    private Vault vault2;
 
     @BeforeEach
     void setUp() {
@@ -70,11 +79,8 @@ class ExecutorVerificationServiceImplTest {
         executor.setEmail(LOGIN);
         assignmentId = UUID.randomUUID();
 
-        vault1 = Vault.builder()
-                .id(UUID.randomUUID())
-                .owner(owner)
-                .status(VaultStatus.ACTIVE)
-                .build();
+        vault1 = Vault.builder().id(UUID.randomUUID()).owner(owner).status(VaultStatus.ACTIVE).build();
+        vault2 = Vault.builder().id(UUID.randomUUID()).owner(owner).status(VaultStatus.ACTIVE).build();
     }
 
     private ExecutorAssignment assignment(ExecutorStatus status) {
@@ -91,32 +97,43 @@ class ExecutorVerificationServiceImplTest {
         return new MockMultipartFile("file", "death-cert.pdf", "application/pdf", PDF);
     }
 
+    private void stubActiveAssignment() {
+        when(executorAssignmentRepository.findById(assignmentId))
+                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+    }
+
     private void stubDmsTriggered() {
         DmsConfig config = new DmsConfig();
         config.setStatus(DmsStatus.TRIGGERED);
         when(dmsConfigRepository.findByOwnerIdForUpdate(owner.getId())).thenReturn(Optional.of(config));
     }
 
-    @Test
-    @DisplayName("Happy path: store encrypted file, link vaults, create PENDING request and audit")
-    void submit_happyPath() throws Exception {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
-        stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(false);
-        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+    private void stubNoOpenRequest() {
+        when(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(any(), any()))
+                .thenReturn(Collections.emptyList());
+    }
 
-        byte[] cipher = "cipher".getBytes(StandardCharsets.UTF_8);
-        when(cryptoService.encryptBytes(any())).thenReturn(cipher);
-        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
-        when(cryptoService.encrypt("/files/cert.pdf")).thenReturn("ENC_PATH");
+    private void stubSave() {
         when(legalVerificationRequestRepository.saveAndFlush(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> {
                     LegalVerificationRequest r = inv.getArgument(0);
                     r.setId(UUID.randomUUID());
                     return r;
                 });
+    }
+
+    @Test
+    @DisplayName("Happy path: store encrypted file, keep original path, link vaults, audit and publish event")
+    void submit_happyPath() throws Exception {
+        stubActiveAssignment();
+        stubDmsTriggered();
+        stubNoOpenRequest();
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+
+        byte[] cipher = "cipher".getBytes(StandardCharsets.UTF_8);
+        when(cryptoService.encryptBytes(any())).thenReturn(cipher);
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
+        stubSave();
 
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), "  note  ");
         DeathVerificationResponse res = service.submit(assignmentId, LOGIN, pdf(), req);
@@ -127,13 +144,64 @@ class ExecutorVerificationServiceImplTest {
 
         ArgumentCaptor<LegalVerificationRequest> captor = ArgumentCaptor.forClass(LegalVerificationRequest.class);
         verify(legalVerificationRequestRepository).saveAndFlush(captor.capture());
-        assertEquals("ENC_PATH", captor.getValue().getDeathCertificateFileUrlEncrypted());
+        String stored = captor.getValue().getDeathCertificateFileUrlEncrypted();
+        assertEquals("/files/cert.pdf", stored);
+        assertTrue(stored.endsWith(".pdf"));
         assertEquals(owner, captor.getValue().getOwner());
+        verify(cryptoService, never()).encrypt(anyString());
 
         verify(verificationRequestVaultRepository).saveAll(argThat(list -> ((List<?>) list).size() == 1));
         verify(fileStorageService).storeFile(any(), eq(cipher));
-        verify(auditLogRepository).save(argThat(a -> a.getAction() == AuditAction.LEGAL_VERIFICATION_REQUESTED
-                && a.getActor() == executor));
+        verify(eventPublisher).publishEvent(new VerificationRequestSubmittedEvent(
+                res.getId(), owner.getId(), executor.getId()));
+    }
+
+    @Test
+    @DisplayName("Two vaults -> one audit row per vault, each carrying its vaultId")
+    void submit_twoVaults_auditsEachVault() throws Exception {
+        stubActiveAssignment();
+        stubDmsTriggered();
+        stubNoOpenRequest();
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+        when(vaultRepository.findById(vault2.getId())).thenReturn(Optional.of(vault2));
+        when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
+        stubSave();
+
+        DeathVerificationResponse res = service.submit(assignmentId, LOGIN, pdf(),
+                new CreateDeathVerificationRequest(List.of(vault1.getId(), vault2.getId()), null));
+
+        verify(auditLogService).log(eq(AuditAction.LEGAL_VERIFICATION_REQUESTED), eq(AuditResult.SUCCESS),
+                eq(executor.getId()), eq(LOGIN), eq(vault1.getId()),
+                eq("LegalVerificationRequest"), eq(res.getId().toString()), anyString());
+        verify(auditLogService).log(eq(AuditAction.LEGAL_VERIFICATION_REQUESTED), eq(AuditResult.SUCCESS),
+                eq(executor.getId()), eq(LOGIN), eq(vault2.getId()),
+                eq("LegalVerificationRequest"), eq(res.getId().toString()), anyString());
+        verifyNoMoreInteractions(auditLogService);
+        verify(eventPublisher, times(1)).publishEvent(any(VerificationRequestSubmittedEvent.class));
+    }
+
+    @Test
+    @DisplayName("Open-request check only considers PENDING and APPROVED, so SIGNED/REJECTED never block")
+    void submit_openRequestCheck_usesPendingAndApprovedOnly() throws Exception {
+        stubActiveAssignment();
+        stubDmsTriggered();
+        stubNoOpenRequest();
+        when(vaultRepository.findById(vault2.getId())).thenReturn(Optional.of(vault2));
+        when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
+        stubSave();
+
+        DeathVerificationResponse res = service.submit(assignmentId, LOGIN, pdf(),
+                new CreateDeathVerificationRequest(List.of(vault2.getId()), null));
+
+        assertEquals(LegalVerificationStatus.PENDING, res.getStatus());
+        ArgumentCaptor<Collection<UUID>> ids = ArgumentCaptor.forClass(Collection.class);
+        ArgumentCaptor<Collection<LegalVerificationStatus>> statuses = ArgumentCaptor.forClass(Collection.class);
+        verify(verificationRequestVaultRepository).findVaultIdsWithOpenRequest(ids.capture(), statuses.capture());
+        assertEquals(List.of(vault2.getId()), List.copyOf(ids.getValue()));
+        assertEquals(EnumSet.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED),
+                EnumSet.copyOf(statuses.getValue()));
     }
 
     @Test
@@ -147,13 +215,10 @@ class ExecutorVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Vault does not belong to owner -> VaultException (404)")
-    void submit_vaultNotOwned_notFound() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+    @DisplayName("Vault does not belong to owner -> VaultException (404) before any open-request lookup")
+    void submit_vaultNotOwned_notFound() throws Exception {
+        stubActiveAssignment();
         stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(false);
 
         User someoneElse = new User();
         someoneElse.setId(UUID.randomUUID());
@@ -163,16 +228,17 @@ class ExecutorVerificationServiceImplTest {
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(otherVault.getId()), "note");
         VaultException ex = assertThrows(VaultException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+
+        verify(verificationRequestVaultRepository, never()).findVaultIdsWithOpenRequest(any(), any());
+        verify(fileStorageService, never()).storeFile(any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("Vault is not ACTIVE -> VaultException (409)")
-    void submit_vaultNotActive_conflict() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+    @DisplayName("Vault is not ACTIVE -> VaultException (409), no event")
+    void submit_vaultNotActive_conflict() throws Exception {
+        stubActiveAssignment();
         stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(false);
 
         Vault unlockedVault = Vault.builder().id(UUID.randomUUID()).owner(owner).status(VaultStatus.UNLOCKED).build();
         when(vaultRepository.findById(unlockedVault.getId())).thenReturn(Optional.of(unlockedVault));
@@ -180,6 +246,9 @@ class ExecutorVerificationServiceImplTest {
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(unlockedVault.getId()), "note");
         VaultException ex = assertThrows(VaultException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+
+        verify(eventPublisher, never()).publishEvent(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
@@ -198,8 +267,7 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("DMS not TRIGGERED -> DmsNotTriggeredException (409)")
     void submit_dmsNotTriggered_conflict() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+        stubActiveAssignment();
         DmsConfig config = new DmsConfig();
         config.setStatus(DmsStatus.ACTIVE);
         when(dmsConfigRepository.findByOwnerIdForUpdate(owner.getId())).thenReturn(Optional.of(config));
@@ -211,24 +279,30 @@ class ExecutorVerificationServiceImplTest {
     }
 
     @Test
-    @DisplayName("Existing active request for owner -> DuplicateVerificationRequestException (409)")
-    void submit_duplicateActiveRequest_conflict() throws Exception {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+    @DisplayName("Vault already has a PENDING/APPROVED request -> DuplicateVerificationRequestException (409)")
+    void submit_vaultAlreadyInProgress_conflict() throws Exception {
+        stubActiveAssignment();
         stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(true);
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+        when(vaultRepository.findById(vault2.getId())).thenReturn(Optional.of(vault2));
+        when(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(any(), any()))
+                .thenReturn(List.of(vault1.getId()));
 
-        CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), null);
-        assertThrows(DuplicateVerificationRequestException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
+        CreateDeathVerificationRequest req =
+                new CreateDeathVerificationRequest(List.of(vault1.getId(), vault2.getId()), null);
+        DuplicateVerificationRequestException ex = assertThrows(DuplicateVerificationRequestException.class,
+                () -> service.submit(assignmentId, LOGIN, pdf(), req));
 
+        assertTrue(ex.getMessage().contains(vault1.getId().toString()));
+        assertFalse(ex.getMessage().contains(vault2.getId().toString()));
         verify(fileStorageService, never()).storeFile(any(), any());
+        verify(legalVerificationRequestRepository, never()).saveAndFlush(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
     @DisplayName("Extension mismatch with magic bytes -> InvalidVerificationDocumentException (400)")
     void submit_extensionMismatch_badRequest() {
-        // File name has .pdf but content is PNG magic bytes
         byte[] pngBytes = new byte[]{(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
         MockMultipartFile mismatchFile = new MockMultipartFile("file", "fake.pdf", "application/pdf", pngBytes);
 
@@ -239,16 +313,13 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Downstream database exception triggers orphan file cleanup")
     void submit_dbErrorCleansUpOrphanFile() throws Exception {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+        stubActiveAssignment();
         stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(false);
+        stubNoOpenRequest();
         when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
 
         when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
         when(fileStorageService.storeFile(any(), any())).thenReturn("/files/temp.pdf");
-        when(cryptoService.encrypt("/files/temp.pdf")).thenReturn("ENC_PATH");
         when(legalVerificationRequestRepository.saveAndFlush(any(LegalVerificationRequest.class)))
                 .thenThrow(new IllegalStateException("database error"));
 
@@ -256,6 +327,20 @@ class ExecutorVerificationServiceImplTest {
         assertThrows(IllegalStateException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
 
         verify(fileStorageService).deleteFile("/files/temp.pdf");
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("Content is encrypted before the DMS row is locked")
+    void submit_encryptsBeforeLockingDmsConfig() throws Exception {
+        when(executorAssignmentRepository.findById(assignmentId)).thenReturn(Optional.empty());
+        when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
+
+        CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), null);
+        assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));
+
+        verify(cryptoService).encryptBytes(any());
+        verifyNoInteractions(dmsConfigRepository);
     }
 
     @Test
@@ -269,8 +354,7 @@ class ExecutorVerificationServiceImplTest {
     @Test
     @DisplayName("Caller is not assigned executor user -> ExecutorAssignmentNotFoundException (404)")
     void submit_callerMismatch_throws404() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+        stubActiveAssignment();
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), "note");
         assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.submit(assignmentId, "other-user-uuid", pdf(), req));
     }
@@ -304,12 +388,9 @@ class ExecutorVerificationServiceImplTest {
 
     @Test
     @DisplayName("Vault not found in repository -> VaultException (404)")
-    void submit_vaultNotFound_throws404() {
-        when(executorAssignmentRepository.findById(assignmentId))
-                .thenReturn(Optional.of(assignment(ExecutorStatus.ACTIVE)));
+    void submit_vaultNotFound_throws404() throws Exception {
+        stubActiveAssignment();
         stubDmsTriggered();
-        when(legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(eq(owner.getId()), any()))
-                .thenReturn(false);
         when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.empty());
 
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), "note");

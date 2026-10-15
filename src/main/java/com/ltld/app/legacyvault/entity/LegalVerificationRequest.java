@@ -40,7 +40,6 @@ public class LegalVerificationRequest {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
-    // FR-08: Ghi chú của Digital Executor khi nộp hồ sơ xác minh cái chết
     @Column(name = "notes", length = 1000)
     private String notes;
 

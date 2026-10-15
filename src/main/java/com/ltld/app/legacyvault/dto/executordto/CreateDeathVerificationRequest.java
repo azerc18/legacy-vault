@@ -9,9 +9,6 @@ import lombok.Setter;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Text part of the multipart request; the death certificate file is bound as MultipartFile "file".
- */
 @Getter
 @Setter
 @NoArgsConstructor

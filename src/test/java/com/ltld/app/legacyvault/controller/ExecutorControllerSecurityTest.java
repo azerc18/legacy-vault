@@ -1,17 +1,23 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
+import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
+import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -27,6 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -39,7 +46,7 @@ class ExecutorControllerSecurityTest {
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private DmsAutomationService dmsAutomationService;
-    @MockitoBean private com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService executorVerificationService;
+    @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(UUID userId) {
@@ -102,18 +109,15 @@ class ExecutorControllerSecurityTest {
                 .andExpect(jsonPath("$.success").value(false));
     }
 
-    // ==========================================
-    // FR-08: Submit Death Verification Endpoint
-    // ==========================================
 
     private static final String SUBMIT_VERIFICATION_URL = "/api/executor-assignments/{id}/verification-requests";
 
     @Test
     void submitVerification_noToken_returns401() throws Exception {
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, UUID.randomUUID())
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, UUID.randomUUID())
                         .file(file)
                         .param("vaultIds", UUID.randomUUID().toString()))
                 .andExpect(status().isUnauthorized());
@@ -125,11 +129,11 @@ class ExecutorControllerSecurityTest {
         UUID userId = UUID.randomUUID();
         UUID vaultId = UUID.randomUUID();
 
-        com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse mockResponse =
-                com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse.builder()
+        DeathVerificationResponse mockResponse =
+                DeathVerificationResponse.builder()
                         .id(UUID.randomUUID())
                         .assignmentId(assignmentId)
-                        .status(com.ltld.app.legacyvault.enums.LegalVerificationStatus.PENDING)
+                        .status(LegalVerificationStatus.PENDING)
                         .vaultIds(List.of(vaultId))
                         .notes("Sample notes")
                         .createdAt(LocalDateTime.now())
@@ -138,10 +142,10 @@ class ExecutorControllerSecurityTest {
         when(executorVerificationService.submit(eq(assignmentId), eq(userId.toString()), any(), any()))
                 .thenReturn(mockResponse);
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .param("vaultIds", vaultId.toString())
                         .param("notes", "Sample notes")
@@ -158,12 +162,12 @@ class ExecutorControllerSecurityTest {
         UUID userId = UUID.randomUUID();
 
         when(executorVerificationService.submit(any(), any(), any(), any()))
-                .thenThrow(new com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException("File exceeds the 10MB limit."));
+                .thenThrow(new InvalidVerificationDocumentException("File exceeds the 10MB limit."));
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .param("vaultIds", UUID.randomUUID().toString())
                         .with(token(userId)))
@@ -177,12 +181,12 @@ class ExecutorControllerSecurityTest {
         UUID userId = UUID.randomUUID();
 
         when(executorVerificationService.submit(any(), any(), any(), any()))
-                .thenThrow(new com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException("A pending verification request already exists."));
+                .thenThrow(new DuplicateVerificationRequestException("A pending verification request already exists."));
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .param("vaultIds", UUID.randomUUID().toString())
                         .with(token(userId)))
@@ -198,10 +202,10 @@ class ExecutorControllerSecurityTest {
         when(executorVerificationService.submit(any(), any(), any(), any()))
                 .thenThrow(new ExecutorNotActiveException("Executor chưa được kích hoạt"));
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .param("vaultIds", UUID.randomUUID().toString())
                         .with(token(userId)))
@@ -217,10 +221,10 @@ class ExecutorControllerSecurityTest {
         when(executorVerificationService.submit(any(), any(), any(), any()))
                 .thenThrow(new ExecutorAssignmentNotFoundException("Phân công không tồn tại"));
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .param("vaultIds", UUID.randomUUID().toString())
                         .with(token(userId)))
@@ -233,8 +237,7 @@ class ExecutorControllerSecurityTest {
         UUID assignmentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
-        // Perform multipart request WITHOUT the "file" part
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .param("vaultIds", UUID.randomUUID().toString())
                         .with(token(userId)))
                 .andExpect(status().isBadRequest())
@@ -246,11 +249,10 @@ class ExecutorControllerSecurityTest {
         UUID assignmentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
-        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+        MockMultipartFile file = new MockMultipartFile(
                 "file", "cert.pdf", "application/pdf", "%PDF".getBytes());
 
-        // Perform multipart request with empty vaultIds
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(SUBMIT_VERIFICATION_URL, assignmentId)
+        mockMvc.perform(multipart(SUBMIT_VERIFICATION_URL, assignmentId)
                         .file(file)
                         .with(token(userId)))
                 .andExpect(status().isBadRequest())

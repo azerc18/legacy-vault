@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -69,6 +70,13 @@ public class EmailSender {
                 .append("Vui lòng không chia sẻ email này với bất kỳ ai.");
 
         sendWithoutOtpFooter(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
+    }
+
+    public void sendVerificationRequestNotification(String email, UUID requestId) {
+        sendWithoutOtpFooter(email,
+                "Hồ sơ xác minh mới - LegacyVault",
+                "Có hồ sơ xác minh mới cần xử lý. Mã hồ sơ: " + requestId
+                        + "\nVui lòng đăng nhập để xem chi tiết.");
     }
 
     private void send(String to, String subject, String body) {

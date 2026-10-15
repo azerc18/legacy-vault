@@ -4,10 +4,12 @@ import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.event.VerificationRequestSubmittedEvent;
 import com.ltld.app.legacyvault.exception.DmsNotTriggeredException;
 import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
@@ -15,10 +17,12 @@ import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.*;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -36,20 +40,18 @@ import java.util.*;
 public class ExecutorVerificationServiceImpl implements ExecutorVerificationService {
 
     static final long MAX_FILE_SIZE = 10L * 1024 * 1024;
-    private static final Set<LegalVerificationStatus> ACTIVE_REQUEST_STATUSES = Set.of(
-            LegalVerificationStatus.PENDING,
-            LegalVerificationStatus.APPROVED,
-            LegalVerificationStatus.SIGNED
-    );
+    private static final Set<LegalVerificationStatus> OPEN_REQUEST_STATUSES =
+            EnumSet.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED);
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
     private final LegalVerificationRequestRepository legalVerificationRequestRepository;
     private final VerificationRequestVaultRepository verificationRequestVaultRepository;
     private final VaultRepository vaultRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final CryptoService cryptoService;
     private final FileStorageService fileStorageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -59,8 +61,8 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
             throw new InvalidVerificationDocumentException("At least one vault ID must be selected.");
         }
 
-        // Validate uploaded document upfront before taking database locks (H1)
         byte[] plain = readAndValidate(file);
+        byte[] encryptedContent = encryptContent(plain);
 
         ExecutorAssignment assignment = executorAssignmentRepository.findById(assignmentId)
                 .filter(a -> isSameUser(a.getExecutorUser(), executorLogin))
@@ -72,7 +74,6 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
 
         UUID ownerId = assignment.getOwner().getId();
 
-        // Lock the owner's DMS config to serialize concurrent submissions across primary and backup executors
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
                 .orElseThrow(() -> new DmsNotTriggeredException("Dead Man's Switch configuration not found."));
 
@@ -80,13 +81,6 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
             throw new DmsNotTriggeredException("Dead Man's Switch has not been triggered.");
         }
 
-        // Prevent duplicate submissions if a non-rejected request already exists for this owner
-        if (legalVerificationRequestRepository.existsByOwnerIdAndStatusIn(ownerId, ACTIVE_REQUEST_STATUSES)) {
-            throw new DuplicateVerificationRequestException(
-                    "An active or pending verification request already exists for this owner.");
-        }
-
-        // Validate that all requested vaults belong to the owner and are in ACTIVE status
         List<Vault> linkedVaults = new ArrayList<>();
         for (UUID vaultId : new LinkedHashSet<>(request.getVaultIds())) {
             Vault vault = vaultRepository.findById(vaultId)
@@ -101,13 +95,18 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
             linkedVaults.add(vault);
         }
 
+        List<UUID> busyVaultIds = verificationRequestVaultRepository.findVaultIdsWithOpenRequest(
+                linkedVaults.stream().map(Vault::getId).toList(), OPEN_REQUEST_STATUSES);
+        if (!busyVaultIds.isEmpty()) {
+            throw new DuplicateVerificationRequestException(
+                    "A verification request is already in progress for vault(s): " + busyVaultIds);
+        }
+
         String storedPath = null;
         try {
-            byte[] encryptedContent = cryptoService.encryptBytes(plain);
             storedPath = fileStorageService.storeFile(file, encryptedContent);
             final String finalStoredPath = storedPath;
 
-            // Register cleanup on transaction rollback (H1)
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
@@ -123,20 +122,16 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                 });
             }
 
-            String encryptedPath = cryptoService.encrypt(storedPath);
-
             String notes = request.getNotes();
-            // Use saveAndFlush so @CreationTimestamp createdAt is populated immediately (H2)
             LegalVerificationRequest savedRequest = legalVerificationRequestRepository.saveAndFlush(
                     LegalVerificationRequest.builder()
                             .owner(assignment.getOwner())
                             .executor(assignment.getExecutorUser())
                             .status(LegalVerificationStatus.PENDING)
-                            .deathCertificateFileUrlEncrypted(encryptedPath)
+                            .deathCertificateFileUrlEncrypted(storedPath)
                             .notes(notes == null || notes.isBlank() ? null : notes.trim())
                             .build());
 
-            // Link selected vaults to the verification request
             List<VerificationRequestVault> requestVaults = linkedVaults.stream()
                     .map(vault -> VerificationRequestVault.builder()
                             .request(savedRequest)
@@ -145,17 +140,17 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                     .toList();
             verificationRequestVaultRepository.saveAll(requestVaults);
 
-            auditLogRepository.save(AuditLog.builder()
-                    .actor(assignment.getExecutorUser())
-                    .action(AuditAction.LEGAL_VERIFICATION_REQUESTED)
-                    .entityType("LegalVerificationRequest")
-                    .entityId(savedRequest.getId())
-                    .metadata(Map.of(
-                            "ownerId", ownerId.toString(),
-                            "assignmentId", assignment.getId().toString(),
-                            "executorType", assignment.getExecutorType().name(),
-                            "vaultCount", linkedVaults.size()))
-                    .build());
+            User executor = assignment.getExecutorUser();
+            String auditDetail = "assignmentId=" + assignment.getId()
+                    + ", executorType=" + assignment.getExecutorType();
+            for (Vault vault : linkedVaults) {
+                auditLogService.log(AuditAction.LEGAL_VERIFICATION_REQUESTED, AuditResult.SUCCESS,
+                        executor.getId(), executor.getEmail(), vault.getId(),
+                        "LegalVerificationRequest", savedRequest.getId().toString(), auditDetail);
+            }
+
+            eventPublisher.publishEvent(new VerificationRequestSubmittedEvent(
+                    savedRequest.getId(), ownerId, executor.getId()));
 
             return DeathVerificationResponse.builder()
                     .id(savedRequest.getId())
@@ -167,9 +162,6 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                     .build();
 
         } catch (Exception e) {
-            // Clean up stored file: if transaction synchronization is active, cleanup is handled
-            // on rollback by afterCompletion. Only delete here if synchronization is not active
-            // (e.g. running outside of a transaction context or in unit tests).
             if (storedPath != null && !TransactionSynchronizationManager.isSynchronizationActive()) {
                 try {
                     fileStorageService.deleteFile(storedPath);
@@ -180,6 +172,14 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
             if (e instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
+            throw new IllegalStateException("Failed to process verification request", e);
+        }
+    }
+
+    private byte[] encryptContent(byte[] plain) {
+        try {
+            return cryptoService.encryptBytes(plain);
+        } catch (Exception e) {
             throw new IllegalStateException("Failed to process verification request", e);
         }
     }

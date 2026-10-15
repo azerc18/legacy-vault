@@ -18,7 +18,7 @@ import java.util.UUID;
 public interface DmsConfigRepository extends JpaRepository<DmsConfig, UUID> {
     Optional<DmsConfig> findByOwnerId(UUID ownerId);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Lock(LockModeType.PESSIMISTIC_FORCE_INCREMENT)
     @Query("SELECT c FROM DmsConfig c WHERE c.owner.id = :ownerId")
     Optional<DmsConfig> findByOwnerIdForUpdate(@Param("ownerId") UUID ownerId);
 
