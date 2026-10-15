@@ -26,9 +26,9 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusOrderByCreatedAtDesc(
             UUID vaultId, UUID beneficiaryId, VerificationMethod method, VerificationStatus status);
 
-    // FR-17: có phiên nào ở trạng thái này không (dùng để kiểm tra "đã bị khóa" với FAILED)
-    boolean existsByVaultIdAndBeneficiaryIdAndStatus(
-            UUID vaultId, UUID beneficiaryId, VerificationStatus status);
+    // FR-17 3b: có phiên ở trạng thái này tạo sau mốc thời gian không (dùng kiểm tra "đang bị khóa tạm" với FAILED)
+    boolean existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+            UUID vaultId, UUID beneficiaryId, VerificationStatus status, LocalDateTime createdAfter);
 
     // FR-17: còn phiên xem hợp lệ không (SUCCESS và verified_at sau mốc thời gian)
     boolean existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(

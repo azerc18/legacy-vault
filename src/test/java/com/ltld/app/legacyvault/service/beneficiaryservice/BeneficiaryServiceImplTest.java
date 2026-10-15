@@ -180,8 +180,9 @@ public class BeneficiaryServiceImplTest {
     }
 
     private void stubLocked(boolean locked) {
-        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
-                vaultId, currentUserId, VerificationStatus.FAILED)).thenReturn(locked);
+        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+                eq(vaultId), eq(currentUserId), eq(VerificationStatus.FAILED), any(LocalDateTime.class)))
+                .thenReturn(locked);
     }
 
     // Vault hợp lệ, claim còn hạn, chưa bị khóa
