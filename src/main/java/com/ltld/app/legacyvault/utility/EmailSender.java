@@ -37,12 +37,20 @@ public class EmailSender {
                         + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
+    /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
     public static String formatDeadline(LocalDateTime claimDeadlineAt) {
         return claimDeadlineAt.atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(VN_ZONE)
                 .format(DEADLINE_FORMAT);
     }
 
+    /**
+     * FR-16: thông báo cho Beneficiary khi Vault được mở khóa.
+     * Cố ý KHÔNG dùng @Async: người gọi cần biết gửi thành công hay không (lỗi gửi ném MailException)
+     * để chỉ ghi notifiedAt khi gửi được và để lượt quét sau gửi lại.
+     * accountActive = false: tài khoản chưa kích hoạt (SRS FR-16 nhánh 2a) nên kèm lời nhắc đăng ký/xác minh.
+     * vaultId: dùng để tạo link mở đúng hồ sơ; không cấu hình frontend thì bỏ dòng link.
+     */
     public void sendVaultUnlockedNotification(String email, String fullName, String ownerName, String vaultName,
                                               LocalDateTime claimDeadlineAt, boolean accountActive, UUID vaultId) {
         String deadline = formatDeadline(claimDeadlineAt);
@@ -82,6 +90,10 @@ public class EmailSender {
         return base + "/beneficiary/vaults/" + vaultId;
     }
 
+    /**
+     * FR-03: nhắc Owner check-in Dead Man's Switch. Không @Async: người gọi gửi sau khi transaction đã commit
+     * và cần biết gửi lỗi để trả lại lần nhắc. Giờ hiển thị đổi sang giờ Việt Nam qua formatDeadline.
+     */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
         sendWithoutOtpFooter(email,
@@ -104,6 +116,7 @@ public class EmailSender {
         javaMailSender.send(message);
     }
 
+    // Gửi email thường, không gắn câu về thời hạn OTP như send()
     private void sendWithoutOtpFooter(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);

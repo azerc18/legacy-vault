@@ -45,6 +45,7 @@ public class BeneficiaryController {
 
     private final BeneficiaryService beneficiaryService;
 
+    // FR-16: Khởi tạo yêu cầu nhận tài sản
     @PostMapping("/claim")
     public ResponseEntity<ApiResponse<BeneficiaryClaimResponse>> initializeClaim(
             Principal principal,
@@ -55,6 +56,7 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    // FR-16/FR-17 bước 1: danh sách vault được bàn giao cho Beneficiary đang đăng nhập
     @GetMapping("/vaults")
     public ResponseEntity<ApiResponse<List<BeneficiaryVaultSummaryResponse>>> listMyVaults(Principal principal) {
         return ResponseEntity.ok()
@@ -62,6 +64,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(beneficiaryService.listMyVaults(currentUserId(principal))));
     }
 
+    // FR-17: Gửi OTP xác thực danh tính qua email
     @PostMapping("/verifications/otp")
     public ResponseEntity<ApiResponse<Void>> sendIdentityOtp(
             Principal principal,
@@ -71,6 +74,7 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("OTP đã được gửi đến email của bạn."));
     }
 
+    // FR-17: Xác thực danh tính bằng OTP hoặc mock eKYC
     @PostMapping("/verifications/verify")
     public ResponseEntity<ApiResponse<VerifyIdentityResponse>> verifyIdentity(
             Principal principal,
@@ -80,6 +84,7 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("Xác thực danh tính thành công.", response));
     }
 
+    // FR-17: Danh sách tài sản trong Vault (sau khi xác thực)
     @GetMapping("/vaults/{vaultId}/assets")
     public ResponseEntity<ApiResponse<List<InheritedAssetSummaryResponse>>> getInheritedAssets(
             Principal principal,
@@ -90,6 +95,7 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success(assets));
     }
 
+    // FR-17: Chi tiết một tài sản đã giải mã tạm thời. Không cho trình duyệt/proxy cache dữ liệu nhạy cảm
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping("/vaults/{vaultId}/assets/{assetId}")
     public ResponseEntity<ApiResponse<InheritedAssetDetailResponse>> getInheritedAssetDetail(
@@ -104,6 +110,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(detail));
     }
 
+    // FR-18: Tải xuống thông tin tài sản đã giải mã dưới dạng tệp. Không cho cache dữ liệu nhạy cảm.
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping(value = "/vaults/{vaultId}/assets/{assetId}/download",
             produces = {MediaType.TEXT_PLAIN_VALUE, MediaType.APPLICATION_JSON_VALUE})
@@ -124,6 +131,7 @@ public class BeneficiaryController {
                 .body(file.getContent());
     }
 
+    // FR-19: Xem trước khi đóng hồ sơ (tài sản đã/chưa xem), không giải mã gì
     @GetMapping("/vaults/{vaultId}/close-preview")
     public ResponseEntity<ApiResponse<CloseVaultPreviewResponse>> previewClose(
             Principal principal,
@@ -134,6 +142,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(beneficiaryService.previewClose(vaultId, currentUserId(principal))));
     }
 
+    // FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault
     @PostMapping("/vaults/{vaultId}/close")
     public ResponseEntity<ApiResponse<CloseVaultResponse>> closeVault(
             Principal principal,
@@ -144,6 +153,7 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("Đã đóng hồ sơ nhận bàn giao.", response));
     }
 
+    // Lấy UUID người dùng từ JWT, cùng cách với VaultController
     private UUID currentUserId(Principal principal) {
         try {
             return UUID.fromString(principal.getName());
@@ -152,6 +162,7 @@ public class BeneficiaryController {
         }
     }
 
+    // FR-18 (phần 2): Danh sách tài liệu pháp lý của vault (chỉ thông tin tóm tắt)
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping("/vaults/{vaultId}/documents")
     public ResponseEntity<ApiResponse<List<LegalDocumentSummaryResponse>>> getVaultDocuments(
@@ -163,6 +174,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(beneficiaryService.getVaultDocuments(vaultId, currentUserId(principal))));
     }
 
+    // FR-18 (phần 2): Tải xuống tài liệu pháp lý đã giải mã. Không cho cache dữ liệu nhạy cảm.
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping("/vaults/{vaultId}/documents/{documentId}/download")
     public ResponseEntity<byte[]> downloadVaultDocument(

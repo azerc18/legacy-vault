@@ -66,6 +66,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
     private static final int CLAIM_TIMEOUT_DAYS = 60;
 
+    // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
     private static final int OTP_TTL_MINUTES = 5;
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
@@ -80,6 +81,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
     private static final String CONFIRM_REQUIRED_MSG = "Cần xác nhận lần cuối để đóng hồ sơ nhận bàn giao.";
+    // Dùng chung cho tên tệp và Content-Type; khớp các loại FR-04 cho phép (PDF, DOC/DOCX, JPG/PNG)
     private static final Map<String, String> DOCUMENT_TYPES = Map.of(
             "pdf", "application/pdf",
             "doc", "application/msword",
@@ -102,7 +104,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final OtpHasher otpHasher;
     private final AuditLogService auditLogService;
 
-
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
             return vault.getClaimDeadlineAt();
@@ -110,7 +111,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
         return base.plusDays(CLAIM_TIMEOUT_DAYS);
     }
-
 
     @Override
     @Transactional(readOnly = true)
@@ -141,11 +141,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }).toList();
     }
 
+    // ===================== FR-16 =====================
 
     @Override
     @Transactional
     public BeneficiaryClaimResponse initializeClaim(BeneficiaryClaimRequest request, UUID currentUserId) {
 
+        // 1. Kiểm tra Vault và Phân quyền (Ngăn lộ Vault ID)
         Vault vault = vaultRepository.findById(request.getVaultId())
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
 
@@ -154,6 +156,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND);
         }
 
+        // 2. Kiểm tra trạng thái Vault
         if (vault.getStatus() == VaultStatus.CLAIMED) {
             throw new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT);
         }
@@ -164,6 +167,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException("Tài sản chưa sẵn sàng để nhận.", HttpStatus.BAD_REQUEST);
         }
 
+        // 3. Khởi tạo hoặc lấy BeneficiaryClaim hiện tại
         BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId()).orElse(null);
 
         if (claim != null) {
@@ -188,6 +192,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
         }
 
+        // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
         IdentityVerification verification = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                         vault.getId(), currentUserId, request.getVerificationMethod(),
@@ -201,6 +206,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                                 .status(VerificationStatus.PENDING)
                                 .build()));
 
+        // 5. Trả về kết quả kèm verificationId
         return BeneficiaryClaimResponse.builder()
                 .claimId(claim.getId())
                 .vaultId(vault.getId())
@@ -211,6 +217,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // ===================== FR-17 =====================
 
     @Override
     @Transactional
@@ -227,24 +234,28 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         LocalDateTime now = LocalDateTime.now();
 
+        // Không gửi OTP khi phiên không còn đủ thời gian cho một OTP trọn vẹn
         LocalDateTime sessionEnd = verification.getCreatedAt().plusMinutes(VERIFICATION_TTL_MINUTES);
         if (now.plusMinutes(OTP_TTL_MINUTES).isAfter(sessionEnd)) {
             throw new BeneficiaryException(
                     "Phiên xác thực sắp hết hạn. Vui lòng khởi tạo lại yêu cầu nhận tài sản.", HttpStatus.BAD_REQUEST);
         }
 
+        // Chặn gửi lại quá nhanh, dựa vào thời điểm gửi lần trước được lưu tường minh
         if (verification.getOtpSentAt() != null
                 && now.isBefore(verification.getOtpSentAt().plusSeconds(OTP_RESEND_SECONDS))) {
             throw new BeneficiaryException(
                     "Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
+        // Gửi lại KHÔNG reset attemptCount, tránh lách giới hạn số lần thử
         String otp = otpGenerator.generate();
         verification.setOtpCode(otpHasher.hash(verification.getId(), otp)); // DB chỉ giữ hash
         verification.setOtpSentAt(now);
         verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
         verificationRepository.save(verification);
 
+        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log
         emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
                 vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
@@ -262,6 +273,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         LocalDateTime now = LocalDateTime.now();
         boolean isOtp = request.getVerificationMethod() == VerificationMethod.OTP;
 
+        // 1. Kiểm tra đầu vào. Các lỗi này không tính vào số lần thử.
         if (isOtp) {
             if (request.getOtp() == null) {
                 throw new BeneficiaryException("OTP không được để trống.", HttpStatus.BAD_REQUEST);
@@ -283,12 +295,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             }
         }
 
+        // 2. GIỮ CHỖ một lượt thử TRƯỚC khi chấm đáp án. UPDATE khóa dòng nên các request song song
+        //    bị xếp hàng, mỗi request nhận một số đếm khác nhau. Nếu chấm trước rồi mới đếm,
+        //    kẻ tấn công vẫn đoán được nhiều lần cùng lúc.
         verificationRepository.incrementAttemptCount(verification.getId());
         int attempts = verificationRepository.findAttemptCountById(verification.getId());
+        // Đồng bộ entity với DB, nếu không lần lưu sau sẽ ghi đè bằng số đếm cũ
         verification.setAttemptCount(attempts);
         int totalAttempts = attempts + verificationRepository.sumAttemptsOfOtherPendingSessions(
                 vault.getId(), currentUserId, verification.getId(), now.minusHours(24));
 
+        // 3. Hết lượt: không chấm đáp án nữa, kể cả khi đáp án đúng
         if (totalAttempts > MAX_VERIFY_ATTEMPTS) {
             lockSession(verification);
             auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
@@ -296,6 +313,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }
 
+        // 4. Chấm đáp án
         boolean passed = isOtp
                 ? otpHasher.matches(verification.getId(), request.getOtp(), verification.getOtpCode())
                 : mockKycVerifier.verify(request.getKycIdNumber());
@@ -315,6 +333,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        // 5. Thành công
         verification.setStatus(VerificationStatus.SUCCESS);
         verification.setVerifiedAt(now);
         clearOtp(verification);
@@ -362,20 +381,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .notes(decrypted.notes())
                 .build();
 
+        // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
                 decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
                 "DigitalAsset", asset.getId().toString(), null);
         return response;
     }
 
+    // FR-18: tải xuống thông tin tài sản đã giải mã dưới dạng tệp .txt
     @Override
     @Transactional
     public AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId) {
+        // Kiểm tra lại phiên xác thực còn hiệu lực (SRS FR-18 bước 2) nằm trong loadDecryptedAsset
         DecryptedAsset decrypted = loadDecryptedAsset(vaultId, assetId, currentUserId);
         DigitalAsset asset = decrypted.asset();
 
         String content = buildDownloadContent(decrypted);
 
+        // SRS FR-18 bước 5: ghi log tải xuống, chỉ sau khi giải mã thành công, không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
                 decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
                 "DigitalAsset", asset.getId().toString(), null);
@@ -386,6 +409,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // FR-18 (phần 2): danh sách tài liệu pháp lý của vault, chỉ thông tin tóm tắt
     @Override
     @Transactional(readOnly = true)
     public List<LegalDocumentSummaryResponse> getVaultDocuments(UUID vaultId, UUID currentUserId) {
@@ -403,21 +427,26 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .toList();
     }
 
+    // FR-18 (phần 2): tải xuống một tài liệu pháp lý đã giải mã
     @Override
     @Transactional(readOnly = true)
     public DocumentDownloadResponse downloadVaultDocument(UUID vaultId, UUID documentId, UUID currentUserId) {
+        // Kiểm tra lại phiên xác thực còn hiệu lực (SRS FR-18 bước 2)
         Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
+        // Bắt buộc thuộc đúng vault, không thì 404 để không lộ tài liệu của vault khác
         LegalDocument document = legalDocumentRepository.findByIdAndVaultId(documentId, vault.getId())
                 .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài liệu.", HttpStatus.NOT_FOUND));
 
         byte[] plain;
         try {
+            // Đọc bản mã hóa từ đĩa rồi giải mã trong bộ nhớ, không lưu lại bản rõ
             plain = cryptoService.decryptBytes(fileStorageService.readFile(document.getFileUrlEncrypted()));
         } catch (Exception e) {
             log.error("Document read/decrypt failed for document {}", document.getId(), e);
+            // Giải mã thất bại có thể là dấu hiệu tệp bị sửa hoặc sai khóa, nên cần nằm trong audit
             auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.FAILURE, currentUserId,
                     vault.getBeneficiary().getEmail(), vault.getId(),
                     "LegalDocument", document.getId().toString(), "Read or decrypt failed");
@@ -438,6 +467,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // ===================== FR-19 =====================
 
     @Override
     @Transactional(readOnly = true)
@@ -473,12 +503,16 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         BeneficiaryClaim claim = ctx.claim();
         assertNotLocked(vault.getId(), currentUserId);
 
+        // SRS FR-19 3a: chưa xác nhận lần cuối thì giữ nguyên trạng thái
         if (!Boolean.TRUE.equals(request.getConfirmed())) {
             throw new BeneficiaryException(CONFIRM_REQUIRED_MSG, HttpStatus.BAD_REQUEST);
         }
 
+        // Đóng hồ sơ không hoàn tác được và khóa nội dung, nên yêu cầu phiên xác thực còn hiệu lực
         assertViewSession(vault.getId(), currentUserId);
 
+        // Sau CLAIMED không giải mã được nữa (Q1), nên tài sản chưa xem sẽ mất quyền xem.
+        // Cho đóng khi còn tài sản chưa xem, nhưng bắt buộc xác nhận rõ ràng.
         List<DigitalAsset> unviewed = digitalAssetRepository.findUnaccessedAssets(vault.getId(), claim.getId());
         if (!unviewed.isEmpty() && !Boolean.TRUE.equals(request.getAcknowledgeUnviewed())) {
             throw new BeneficiaryException("Còn " + unviewed.size()
@@ -487,6 +521,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        // Chuyển trạng thái nguyên tử: request đóng song song thứ hai nhận 409, không ghi audit trùng
         if (claimRepository.markClaimed(claim.getId(), now) == 0) {
             throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
         }
@@ -495,6 +530,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         vault.setStatus(VaultStatus.CLAIMED);
         vaultRepository.save(vault);
 
+        // Ghi số lượng và id tài sản chưa xem để đối soát sau này, không có dữ liệu rõ
         String detail = "unviewedCount=" + unviewed.size()
                 + ", unviewedAssetIds=" + unviewed.stream().map(a -> a.getId().toString()).toList();
         auditLogService.log(AuditAction.CLAIM_COMPLETED, AuditResult.SUCCESS, currentUserId,
@@ -508,12 +544,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+    // Kết quả đã giải mã, dùng chung cho xem chi tiết (FR-17) và tải xuống (FR-18)
     private record DecryptedAsset(Vault vault, DigitalAsset asset, String secret, String notes) {
     }
 
     private record AccessContext(Vault vault, BeneficiaryClaim claim) {
     }
 
+    // Kiểm tra quyền, trạng thái, khóa, phiên xem rồi giải mã trong bộ nhớ
     private DecryptedAsset loadDecryptedAsset(UUID vaultId, UUID assetId, UUID currentUserId) {
         AccessContext ctx = loadAccessibleVault(vaultId, currentUserId);
         Vault vault = ctx.vault();
@@ -526,19 +564,23 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         DecryptedAsset decrypted;
         try {
+            // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
             decrypted = new DecryptedAsset(vault, asset,
                     cryptoService.decrypt(asset.getEncryptedSecret()),
                     cryptoService.decrypt(asset.getNotesEncrypted()));
         } catch (Exception e) {
+            // Không log dữ liệu đã giải mã, chỉ log id tài sản
             log.error("Decrypt failed for asset {}", asset.getId(), e);
             throw new BeneficiaryException(
                     "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
+        // Chỉ ghi nhận khi giải mã thành công (điều kiện đóng hồ sơ ở FR-19)
         markContentAccessed(ctx.claim().getId(), asset.getId());
         return decrypted;
     }
 
+    // FR-19: ghi nhận LẦN ĐẦU Beneficiary xem chi tiết hoặc tải xuống nội dung của từng tài sản
     private void markContentAccessed(UUID claimId, UUID assetId) {
         assetAccessRecordRepository.insertIfAbsent(UUID.randomUUID(), claimId, assetId, LocalDateTime.now());
     }
@@ -559,6 +601,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 + "Vui lòng lưu giữ thông tin này an toàn và xóa tệp sau khi đã lưu.\n";
     }
 
+    // Tên tài sản do người dùng nhập nên phải làm sạch trước khi đặt tên tệp (chống header injection, ký tự cấm)
     private String toSafeFileName(String assetName) {
         return toSafeFileName(assetName, "asset");
     }
@@ -571,12 +614,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         if (base.isEmpty()) {
             return fallback;
         }
+        // Cắt tối đa 80 ký tự theo code point để không làm hỏng ký tự đặc biệt
         return base.codePoints()
                 .limit(80)
                 .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
                 .toString();
     }
 
+    // Tên tệp tài liệu do Owner đặt: làm sạch phần tên, giữ lại phần mở rộng ngắn hợp lệ để mở đúng ứng dụng
     private String toSafeDocumentFileName(String originalName) {
         String name = originalName == null ? "" : originalName;
         int dot = name.lastIndexOf('.');
@@ -589,6 +634,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             ext = candidate;
             base = name.substring(0, dot);
         } else {
+            // Phần mở rộng không nằm trong danh sách cho phép: bỏ dấu chấm để tên không còn đuôi (x.exe -> x_exe)
             base = name.replace('.', '_');
         }
         String safeBase = toSafeFileName(base, "document");
@@ -600,7 +646,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         String ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
         return DOCUMENT_TYPES.getOrDefault(ext, "application/octet-stream");
     }
+    // ===================== Helper dùng chung cho FR-17 =====================
 
+    // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
     private AccessContext loadAccessibleVault(UUID vaultId, UUID currentUserId) {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
@@ -632,6 +680,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         return new AccessContext(vault, claim);
     }
 
+    // Khóa theo (vault, beneficiary): đã có phiên FAILED thì không tạo phiên mới để lách
     private void assertNotLocked(UUID vaultId, UUID currentUserId) {
         if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
                 vaultId, currentUserId, VerificationStatus.FAILED)) {
@@ -650,6 +699,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         return v;
     }
 
+    // Phiên xem hợp lệ = có phiên SUCCESS với verifiedAt trong VIEW_SESSION_MINUTES gần nhất
     private void assertViewSession(UUID vaultId, UUID currentUserId) {
         boolean valid = verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
                 vaultId, currentUserId, VerificationStatus.SUCCESS,

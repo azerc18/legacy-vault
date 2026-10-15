@@ -136,6 +136,7 @@ public class BeneficiaryServiceImplTest {
                 .status(status).claimDeadlineAt(deadline).build();
     }
 
+    // ===================== FR-17: helper =====================
 
     private IdentityVerification pendingSession(VerificationMethod method) {
         return IdentityVerification.builder()
@@ -171,6 +172,7 @@ public class BeneficiaryServiceImplTest {
                 .build();
     }
 
+    // Vault UNLOCKED + claim còn hạn
     private void stubVaultAndClaim() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
         when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
@@ -182,6 +184,7 @@ public class BeneficiaryServiceImplTest {
                 vaultId, currentUserId, VerificationStatus.FAILED)).thenReturn(locked);
     }
 
+    // Vault hợp lệ, claim còn hạn, chưa bị khóa
     private void stubAccessibleVault() {
         stubVaultAndClaim();
         stubLocked(false);
@@ -208,6 +211,7 @@ public class BeneficiaryServiceImplTest {
 
     @Test
     void initializeClaim_wrongBeneficiary_throwsBeneficiaryException_404() {
+        // Giả lập Vault thuộc về một người khác
         User differentUser = new User();
         differentUser.setId(UUID.randomUUID());
         unlockedVault.setBeneficiary(differentUser);
@@ -237,6 +241,7 @@ public class BeneficiaryServiceImplTest {
     void initializeClaim_success_reusesExistingPendingVerification() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
 
+        // Giả lập đã có sẵn Claim
         BeneficiaryClaim existingClaim = BeneficiaryClaim.builder()
                 .id(UUID.randomUUID())
                 .vault(unlockedVault)
@@ -245,6 +250,7 @@ public class BeneficiaryServiceImplTest {
                 .build();
         when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(existingClaim));
 
+        // Giả lập đã có sẵn 1 phiên xác thực PENDING
         IdentityVerification pendingVerification = IdentityVerification.builder()
                 .id(UUID.randomUUID())
                 .vault(unlockedVault)
@@ -254,6 +260,7 @@ public class BeneficiaryServiceImplTest {
                 any(), any(), any(), any(), any())).thenReturn(Optional.of(pendingVerification));
         BeneficiaryClaimResponse response = beneficiaryService.initializeClaim(request, currentUserId);
 
+        // Kiểm tra xem hàm save của verification có KHÔNG bị gọi thêm lần nào (tái sử dụng thành công)
         verify(verificationRepository, never()).save(any());
         assertThat(response.getVerificationId()).isEqualTo(pendingVerification.getId());
     }
@@ -425,6 +432,7 @@ public class BeneficiaryServiceImplTest {
         assertThat(captor.getValue().getMethod()).isEqualTo(VerificationMethod.EKYC_MOCK);
     }
 
+    // ===================== FR-17: gửi OTP =====================
 
 
     @Test
@@ -500,6 +508,7 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
     }
 
+    // ===================== FR-17: xác thực danh tính =====================
 
 
     @Test
@@ -572,6 +581,7 @@ public class BeneficiaryServiceImplTest {
         verify(verificationRepository, never()).save(any());
     }
 
+    // ===================== FR-17: xem tài sản =====================
 
     @Test
     void getInheritedAssets_withViewSession_returnsSummariesWithoutDecrypting() {
@@ -764,7 +774,8 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.verifyIdentity(
                         verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
 
-        assertThat(ex.getMessage()).contains("còn 4 lần");
+        assertThat(ex.getMessage()).contains("còn 4 lần"); // còn 4 lần thử
+        // Bộ đếm tăng trong DB bằng một câu UPDATE, không tính trên RAM
         verify(verificationRepository).incrementAttemptCount(session.getId());
         assertThat(session.getAttemptCount()).isEqualTo(1);
         assertThat(session.getStatus()).isEqualTo(VerificationStatus.PENDING);
@@ -797,8 +808,10 @@ public class BeneficiaryServiceImplTest {
         session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(3));
         stubAccessibleVault();
         stubPendingSession(session);
+        // Request thứ 6 chen vào lúc phiên chưa kịp bị khóa
         when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(6);
 
+        // Dù gửi OTP ĐÚNG vẫn bị từ chối vì đã hết lượt
         expectError(HttpStatus.LOCKED,
                 () -> beneficiaryService.verifyIdentity(
                         verifyRequest(VerificationMethod.OTP, "123456", null), currentUserId));
@@ -847,6 +860,7 @@ public class BeneficiaryServiceImplTest {
         stubAccessibleVault();
         stubPendingSession(session);
         when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(1);
+        // Các phiên PENDING cũ đã có 4 lần sai, cộng 1 lần này là 5
         when(verificationRepository.sumAttemptsOfOtherPendingSessions(
                 eq(vaultId), eq(currentUserId), eq(session.getId()), any(LocalDateTime.class)))
                 .thenReturn(4);
@@ -901,7 +915,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void sendIdentityOtp_sessionAboutToExpire_throws400() {
         IdentityVerification session = pendingSession(VerificationMethod.OTP);
-        session.setCreatedAt(LocalDateTime.now().minusMinutes(12));
+        session.setCreatedAt(LocalDateTime.now().minusMinutes(12)); // còn 3 phút < 5 phút của một OTP
         stubAccessibleVault();
         stubPendingSession(session);
 
@@ -989,6 +1003,7 @@ public class BeneficiaryServiceImplTest {
                 any(), any(), any(), any(), any(), any(), any());
     }
 
+    // ===================== FR-18: tải xuống =====================
 
     private void stubDownloadableAsset(UUID assetId, String name) throws Exception {
         stubAccessibleVault();
@@ -1044,7 +1059,7 @@ public class BeneficiaryServiceImplTest {
 
         AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
 
-        assertThat(file.getFileName()).hasSize(84);
+        assertThat(file.getFileName()).hasSize(84); // 80 ký tự + ".txt"
     }
 
     @Test
@@ -1150,6 +1165,9 @@ public class BeneficiaryServiceImplTest {
         verifyNoInteractions(auditLogService);
     }
 
+    // ===================== FR-19 =====================
+
+    // Vault UNLOCKED + claim còn hạn + chưa bị khóa; trả về claim để test kiểm tra thay đổi
     private BeneficiaryClaim stubClaimForClose() {
         BeneficiaryClaim claim = claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5));
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
@@ -1289,6 +1307,7 @@ public class BeneficiaryServiceImplTest {
         BeneficiaryClaim claim = stubClaimForClose();
         stubViewSession(true);
         when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        // Request song song kia đã chuyển claim sang CLAIMED trước: câu UPDATE có điều kiện không khớp dòng nào
         when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(0);
 
         expectError(HttpStatus.CONFLICT,
@@ -1299,6 +1318,7 @@ public class BeneficiaryServiceImplTest {
         verifyNoInteractions(auditLogService);
     }
 
+    // ----- FR-19: xem trước khi đóng hồ sơ -----
 
     @Test
     void previewClose_returnsTotalViewedAndUnviewedList_withoutDecrypting() {
@@ -1374,6 +1394,7 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
     }
 
+    // ----- Ghi nhận xem/tải xuống theo từng tài sản (FR-17, FR-18) -----
 
     @Test
     void getInheritedAssetDetail_firstAccess_recordsAccessForThatAsset() throws Exception {
@@ -1408,6 +1429,8 @@ public class BeneficiaryServiceImplTest {
         beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
         beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
 
+        // Service luôn gọi INSERT IGNORE cho cùng cặp (claim, asset); DB giữ đúng 1 dòng
+        // (đã kiểm chứng ở test repository), nên request thứ hai không lỗi và không ghi đè thời điểm đầu.
         verify(assetAccessRecordRepository, times(2)).insertIfAbsent(
                 any(UUID.class), eq(claim.getId()), eq(assetId), any(LocalDateTime.class));
     }
@@ -1439,6 +1462,7 @@ public class BeneficiaryServiceImplTest {
         verifyNoInteractions(assetAccessRecordRepository);
     }
 
+    // ===================== FR-18 phần 2: tài liệu pháp lý =====================
 
     private LegalDocument legalDocument(UUID id, String fileName) {
         return LegalDocument.builder()
@@ -1685,7 +1709,6 @@ public class BeneficiaryServiceImplTest {
                 .content("my-secret".getBytes(StandardCharsets.UTF_8)).build();
         assertThat(r.toString()).doesNotContain("content=").doesNotContain("my-secret").contains("a.pdf");
     }
-
 
     @Test
     void listMyVaults_returnsHandedOverVaultsWithClaimInfo() {

@@ -41,7 +41,7 @@ security:
 app:
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
-  # Địa chỉ frontend, dùng để tạo link trong email. Khi deploy, override: FRONTEND_BASE_URL=https://...
+  # Địa chỉ frontend (Vite, cổng 5173), dùng để tạo link trong email. BẮT BUỘC đặt FRONTEND_BASE_URL=https://... khi deploy, nếu không mail sẽ chứa link localhost.
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   storage:
