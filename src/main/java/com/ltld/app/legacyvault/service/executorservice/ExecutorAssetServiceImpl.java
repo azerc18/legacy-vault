@@ -83,6 +83,8 @@ public class ExecutorAssetServiceImpl implements ExecutorAssetService {
                 .status(vault.getStatus())
                 .handoverInstructions(vault.getDescription())
                 .beneficiary(beneficiary)
+                .beneficiaryPending(vault.getBeneficiary() == null
+                        && vault.getBeneficiaryEmail() != null && !vault.getBeneficiaryEmail().isBlank())
                 .assets(assetResponses)
                 .build();
     }

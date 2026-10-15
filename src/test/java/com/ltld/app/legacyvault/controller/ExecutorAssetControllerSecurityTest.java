@@ -125,6 +125,33 @@ class ExecutorAssetControllerSecurityTest {
     }
 
     @Test
+    void getAssignedVaults_pendingBeneficiary_exposesFlagButNotEmail() throws Exception {
+        UUID assignmentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ExecutorVaultResponse vault = ExecutorVaultResponse.builder()
+                .vaultId(UUID.randomUUID())
+                .name("Két chờ đăng ký")
+                .status(VaultStatus.ACTIVE)
+                .beneficiary(null)
+                .beneficiaryPending(true)
+                .assets(Collections.emptyList())
+                .build();
+        ExecutorAssignedVaultsResponse response = ExecutorAssignedVaultsResponse.builder()
+                .assignmentId(assignmentId)
+                .ownerFullName("Nguyen Van A")
+                .vaults(List.of(vault))
+                .build();
+        when(executorAssetService.getAssignedVaults(eq(assignmentId), eq(userId.toString()))).thenReturn(response);
+
+        mockMvc.perform(get(GET_VAULTS_URL, assignmentId).with(token(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.vaults[0].beneficiaryPending").value(true))
+                .andExpect(jsonPath("$.data.vaults[0].beneficiary").doesNotExist())
+                .andExpect(content().string(not(containsString("beneficiaryEmail"))))
+                .andExpect(content().string(not(containsString("@"))));
+    }
+
+    @Test
     void getAssignedVaults_inactiveAssignment_returns403() throws Exception {
         UUID assignmentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
