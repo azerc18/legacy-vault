@@ -13,6 +13,7 @@ public class ExecutorVaultResponse {
     private final UUID vaultId;
     private final String name;
     private final VaultStatus status;
+    /** Lấy từ {@code Vault.description} do Owner nhập. */
     private final String handoverInstructions;
     private final ExecutorVaultBeneficiaryResponse beneficiary;
     private final List<ExecutorVaultAssetResponse> assets;
