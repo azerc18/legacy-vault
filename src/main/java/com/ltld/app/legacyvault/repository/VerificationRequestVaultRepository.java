@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -32,4 +33,8 @@ public interface VerificationRequestVaultRepository extends JpaRepository<Verifi
             """)
     List<VerificationRequestVault> findProgressRows(@Param("executorId") UUID executorId,
                                                     @Param("ownerId") UUID ownerId);
+
+    @Query("SELECT DISTINCT rv.vault.id FROM VerificationRequestVault rv WHERE rv.vault.id IN :vaultIds AND rv.request.status IN :statuses")
+    List<UUID> findVaultIdsWithOpenRequest(@Param("vaultIds") Collection<UUID> vaultIds,
+                                           @Param("statuses") Collection<LegalVerificationStatus> statuses);
 }

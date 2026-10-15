@@ -112,6 +112,13 @@ public class EmailSender {
         sendWithoutOtpFooter(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
     }
 
+    public void sendVerificationRequestNotification(String email, UUID requestId) {
+        sendWithoutOtpFooter(email,
+                "Hồ sơ xác minh mới - LegacyVault",
+                "Có hồ sơ xác minh mới cần xử lý. Mã hồ sơ: " + requestId
+                        + "\nVui lòng đăng nhập để xem chi tiết.");
+    }
+
     private String vaultLink(UUID vaultId) {
         if (vaultId == null || frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
             return null;

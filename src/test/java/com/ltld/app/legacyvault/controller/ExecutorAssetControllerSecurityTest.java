@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -46,6 +47,7 @@ class ExecutorAssetControllerSecurityTest {
     @MockitoBean private DmsAutomationService dmsAutomationService;
     @MockitoBean private ExecutorAssetService executorAssetService;
     @MockitoBean private ExecutorHandoverService executorHandoverService;
+    @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     private static RequestPostProcessor token(UUID userId) {
@@ -124,6 +126,33 @@ class ExecutorAssetControllerSecurityTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.vaults").isArray())
                 .andExpect(jsonPath("$.data.vaults").isEmpty());
+    }
+
+    @Test
+    void getAssignedVaults_pendingBeneficiary_exposesFlagButNotEmail() throws Exception {
+        UUID assignmentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        ExecutorVaultResponse vault = ExecutorVaultResponse.builder()
+                .vaultId(UUID.randomUUID())
+                .name("Két chờ đăng ký")
+                .status(VaultStatus.ACTIVE)
+                .beneficiary(null)
+                .beneficiaryPending(true)
+                .assets(Collections.emptyList())
+                .build();
+        ExecutorAssignedVaultsResponse response = ExecutorAssignedVaultsResponse.builder()
+                .assignmentId(assignmentId)
+                .ownerFullName("Nguyen Van A")
+                .vaults(List.of(vault))
+                .build();
+        when(executorAssetService.getAssignedVaults(eq(assignmentId), eq(userId.toString()))).thenReturn(response);
+
+        mockMvc.perform(get(GET_VAULTS_URL, assignmentId).with(token(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.vaults[0].beneficiaryPending").value(true))
+                .andExpect(jsonPath("$.data.vaults[0].beneficiary").doesNotExist())
+                .andExpect(content().string(not(containsString("beneficiaryEmail"))))
+                .andExpect(content().string(not(containsString("@"))));
     }
 
     @Test
