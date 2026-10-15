@@ -1,11 +1,11 @@
 package com.ltld.app.legacyvault.utility;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -37,20 +37,12 @@ public class EmailSender {
                         + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
-    /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
     public static String formatDeadline(LocalDateTime claimDeadlineAt) {
         return claimDeadlineAt.atZone(ZoneId.systemDefault())
                 .withZoneSameInstant(VN_ZONE)
                 .format(DEADLINE_FORMAT);
     }
 
-    /**
-     * FR-16: thông báo cho Beneficiary khi Vault được mở khóa.
-     * Cố ý KHÔNG dùng @Async: người gọi cần biết gửi thành công hay không (lỗi gửi ném MailException)
-     * để chỉ ghi notifiedAt khi gửi được và để lượt quét sau gửi lại.
-     * accountActive = false: tài khoản chưa kích hoạt (SRS FR-16 nhánh 2a) nên kèm lời nhắc đăng ký/xác minh.
-     * vaultId: dùng để tạo link mở đúng hồ sơ (FR-16 bước 4); không cấu hình frontend thì bỏ dòng link.
-     */
     public void sendVaultUnlockedNotification(String email, String fullName, String ownerName, String vaultName,
                                               LocalDateTime claimDeadlineAt, boolean accountActive, UUID vaultId) {
         String deadline = formatDeadline(claimDeadlineAt);
@@ -81,7 +73,6 @@ public class EmailSender {
         sendWithoutOtpFooter(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
     }
 
-    // Link mở hồ sơ trên frontend; null nếu chưa cấu hình địa chỉ frontend
     private String vaultLink(UUID vaultId) {
         if (vaultId == null || frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
             return null;
@@ -101,7 +92,6 @@ public class EmailSender {
         javaMailSender.send(message);
     }
 
-    // Gửi email thường, không gắn câu về thời hạn OTP như send()
     private void sendWithoutOtpFooter(String to, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);

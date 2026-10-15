@@ -1,7 +1,19 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.DocumentType;

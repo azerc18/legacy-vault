@@ -42,6 +42,6 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // FR-16/FR-17: danh sách vault được bàn giao cho một Beneficiary (mới mở khóa trước).
     // EntityGraph nạp luôn owner để hiển thị tên Owner mà không phát sinh thêm truy vấn cho từng vault.
     @EntityGraph(attributePaths = {"owner"})
-    List<Vault> findByBeneficiaryIdAndStatusInOrderByUnlockedAtDesc(UUID beneficiaryId,
+    List<Vault> findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(UUID beneficiaryId,
                                                                     Collection<VaultStatus> statuses);
 }
