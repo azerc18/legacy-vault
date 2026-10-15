@@ -16,6 +16,10 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // FR-03: Owner phải có ít nhất 1 Vault mới được cấu hình DMS.
     boolean existsByOwnerId(UUID ownerId);
 
+    // FR-08: Vault của Owner kèm Beneficiary (LEFT JOIN FETCH tránh N+1)
+    @Query("SELECT v FROM Vault v LEFT JOIN FETCH v.beneficiary WHERE v.owner.id = :ownerId ORDER BY v.createdAt ASC, v.id ASC")
+    List<Vault> findByOwnerIdWithBeneficiary(@Param("ownerId") UUID ownerId);
+
     // FR-16: Vault UNLOCKED có Beneficiary, còn hạn nhận, mà chưa gửi được thông báo
     // (chưa có claim, hoặc claim chưa có notifiedAt, còn lượt thử và đã qua khoảng chờ tối thiểu).
     // unlockedBefore: bỏ qua Vault vừa mở khóa để không đụng với listener đang xử lý sự kiện.
