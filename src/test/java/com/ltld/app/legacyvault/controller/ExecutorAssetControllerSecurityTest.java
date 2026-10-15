@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -44,6 +45,7 @@ class ExecutorAssetControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private DmsAutomationService dmsAutomationService;
     @MockitoBean private ExecutorAssetService executorAssetService;
+    @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     private static RequestPostProcessor token(UUID userId) {

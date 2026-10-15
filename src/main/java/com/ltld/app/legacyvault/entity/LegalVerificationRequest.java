@@ -40,6 +40,9 @@ public class LegalVerificationRequest {
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
 
+    @Column(name = "notes", length = 1000)
+    private String notes;
+
     @Column(name = "decided_at")
     private LocalDateTime decidedAt;
 
