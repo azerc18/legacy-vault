@@ -205,6 +205,57 @@ class ExecutorAssetServiceImplTest {
     }
 
     @Test
+    @DisplayName("Invited by email but no account yet -> beneficiaryPending is true and beneficiary is null")
+    void getAssignedVaults_beneficiaryInvitedByEmail_isPending() {
+        stubGuardAllows();
+        Vault vault = Vault.builder().id(UUID.randomUUID()).owner(owner).name("Vault Pending")
+                .status(VaultStatus.ACTIVE).beneficiaryEmail("invitee@example.com").build();
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId)).thenReturn(List.of(vault));
+        when(digitalAssetRepository.findByVaultIdInAndStatus(any(), eq(AssetStatus.ACTIVE)))
+                .thenReturn(Collections.emptyList());
+
+        ExecutorVaultResponse res = executorAssetService.getAssignedVaults(assignmentId, LOGIN).getVaults().get(0);
+
+        assertTrue(res.isBeneficiaryPending());
+        assertNull(res.getBeneficiary());
+    }
+
+    @Test
+    @DisplayName("Beneficiary already linked -> beneficiaryPending is false even if an email is still stored")
+    void getAssignedVaults_beneficiaryLinked_isNotPending() {
+        stubGuardAllows();
+        User linked = User.builder().id(UUID.randomUUID()).fullName("Linked Person").build();
+        Vault vault = Vault.builder().id(UUID.randomUUID()).owner(owner).name("Vault Linked")
+                .status(VaultStatus.ACTIVE).beneficiary(linked).beneficiaryEmail("linked@example.com").build();
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId)).thenReturn(List.of(vault));
+        when(digitalAssetRepository.findByVaultIdInAndStatus(any(), eq(AssetStatus.ACTIVE)))
+                .thenReturn(Collections.emptyList());
+
+        ExecutorVaultResponse res = executorAssetService.getAssignedVaults(assignmentId, LOGIN).getVaults().get(0);
+
+        assertFalse(res.isBeneficiaryPending());
+        assertEquals("Linked Person", res.getBeneficiary().getFullName());
+    }
+
+    @Test
+    @DisplayName("No beneficiary and no invited email (or a blank one) -> beneficiaryPending is false")
+    void getAssignedVaults_noBeneficiaryAtAll_isNotPending() {
+        stubGuardAllows();
+        Vault none = Vault.builder().id(UUID.randomUUID()).owner(owner).name("Vault None")
+                .status(VaultStatus.ACTIVE).build();
+        Vault blank = Vault.builder().id(UUID.randomUUID()).owner(owner).name("Vault Blank")
+                .status(VaultStatus.ACTIVE).beneficiaryEmail("   ").build();
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId)).thenReturn(List.of(none, blank));
+        when(digitalAssetRepository.findByVaultIdInAndStatus(any(), eq(AssetStatus.ACTIVE)))
+                .thenReturn(Collections.emptyList());
+
+        List<ExecutorVaultResponse> vaults = executorAssetService.getAssignedVaults(assignmentId, LOGIN).getVaults();
+
+        assertFalse(vaults.get(0).isBeneficiaryPending());
+        assertFalse(vaults.get(1).isBeneficiaryPending());
+    }
+
+    @Test
     @DisplayName("Null handover instructions -> field stays null without NPE")
     void getAssignedVaults_handoverInstructionsNull_noNpe() {
         stubGuardAllows();

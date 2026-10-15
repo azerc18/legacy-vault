@@ -16,5 +16,7 @@ public class ExecutorVaultResponse {
     /** Lấy từ {@code Vault.description} do Owner nhập. */
     private final String handoverInstructions;
     private final ExecutorVaultBeneficiaryResponse beneficiary;
+    // true: đã mời qua email nhưng người thụ hưởng chưa có tài khoản; không trả email
+    private final boolean beneficiaryPending;
     private final List<ExecutorVaultAssetResponse> assets;
 }
