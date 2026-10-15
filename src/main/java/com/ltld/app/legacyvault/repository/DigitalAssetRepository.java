@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID> {
     List<DigitalAsset> findByVaultId(UUID vaultId);
 
+    // FR-08: tài sản của nhiều Vault trong một truy vấn (tránh N+1)
     @Query("SELECT a FROM DigitalAsset a WHERE a.vault.id IN :vaultIds AND a.status = :status")
     List<DigitalAsset> findByVaultIdInAndStatus(@Param("vaultIds") Collection<UUID> vaultIds, @Param("status") AssetStatus status);
 

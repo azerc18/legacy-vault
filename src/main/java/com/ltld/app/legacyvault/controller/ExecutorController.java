@@ -36,6 +36,7 @@ public class ExecutorController {
         return ResponseEntity.ok(ApiResponse.success("Activation acknowledged", response));
     }
 
+    // FR-08: Executor xem danh sách Vault/tài sản của Owner và hướng dẫn bàn giao (chỉ metadata, không giải mã)
     @GetMapping("/{assignmentId}/vaults")
     public ResponseEntity<ApiResponse<ExecutorAssignedVaultsResponse>> getAssignedVaults(
             @PathVariable UUID assignmentId, Principal principal) {

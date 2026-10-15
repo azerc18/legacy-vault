@@ -19,6 +19,7 @@ public class ExecutorAccessGuard {
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 
+    /** 404 nếu không tồn tại hoặc không phải của người gọi (không lộ sự tồn tại); 403 nếu chưa ACTIVE. */
     public ExecutorAssignment requireActiveAssignment(UUID assignmentId, String executorLogin) {
         ExecutorAssignment assignment = executorAssignmentRepository.findById(assignmentId)
                 .filter(a -> isSameUser(a.getExecutorUser(), executorLogin))
