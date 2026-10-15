@@ -4,8 +4,10 @@ import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
+import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -32,6 +35,7 @@ public class ExecutorController {
 
     private final DmsAutomationService dmsAutomationService;
     private final ExecutorAssetService executorAssetService;
+    private final ExecutorHandoverService executorHandoverService;
     private final ExecutorVerificationService executorVerificationService;
 
     // FR-07 bước 4: Executor xác nhận đã nhận thông báo kích hoạt.
@@ -54,6 +58,16 @@ public class ExecutorController {
         ExecutorAssignedVaultsResponse response =
                 executorAssetService.getAssignedVaults(assignmentId, principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Assigned vaults retrieved", response));
+    }
+
+    // FR-10: Executor theo dõi tiến độ bàn giao các Vault trong yêu cầu xác minh mình đã gửi
+    @GetMapping("/{assignmentId}/handover-progress")
+    public ResponseEntity<ApiResponse<List<VaultHandoverProgressResponse>>> getHandoverProgress(
+            @PathVariable UUID assignmentId, Principal principal) {
+
+        List<VaultHandoverProgressResponse> response =
+                executorHandoverService.getHandoverProgress(assignmentId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Handover progress retrieved", response));
     }
 
     @PostMapping(value = "/{assignmentId}/verification-requests", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

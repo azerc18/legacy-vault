@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -49,6 +50,7 @@ class ExecutorControllerSecurityTest {
     @MockitoBean private DmsAutomationService dmsAutomationService;
     @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private ExecutorAssetService executorAssetService;
+    @MockitoBean private ExecutorHandoverService executorHandoverService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(UUID userId) {
