@@ -33,6 +33,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -71,7 +72,8 @@ import static org.mockito.Mockito.verify;
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "app.dms.scheduler.enabled=false"
+        "app.dms.scheduler.enabled=false",
+        "app.beneficiary.notify-retry.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class DmsEscalationIntegrationTest {
@@ -101,6 +103,8 @@ class DmsEscalationIntegrationTest {
     private NotificationRepository notificationRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     // Mốc T0 = lúc quét kích hoạt; cắt về giây để so sánh với DATETIME của MySQL không lệch.
     private static final LocalDateTime T0 = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
@@ -379,6 +383,8 @@ class DmsEscalationIntegrationTest {
         assertThat(notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(s.primaryUserId)).hasSize(1);
         assertThat(auditCount(s, AuditAction.DMS_TRIGGERED)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(1);
+        assertThat(executorRoleCount(s.primaryUserId)).isEqualTo(1);   // C2/T7
+        assertThat(executorRoleCount(s.backupUserId)).isZero();
 
         LocalDateTime day14 = T0.plusDays(14);
         dmsAutomationService.escalateUnresponsivePrimaries(day14);
@@ -392,6 +398,7 @@ class DmsEscalationIntegrationTest {
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(2);
         verify(executorNotificationService, times(1)).send(eq(s.backupEmail), anyString());
+        assertThat(executorRoleCount(s.backupUserId)).isEqualTo(1);
     }
 
     // ---------- B1: acknowledge và escalate chạy đua trên cùng một Primary ----------
@@ -548,6 +555,12 @@ class DmsEscalationIntegrationTest {
                 "SELECT COUNT(*) FROM audit_logs WHERE action = ?"
                         + " AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
                 Integer.class, action.name(), "%ownerId=" + s.ownerId + "%");
+    }
+
+    private long executorRoleCount(UUID userId) {
+        return transactionTemplate.execute(tx -> userRepository.findById(userId).orElseThrow().getRoles().stream()
+                .filter(r -> "EXECUTOR".equals(r.getCode()))
+                .count());
     }
 
     private int totalAuditCount(Seed s) {

@@ -132,8 +132,9 @@ public class TokenServiceImpl implements TokenService {
 
         User user = stored.getUser();
 
-        if(user.getStatus() != UserStatus.ACTIVE ){
-            auditLogService.failure(AuditAction.ACCOUNT_LOCKED, null, null, "account locked");
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            auditLogService.failure(AuditAction.TOKEN_REFRESH_FAILED, user.getId(), user.getEmail(),
+                    "account not active: " + user.getStatus());
             throw new LockedAccountException();
         }
 

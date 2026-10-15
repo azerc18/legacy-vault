@@ -12,7 +12,14 @@ public enum AuditAction {
     // FR-12/14: audit quyết định pháp lý
     LEGAL_REQUEST_APPROVED, LEGAL_REQUEST_REJECTED, LEGAL_REQUEST_SIGNED, LEGAL_SIGN_FAILED,
     LEGAL_SIGN_OTP_SENT,
+    // FR-07: kích hoạt DMS và Executor
     DMS_TRIGGERED, DMS_TRIGGERED_NO_EXECUTOR, EXECUTOR_ACTIVATED, EXECUTOR_ACKNOWLEDGED,
+    // FR-18 (phần 2): tải tài liệu pháp lý
+    DOCUMENT_DOWNLOADED,
+    // FR-16: thông báo bàn giao cho Beneficiary
+    BENEFICIARY_NOTIFIED, BENEFICIARY_NOTIFY_FAILED, BENEFICIARY_NOTIFY_GAVE_UP,
+    // FR-03: cấu hình và check-in DMS
+    DMS_CONFIGURED, DMS_CHECKIN,
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)
     EXECUTOR_ASSIGNED, EXECUTOR_REPLACED
 }

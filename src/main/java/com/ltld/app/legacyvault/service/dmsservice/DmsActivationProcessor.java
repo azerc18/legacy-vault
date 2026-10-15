@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
+import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
@@ -18,6 +19,7 @@ import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import lombok.RequiredArgsConstructor;
@@ -43,20 +45,23 @@ public class DmsActivationProcessor {
     public static final String ENTITY_DMS_CONFIG = "DmsConfig";
     public static final String ENTITY_EXECUTOR_ASSIGNMENT = "ExecutorAssignment";
 
-    // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
-    private static final String MSG_PRIMARY_ACTIVATED =
-            "Quy trình bàn giao LegacyVault đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
-    private static final String MSG_BACKUP_ACTIVATED =
-            "Quyền Digital Executor của bạn đã được kích hoạt. Vui lòng đăng nhập và xác nhận đã nhận thông báo.";
+    // Mã role Executor, trùng với DataInitializer.
+    static final String ROLE_EXECUTOR = "EXECUTOR";
 
-    // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), cách nhau ít nhất RETRY_INTERVAL.
-    static final int MAX_ATTEMPTS = 24;
-    static final Duration RETRY_INTERVAL = Duration.ofHours(1);
+    // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
+    // Tham số: Owner (tên + email), loại Executor (Primary/Backup), mã ExecutorAssignment.
+    private static final String MSG_EXECUTOR_ACTIVATED =
+            "Dead Man's Switch của %s đã được kích hoạt. Bạn là Executor %s.%n"
+                    + "Vui lòng đăng nhập LegacyVault và xác nhận đã nhận thông báo (mã: %s).";
+
+    // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), giãn cách theo retryDelay.
+    static final int MAX_ATTEMPTS = 20;
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final NotificationRepository notificationRepository;
+    private final RoleRepository roleRepository;
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
 
@@ -93,7 +98,7 @@ public class DmsActivationProcessor {
         flushBeforeSideEffects();
         audit(AuditAction.DMS_TRIGGERED, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
         if (target.isPresent()) {
-            notifyActivated(config, target.get(), primary.isPresent() ? MSG_PRIMARY_ACTIVATED : MSG_BACKUP_ACTIVATED, now);
+            notifyActivated(config, target.get(), now);
             return;
         }
 
@@ -154,13 +159,24 @@ public class DmsActivationProcessor {
         flushBeforeSideEffects();
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
-        notifyActivated(config, backup, MSG_BACKUP_ACTIVATED, now);
+        notifyActivated(config, backup, now);
     }
 
     private void markActive(ExecutorAssignment assignment, LocalDateTime now) {
         assignment.setStatus(ExecutorStatus.ACTIVE);
         assignment.setActivatedAt(now);
         executorAssignmentRepository.save(assignment);
+        ensureExecutorRole(assignment.getExecutorUser());
+    }
+
+    /** Executor được kích hoạt cần role EXECUTOR; idempotent, User là entity managed nên lưu khi flush. */
+    private void ensureExecutorRole(User user) {
+        if (user.getRoles().stream().anyMatch(r -> ROLE_EXECUTOR.equals(r.getCode()))) {
+            return;
+        }
+        Role executorRole = roleRepository.findByCode(ROLE_EXECUTOR)
+                .orElseThrow(() -> new IllegalStateException("Role not found: " + ROLE_EXECUTOR));
+        user.getRoles().add(executorRole);
     }
 
     /**
@@ -172,8 +188,8 @@ public class DmsActivationProcessor {
         executorAssignmentRepository.flush();
     }
 
-    private void notifyActivated(DmsConfig config, ExecutorAssignment assignment, String content, LocalDateTime now) {
-        sendNotification(assignment.getExecutorUser(), config.getId(), content, now);
+    private void notifyActivated(DmsConfig config, ExecutorAssignment assignment, LocalDateTime now) {
+        sendNotification(assignment.getExecutorUser(), config.getId(), activationMessage(config.getOwner(), assignment), now);
         audit(AuditAction.EXECUTOR_ACTIVATED, ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId(),
                 ownerDetail(config.getOwner().getId()) + ", executorType=" + assignment.getExecutorType());
     }
@@ -183,7 +199,8 @@ public class DmsActivationProcessor {
         findActivationNotification(config, recipient.getId())
                 .filter(n -> n.getStatus() == NotificationStatus.FAILED
                         && n.getAttemptCount() < MAX_ATTEMPTS
-                        && (n.getLastAttemptAt() == null || n.getLastAttemptAt().plus(RETRY_INTERVAL).isBefore(now)))
+                        && (n.getLastAttemptAt() == null
+                                || !n.getLastAttemptAt().plus(retryDelay(n.getAttemptCount())).isAfter(now)))
                 .ifPresent(n -> {
                     n.setAttemptCount(n.getAttemptCount() + 1);
                     n.setLastAttemptAt(now);
@@ -197,6 +214,21 @@ public class DmsActivationProcessor {
                     }
                     notificationRepository.save(n);
                 });
+    }
+
+    /** Khoảng chờ trước lần gửi lại tiếp theo: 1h, 2h, 4h, 8h, 16h, sau đó 24h. */
+    static Duration retryDelay(int attemptCount) {
+        long hours = Math.min(24, 1L << Math.max(0, attemptCount - 1));
+        return Duration.ofHours(hours);
+    }
+
+    // Nội dung lưu vào Notification.content nên lần gửi lại dùng đúng nội dung này.
+    static String activationMessage(User owner, ExecutorAssignment assignment) {
+        String ownerLabel = owner.getFullName() == null || owner.getFullName().isBlank()
+                ? owner.getEmail()
+                : owner.getFullName() + " (" + owner.getEmail() + ")";
+        String executorType = assignment.getExecutorType() == ExecutorType.PRIMARY ? "Primary" : "Backup";
+        return String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel, executorType, assignment.getId());
     }
 
     private Optional<Notification> findActivationNotification(DmsConfig config, UUID recipientId) {
