@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -60,4 +61,26 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     @EntityGraph(attributePaths = {"owner"})
     List<Vault> findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(UUID beneficiaryId,
                                                                     Collection<VaultStatus> statuses);
+
+    // BR-04: Vault UNLOCKED đã quá hạn nhận
+    @Query("""
+            SELECT v.id FROM Vault v
+            WHERE v.status = com.ltld.app.legacyvault.enums.VaultStatus.UNLOCKED
+              AND v.claimDeadlineAt < :now
+            ORDER BY v.claimDeadlineAt ASC
+            """)
+    List<UUID> findExpiredUnlockedVaultIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    // UNLOCKED -> ARCHIVED_LOCKED nguyên tử: vault vừa CLAIMED thì nhận 0 dòng bị ảnh hưởng và bị bỏ qua
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("""
+            UPDATE Vault v
+            SET v.status = com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED,
+                v.archivedAt = :now, v.purgeEligibleAt = :purgeAt, v.updatedAt = :now
+            WHERE v.id = :id
+              AND v.status = com.ltld.app.legacyvault.enums.VaultStatus.UNLOCKED
+              AND v.claimDeadlineAt < :now
+            """)
+    int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
+                         @Param("purgeAt") LocalDateTime purgeAt);
 }

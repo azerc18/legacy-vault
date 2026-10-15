@@ -29,4 +29,13 @@ public interface BeneficiaryClaimRepository extends JpaRepository<BeneficiaryCla
             WHERE c.id = :id AND c.status = com.ltld.app.legacyvault.enums.ClaimStatus.PENDING
             """)
     int markClaimed(@Param("id") UUID id, @Param("now") LocalDateTime now);
+
+    // BR-04: PENDING -> EXPIRED nguyên tử; claim đã CLAIMED thì không bị đụng
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE BeneficiaryClaim c
+            SET c.status = com.ltld.app.legacyvault.enums.ClaimStatus.EXPIRED
+            WHERE c.vault.id = :vaultId AND c.status = com.ltld.app.legacyvault.enums.ClaimStatus.PENDING
+            """)
+    int markExpiredByVaultId(@Param("vaultId") UUID vaultId);
 }
