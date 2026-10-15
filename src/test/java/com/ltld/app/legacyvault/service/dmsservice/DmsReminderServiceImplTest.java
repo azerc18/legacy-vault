@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -42,7 +43,7 @@ class DmsReminderServiceImplTest {
     private DmsReminderServiceImpl service;
 
     private static DmsReminderProcessor.ReminderMail mail(String email) {
-        return new DmsReminderProcessor.ReminderMail(email, NOW, NOW.plusDays(7), 1, 3);
+        return new DmsReminderProcessor.ReminderMail(email, NOW, NOW.plusDays(7), 1, 3, 0);
     }
 
     @Test
@@ -95,7 +96,58 @@ class DmsReminderServiceImplTest {
         order.verify(processor).prepareReminder(skipped, NOW);
         order.verify(processor).prepareReminder(due, NOW);
         order.verify(emailSender).sendDmsCheckinReminder("due@example.test", NOW, NOW.plusDays(7), 1, 3);
+        order.verify(processor).recordReminderSent(due, NOW);
         order.verifyNoMoreInteractions();
+    }
+
+    @Test
+    @DisplayName("M1 (T1): gửi mail lỗi -> releaseReminder(id, 1, 0, now), KHÔNG ghi REMINDER_SENT")
+    void mailFailure_releasesReminderAndDoesNotRecord() {
+        UUID id = UUID.randomUUID();
+        when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW)).thenReturn(List.of(id));
+        when(processor.prepareReminder(id, NOW)).thenReturn(Optional.of(mail("owner@example.test")));
+        doThrow(new IllegalStateException("SMTP down")).when(emailSender)
+                .sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt());
+
+        service.sendDueReminders(NOW);
+
+        verify(processor).releaseReminder(id, 1, 0, NOW);
+        verify(processor, never()).recordReminderSent(any(), any());
+    }
+
+    @Test
+    @DisplayName("M1 (T1): gửi mail thành công -> recordReminderSent(id, now), không release")
+    void mailSuccess_recordsReminderAndDoesNotRelease() {
+        UUID id = UUID.randomUUID();
+        when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW)).thenReturn(List.of(id));
+        when(processor.prepareReminder(id, NOW)).thenReturn(Optional.of(mail("owner@example.test")));
+
+        service.sendDueReminders(NOW);
+
+        verify(processor).recordReminderSent(id, NOW);
+        verify(processor, never()).releaseReminder(any(), anyInt(), anyInt(), any());
+    }
+
+    @Test
+    @DisplayName("M1: release hoặc ghi REMINDER_SENT lỗi -> chỉ log, vẫn xử lý Owner tiếp theo")
+    void releaseOrRecordFailure_doesNotBlockOthers() {
+        UUID failingMail = UUID.randomUUID();
+        UUID failingRecord = UUID.randomUUID();
+        UUID ok = UUID.randomUUID();
+        when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW))
+                .thenReturn(List.of(failingMail, failingRecord, ok));
+        when(processor.prepareReminder(failingMail, NOW)).thenReturn(Optional.of(mail("fail@example.test")));
+        when(processor.prepareReminder(failingRecord, NOW)).thenReturn(Optional.of(mail("record@example.test")));
+        when(processor.prepareReminder(ok, NOW)).thenReturn(Optional.of(mail("ok@example.test")));
+        doThrow(new IllegalStateException("SMTP down")).when(emailSender)
+                .sendDmsCheckinReminder(eq("fail@example.test"), any(), any(), anyInt(), anyInt());
+        doThrow(new IllegalStateException("DB down")).when(processor).releaseReminder(failingMail, 1, 0, NOW);
+        doThrow(new IllegalStateException("DB down")).when(processor).recordReminderSent(failingRecord, NOW);
+
+        assertThatCode(() -> service.sendDueReminders(NOW)).doesNotThrowAnyException();
+
+        verify(processor, never()).releaseReminder(eq(failingRecord), anyInt(), anyInt(), any());
+        verify(processor).recordReminderSent(ok, NOW);
     }
 
     @Test

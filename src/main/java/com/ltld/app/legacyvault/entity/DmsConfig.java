@@ -80,6 +80,13 @@ public class DmsConfig {
     @Column(name = "next_reminder_at")
     private LocalDateTime nextReminderAt;
 
+    // FR-03/Q27: số lần FR-07 đã hoãn kích hoạt trong chu kỳ hiện tại vì Owner chưa nhận được lần nhắc nào.
+    // DEFAULT 0 như remindersSent; check-in hoặc lưu cấu hình đặt lại về 0.
+    @Column(name = "trigger_deferrals", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private int triggerDeferrals = 0;
+
     @Column(name = "triggered_at")
     private LocalDateTime triggeredAt;
 

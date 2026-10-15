@@ -216,6 +216,32 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
+    @DisplayName("Q28 (T5): DMS SUSPENDED -> Owner không tự bật lại bằng lưu cấu hình: 409, không lưu, không audit")
+    void upsert_whenSuspended_returns409() {
+        DmsConfig existing = existingConfig(DmsStatus.SUSPENDED);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
+                .isInstanceOf(DmsException.class)
+                .hasMessage("Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.")
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Q27 (T7): lưu lại cấu hình bắt đầu chu kỳ mới -> triggerDeferrals về 0")
+    void upsert_resetsTriggerDeferrals() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        existing.setTriggerDeferrals(3);
+
+        service.upsertConfig(ownerId, request(30, 7, 3));
+
+        assertThat(savedConfig().getTriggerDeferrals()).isZero();
+    }
+
+    @Test
     @DisplayName("FR-03: hai yêu cầu tạo đồng thời (trùng owner_id) -> 409 rõ ràng, không audit")
     void upsert_concurrentCreate_returns409() {
         when(dmsConfigRepository.saveAndFlush(any(DmsConfig.class)))
@@ -294,8 +320,21 @@ class DmsConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.checkIn(ownerId))
                 .isInstanceOf(DmsException.class)
+                .hasMessage("Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.")
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
         verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Q27 (T7): check-in bắt đầu chu kỳ mới -> triggerDeferrals về 0")
+    void checkIn_resetsTriggerDeferrals() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        existing.setTriggerDeferrals(2);
+
+        service.checkIn(ownerId);
+
+        assertThat(existing.getTriggerDeferrals()).isZero();
+        assertThat(existing.getRemindersSent()).isZero();
     }
 
     @Test

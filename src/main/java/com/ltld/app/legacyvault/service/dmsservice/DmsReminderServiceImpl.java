@@ -33,18 +33,31 @@ public class DmsReminderServiceImpl implements DmsReminderService {
                 log.error("FR-03: preparing reminder failed for dmsConfig {}: {}", configId, e.getMessage(), e);
                 continue;
             }
-            mail.ifPresent(m -> send(configId, m));
+            mail.ifPresent(m -> send(configId, m, now));
         }
     }
 
-    // Nhắc nhở gửi tối đa một lần: lỗi mail chỉ log, không gửi lại.
-    private void send(UUID configId, DmsReminderProcessor.ReminderMail mail) {
+    // Nhắc nhở gửi ít nhất một lần: nhắc trùng thì vô hại, nhắc thiếu có thể kích hoạt bàn giao khi Owner còn sống.
+    // Gửi lỗi thì trả lại lần nhắc để lượt quét sau gửi lại; gửi được thì mới ghi DmsCheckin REMINDER_SENT.
+    private void send(UUID configId, DmsReminderProcessor.ReminderMail mail, LocalDateTime now) {
         try {
             emailSender.sendDmsCheckinReminder(mail.ownerEmail(), mail.checkinDueAt(), mail.triggerAt(),
                     mail.reminderNumber(), mail.reminderCount());
         } catch (RuntimeException e) {
-            log.warn("FR-03: sending reminder {}/{} for dmsConfig {} failed: {}",
-                    mail.reminderNumber(), mail.reminderCount(), configId, e.getMessage());
+            log.error("FR-03: sending reminder {}/{} for dmsConfig {} failed, will retry",
+                    mail.reminderNumber(), mail.reminderCount(), configId, e);
+            try {
+                processor.releaseReminder(configId, mail.reminderNumber(), mail.previousRemindersSent(), now);
+            } catch (RuntimeException ex) {
+                log.error("FR-03: could not release reminder for dmsConfig {}", configId, ex);
+            }
+            return;
+        }
+        // Mail đã gửi: lỗi ghi DmsCheckin chỉ log, không trả lại lần nhắc (tránh gửi trùng vì lỗi DB).
+        try {
+            processor.recordReminderSent(configId, now);
+        } catch (RuntimeException e) {
+            log.error("FR-03: could not record sent reminder for dmsConfig {}", configId, e);
         }
     }
 }

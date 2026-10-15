@@ -31,6 +31,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
+    static final String SUSPENDED_MESSAGE = "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -53,6 +54,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         if (existing != null && existing.getStatus() == DmsStatus.TRIGGERED) {
             throw new DmsException("Dead Man's Switch đã được kích hoạt, không thể thay đổi cấu hình.",
                     HttpStatus.CONFLICT);
+        }
+        // Q28: SUSPENDED do Admin đặt và gỡ; Owner không tự bật lại bằng cách lưu cấu hình.
+        if (existing != null && existing.getStatus() == DmsStatus.SUSPENDED) {
+            throw new DmsException(SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
         }
         // FR-03 precondition: có ít nhất 1 Vault.
         if (!vaultRepository.existsByOwnerId(ownerId)) {
@@ -104,9 +109,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         DmsConfig config = findConfig(ownerId);
         if (config.getStatus() != DmsStatus.ACTIVE) {
             // TRIGGERED: SRS không cho Owner hủy quy trình bàn giao đã kích hoạt bằng check-in.
-            throw new DmsException(config.getStatus() == DmsStatus.TRIGGERED
-                    ? "Dead Man's Switch đã được kích hoạt, không thể check-in."
-                    : "Dead Man's Switch không ở trạng thái hoạt động.", HttpStatus.CONFLICT);
+            // SUSPENDED (Q28): chỉ Admin gỡ được.
+            throw new DmsException(switch (config.getStatus()) {
+                case TRIGGERED -> "Dead Man's Switch đã được kích hoạt, không thể check-in.";
+                case SUSPENDED -> SUSPENDED_MESSAGE;
+                default -> "Dead Man's Switch không ở trạng thái hoạt động.";
+            }, HttpStatus.CONFLICT);
         }
         if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
                 || config.getReminderCount() == null) {
@@ -140,6 +148,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 config.getGracePeriodDays(), config.getReminderCount());
         config.setLastCheckinAt(now);
         config.setRemindersSent(0);
+        config.setTriggerDeferrals(0);
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }

@@ -76,7 +76,7 @@ class DmsReminderProcessorTest {
     }
 
     @Test
-    @DisplayName("FR-03: tới lần nhắc đầu -> remindersSent 1, lần kế +56h, ghi DmsCheckin REMINDER_SENT, trả mail 1/3")
+    @DisplayName("FR-03: tới lần nhắc đầu -> remindersSent 1, lần kế +56h, trả mail 1/3; chưa ghi REMINDER_SENT trước khi gửi")
     void dueReminder_incrementsCounterAndSchedulesNext() {
         LocalDateTime now = DUE.plusMinutes(1);
 
@@ -86,14 +86,9 @@ class DmsReminderProcessorTest {
         assertThat(config.getNextReminderAt()).isEqualTo(DUE.plusHours(56));
         assertThat(config.getNextCheckinDueAt()).isEqualTo(TRIGGER);   // nhắc không lùi hạn trigger
         verify(dmsConfigRepository).saveAndFlush(config);
+        verifyNoInteractions(dmsCheckinRepository);   // M1: REMINDER_SENT ghi sau khi gửi (recordReminderSent)
 
-        DmsCheckin checkin = savedCheckin();
-        assertThat(checkin.getDmsConfig()).isSameAs(config);
-        assertThat(checkin.getCheckinType()).isEqualTo(DmsCheckinType.REMINDER_SENT);
-        assertThat(checkin.getChannel()).isEqualTo(NotificationChannel.EMAIL);
-        assertThat(checkin.getOccurredAt()).isEqualTo(now);
-
-        assertThat(mail).contains(new DmsReminderProcessor.ReminderMail("owner@example.test", DUE, TRIGGER, 1, 3));
+        assertThat(mail).contains(new DmsReminderProcessor.ReminderMail("owner@example.test", DUE, TRIGGER, 1, 3, 0));
     }
 
     @Test
@@ -132,8 +127,9 @@ class DmsReminderProcessorTest {
 
         assertThat(config.getRemindersSent()).isEqualTo(3);
         assertThat(config.getNextReminderAt()).isNull();
-        assertThat(savedCheckin().getOccurredAt()).isEqualTo(now);   // đúng một DmsCheckin
+        verifyNoInteractions(dmsCheckinRepository);
         assertThat(mail).get().extracting(DmsReminderProcessor.ReminderMail::reminderNumber).isEqualTo(3);
+        assertThat(mail).get().extracting(DmsReminderProcessor.ReminderMail::previousRemindersSent).isEqualTo(0);
     }
 
     @Test
@@ -164,12 +160,15 @@ class DmsReminderProcessorTest {
     }
 
     @Test
-    @DisplayName("FR-03: đã qua thời điểm kích hoạt -> không gửi mail, dừng nhắc, để FR-07 trigger")
+    @DisplayName("FR-03: đã qua thời điểm kích hoạt -> không gửi mail, dừng nhắc, giữ nguyên remindersSent, để FR-07 trigger")
     void pastTrigger_stopsRemindingWithoutMail() {
+        config.setRemindersSent(1);
+        config.setNextReminderAt(DUE.plusHours(56));
+
         Optional<DmsReminderProcessor.ReminderMail> mail = processor.prepareReminder(config.getId(), TRIGGER);
 
         assertThat(mail).isEmpty();
-        assertThat(config.getRemindersSent()).isEqualTo(3);
+        assertThat(config.getRemindersSent()).isEqualTo(1);
         assertThat(config.getNextReminderAt()).isNull();
         assertThat(config.getStatus()).isEqualTo(DmsStatus.ACTIVE);
         verify(dmsConfigRepository).saveAndFlush(config);
@@ -188,5 +187,136 @@ class DmsReminderProcessorTest {
         assertThat(config.getRemindersSent()).isEqualTo(1);
         assertThat(config.getNextReminderAt()).isEqualTo(DUE.plusHours(56));
         verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @Test
+    @DisplayName("Q27 (T8): qua triggerAt mà chưa gửi được lần nào -> remindersSent vẫn 0, nextReminderAt = null")
+    void pastTrigger_withoutAnyDeliveredReminder_keepsZero() {
+        LocalDateTime now = TRIGGER.plusDays(2);   // server tắt suốt thời gian chờ
+
+        assertThat(processor.prepareReminder(config.getId(), now)).isEmpty();
+
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getNextReminderAt()).isNull();
+        verify(dmsConfigRepository).saveAndFlush(config);
+        verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @Test
+    @DisplayName("Q27: nextCheckinDueAt null -> không gửi, dừng nhắc, giữ nguyên remindersSent")
+    void missingTriggerDeadline_stopsRemindingWithoutMail() {
+        config.setNextCheckinDueAt(null);
+
+        assertThat(processor.prepareReminder(config.getId(), DUE.plusMinutes(1))).isEmpty();
+
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getNextReminderAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("Q27 (T6): FR-07 hoãn và lùi nextCheckinDueAt 24 giờ -> vẫn gửi lần nhắc bù với hạn mới")
+    void deferredTrigger_sendsCatchUpReminderWithNewDeadline() {
+        // FR-07 hoãn tại TRIGGER: lùi hạn chót 24 giờ và đặt nextReminderAt = lúc hoãn.
+        LocalDateTime deferredTrigger = TRIGGER.plusHours(24);
+        config.setNextCheckinDueAt(deferredTrigger);
+        config.setNextReminderAt(TRIGGER);
+        config.setTriggerDeferrals(1);
+        LocalDateTime now = TRIGGER.plusMinutes(15);
+
+        Optional<DmsReminderProcessor.ReminderMail> mail = processor.prepareReminder(config.getId(), now);
+
+        assertThat(mail).contains(new DmsReminderProcessor.ReminderMail(
+                "owner@example.test", DUE, deferredTrigger, 3, 3, 0));
+        assertThat(config.getRemindersSent()).isEqualTo(3);
+        assertThat(config.getNextReminderAt()).isNull();
+        assertThat(config.getNextCheckinDueAt()).isEqualTo(deferredTrigger);
+    }
+
+    // ---------- recordReminderSent / releaseReminder (M1) ----------
+
+    @Test
+    @DisplayName("M1: recordReminderSent -> ghi DmsCheckin REMINDER_SENT qua EMAIL tại now")
+    void recordReminderSent_savesCheckin() {
+        LocalDateTime now = DUE.plusMinutes(1);
+
+        processor.recordReminderSent(config.getId(), now);
+
+        DmsCheckin checkin = savedCheckin();
+        assertThat(checkin.getDmsConfig()).isSameAs(config);
+        assertThat(checkin.getCheckinType()).isEqualTo(DmsCheckinType.REMINDER_SENT);
+        assertThat(checkin.getChannel()).isEqualTo(NotificationChannel.EMAIL);
+        assertThat(checkin.getOccurredAt()).isEqualTo(now);
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("M1: recordReminderSent khi config không còn -> không làm gì")
+    void recordReminderSent_missingConfig_doesNothing() {
+        processor.recordReminderSent(UUID.randomUUID(), DUE);
+
+        verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @Test
+    @DisplayName("M1 (T2): releaseReminder hợp lệ -> khôi phục remindersSent, nextReminderAt = now để lượt sau gửi lại")
+    void releaseReminder_restoresPreviousCountAndRetriesNow() {
+        config.setRemindersSent(2);
+        config.setNextReminderAt(DUE.plusHours(112));
+        LocalDateTime now = DUE.plusHours(57);
+
+        processor.releaseReminder(config.getId(), 2, 1, now);
+
+        assertThat(config.getRemindersSent()).isEqualTo(1);
+        assertThat(config.getNextReminderAt()).isEqualTo(now);
+        verify(dmsConfigRepository).saveAndFlush(config);
+    }
+
+    @Test
+    @DisplayName("M1 (T2): Owner vừa check-in (remindersSent về 0) -> releaseReminder không làm gì")
+    void releaseReminder_afterOwnerCheckIn_doesNothing() {
+        // Check-in đã bắt đầu chu kỳ mới: remindersSent = 0, nextReminderAt ở chu kỳ sau.
+        LocalDateTime newCycleReminder = DUE.plusDays(30);
+        config.setRemindersSent(0);
+        config.setNextReminderAt(newCycleReminder);
+
+        processor.releaseReminder(config.getId(), 1, 0, DUE.plusMinutes(1));
+
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getNextReminderAt()).isEqualTo(newCycleReminder);
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("M1: DMS không còn ACTIVE hoặc config không còn -> releaseReminder không làm gì")
+    void releaseReminder_notActiveOrMissing_doesNothing() {
+        config.setRemindersSent(1);
+        config.setStatus(DmsStatus.TRIGGERED);
+
+        processor.releaseReminder(config.getId(), 1, 0, TRIGGER);
+        processor.releaseReminder(UUID.randomUUID(), 1, 0, TRIGGER);
+
+        assertThat(config.getRemindersSent()).isEqualTo(1);
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("M1 (T9): lần nhắc nhảy 0 -> 2, gửi lỗi -> release khôi phục remindersSent = 0 (không phải 1), lượt sau gửi lại lần 2")
+    void jumpedReminder_releaseRestoresZero() {
+        LocalDateTime now = DUE.plusHours(60);   // lần 1 và lần 2 đều đã quá hạn
+
+        Optional<DmsReminderProcessor.ReminderMail> mail = processor.prepareReminder(config.getId(), now);
+        assertThat(mail).get().extracting(DmsReminderProcessor.ReminderMail::reminderNumber).isEqualTo(2);
+        assertThat(mail).get().extracting(DmsReminderProcessor.ReminderMail::previousRemindersSent).isEqualTo(0);
+        assertThat(config.getRemindersSent()).isEqualTo(2);
+
+        processor.releaseReminder(config.getId(), 2, mail.get().previousRemindersSent(), now);
+
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getNextReminderAt()).isEqualTo(now);
+
+        // Lượt quét kế tiếp gửi lại đúng lần nhắc mới nhất.
+        Optional<DmsReminderProcessor.ReminderMail> retry = processor.prepareReminder(config.getId(), now.plusMinutes(15));
+        assertThat(retry).get().extracting(DmsReminderProcessor.ReminderMail::reminderNumber).isEqualTo(2);
+        assertThat(config.getRemindersSent()).isEqualTo(2);
     }
 }

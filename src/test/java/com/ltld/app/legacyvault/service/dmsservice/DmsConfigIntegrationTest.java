@@ -30,6 +30,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mail.MailSendException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
@@ -54,6 +55,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -205,6 +207,32 @@ class DmsConfigIntegrationTest {
         assertThat(reminderCheckins(s)).hasSize(REMINDERS)
                 .allSatisfy(c -> assertThat(c.getChannel()).isEqualTo(NotificationChannel.EMAIL));
         verify(emailSender, times(REMINDERS)).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void reminderMailFails_thenRetriedNextScan_recordsExactlyOneReminder() {
+        Seed s = seed(true, false);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        LocalDateTime due = config(s).getLastCheckinAt().plusDays(INTERVAL_DAYS);
+        LocalDateTime triggerAt = due.plusDays(GRACE_DAYS);
+        doThrow(new MailSendException("SMTP down")).doNothing().when(emailSender)
+                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+
+        // Lượt 1: gửi lỗi -> trả lại lần nhắc, không ghi REMINDER_SENT.
+        dmsReminderService.sendDueReminders(due);
+
+        assertThat(config(s).getRemindersSent()).isZero();
+        assertThat(config(s).getNextReminderAt()).isEqualTo(due);
+        assertThat(reminderCheckins(s)).isEmpty();
+
+        // Lượt 2 (15 phút sau): gửi lại đúng lần nhắc 1 và thành công.
+        dmsReminderService.sendDueReminders(due.plusMinutes(15));
+
+        DmsConfig config = config(s);
+        assertThat(config.getRemindersSent()).isEqualTo(1);
+        assertThat(config.getNextReminderAt()).isEqualTo(due.plusHours(56));
+        assertThat(reminderCheckins(s)).hasSize(1);
+        verify(emailSender, times(2)).sendDmsCheckinReminder(s.ownerEmail, due, triggerAt, 1, REMINDERS);
     }
 
     // ---------- 3. Check-in cứu DMS ----------

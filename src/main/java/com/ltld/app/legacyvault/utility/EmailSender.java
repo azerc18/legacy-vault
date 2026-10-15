@@ -17,8 +17,6 @@ public class EmailSender {
     private final int OTP_EXPIRE_SECONDS = 300;
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final DateTimeFormatter DMS_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
-
     @Async
     public void sendEmail(String email, String otp) {
         send(email,
@@ -74,20 +72,18 @@ public class EmailSender {
 
     /**
      * FR-03: nhắc Owner check-in Dead Man's Switch. Không @Async: người gọi gửi sau khi transaction đã commit
-     * và cần bắt được lỗi gửi để ghi log. Không dùng send() vì footer của nó dành cho OTP.
+     * và cần biết gửi lỗi để trả lại lần nhắc. Giờ hiển thị đổi sang giờ Việt Nam qua formatDeadline.
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
-        message.setSubject("Nhắc check-in Dead Man's Switch (" + reminderNumber + "/" + reminderCount + ") - LegacyVault");
-        message.setText("Bạn chưa check-in Dead Man's Switch trên LegacyVault."
-                + "\nHạn check-in: " + DMS_TIME_FORMAT.format(checkinDueAt)
-                + "\nNếu bạn không phản hồi, hệ thống sẽ kích hoạt quy trình bàn giao vào lúc "
-                + DMS_TIME_FORMAT.format(triggerAt) + " và gửi thông báo cho Digital Executor của bạn."
-                + "\n\nĐể check-in, hãy đăng nhập LegacyVault và chọn \"Check-in\" trong mục Cài đặt Dead Man's Switch."
-                + "\nĐây là lần nhắc thứ " + reminderNumber + " trên tổng số " + reminderCount + " lần.");
-        javaMailSender.send(message);
+        sendWithoutOtpFooter(email,
+                "Nhắc check-in Dead Man's Switch (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
+                "Bạn chưa check-in Dead Man's Switch trên LegacyVault."
+                        + "\nHạn check-in: " + formatDeadline(checkinDueAt) + " (giờ Việt Nam)"
+                        + "\nNếu bạn không phản hồi, hệ thống sẽ kích hoạt quy trình bàn giao vào lúc "
+                        + formatDeadline(triggerAt) + " (giờ Việt Nam) và gửi thông báo cho Digital Executor của bạn."
+                        + "\n\nĐể check-in, hãy đăng nhập LegacyVault và chọn \"Check-in\" trong mục Cài đặt Dead Man's Switch."
+                        + "\nĐây là lần nhắc thứ " + reminderNumber + " trên tổng số " + reminderCount + " lần.");
     }
 
     private void send(String to, String subject, String body) {
