@@ -386,21 +386,26 @@ public class VerificationTokenServiceImplTest {
         request.setOtp("123456");
         User user = pendingUser();
         VerificationToken token = tokenFor(user, "123456", 0, Instant.now().plusSeconds(100));
-        Vault pendingVault = Vault.builder().id(UUID.randomUUID()).beneficiaryEmail("test@example.com").build();
+        Vault firstVault = Vault.builder().id(UUID.randomUUID()).beneficiaryEmail("test@example.com").build();
+        Vault secondVault = Vault.builder().id(UUID.randomUUID()).beneficiaryEmail("test@example.com").build();
 
         when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(user));
         when(tokenRepository.findTopByUserAndTypeAndIsUsedFalseOrderByCreatedAtDesc(user, TokenType.EMAIL_VERIFICATION))
                 .thenReturn(Optional.of(token));
         when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com"))
-                .thenReturn(List.of(pendingVault));
+                .thenReturn(List.of(firstVault, secondVault));
 
         tokenService.verifyEmail(request);
 
-        assertThat(pendingVault.getBeneficiary()).isSameAs(user);
-        assertThat(pendingVault.getBeneficiaryEmail()).isNull();
-        verify(vaultRepository).saveAll(List.of(pendingVault));
-        verify(auditLogService).log(AuditAction.BENEFICIARY_LINKED, AuditResult.SUCCESS, user.getId(),
-                "test@example.com", "Vault", pendingVault.getId().toString(), null);
+        verify(vaultRepository).findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com");
+        for (Vault vault : List.of(firstVault, secondVault)) {
+            assertThat(vault.getBeneficiary()).isSameAs(user);
+            assertThat(vault.getBeneficiaryEmail()).isNull();
+            // m1 (T4): audit BENEFICIARY_LINKED mang vaultId của đúng từng Vault
+            verify(auditLogService).log(AuditAction.BENEFICIARY_LINKED, AuditResult.SUCCESS, user.getId(),
+                    "test@example.com", vault.getId(), "Vault", vault.getId().toString(), null);
+        }
+        verify(vaultRepository).saveAll(List.of(firstVault, secondVault));
     }
 
     @Test

@@ -8,18 +8,18 @@ import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
@@ -185,6 +185,9 @@ public class VaultServiceImpl implements VaultService {
                     + "). Gửi lại với confirmReplace=true để thay thế.", HttpStatus.CONFLICT);
         }
 
+        // m5: lấy định danh người cũ trước khi ghi đè, để audit không cần ghi email
+        User previousBeneficiary = vault.getBeneficiary();
+
         // Chỉ liên kết ngay với tài khoản đã xác minh email; còn lại lưu email chờ và liên kết khi xác minh xong
         User beneficiary = userRepository.findByEmail(email)
                 .filter(u -> u.getStatus() != UserStatus.PENDING)
@@ -194,19 +197,44 @@ public class VaultServiceImpl implements VaultService {
         vaultRepository.save(vault);
 
         boolean pending = beneficiary == null;
-        auditLogService.log(replacing ? AuditAction.BENEFICIARY_REPLACED : AuditAction.BENEFICIARY_ASSIGNED,
-                AuditResult.SUCCESS, ownerId, owner.getEmail(), vaultId, "Vault", vaultId.toString(),
-                "beneficiary=" + email + (replacing ? ", previous=" + currentEmail : "")
-                        + (pending ? ", pending registration" : ""));
-
-        if (pending) {
-            emailSender.sendBeneficiaryInvitation(email, owner.getFullName(), vault.getName());
-        } else {
-            emailSender.sendBeneficiaryAssignedNotice(email, owner.getFullName(), vault.getName());
+        // m5: audit nằm trong nhật ký Vault (FR-05) nên không ghi email bên thứ ba; chỉ ghi user id hoặc cờ chờ đăng ký
+        String detail = (pending ? "pendingRegistration=true" : "beneficiaryUserId=" + beneficiary.getId());
+        if (replacing) {
+            detail += previousBeneficiary != null
+                    ? ", previousUserId=" + previousBeneficiary.getId()
+                    : ", previousPendingRegistration=true";
         }
-        emailSender.sendBeneficiaryAssignmentConfirmation(owner.getEmail(), vault.getName(), email, pending);
+        auditLogService.log(replacing ? AuditAction.BENEFICIARY_REPLACED : AuditAction.BENEFICIARY_ASSIGNED,
+                AuditResult.SUCCESS, ownerId, owner.getEmail(), vaultId, "Vault", vaultId.toString(), detail);
+
+        // m2: gửi email sau khi commit; lấy sẵn giá trị để không chạm lazy entity sau commit
+        String ownerName = owner.getFullName();
+        String ownerEmail = owner.getEmail();
+        String vaultName = vault.getName();
+        runAfterCommit(() -> {
+            if (pending) {
+                emailSender.sendBeneficiaryInvitation(email, ownerName, vaultName);
+            } else {
+                emailSender.sendBeneficiaryAssignedNotice(email, ownerName, vaultName);
+            }
+            emailSender.sendBeneficiaryAssignmentConfirmation(ownerEmail, vaultName, email, pending);
+        });
 
         return toAssignResponse(vault, email, replacing);
+    }
+
+    // Chạy sau khi transaction commit; không có transaction (unit test) thì chạy ngay
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     private AssignBeneficiaryResponse toAssignResponse(Vault vault, String email, boolean replaced) {

@@ -25,6 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Collections;
 import java.util.List;
@@ -271,8 +273,10 @@ class VaultServiceImplTest {
         verify(emailSender).sendBeneficiaryAssignedNotice("ben@example.com", "Owner", "My Vault");
         verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "ben@example.com", false);
         verify(emailSender, never()).sendBeneficiaryInvitation(any(), any(), any());
+        // m5: detail chỉ có user id, không có email người thụ hưởng
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_ASSIGNED), eq(AuditResult.SUCCESS), eq(ownerId),
-                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
+                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
+                eq("beneficiaryUserId=" + ben.getId()));
     }
 
     @Test
@@ -289,6 +293,9 @@ class VaultServiceImplTest {
         assertTrue(response.isPendingRegistration());
         verify(emailSender).sendBeneficiaryInvitation("new@example.com", "Owner", "My Vault");
         verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "new@example.com", true);
+        // m5: người chưa có tài khoản chỉ ghi cờ chờ đăng ký, không ghi email
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_ASSIGNED), eq(AuditResult.SUCCESS), eq(ownerId),
+                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), eq("pendingRegistration=true"));
     }
 
     @Test
@@ -338,6 +345,11 @@ class VaultServiceImplTest {
                 () -> vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("ben@example.com", null)));
 
         verify(vaultRepository, never()).save(any());
+        // T7: audit từ chối kèm trạng thái Vault
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_ASSIGN_DENIED), eq(AuditResult.FAILURE), eq(ownerId),
+                eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
+                eq("vault status UNLOCKED"));
+        verifyNoInteractions(emailSender);
     }
 
     @Test
@@ -349,6 +361,8 @@ class VaultServiceImplTest {
                 () -> vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("OWNER@example.com", null)));
 
         verify(vaultRepository, never()).save(any());
+        // T8: không gửi email, không ghi audit nào (kể cả SUCCESS)
+        verifyNoInteractions(emailSender, auditLogService);
     }
 
     @Test
@@ -378,7 +392,8 @@ class VaultServiceImplTest {
     @Test
     void assignBeneficiary_existingBeneficiaryWithConfirm_replaces() {
         Vault vault = activeVault();
-        vault.setBeneficiary(userWith("old@example.com", UserStatus.ACTIVE));
+        User old = userWith("old@example.com", UserStatus.ACTIVE);
+        vault.setBeneficiary(old);
         when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
         when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
 
@@ -390,7 +405,57 @@ class VaultServiceImplTest {
         assertEquals("new@example.com", vault.getBeneficiaryEmail());
         assertTrue(response.isReplaced());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REPLACED), eq(AuditResult.SUCCESS), eq(ownerId),
-                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), contains("previous=old@example.com"));
+                any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
+                eq("pendingRegistration=true, previousUserId=" + old.getId()));
+    }
+
+    // ===== m2 (T5): email chỉ gửi sau khi transaction commit =====
+
+    private void runAfterCommitCallbacks() {
+        TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+    }
+
+    @Test
+    void assignBeneficiary_verifiedUser_sendsEmailsOnlyAfterCommit() {
+        Vault vault = activeVault();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(userRepository.findByEmail("ben@example.com"))
+                .thenReturn(Optional.of(userWith("ben@example.com", UserStatus.ACTIVE)));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("ben@example.com", null));
+            verifyNoInteractions(emailSender);
+
+            runAfterCommitCallbacks();
+
+            verify(emailSender).sendBeneficiaryAssignedNotice("ben@example.com", "Owner", "My Vault");
+            verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "ben@example.com", false);
+            verifyNoMoreInteractions(emailSender);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void assignBeneficiary_pendingRegistration_sendsInvitationOnlyAfterCommit() {
+        Vault vault = activeVault();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.empty());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("new@example.com", null));
+            verifyNoInteractions(emailSender);
+
+            runAfterCommitCallbacks();
+
+            verify(emailSender).sendBeneficiaryInvitation("new@example.com", "Owner", "My Vault");
+            verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "new@example.com", true);
+            verifyNoMoreInteractions(emailSender);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

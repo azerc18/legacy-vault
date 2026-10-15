@@ -21,7 +21,7 @@ public class EmailSender {
     public void sendEmail(String email, String otp) {
         send(email,
                 "Mã xác thực OTP - LegacyVault",
-                "Mã OTP của bạn là: " + otp + otpFooter());
+                "Mã OTP của bạn là: " + otp);
     }
 
     @Async
@@ -29,14 +29,13 @@ public class EmailSender {
         send(email,
                 "Đặt lại mật khẩu - LegacyVault",
                 "Mã đặt lại mật khẩu của bạn là: " + otp
-                        + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu."
-                        + otpFooter());
+                        + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
     }
 
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
     @Async
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
-        send(email,
+        sendWithoutOtpFooter(email,
                 "Lời mời trở thành người thụ hưởng - LegacyVault",
                 ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
                         + "\nVui lòng đăng ký tài khoản (hoặc hoàn tất xác minh email nếu đã đăng ký) bằng chính địa chỉ email này"
@@ -46,7 +45,7 @@ public class EmailSender {
     // FR-02: thông báo cho người thụ hưởng đã có tài khoản
     @Async
     public void sendBeneficiaryAssignedNotice(String email, String ownerName, String vaultName) {
-        send(email,
+        sendWithoutOtpFooter(email,
                 "Bạn được chỉ định là người thụ hưởng - LegacyVault",
                 ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
                         + "\nBạn sẽ nhận được thông báo khi Vault được mở khóa để bàn giao.");
@@ -56,17 +55,12 @@ public class EmailSender {
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
                                                       String beneficiaryEmail, boolean pendingRegistration) {
-        send(ownerEmail,
+        sendWithoutOtpFooter(ownerEmail,
                 "Xác nhận chỉ định người thụ hưởng - LegacyVault",
                 "Bạn đã chỉ định " + beneficiaryEmail + " là người thụ hưởng của Vault \"" + vaultName + "\"."
                         + (pendingRegistration
                         ? "\nNgười này chưa có tài khoản đã xác minh; hệ thống đã gửi lời mời đăng ký."
                         : ""));
-    }
-
-    private String otpFooter() {
-        return "\nMã có hiệu lực trong " + (OTP_EXPIRE_SECONDS / 60) + " phút."
-                + "\nVui lòng không chia sẻ mã này với bất kỳ ai.";
     }
 
     /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
@@ -127,7 +121,9 @@ public class EmailSender {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(to);
         message.setSubject(subject);
-        message.setText(body);
+        message.setText(body
+                + "\nMã có hiệu lực trong " + (OTP_EXPIRE_SECONDS / 60) + " phút."
+                + "\nVui lòng không chia sẻ mã này với bất kỳ ai.");
         javaMailSender.send(message);
     }
 

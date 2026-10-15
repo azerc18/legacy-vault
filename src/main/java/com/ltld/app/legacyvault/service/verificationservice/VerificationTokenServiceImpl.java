@@ -181,17 +181,19 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
         userRepository.save(user);
         auditLogService.success(AuditAction.EMAIL_VERIFIED, user.getId(), email);
 
-        linkPendingBeneficiaryVaults(user, email);
+        linkPendingBeneficiaryVaults(user);
     }
 
-    // FR-02: liên kết các Vault đã mời email này làm người thụ hưởng khi chưa có tài khoản
-    private void linkPendingBeneficiaryVaults(User user, String email) {
+    // FR-02: liên kết các Vault đã mời email này làm người thụ hưởng khi chưa có tài khoản.
+    // Dùng email đã chuẩn hóa (lowercase) của user, khớp với beneficiary_email đã lưu, không dùng email từ request.
+    private void linkPendingBeneficiaryVaults(User user) {
+        String email = user.getEmail();
         List<Vault> pendingVaults = vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull(email);
         for (Vault vault : pendingVaults) {
             vault.setBeneficiary(user);
             vault.setBeneficiaryEmail(null);
             auditLogService.log(AuditAction.BENEFICIARY_LINKED, AuditResult.SUCCESS, user.getId(), email,
-                    "Vault", vault.getId().toString(), null);
+                    vault.getId(), "Vault", vault.getId().toString(), null);
         }
         vaultRepository.saveAll(pendingVaults);
     }
