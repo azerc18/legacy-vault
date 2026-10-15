@@ -12,8 +12,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -53,6 +52,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -526,6 +526,44 @@ class ExecutorManagementServiceImplTest {
         when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of());
 
         assertThat(service.listExecutors(ownerId)).isEmpty();
+    }
+
+    // ---------- m1 (T1): thứ tự khóa DmsConfig -> User (theo id) -> ExecutorAssignment ----------
+
+    @Test
+    @DisplayName("m1 (T1): thay người khóa DmsConfig, rồi User theo id tăng dần (không theo thứ tự mới/cũ), rồi mới ghi ExecutorAssignment")
+    void assign_replace_locksDmsConfigThenUsersByIdThenAssignment() {
+        User previous = user(new UUID(0, 1), "old@example.test", UserStatus.ACTIVE);
+        User newcomer = user(new UUID(0, 2), "new@example.test", UserStatus.ACTIVE);
+        when(userRepository.findByEmail("new@example.test")).thenReturn(Optional.of(newcomer));
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, previous, ExecutorStatus.INACTIVE);
+
+        service.assignExecutor(ownerId, ExecutorType.PRIMARY, request("new@example.test", true));
+
+        InOrder order = inOrder(dmsConfigRepository, userRepository, executorAssignmentRepository);
+        order.verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        order.verify(userRepository).findByIdForUpdate(previous.getId());
+        order.verify(userRepository).findByIdForUpdate(newcomer.getId());
+        order.verify(executorAssignmentRepository).existsByExecutorUserIdAndStatusNotAndIdNot(
+                previous.getId(), ExecutorStatus.REVOKED, current.getId());
+        order.verify(executorAssignmentRepository).saveAndFlush(current);
+        verify(userRepository, times(2)).findByIdForUpdate(any());
+    }
+
+    @Test
+    @DisplayName("m1 (T1): thu hồi chỉ khóa User của Executor bị thu hồi, sau DmsConfig và trước khi ghi ExecutorAssignment")
+    void revoke_locksOnlyExecutorUser() {
+        ExecutorAssignment current = assignment(ExecutorType.BACKUP, candidate, ExecutorStatus.INACTIVE);
+
+        service.revokeExecutor(ownerId, ExecutorType.BACKUP);
+
+        InOrder order = inOrder(dmsConfigRepository, userRepository, executorAssignmentRepository);
+        order.verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        order.verify(userRepository).findByIdForUpdate(candidate.getId());
+        order.verify(executorAssignmentRepository).existsByExecutorUserIdAndStatusNotAndIdNot(
+                candidate.getId(), ExecutorStatus.REVOKED, current.getId());
+        order.verify(executorAssignmentRepository).saveAndFlush(current);
+        verify(userRepository, times(1)).findByIdForUpdate(any());
     }
 
     // ---------- helpers ----------

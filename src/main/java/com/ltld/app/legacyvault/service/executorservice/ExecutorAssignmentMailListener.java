@@ -1,7 +1,6 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

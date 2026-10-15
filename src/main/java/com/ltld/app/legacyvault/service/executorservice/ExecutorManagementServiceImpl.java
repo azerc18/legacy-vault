@@ -11,8 +11,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent;
-import com.ltld.app.legacyvault.event.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -26,13 +25,16 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -60,14 +62,16 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
     private final ApplicationEventPublisher eventPublisher;
 
+    // READ_COMMITTED: MySQL chạy REPEATABLE READ nên các câu đọc thường sau khi giữ khóa User vẫn thấy snapshot
+    // cũ; READ_COMMITTED để existsBy... và lần nạp roles thấy dữ liệu đã commit mới nhất.
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ExecutorAssignmentResponse assignExecutor(UUID ownerId, ExecutorType type, AssignExecutorRequest request) {
         ensureDmsNotTriggered(ownerId);
         User owner = loadOwner(ownerId);
 
         // 422 cho cả "chưa đăng ký" lẫn "chưa xác minh": request hợp lệ về cú pháp nhưng không xử lý được,
-        // và dùng chung một thông báo để không lộ email nào đã có tài khoản.
+        // và dùng chung một thông báo cho chưa đăng ký và chưa xác minh.
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         User candidate = userRepository.findByEmail(email)
                 .filter(u -> u.getStatus() == UserStatus.ACTIVE)
@@ -117,6 +121,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setAcknowledgedAt(null);
         assignment.setRevokedAt(null);
 
+        lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
         grantExecutorRole(candidate);
         if (previous != null) {
             revokeExecutorRoleIfUnused(previous, assignment.getId());
@@ -140,8 +145,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         return toResponse(saved);
     }
 
+    // READ_COMMITTED: cùng lý do với assignExecutor.
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ExecutorAssignmentResponse revokeExecutor(UUID ownerId, ExecutorType type) {
         ensureDmsNotTriggered(ownerId);
         User owner = loadOwner(ownerId);
@@ -155,6 +161,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setStatus(ExecutorStatus.REVOKED);
         assignment.setRevokedAt(LocalDateTime.now());
         User executor = assignment.getExecutorUser();
+        lockUsersInOrder(executor.getId());
         revokeExecutorRoleIfUnused(executor, assignment.getId());
 
         ExecutorAssignment saved = saveAndFlush(assignment, type);
@@ -206,6 +213,19 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private User loadOwner(UUID ownerId) {
         return userRepository.findById(ownerId)
                 .orElseThrow(() -> new ExecutorManagementException("Không tìm thấy tài khoản.", HttpStatus.NOT_FOUND));
+    }
+
+    /**
+     * m1: khóa các User sắp được thêm/gỡ role EXECUTOR, theo id tăng dần (bỏ null), để hai Owner thao tác trên
+     * cùng một người không ghi đè quyết định của nhau. Thứ tự khóa toàn cục:
+     * DmsConfig (ensureDmsNotTriggered) -> User (ở đây) -> ExecutorAssignment (saveAndFlush).
+     */
+    private void lockUsersInOrder(UUID... userIds) {
+        Arrays.stream(userIds)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .forEach(userRepository::findByIdForUpdate);
     }
 
     private void grantExecutorRole(User user) {

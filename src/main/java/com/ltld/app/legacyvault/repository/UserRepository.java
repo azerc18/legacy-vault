@@ -18,4 +18,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.email = :email")
     Optional<User> findByEmailForUpdate(@Param("email") String email);
+
+    // FR-06: khóa dòng User trước khi thêm/gỡ role EXECUTOR, để hai Owner thao tác trên cùng một người
+    // không ghi đè quyết định của nhau.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") UUID id);
 }

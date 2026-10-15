@@ -28,6 +28,7 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -298,6 +299,48 @@ class ExecutorManagementIntegrationTest {
 
         verify(emailSender, timeout(MAIL_WAIT_MS).times(2)).sendExecutorRevokedNotice(
                 eq(x.getEmail()), anyString(), anyString(), any());
+    }
+
+    // ---------- 4b. m1 (T2) Race: hai Owner cùng thao tác trên một người ----------
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void ownerARevokesWhileOwnerBAssignsSameUser_userKeepsExecutorRole_noDeadlock() throws Exception {
+        int rounds = 20;
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < rounds; round++) {
+                Owner ownerA = owner(null);
+                Owner ownerB = owner(null);
+                User x = user("x" + round);
+                assign(ownerA, ExecutorType.PRIMARY, x, false);
+
+                // Vòng chẵn cho thu hồi xuất phát trễ, vòng lẻ cho chỉ định xuất phát trễ (0–4 ms), để cả hai thứ tự đều xảy ra.
+                boolean delayRevoke = round % 2 == 0;
+                long headStartNanos = TimeUnit.MILLISECONDS.toNanos(round / 2 % 5);
+                List<Throwable> results = runConcurrently(pool, List.of(
+                        () -> {
+                            if (delayRevoke) spin(headStartNanos);
+                            return executorManagementService.revokeExecutor(ownerA.id, ExecutorType.PRIMARY);
+                        },
+                        () -> {
+                            if (!delayRevoke) spin(headStartNanos);
+                            return assign(ownerB, ExecutorType.PRIMARY, x, false);
+                        }));
+
+                assertThat(results).as("vòng %d: cả hai thao tác thành công, không deadlock/lỗi khóa", round)
+                        .containsOnlyNulls();
+                boolean stillAssigned = executorAssignmentRepository.existsByExecutorUserIdAndStatusNotAndIdNot(
+                        x.getId(), ExecutorStatus.REVOKED, UUID.randomUUID());
+                assertThat(stillAssigned).as("vòng %d: X vẫn là Executor của Owner B", round).isTrue();
+                assertThat(hasExecutorRole(x.getId()))
+                        .as("vòng %d: X còn assignment chưa REVOKED thì phải còn role EXECUTOR", round).isTrue();
+
+                deleteSeededData();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     // ---------- 5. Race: PUT thay Primary vs trigger của FR-07 ----------

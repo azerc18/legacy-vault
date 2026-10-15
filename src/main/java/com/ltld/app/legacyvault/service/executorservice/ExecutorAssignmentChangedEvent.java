@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.event;
+package com.ltld.app.legacyvault.service.executorservice;
 
 import com.ltld.app.legacyvault.enums.ExecutorType;
 
