@@ -1,16 +1,23 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.enums.DocumentType;
 import com.ltld.app.legacyvault.service.documentservice.DocumentService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +29,7 @@ public class DocumentController {
 
     private final DocumentService documentService;
 
+    // FR-04: Owner upload tài liệu pháp lý vào Vault (mã hóa trước khi lưu)
     // Phải khai báo consumes = "multipart/form-data" vì gửi file khác với gửi JSON bình thường
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
@@ -31,12 +39,9 @@ public class DocumentController {
             @RequestParam("type") DocumentType type,
             @RequestParam("file") MultipartFile file) throws Exception {
 
-        // Lấy UUID của người dùng đang gọi API từ JWT Token
         UUID ownerId = UUID.fromString(principal.getName());
-
-        // Ném dữ liệu cho Service xử lý
         LegalDocument document = documentService.uploadDocument(ownerId, vaultId, type, file);
-        
+
         DocumentResponse response = DocumentResponse.builder()
                 .id(document.getId())
                 .vaultId(document.getVault().getId())
@@ -44,10 +49,11 @@ public class DocumentController {
                 .fileName(document.getFileName())
                 .uploadedAt(document.getUploadedAt())
                 .build();
-                
+
         return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", response));
     }
 
+    // FR-04: Owner xem danh sách tài liệu pháp lý của một Vault
     @GetMapping("/vault/{vaultId}")
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<List<DocumentResponse>>> getDocumentsByVault(
@@ -58,25 +64,27 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tài liệu thành công", documents));
     }
 
+    // FR-04: Owner tải xuống và giải mã tài liệu (trả 404 nếu không phải chủ sở hữu)
     @GetMapping("/{documentId}/download")
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<byte[]> downloadDocument(
             Principal principal,
             @PathVariable UUID documentId) throws Exception {
         UUID ownerId = UUID.fromString(principal.getName());
-        com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse file = documentService.downloadDocumentForOwner(documentId, ownerId);
+        DocumentDownloadResponse file = documentService.downloadDocumentForOwner(documentId, ownerId);
 
         return ResponseEntity.ok()
-                .contentType(org.springframework.http.MediaType.parseMediaType(file.getContentType()))
-                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
-                        org.springframework.http.ContentDisposition.attachment()
-                                .filename(file.getFileName(), java.nio.charset.StandardCharsets.UTF_8)
+                .contentType(MediaType.parseMediaType(file.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(file.getFileName(), StandardCharsets.UTF_8)
                                 .build().toString())
                 .header("X-Content-Type-Options", "nosniff")
-                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .cacheControl(CacheControl.noStore())
                 .body(file.getContent());
     }
 
+    // FR-04: Owner xóa tài liệu pháp lý (file vật lý xóa sau khi DB commit)
     @DeleteMapping("/{documentId}")
     @PreAuthorize("hasAuthority('VAULT_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteDocument(

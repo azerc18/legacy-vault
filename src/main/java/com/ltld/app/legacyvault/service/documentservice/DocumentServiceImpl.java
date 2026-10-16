@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.documentservice;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
@@ -23,6 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -104,7 +107,7 @@ public class DocumentServiceImpl implements DocumentService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
         if (!vault.getOwner().getId().equals(ownerId)) {
-            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
         return legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)
                 .stream()
@@ -120,12 +123,14 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse downloadDocumentForOwner(UUID documentId, UUID ownerId) throws Exception {
+    public DocumentDownloadResponse downloadDocumentForOwner(UUID documentId, UUID ownerId) throws Exception {
         LegalDocument doc = legalDocumentRepository.findById(documentId)
                 .orElseThrow(() -> new VaultException("Document not found", HttpStatus.NOT_FOUND));
         Vault vault = doc.getVault();
+
+        // m1: Trả 404 thay vì 403 để tránh lộ sự tồn tại tài liệu khi non-owner tra cứu
         if (!vault.getOwner().getId().equals(ownerId)) {
-            throw new VaultException("Unauthorized: You don't own this document", HttpStatus.FORBIDDEN);
+            throw new VaultException("Document not found", HttpStatus.NOT_FOUND);
         }
         byte[] encryptedBytes = fileStorageService.readFile(doc.getFileUrlEncrypted());
         byte[] decryptedBytes = cryptoService.decryptBytes(encryptedBytes);
@@ -140,7 +145,7 @@ public class DocumentServiceImpl implements DocumentService {
         auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.SUCCESS,
                 ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "LegalDocument", doc.getId().toString(), "Owner downloaded document");
-        return com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse.builder()
+        return DocumentDownloadResponse.builder()
                 .fileName(doc.getFileName())
                 .contentType(contentType)
                 .content(decryptedBytes)
@@ -153,18 +158,37 @@ public class DocumentServiceImpl implements DocumentService {
         LegalDocument doc = legalDocumentRepository.findById(documentId)
                 .orElseThrow(() -> new VaultException("Document not found", HttpStatus.NOT_FOUND));
         Vault vault = doc.getVault();
+
+        // m1: Trả 404 thay vì 403 để tránh lộ sự tồn tại tài liệu khi non-owner tra cứu
         if (!vault.getOwner().getId().equals(ownerId)) {
-            throw new VaultException("Unauthorized: You don't own this document", HttpStatus.FORBIDDEN);
+            throw new VaultException("Document not found", HttpStatus.NOT_FOUND);
         }
 
         if (vault.getStatus() != com.ltld.app.legacyvault.enums.VaultStatus.ACTIVE) {
-            throw new VaultException("Cannot delete document from vault in " + vault.getStatus() + " state", HttpStatus.BAD_REQUEST);
+            throw new VaultException("Cannot delete document from vault in " + vault.getStatus() + " state",
+                    HttpStatus.BAD_REQUEST);
         }
 
-        // 1. Xóa file vật lý trên đĩa
-        fileStorageService.deleteFile(doc.getFileUrlEncrypted());
-
-        // 2. Xóa bản ghi trong DB
+        // M2: Xóa bản ghi DB TRONG transaction; xóa file vật lý SAU KHI commit thành công
+        // Nếu DB rollback → file vẫn còn nguyên, không mất tài liệu pháp lý
+        String fileUrl = doc.getFileUrlEncrypted();
         legalDocumentRepository.delete(doc);
+        legalDocumentRepository.flush();
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    fileStorageService.deleteFile(fileUrl);
+                }
+            });
+        } else {
+            // Khi chạy ngoài Spring transaction (ví dụ: trong unit test)
+            fileStorageService.deleteFile(fileUrl);
+        }
+
+        auditLogService.log(AuditAction.DOCUMENT_DELETED, AuditResult.SUCCESS,
+                ownerId, vault.getOwner().getEmail(), vault.getId(),
+                "LegalDocument", documentId.toString(), null);
     }
 }
