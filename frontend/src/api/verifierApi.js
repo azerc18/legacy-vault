@@ -1,120 +1,45 @@
-// Lớp truy cập dữ liệu cho module Legal Verifier (Người 5).
-// Các trang CHỈ gọi hàm trong file này, không tự gọi axios/fetch.
-// Khi BE cả nhóm xong: đặt USE_MOCK = false rồi kiểm tra lại đường dẫn so với LegalVerificationController.
+// API cho Legal Verifier — khớp LegalVerificationController (/api/verifier/requests)
+// Dùng http.js chung: tự gắn token + tự refresh khi 401.
+// Mọi hàm trả về đúng VerificationRequestResponseDto của BE:
+// { id, ownerName, executorName, status, hasDeathCertificate, vaultIds[], rejectionReason, decidedAt, createdAt }
 
-import axios from 'axios';
+import http from './http.js';
 
-const USE_MOCK = true;
+const BASE = '/verifier/requests';
+const unwrap = (res) => res.data?.data;
 
-const http = axios.create({ baseURL: '/api/verifier' });
-http.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token'); // TODO: khớp với cách Người 1 lưu JWT
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-});
-
-const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms));
-
-// ---------- DỮ LIỆU GIẢ ----------
-let mockRequests = [
-    {
-        id: 1,
-        ownerName: 'John Doe',
-        executorName: 'Robert',
-        executorEmail: 'robert@example.com',
-        relationship: 'Son',
-        submittedDate: '2026-10-01',
-        status: 'PENDING', // PENDING | APPROVED | SIGNED | REJECTED
-        deathCertificate: 'death_cert_john_doe.pdf',
-        vaults: ['Family Trust & Wills', 'Crypto & Digital Assets'],
-        rejectReason: null,
-    },
-    {
-        id: 2,
-        ownerName: 'Alice Smith',
-        executorName: 'David Johnson',
-        executorEmail: 'david@example.com',
-        relationship: 'Brother',
-        submittedDate: '2026-09-28',
-        status: 'PENDING',
-        deathCertificate: 'certificate_alice_smith.pdf',
-        vaults: ['Personal Directives & Insurance'],
-        rejectReason: null,
-    },
-];
-let mockHistory = [
-    { id: 101, requestId: 0, action: 'REJECTED', owner: 'Nguyen Van A', at: '2026-09-20', note: 'Death certificate is blurry' },
-];
-
-// ---------- HÀM CÔNG KHAI ----------
+// UC12: hồ sơ cần xử lý = PENDING (chờ duyệt) + APPROVED do mình duyệt (chờ ký)
+// BE: GET /requests chỉ trả PENDING, nên lấy thêm APPROVED từ /history
 export async function getRequests() {
-    if (USE_MOCK) { await delay(); return mockRequests.map((r) => ({ ...r })); }
-    return (await http.get('/requests')).data;
+    const [pending, approved] = await Promise.all([
+        http.get(BASE).then(unwrap),
+        http.get(`${BASE}/history`, { params: { status: 'APPROVED', size: 100 } }).then(unwrap),
+    ]);
+    return [...(approved ?? []), ...(pending ?? [])];
 }
 
-export async function getRequestById(id) {
-    if (USE_MOCK) {
-        await delay();
-        const r = mockRequests.find((x) => x.id === Number(id));
-        if (!r) throw new Error('Request not found');
-        return { ...r };
-    }
-    return (await http.get(`/requests/${id}`)).data;
-}
+// UC12: chi tiết (404 nếu không tồn tại hoặc xung đột lợi ích)
+export const getRequestById = (id) => http.get(`${BASE}/${id}`).then(unwrap);
 
-// Bước 1 của luồng: duyệt (UC12)
-export async function approveRequest(id) {
-    if (USE_MOCK) {
-        await delay();
-        const r = mockRequests.find((x) => x.id === Number(id));
-        if (!r) throw new Error('Request not found');
-        if (r.status !== 'PENDING') throw new Error('This request has already been processed');
-        r.status = 'APPROVED';
-        return { ...r };
-    }
-    return (await http.post(`/requests/${id}/approve`)).data; // TODO: kiểm tra path với controller
-}
+// UC13: kiểm tra giấy chứng tử (mock) -> { requestId, valid, message }
+export const verifyDocument = (id) => http.get(`${BASE}/${id}/document/verify`).then(unwrap);
 
-// Bước 2 của luồng: ký số (UC14) -> Vault chuyển UNLOCKED
-export async function signRequest(id, pin) {
-    if (USE_MOCK) {
-        await delay(800);
-        const r = mockRequests.find((x) => x.id === Number(id));
-        if (!r) throw new Error('Request not found');
-        if (r.status !== 'APPROVED') throw new Error('The request must be approved before signing');
-        if (!/^\d{6}$/.test(pin)) throw new Error('PIN must be exactly 6 digits');
-        r.status = 'SIGNED';
-        mockHistory.unshift({ id: Date.now(), requestId: r.id, action: 'SIGNED', owner: r.ownerName, at: new Date().toISOString().slice(0, 10), note: '' });
-        return { ...r };
-    }
-    return (await http.post(`/requests/${id}/sign`, { pin })).data; // TODO: kiểm tra path/body với controller
-}
+// UC12: duyệt / từ chối (lý do bắt buộc, tối đa 1000 ký tự)
+export const approveRequest = (id) => http.post(`${BASE}/${id}/approve`).then(unwrap);
+export const rejectRequest = (id, reason) => http.post(`${BASE}/${id}/reject`, { reason }).then(unwrap);
 
-export async function rejectRequest(id, reason) {
-    if (USE_MOCK) {
-        await delay();
-        const r = mockRequests.find((x) => x.id === Number(id));
-        if (!r) throw new Error('Request not found');
-        if (r.status !== 'PENDING') throw new Error('This request has already been processed');
-        r.status = 'REJECTED';
-        r.rejectReason = reason;
-        mockHistory.unshift({ id: Date.now(), requestId: r.id, action: 'REJECTED', owner: r.ownerName, at: new Date().toISOString().slice(0, 10), note: reason });
-        return { ...r };
-    }
-    return (await http.post(`/requests/${id}/reject`, { reason })).data;
-}
+// UC14 bước 1: gửi mã ký 6 số qua email (hết hạn 5 phút, gửi lại sau 60s)
+export const sendSignOtp = (id) => http.post(`${BASE}/${id}/sign/otp`);
 
-// UC15: lịch sử, có lọc theo action
-export async function getHistory({ action } = {}) {
-    if (USE_MOCK) {
-        await delay();
-        return mockHistory.filter((h) => !action || h.action === action);
-    }
-    return (await http.get('/history', { params: { action } })).data; // TODO: kiểm tra path/param
-}
+// UC14 bước 2: ký và mở khoá vault. BE hiện chỉ chấp nhận method MOCK_OTP
+export const signRequest = (id, code) =>
+    http.post(`${BASE}/${id}/sign`, { method: 'MOCK_OTP', code }).then(unwrap);
 
-// UC13: xác thực tài liệu (mock)
-export async function verifyDocument(id) {
-    if (USE_MOCK) { await delay(1000); return { valid: true, checkedAt: new Date().toISOString() }; }
-    return (await http.post(`/requests/${id}/verify-document`)).data; // TODO: kiểm tra path
+// UC15: lịch sử hồ sơ mình đã xử lý. status: APPROVED | REJECTED | SIGNED; from/to: 'YYYY-MM-DD'
+export async function getHistory({ status, from, to, page = 0, size = 20 } = {}) {
+    const params = { page, size };
+    if (status) params.status = status;
+    if (from) params.from = from;
+    if (to) params.to = to;
+    return (await http.get(`${BASE}/history`, { params }).then(unwrap)) ?? [];
 }
