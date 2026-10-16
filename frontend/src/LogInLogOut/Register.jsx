@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { getUser } from '../auth/auth.js';
 
 export default function Register() {
     const [formData, setFormData] = useState({
@@ -13,6 +14,8 @@ export default function Register() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    if (getUser()) return <Navigate to="/home" replace />;
 
     const handleChange = (e) => {
         setFormData({

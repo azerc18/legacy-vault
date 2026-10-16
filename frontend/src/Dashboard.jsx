@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { getUser } from './auth/auth.js';
 
 // ---------- Nội dung (sửa text ở đây, không cần đụng JSX) ----------
 const NAV = [
@@ -82,6 +83,7 @@ function Icon({ name, className = '' }) {
 // ---------- Trang ----------
 export default function Dashboard() {
     const [openFaq, setOpenFaq] = useState(0);
+    if (getUser()) return <Navigate to="/home" replace />;
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">

@@ -76,7 +76,7 @@ export default function UserHome() {
             {/* Top bar */}
             <header className="bg-surface-container-lowest border-b border-outline-variant/30">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
+                    <Link to="/home" className="flex items-center gap-2">
                         <span className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
                             <Icon name="shield_locked" className="text-[20px]" />
                         </span>

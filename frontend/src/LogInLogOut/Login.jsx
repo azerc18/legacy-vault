@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { saveSession, ROLES } from '../auth/auth.js';
+import { saveSession, ROLES, getUser } from '../auth/auth.js';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -12,6 +12,10 @@ export default function Login() {
     const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [needVerify, setNeedVerify] = useState(false);
+    const current = getUser();
+    if (current) {
+        return <Navigate to={current.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home' : '/home'} replace />;
+    }
 
     const handleLogin = async (e) => {
         e.preventDefault();
