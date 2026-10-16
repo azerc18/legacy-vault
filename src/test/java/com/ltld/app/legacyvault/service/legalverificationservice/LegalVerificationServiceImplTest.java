@@ -508,6 +508,14 @@ public class LegalVerificationServiceImplTest {
     }
 
     @Test
+    void verifyDocument_jpegFormat_returnsValid() {
+        pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.jpeg");
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThat(service.verifyDocument(requestId, verifierId).isValid()).isTrue();
+    }
+
+    @Test
     void verifyDocument_requestNotFound_throwsNotFoundException() {
         when(requestRepository.findById(requestId)).thenReturn(Optional.empty());
 

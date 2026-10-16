@@ -107,7 +107,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .valid(valid)
                 .message(valid
                         ? "Tài liệu hợp lệ"
-                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .png)")
+                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .jpeg, .png)")
                 .build();
     }
 
@@ -409,7 +409,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private boolean mockVerifyDocument(String documentRef) {
         if (documentRef == null) return false;
         String ref = documentRef.toLowerCase();
-        return ref.endsWith(".pdf") || ref.endsWith(".jpg") || ref.endsWith(".png");
+        return ref.endsWith(".pdf") || ref.endsWith(".jpg")
+                || ref.endsWith(".jpeg") || ref.endsWith(".png");
     }
 
     private LegalVerificationRequest findRequestOrThrow(UUID requestId) {
@@ -459,9 +460,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     }
 
     // M3: lấy email người thao tác để ghi audit
+    // M3: lấy email người thao tác để ghi audit
     private String emailOf(UUID userId) {
-        User user = userRepository.getReferenceById(userId);
-        return user == null ? null : user.getEmail();
+        return userRepository.findById(userId).map(User::getEmail).orElse(null);
     }
 
     // 1 hồ sơ: lấy vault riêng
