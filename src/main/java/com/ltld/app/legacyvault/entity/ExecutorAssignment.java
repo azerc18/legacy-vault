@@ -43,6 +43,11 @@ public class ExecutorAssignment {
     @Builder.Default
     private ExecutorStatus status = ExecutorStatus.INACTIVE;
 
+    // FR-06: thời điểm Owner chỉ định người hiện tại (dòng có thể được dùng lại khi thay người,
+    // nên createdAt không phản ánh lần chỉ định gần nhất). NULL với dữ liệu cũ trước FR-06.
+    @Column(name = "assigned_at")
+    private LocalDateTime assignedAt;
+
     @Column(name = "activated_at")
     private LocalDateTime activatedAt;
 

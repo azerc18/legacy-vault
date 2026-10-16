@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +17,12 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
     List<ExecutorAssignment> findAllByOwnerId(UUID ownerId);
 
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorType(UUID ownerId, ExecutorType executorType);
+
+    Optional<ExecutorAssignment> findByOwnerIdAndExecutorTypeAndStatus(
+            UUID ownerId, ExecutorType executorType, ExecutorStatus status);
+
+    // FR-06: user còn giữ assignment nào khác (của bất kỳ Owner nào) chưa bị thu hồi không.
+    boolean existsByExecutorUserIdAndStatusNotAndIdNot(UUID executorUserId, ExecutorStatus status, UUID excludedId);
 
     // FR-02 (Q26): email này có đang là Executor chưa bị thu hồi của Owner không (email truyền vào đã lowercase).
     @Query("select count(a) > 0 from ExecutorAssignment a where a.owner.id = :ownerId and a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED and lower(a.executorUser.email) = :email")

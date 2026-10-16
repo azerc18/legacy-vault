@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.utility;
 
+import com.ltld.app.legacyvault.enums.ExecutorType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
@@ -165,6 +166,37 @@ public class EmailSender {
                 "Tin nhắn mới trong hồ sơ xác minh - LegacyVault",
                 "Có tin nhắn hoặc tệp bổ sung mới trong hồ sơ xác minh. Mã hồ sơ: " + requestId
                         + "\nVui lòng đăng nhập để xem chi tiết.");
+    }
+
+    // FR-06: method đồng bộ; bản thân listener AFTER_COMMIT đã chạy @Async, lỗi do listener bắt và log.
+    // Không nêu tên Executor còn lại của Owner.
+    public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
+        String role = type == ExecutorType.PRIMARY ? "Executor chính (PRIMARY)" : "Executor dự phòng (BACKUP)";
+        sendWithoutOtpFooter(to,
+                "Bạn được chỉ định làm Digital Executor - LegacyVault",
+                ownerLabel(ownerName, ownerEmail) + " đã chỉ định bạn làm " + role + " trên LegacyVault."
+                        + "\nBạn chưa cần làm gì lúc này. Khi Dead Man's Switch của " + ownerDisplayName(ownerName, ownerEmail)
+                        + " được kích hoạt, hệ thống sẽ gửi thông báo để bạn đăng nhập và xác nhận tiếp nhận quy trình bàn giao."
+                        + "\nNếu bạn không biết người này, hãy liên hệ bộ phận hỗ trợ LegacyVault.");
+    }
+
+    public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
+        String role = type == ExecutorType.PRIMARY ? "Executor chính (PRIMARY)" : "Executor dự phòng (BACKUP)";
+        sendWithoutOtpFooter(to,
+                "Quyền Digital Executor của bạn đã bị thu hồi - LegacyVault",
+                ownerLabel(ownerName, ownerEmail) + " đã thu hồi vai trò " + role + " của bạn trên LegacyVault."
+                        + "\nTừ thời điểm này bạn không còn quyền thực hiện quy trình bàn giao cho "
+                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+    }
+
+    // FR-06: Owner tạo trước khi có fullName (null/rỗng) thì hiển thị email, không in chữ "null".
+    private static String ownerDisplayName(String ownerName, String ownerEmail) {
+        return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName;
+    }
+
+    // "Tên (email)"; không có tên thì chỉ "email".
+    private static String ownerLabel(String ownerName, String ownerEmail) {
+        return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName + " (" + ownerEmail + ")";
     }
 
     private void send(String to, String subject, String body) {
