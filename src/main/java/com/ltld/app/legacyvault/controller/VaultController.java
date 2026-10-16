@@ -1,11 +1,20 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.vaultdto.*;
+import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,14 +30,13 @@ public class VaultController {
 
     private final VaultService vaultService;
 
-    // Khi Client gọi POST /api/vaults, hàm này chạy
+    // FR-01: Owner tạo Vault mới
     @PostMapping
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<VaultResponse>> createVault(
             Principal principal,
             @RequestBody CreateVaultRequest request) throws Exception {
 
-        // Lấy UUID của người dùng đang đăng nhập (chứng thực qua JWT)
         UUID ownerId = UUID.fromString(principal.getName());
         Vault vault = vaultService.createVault(ownerId, request);
 
@@ -44,7 +52,7 @@ public class VaultController {
         return ResponseEntity.ok(ApiResponse.success("Vault created successfully", response));
     }
 
-    // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy
+    // FR-01: Owner xóa Vault (chỉ khi ACTIVE)
     @DeleteMapping("/{vaultId}")
     @PreAuthorize("hasAuthority('VAULT_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteVault(
@@ -69,6 +77,7 @@ public class VaultController {
         return ResponseEntity.ok(ApiResponse.success("Chỉ định người thụ hưởng thành công", response));
     }
 
+    // FR-27: Owner xem danh sách Vault của mình
     @GetMapping
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<List<VaultResponse>>> getMyVaults(Principal principal) {
@@ -77,39 +86,49 @@ public class VaultController {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault thành công", list));
     }
 
+    // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu)
     @GetMapping("/{vaultId}")
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<VaultDetailResponse>> getVaultDetail(
             Principal principal,
-            @PathVariable UUID vaultId,
-            org.springframework.security.core.Authentication authentication) {
-        UUID requesterId = UUID.fromString(principal.getName());
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ADMIN_MANAGE") || a.getAuthority().equals("ROLE_ADMIN"));
-
-        VaultDetailResponse response = vaultService.getVaultDetail(vaultId, requesterId, isAdmin);
+            @PathVariable UUID vaultId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        VaultDetailResponse response = vaultService.getVaultDetail(vaultId, ownerId);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết Vault thành công", response));
     }
 
+    // FR-27: Owner cập nhật tên/mô tả Vault (bị chặn khi DMS triggered hoặc có verification đang mở)
     @PutMapping("/{vaultId}")
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<VaultResponse>> updateVault(
             Principal principal,
             @PathVariable UUID vaultId,
-            @jakarta.validation.Valid @RequestBody UpdateVaultRequest request) {
+            @Valid @RequestBody UpdateVaultRequest request) {
         UUID ownerId = UUID.fromString(principal.getName());
         VaultResponse response = vaultService.updateVault(vaultId, ownerId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật Vault thành công", response));
     }
 
+    // FR-20/Admin: Admin xem toàn bộ Vault, lọc theo trạng thái, phân trang
+    // Endpoint tách biệt /admin/all để không xung đột với /{vaultId} của Owner
     @GetMapping("/admin/all")
     @PreAuthorize("hasAuthority('ADMIN_MANAGE')")
-    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<VaultResponse>>> getAllVaultsAdmin(
-            @RequestParam(required = false) com.ltld.app.legacyvault.enums.VaultStatus status,
-            org.springframework.data.domain.Pageable pageable) {
-        org.springframework.data.domain.Page<VaultResponse> page = vaultService.getAllVaultsForAdmin(status, pageable);
+    public ResponseEntity<ApiResponse<Page<VaultResponse>>> getAllVaultsAdmin(
+            @RequestParam(required = false) VaultStatus status,
+            Pageable pageable) {
+        Page<VaultResponse> page = vaultService.getAllVaultsForAdmin(status, pageable);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault cho Admin thành công", page));
     }
 
-}
+    // FR-20/Admin: Admin xem chi tiết một Vault bất kỳ
+    @GetMapping("/admin/{vaultId}")
+    @PreAuthorize("hasAuthority('ADMIN_MANAGE')")
+    public ResponseEntity<ApiResponse<AdminVaultDetailResponse>> getAdminVaultDetail(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+        UUID adminId = UUID.fromString(principal.getName());
+        AdminVaultDetailResponse response = vaultService.getAdminVaultDetail(vaultId, adminId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết Vault thành công", response));
+    }
 
+}

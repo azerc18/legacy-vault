@@ -1,27 +1,38 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
-import com.ltld.app.legacyvault.dto.vaultdto.*;
+import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.exception.VaultException;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
-import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +55,8 @@ public class VaultServiceImpl implements VaultService {
     private final AuditLogService auditLogService;
     private final EmailSender emailSender;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final DmsConfigRepository dmsConfigRepository;
+    private final VerificationRequestVaultRepository verificationRequestVaultRepository;
 
     @Override
     @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
@@ -71,7 +84,7 @@ public class VaultServiceImpl implements VaultService {
                         .assetName(assetDto.getAssetName())
                         // ĐÂY LÀ CHỖ QUAN TRỌNG NHẤT: Gọi CryptoService để mã hóa chữ gốc thành loằng ngoằng
                         .encryptedSecret(cryptoService.encrypt(assetDto.getSecret()))
-                        .encryptionKeyRef(CryptoServiceImpl.CURRENT_KEY_REF)
+                        .encryptionKeyRef(CryptoService.CURRENT_KEY_REF)
                         .notesEncrypted(assetDto.getNotes() != null ? cryptoService.encrypt(assetDto.getNotes()) : null)
                         .status(AssetStatus.ACTIVE)
                         .build();
@@ -265,6 +278,7 @@ public class VaultServiceImpl implements VaultService {
                         .name(vault.getName())
                         .description(vault.getDescription())
                         .status(vault.getStatus())
+                        .ownerId(vault.getOwner() != null ? vault.getOwner().getId() : ownerId)
                         .createdAt(vault.getCreatedAt())
                         .updatedAt(vault.getUpdatedAt())
                         .build())
@@ -273,16 +287,17 @@ public class VaultServiceImpl implements VaultService {
 
     @Override
     @Transactional(readOnly = true)
-    public VaultDetailResponse getVaultDetail(UUID vaultId, UUID requesterId, boolean isAdmin) {
+    public VaultDetailResponse getVaultDetail(UUID vaultId, UUID ownerId) {
+        // m1: Trả 404 (không phải 403) để tránh lộ ID — kẻ tấn công không biết vault có tồn tại không
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        if (!isAdmin && !vault.getOwner().getId().equals(requesterId)) {
-            throw new VaultException("Unauthorized: You don't have permission to access this vault", HttpStatus.FORBIDDEN);
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         int docCount = legalDocumentRepository.countByVaultId(vaultId);
-        int assetCount = (int) digitalAssetRepository.countByVaultIdAndStatus(vaultId, com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE);
+        int assetCount = (int) digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
 
         return VaultDetailResponse.builder()
                 .id(vault.getId())
@@ -305,26 +320,39 @@ public class VaultServiceImpl implements VaultService {
     @Override
     @Transactional
     public VaultResponse updateVault(UUID vaultId, UUID ownerId, UpdateVaultRequest request) {
-        Vault vault = vaultRepository.findById(vaultId)
-                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+        // m1: Trả 404 thay vì 403 để tránh lộ sự tồn tại của vault khi non-owner tra cứu
+        Vault vault = loadOwnedVault(vaultId, ownerId);
 
-        if (!vault.getOwner().getId().equals(ownerId)) {
-            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
-        }
+        // m3: Chặn sửa khi DMS đã kích hoạt
+        ensureDmsNotTriggered(vault.getOwner().getId());
 
-        if (vault.getStatus() != com.ltld.app.legacyvault.enums.VaultStatus.ACTIVE) {
-            throw new VaultException("Cannot update vault that is not in active state", HttpStatus.BAD_REQUEST);
+        // m3: Chặn sửa khi đang có yêu cầu xác minh mở (PENDING/APPROVED)
+        boolean hasOpenVerification = !verificationRequestVaultRepository
+                .findVaultIdsWithOpenRequest(
+                        List.of(vaultId),
+                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED))
+                .isEmpty();
+        if (hasOpenVerification) {
+            throw new VaultException(
+                    "Cannot update vault while a verification request is pending or approved",
+                    HttpStatus.CONFLICT);
         }
 
         vault.setName(request.getName());
         vault.setDescription(request.getDescription());
         Vault updated = vaultRepository.save(vault);
 
+        // m4: Ghi nhật ký cập nhật để audit trail đầy đủ
+        auditLogService.log(AuditAction.VAULT_UPDATED, AuditResult.SUCCESS,
+                ownerId, vault.getOwner().getEmail(), vaultId,
+                "Vault", vaultId.toString(), null);
+
         return VaultResponse.builder()
                 .id(updated.getId())
                 .name(updated.getName())
                 .description(updated.getDescription())
                 .status(updated.getStatus())
+                .ownerId(updated.getOwner() != null ? updated.getOwner().getId() : ownerId)
                 .createdAt(updated.getCreatedAt())
                 .updatedAt(updated.getUpdatedAt())
                 .build();
@@ -332,8 +360,8 @@ public class VaultServiceImpl implements VaultService {
 
     @Override
     @Transactional(readOnly = true)
-    public org.springframework.data.domain.Page<VaultResponse> getAllVaultsForAdmin(com.ltld.app.legacyvault.enums.VaultStatus status, org.springframework.data.domain.Pageable pageable) {
-        org.springframework.data.domain.Page<Vault> page = (status != null)
+    public Page<VaultResponse> getAllVaultsForAdmin(VaultStatus status, Pageable pageable) {
+        Page<Vault> page = (status != null)
                 ? vaultRepository.findByStatus(status, pageable)
                 : vaultRepository.findAll(pageable);
 
@@ -342,9 +370,60 @@ public class VaultServiceImpl implements VaultService {
                 .name(v.getName())
                 .description(v.getDescription())
                 .status(v.getStatus())
+                .ownerId(v.getOwner().getId())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
                 .build());
+    }
+
+    // FR-20/Admin: Xem chi tiết một Vault bất kỳ
+    @Override
+    @Transactional(readOnly = true)
+    public AdminVaultDetailResponse getAdminVaultDetail(UUID vaultId, UUID adminId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+
+        int docCount = legalDocumentRepository.countByVaultId(vaultId);
+        int assetCount = (int) digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
+
+        return AdminVaultDetailResponse.builder()
+                .id(vault.getId())
+                .name(vault.getName())
+                .description(vault.getDescription())
+                .status(vault.getStatus())
+                .ownerId(vault.getOwner().getId())
+                .ownerEmail(vault.getOwner().getEmail())
+                .unlockedAt(vault.getUnlockedAt())
+                .claimDeadlineAt(vault.getClaimDeadlineAt())
+                .createdAt(vault.getCreatedAt())
+                .updatedAt(vault.getUpdatedAt())
+                .totalDocuments(docCount)
+                .totalAssets(assetCount)
+                .build();
+    }
+
+    // Tải Vault và kiểm tra quyền sở hữu — trả 404 (không phải 403) để tránh lộ sự tồn tại của vault
+    private Vault loadOwnedVault(UUID vaultId, UUID ownerId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            // Không phân biệt "vault không tồn tại" và "không phải chủ" để chống ID enumeration
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
+        }
+        if (vault.getStatus() != VaultStatus.ACTIVE) {
+            throw new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST);
+        }
+        return vault;
+    }
+
+    // Kiểm tra DMS chưa kích hoạt; nếu đã TRIGGERED thì chặn mọi thao tác sửa đổi Vault
+    private void ensureDmsNotTriggered(UUID ownerId) {
+        dmsConfigRepository.findByOwnerId(ownerId).ifPresent(dms -> {
+            if (dms.getStatus() == DmsStatus.TRIGGERED) {
+                throw new VaultException(
+                        "Cannot modify vault: dead-man switch has been triggered", HttpStatus.CONFLICT);
+            }
+        });
     }
 
 }

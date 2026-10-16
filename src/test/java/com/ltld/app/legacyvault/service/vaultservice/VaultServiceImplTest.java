@@ -19,8 +19,21 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -61,6 +74,10 @@ class VaultServiceImplTest {
     private EmailSender emailSender;
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;
+    @Mock
+    private DmsConfigRepository dmsConfigRepository;
+    @Mock
+    private VerificationRequestVaultRepository verificationRequestVaultRepository;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -511,5 +528,150 @@ class VaultServiceImplTest {
         assertSame(ben, vault.getBeneficiary());
         verify(vaultRepository, never()).save(any());
         verifyNoInteractions(emailSender);
+    }
+
+    // ===== FR-01/FR-27/FR-20: Vault CRUD & Admin Detail Tests =====
+
+    @Test
+    @DisplayName("getMyVaults: Lấy danh sách két của Owner thành công")
+    void getMyVaults_Success() {
+        Vault vault = activeVault();
+        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+                .thenReturn(List.of(vault));
+
+        List<VaultResponse> result = vaultService.getMyVaults(ownerId);
+
+        assertEquals(1, result.size());
+        assertEquals("My Vault", result.get(0).getName());
+        assertEquals(ownerId, result.get(0).getOwnerId());
+        verify(vaultRepository).findByOwnerIdOrderByCreatedAtDesc(ownerId);
+    }
+
+    @Test
+    @DisplayName("getMyVaults: Trả về danh sách rỗng khi Owner chưa có két")
+    void getMyVaults_EmptyList() {
+        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+                .thenReturn(List.of());
+
+        List<VaultResponse> result = vaultService.getMyVaults(ownerId);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("getVaultDetail: Owner xem chi tiết két của mình thành công")
+    void getVaultDetail_AsOwner_Success() {
+        Vault vault = activeVault();
+        UUID vId = vault.getId();
+        when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
+        when(legalDocumentRepository.countByVaultId(vId)).thenReturn(2);
+        when(digitalAssetRepository.countByVaultIdAndStatus(vId, AssetStatus.ACTIVE)).thenReturn(3L);
+
+        VaultDetailResponse detail = vaultService.getVaultDetail(vId, ownerId);
+
+        assertEquals(vId, detail.getId());
+        assertEquals("owner@example.com", detail.getOwnerEmail());
+        assertEquals(2, detail.getTotalDocuments());
+        assertEquals(3, detail.getTotalAssets());
+    }
+
+    @Test
+    @DisplayName("getAdminVaultDetail: Admin xem chi tiết bất kỳ két nào thành công")
+    void getAdminVaultDetail_AsAdmin_Success() {
+        Vault vault = activeVault();
+        UUID vId = vault.getId();
+        when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
+        when(legalDocumentRepository.countByVaultId(vId)).thenReturn(0);
+        when(digitalAssetRepository.countByVaultIdAndStatus(vId, AssetStatus.ACTIVE)).thenReturn(0L);
+
+        UUID adminId = UUID.randomUUID();
+        AdminVaultDetailResponse detail = vaultService.getAdminVaultDetail(vId, adminId);
+
+        assertEquals(vId, detail.getId());
+        assertEquals("owner@example.com", detail.getOwnerEmail());
+    }
+
+    @Test
+    @DisplayName("getVaultDetail: Người khác xem lén két -> Bị chặn 404 Not Found (m1)")
+    void getVaultDetail_Unauthorized_ThrowsNotFound() {
+        Vault vault = activeVault();
+        UUID attackerId = UUID.randomUUID();
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.getVaultDetail(vault.getId(), attackerId));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    @DisplayName("getVaultDetail: Két không tồn tại -> Báo 404 Not Found")
+    void getVaultDetail_NotFound_ThrowsNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(vaultRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.getVaultDetail(unknownId, ownerId));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    @DisplayName("updateVault: Cập nhật tên và mô tả khi két ACTIVE thành công")
+    void updateVault_Success() {
+        Vault vault = activeVault();
+        UUID vId = vault.getId();
+        when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
+        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
+        VaultResponse response = vaultService.updateVault(vId, ownerId, request);
+
+        assertEquals("Tên két mới", response.getName());
+        assertEquals("Mô tả mới", response.getDescription());
+        verify(vaultRepository).save(vault);
+        verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@example.com"), eq(vId),
+                eq("Vault"), eq(vId.toString()), any());
+    }
+
+    @Test
+    @DisplayName("updateVault: Người khác sửa két -> Chặn 404 Not Found (m1)")
+    void updateVault_Unauthorized_ThrowsNotFound() {
+        Vault vault = activeVault();
+        UUID attackerId = UUID.randomUUID();
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.updateVault(vault.getId(), attackerId, request));
+        assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateVault: Két đã UNLOCKED -> Chặn 400 Bad Request")
+    void updateVault_NotActive_ThrowsBadRequest() {
+        Vault vault = activeVault();
+        vault.setStatus(VaultStatus.UNLOCKED);
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.updateVault(vault.getId(), ownerId, request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("getAllVaultsForAdmin: Admin lọc theo trạng thái và phân trang thành công")
+    void getAllVaultsForAdmin_Success() {
+        Vault vault = activeVault();
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Vault> page = new PageImpl<>(List.of(vault), pageable, 1);
+        when(vaultRepository.findByStatus(VaultStatus.ACTIVE, pageable)).thenReturn(page);
+
+        Page<VaultResponse> result = vaultService.getAllVaultsForAdmin(VaultStatus.ACTIVE, pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals("My Vault", result.getContent().get(0).getName());
     }
 }

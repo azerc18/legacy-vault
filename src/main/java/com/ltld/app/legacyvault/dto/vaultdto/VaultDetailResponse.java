@@ -1,31 +1,27 @@
 package com.ltld.app.legacyvault.dto.vaultdto;
 
 import com.ltld.app.legacyvault.enums.VaultStatus;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Data
+@Getter
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class VaultDetailResponse {
-    private UUID id;
-    private String name;
-    private String description;
-    private VaultStatus status;
-    private UUID ownerId;
-    private String ownerEmail;
-    private UUID beneficiaryId;
-    private String beneficiaryEmail;
-    private LocalDateTime unlockedAt;
-    private LocalDateTime claimDeadlineAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-    private int totalDocuments;
-    private int totalAssets;
+    private final UUID id;
+    private final String name;
+    private final String description;
+    private final VaultStatus status;
+    private final UUID ownerId;
+    private final String ownerEmail;
+    private final UUID beneficiaryId;
+    private final String beneficiaryEmail;
+    private final LocalDateTime unlockedAt;
+    private final LocalDateTime claimDeadlineAt;
+    private final LocalDateTime createdAt;
+    private final LocalDateTime updatedAt;
+    private final int totalDocuments;
+    private final int totalAssets;
 }
