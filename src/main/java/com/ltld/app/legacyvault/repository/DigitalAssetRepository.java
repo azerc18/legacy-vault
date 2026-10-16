@@ -2,10 +2,12 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -36,4 +38,14 @@ public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID
                               WHERE r.asset.id = a.id AND r.claim.id = :claimId)
             """)
     List<DigitalAsset> findUnaccessedAssets(@Param("vaultId") UUID vaultId, @Param("claimId") UUID claimId);
+
+    // BR-04: khi lưu trữ chỉ giữ metadata (tên, loại, trạng thái, tham chiếu khóa).
+    // encrypted_secret là NOT NULL nên ghi chuỗi rỗng; bulk UPDATE bỏ qua @UpdateTimestamp nên set updatedAt tay.
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE DigitalAsset a
+            SET a.encryptedSecret = '', a.notesEncrypted = NULL, a.attachmentUrl = NULL, a.updatedAt = :now
+            WHERE a.vault.id = :vaultId
+            """)
+    int wipeContentByVaultId(@Param("vaultId") UUID vaultId, @Param("now") LocalDateTime now);
 }
