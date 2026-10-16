@@ -11,8 +11,7 @@ const FEATURES = [
     { role: 'OWNER', icon: 'favorite', title: "Dead Man's Switch", text: 'Set your check-in schedule and check in.', to: null },
     { role: 'OWNER', icon: 'history', title: 'Activity log', text: 'See who accessed your vaults and when.', to: null },
     // Beneficiary
-    { role: 'BENEFICIARY', icon: 'redeem', title: 'Claim inheritance', text: 'Start a claim and verify your identity.', to: null },
-    { role: 'BENEFICIARY', icon: 'folder_open', title: 'Inherited assets', text: 'View and download assets assigned to you.', to: null },
+    { role: 'BENEFICIARY', icon: 'redeem', title: 'Inherited vaults', text: 'Verify your identity and receive assets.', to: '/beneficiary' },
     // Executor
     { role: 'EXECUTOR', icon: 'badge', title: 'Executor duties', text: 'See vaults where you are the executor.', to: '/executor/home' },        // Legal Verifier
     { role: 'LEGAL_VERIFIER', icon: 'gavel', title: 'Verification requests', text: 'Review and sign pending requests.', to: '/verifier' },

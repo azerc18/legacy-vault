@@ -12,6 +12,8 @@ import VerificationRequestDetail from './LegalVerifier/VerificationRequestDetail
 import VerificationHistory from './LegalVerifier/VerificationHistory.jsx';
 import VerifierHome from './LegalVerifier/VerifierHome.jsx';
 import ExecutorHome from './Executor/ExecutorHome.jsx';
+import BeneficiaryVaults from './Beneficiary/BeneficiaryVaults.jsx';
+import BeneficiaryVaultDetail from './Beneficiary/BeneficiaryVaultDetail.jsx';
 
 function App() {
     return (
@@ -29,6 +31,8 @@ function App() {
                 <Route path="/verifier" element={<LegalVerifierDashboard />} />
                 <Route path="/verifier/request/:requestId" element={<VerificationRequestDetail />} />
                 <Route path="/verifier/history" element={<VerificationHistory />} />
+                <Route path="/beneficiary" element={<BeneficiaryVaults />} />
+                <Route path="/beneficiary/vaults/:vaultId" element={<BeneficiaryVaultDetail />} />
             </Routes>
         </BrowserRouter>
     );
