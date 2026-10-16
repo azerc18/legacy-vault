@@ -25,5 +25,7 @@ public enum AuditAction {
     LEGAL_VERIFICATION_REQUESTED,
     VERIFICATION_MESSAGE_SENT,
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)
-    EXECUTOR_ASSIGNED, EXECUTOR_REPLACED
+    EXECUTOR_ASSIGNED, EXECUTOR_REPLACED,
+    // D1: Verifier xem giấy chứng tử
+    LEGAL_DOCUMENT_VIEWED
 }

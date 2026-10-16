@@ -40,6 +40,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 
 import java.time.Duration;
 import java.time.LocalDate;
@@ -72,6 +75,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
     private final EmailSender emailSender;
+    private final FileStorageService fileStorageService;
+    private final CryptoService cryptoService;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -104,6 +109,64 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                         ? "Tài liệu hợp lệ"
                         : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .png)")
                 .build();
+    }
+
+    // D1: Verifier xem giấy chứng tử
+    @Override
+    @Transactional(readOnly = true)
+    public VerificationDocumentDto getDocument(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = findRequestOrThrow(requestId);
+        assertNotConflictOfInterestForRead(request, verifierId);   // xung đột -> 404
+
+        // PENDING: verifier nào cũng xem được. Đã quyết định: chỉ verifier được giao
+        if (request.getStatus() != LegalVerificationStatus.PENDING
+                && (request.getVerifier() == null
+                || !verifierId.equals(request.getVerifier().getId()))) {
+            throw new NotAssignedVerifierException(
+                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được xem tài liệu.");
+        }
+
+        String email = emailOf(verifierId);
+        byte[] plain;
+        try {
+            plain = cryptoService.decryptBytes(
+                    fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
+        } catch (Exception e) {
+            log.error("Death certificate read/decrypt failed for request {}", requestId, e);
+            auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.FAILURE,
+                    verifierId, email, "LegalVerificationRequest", requestId.toString(),
+                    "Read or decrypt failed");
+            throw new IllegalStateException("Không thể đọc tài liệu. Vui lòng thử lại sau.");
+        }
+
+        String contentType = detectContentType(plain);
+        auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.SUCCESS,
+                verifierId, email, "LegalVerificationRequest", requestId.toString(), null);
+
+        return VerificationDocumentDto.builder()
+                .content(plain)
+                .contentType(contentType)
+                .fileName("giay-chung-tu-" + requestId + extensionOf(contentType))
+                .build();
+    }
+
+    private String detectContentType(byte[] b) {
+        if (b.length >= 4 && b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46)
+            return "application/pdf";                       // %PDF
+        if (b.length >= 4 && (b[0] & 0xFF) == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47)
+            return "image/png";
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF)
+            return "image/jpeg";
+        return "application/octet-stream";
+    }
+
+    private String extensionOf(String contentType) {
+        return switch (contentType) {
+            case "application/pdf" -> ".pdf";
+            case "image/png" -> ".png";
+            case "image/jpeg" -> ".jpg";
+            default -> ".bin";
+        };
     }
 
     // UC12: phê duyệt hồ sơ (chưa mở khóa Vault)

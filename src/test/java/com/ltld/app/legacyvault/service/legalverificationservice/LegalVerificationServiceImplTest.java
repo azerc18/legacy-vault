@@ -30,6 +30,9 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +87,12 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private EmailSender emailSender;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @Mock
+    private CryptoService cryptoService;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -650,5 +659,46 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to, 0, 20))
                 .isInstanceOf(InvalidDateRangeException.class);
+    }
+    // ---------- getDocument (D1) ----------
+
+    @Test
+    void getDocument_verifierIsOwner_throwsNotFoundAndNeverReadsFile() throws Exception {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.getDocument(requestId, ownerId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+
+        verify(fileStorageService, never()).readFile(any());
+    }
+
+    @Test
+    void getDocument_pending_returnsDecryptedBytesAndPdfContentType() throws Exception {
+        byte[] cipher = "cipher-bytes".getBytes();
+        byte[] plain = "%PDF-1.4 noi dung giay chung tu".getBytes();
+
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+
+        VerificationDocumentDto dto = service.getDocument(requestId, verifierId);
+
+        assertThat(dto.getContent()).isEqualTo(plain);
+        assertThat(dto.getContentType()).isEqualTo("application/pdf");
+        assertThat(dto.getFileName()).endsWith(".pdf");
+        verify(auditLogService).log(eq(AuditAction.LEGAL_DOCUMENT_VIEWED), eq(AuditResult.SUCCESS),
+                eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
+    }
+
+    @Test
+    void getDocument_approvedByAnotherVerifier_throwsNotAssigned() throws Exception {
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        pendingRequest.setVerifier(User.builder().id(UUID.randomUUID()).build());
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.getDocument(requestId, verifierId))
+                .isInstanceOf(NotAssignedVerifierException.class);
+
+        verify(fileStorageService, never()).readFile(any());
     }
 }
