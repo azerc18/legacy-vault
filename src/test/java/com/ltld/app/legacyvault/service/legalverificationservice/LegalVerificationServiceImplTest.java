@@ -4,12 +4,15 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationRes
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -23,6 +26,8 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
@@ -93,6 +98,12 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private CryptoService cryptoService;
+
+    @Mock
+    private DmsConfigRepository dmsConfigRepository;
+
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -230,9 +241,18 @@ public class LegalVerificationServiceImplTest {
         return Vault.builder().id(UUID.randomUUID()).status(status).owner(pendingRequest.getOwner()).build();
     }
 
+    // D3: giả lập DMS của Owner đã TRIGGERED và Executor của hồ sơ còn ACTIVE
+    private void handoverStillValid() {
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.TRIGGERED).build()));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
+                ownerId, pendingRequest.getExecutor().getId(), ExecutorStatus.ACTIVE)).thenReturn(true);
+    }
+
     @Test
     void sign_success_savesSignatureUnlocksVaultAndSetsClaimDeadline() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -435,6 +455,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultNotActive_throwsAndDoesNotSignOrUnlock() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -455,6 +476,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultOfAnotherOwner_throwsConflict() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -475,6 +497,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_noVaultLinked_throwsConflict() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -486,6 +509,63 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
+    }
+
+    // ---------- D3: kiểm tra lại DMS và Executor khi ký ----------
+
+    @Test
+    void sign_dmsNotTriggered_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.ACTIVE).build()));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
+    void sign_noDmsConfig_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
+    void sign_executorNoLongerActive_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.TRIGGERED).build()));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
+                ownerId, pendingRequest.getExecutor().getId(), ExecutorStatus.ACTIVE)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
     }
 
     // ---------- UC13: verifyDocument (với kiểm tra N6) ----------
@@ -668,6 +748,7 @@ public class LegalVerificationServiceImplTest {
         assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to, 0, 20))
                 .isInstanceOf(InvalidDateRangeException.class);
     }
+
     // ---------- getDocument (D1) ----------
 
     @Test
