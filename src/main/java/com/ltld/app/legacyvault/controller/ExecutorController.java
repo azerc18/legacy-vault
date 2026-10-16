@@ -4,12 +4,14 @@ import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
+import com.ltld.app.legacyvault.dto.executordto.MyExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
@@ -41,6 +43,14 @@ public class ExecutorController {
     private final ExecutorHandoverService executorHandoverService;
     private final ExecutorVerificationService executorVerificationService;
     private final VerificationExchangeService verificationExchangeService;
+    private final ExecutorSelfService executorSelfService;
+
+    // B1: điểm vào của FE Executor, các assignment chưa REVOKED của người đăng nhập (gồm nhiều Owner).
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<List<MyExecutorAssignmentResponse>>> getMyAssignments(Principal principal) {
+        List<MyExecutorAssignmentResponse> response = executorSelfService.listMyAssignments(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Executor assignments retrieved", response));
+    }
 
     // FR-07 bước 4: Executor xác nhận đã nhận thông báo kích hoạt.
     // Principal.getName() là định danh của phiên đăng nhập (email hoặc user id); Auth/JWT do module khác cung cấp.
