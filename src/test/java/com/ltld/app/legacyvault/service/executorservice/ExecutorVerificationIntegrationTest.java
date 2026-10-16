@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -77,6 +79,7 @@ class ExecutorVerificationIntegrationTest {
     @Autowired private VaultRepository vaultRepository;
     @Autowired private LegalVerificationRequestRepository legalVerificationRequestRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private DmsActivationProcessor dmsActivationProcessor;
 
     private User owner;
     private User primaryUser;
@@ -198,6 +201,27 @@ class ExecutorVerificationIntegrationTest {
         DeathVerificationResponse second = executorVerificationService.submit(backup.getId(), backupUser.getEmail(),
                 pdf(), new CreateDeathVerificationRequest(List.of(other.getId()), null));
         assertThat(second.getVaultIds()).containsExactly(other.getId());
+    }
+
+    @Test
+    void primarySubmittingBeforeAcknowledging_isNotRevokedByBr03AfterWaitDays() {
+        LocalDateTime activatedAt = LocalDateTime.now().minusDays(20);
+        primary.setActivatedAt(activatedAt);
+        primary = executorAssignmentRepository.save(primary);
+        backup.setStatus(ExecutorStatus.INACTIVE);
+        backup = executorAssignmentRepository.save(backup);
+
+        executorVerificationService.submit(primary.getId(), primaryUser.getEmail(),
+                pdf(), new CreateDeathVerificationRequest(List.of(vault.getId()), null));
+
+        UUID configId = dmsConfigRepository.findByOwnerId(owner.getId()).orElseThrow().getId();
+        dmsActivationProcessor.escalateIfPrimaryUnresponsive(configId, LocalDateTime.now());
+
+        ExecutorAssignment reloadedPrimary = executorAssignmentRepository.findById(primary.getId()).orElseThrow();
+        assertThat(reloadedPrimary.getAcknowledgedAt()).isNotNull();
+        assertThat(reloadedPrimary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(executorAssignmentRepository.findById(backup.getId()).orElseThrow().getStatus())
+                .isEqualTo(ExecutorStatus.INACTIVE);
     }
 
     private Callable<DeathVerificationResponse> submitAs(ExecutorAssignment assignment, User executorUser,
