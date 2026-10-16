@@ -13,7 +13,7 @@ export default function BeneficiaryVaults() {
 
     useEffect(() => {
         beneficiaryApi.listVaults()
-            .then(setVaults)
+            .then((list) => setVaults(Array.isArray(list) ? list : []))
             .catch((err) => setError(getErrorMessage(err, 'Could not load your vaults.')))
             .finally(() => setLoading(false));
     }, []);
