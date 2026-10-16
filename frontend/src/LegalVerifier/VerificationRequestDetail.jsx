@@ -6,7 +6,7 @@ import {
 } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
-
+import VerificationMessages from './VerificationMessages.jsx';
 const RESEND_SECONDS = 60; // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 
 export default function VerificationRequestDetail() {
@@ -301,6 +301,7 @@ export default function VerificationRequestDetail() {
                             </div>
                         )}
 
+                        <VerificationMessages requestId={req.id} status={req.status} />
                         <p className="text-xs text-outline mt-6 pt-6 border-t border-outline-variant/20 text-center">
                             This decision will be recorded in the system history.
                         </p>
