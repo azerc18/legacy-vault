@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -41,6 +43,7 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
 
     private final ExecutorAccessGuard executorAccessGuard;
     private final DmsConfigRepository dmsConfigRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final LegalVerificationRequestRepository legalVerificationRequestRepository;
     private final VerificationRequestVaultRepository verificationRequestVaultRepository;
     private final VaultRepository vaultRepository;
@@ -93,6 +96,14 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                     "A verification request is already in progress for vault(s): " + busyVaultIds);
         }
 
+        // B2 (F1): nộp hồ sơ = đã phản hồi, nên BR-03 không thu hồi Primary làm hồ sơ bị kẹt.
+        // Flush ngay để xung đột @Version với lượt leo thang nổ ra trước khi lưu file.
+        boolean acknowledgedNow = assignment.getAcknowledgedAt() == null;
+        if (acknowledgedNow) {
+            assignment.setAcknowledgedAt(LocalDateTime.now());
+            executorAssignmentRepository.saveAndFlush(assignment);
+        }
+
         String storedPath = null;
         try {
             storedPath = fileStorageService.storeFile(file, encryptedContent);
@@ -138,6 +149,14 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                 auditLogService.log(AuditAction.LEGAL_VERIFICATION_REQUESTED, AuditResult.SUCCESS,
                         executor.getId(), executor.getEmail(), vault.getId(),
                         "LegalVerificationRequest", savedRequest.getId().toString(), auditDetail);
+            }
+            if (acknowledgedNow) {
+                // vaultId = null: giống FR-07, xác nhận gắn với Owner chứ không với một Vault cụ thể.
+                auditLogService.log(AuditAction.EXECUTOR_ACKNOWLEDGED, AuditResult.SUCCESS,
+                        executor.getId(), executor.getEmail(), null,
+                        DmsActivationProcessor.ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId().toString(),
+                        "ownerId=" + ownerId + ", executorType=" + assignment.getExecutorType()
+                                + ", via=VERIFICATION_SUBMIT");
             }
 
             eventPublisher.publishEvent(new VerificationRequestSubmittedEvent(
