@@ -47,6 +47,7 @@ class ExecutorHandoverControllerSecurityTest {
     @MockitoBean private ExecutorHandoverService executorHandoverService;
     @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private VerificationExchangeService verificationExchangeService;
+    @MockitoBean private com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService executorSelfService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     private static RequestPostProcessor token(UUID userId) {

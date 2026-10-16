@@ -27,4 +27,12 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
     // FR-02 (Q26): email này có đang là Executor chưa bị thu hồi của Owner không (email truyền vào đã lowercase).
     @Query("select count(a) > 0 from ExecutorAssignment a where a.owner.id = :ownerId and a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED and lower(a.executorUser.email) = :email")
     boolean existsLiveExecutorWithEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
+
+    // B1: các assignment chưa bị thu hồi của một Executor (gồm nhiều Owner), mới nhất trước.
+    @Query("select a from ExecutorAssignment a join fetch a.owner where a.executorUser.id = :userId and a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED order by a.createdAt desc")
+    List<ExecutorAssignment> findLiveByExecutorUserId(@Param("userId") UUID userId);
+
+    // B1: như trên nhưng tra theo email (email truyền vào đã lowercase), khi principal là email thay vì user id.
+    @Query("select a from ExecutorAssignment a join fetch a.owner where lower(a.executorUser.email) = :email and a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED order by a.createdAt desc")
+    List<ExecutorAssignment> findLiveByExecutorEmail(@Param("email") String email);
 }
