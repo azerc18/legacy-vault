@@ -20,6 +20,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -36,6 +38,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -383,6 +386,51 @@ class DmsConfigServiceImplTest {
         assertThat(response.getTriggerAt()).isEqualTo(existing.getNextCheckinDueAt());
         assertThat(response.getNextReminderAt()).isEqualTo(existing.getNextReminderAt());
         assertThat(response.getRemindersSent()).isEqualTo(2);
+        verifyNothingWritten();
+    }
+
+    // ---------- assertHandoverNotStarted (O1) ----------
+
+    @Test
+    @DisplayName("O1: DMS TRIGGERED -> DmsException 409, chỉ đọc có khóa, không ghi gì")
+    void assertHandoverNotStarted_whenTriggered_throws409() {
+        lockedConfig(DmsStatus.TRIGGERED);
+
+        assertThatThrownBy(() -> service.assertHandoverNotStarted(ownerId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.HANDOVER_STARTED_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O1: chưa có DmsConfig -> cho qua")
+    void assertHandoverNotStarted_withoutConfig_passes() {
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
+
+        assertThatCode(() -> service.assertHandoverNotStarted(ownerId)).doesNotThrowAnyException();
+        verifyLockedLookupOnly();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = "TRIGGERED", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("O1: DMS chưa kích hoạt (mọi trạng thái khác TRIGGERED) -> cho qua")
+    void assertHandoverNotStarted_whenNotTriggered_passes(DmsStatus status) {
+        lockedConfig(status);
+
+        assertThatCode(() -> service.assertHandoverNotStarted(ownerId)).doesNotThrowAnyException();
+        verifyLockedLookupOnly();
+    }
+
+    private void lockedConfig(DmsStatus status) {
+        DmsConfig config = existingConfig(status);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(config));
+    }
+
+    // Phải đọc bằng khóa PESSIMISTIC_FORCE_INCREMENT, không phải findByOwnerId thường.
+    private void verifyLockedLookupOnly() {
+        verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
         verifyNothingWritten();
     }
 }
