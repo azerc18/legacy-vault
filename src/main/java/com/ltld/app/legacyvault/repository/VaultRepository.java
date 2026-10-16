@@ -83,4 +83,13 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             """)
     int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
                          @Param("purgeAt") LocalDateTime purgeAt);
+    // Lấy danh sách Vault của Owner (mới nhất xếp trước)
+    List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
+
+    // Lấy danh sách Vault của Owner có phân trang (dành cho trường hợp nhiều két)
+    org.springframework.data.domain.Page<Vault> findByOwnerId(UUID ownerId, org.springframework.data.domain.Pageable pageable);
+
+    // Admin tìm kiếm và lọc Vault theo trạng thái
+    org.springframework.data.domain.Page<Vault> findByStatus(com.ltld.app.legacyvault.enums.VaultStatus status, org.springframework.data.domain.Pageable pageable);
+
 }

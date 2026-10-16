@@ -1,8 +1,6 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
-import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
-import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
-import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.*;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
@@ -256,4 +254,97 @@ public class VaultServiceImpl implements VaultService {
                 .replaced(replaced)
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VaultResponse> getMyVaults(UUID ownerId) {
+        return vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
+                .stream()
+                .map(vault -> VaultResponse.builder()
+                        .id(vault.getId())
+                        .name(vault.getName())
+                        .description(vault.getDescription())
+                        .status(vault.getStatus())
+                        .createdAt(vault.getCreatedAt())
+                        .updatedAt(vault.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public VaultDetailResponse getVaultDetail(UUID vaultId, UUID requesterId, boolean isAdmin) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+
+        if (!isAdmin && !vault.getOwner().getId().equals(requesterId)) {
+            throw new VaultException("Unauthorized: You don't have permission to access this vault", HttpStatus.FORBIDDEN);
+        }
+
+        int docCount = legalDocumentRepository.countByVaultId(vaultId);
+        int assetCount = (int) digitalAssetRepository.countByVaultIdAndStatus(vaultId, com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE);
+
+        return VaultDetailResponse.builder()
+                .id(vault.getId())
+                .name(vault.getName())
+                .description(vault.getDescription())
+                .status(vault.getStatus())
+                .ownerId(vault.getOwner().getId())
+                .ownerEmail(vault.getOwner().getEmail())
+                .beneficiaryId(vault.getBeneficiary() != null ? vault.getBeneficiary().getId() : null)
+                .beneficiaryEmail(vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail())
+                .unlockedAt(vault.getUnlockedAt())
+                .claimDeadlineAt(vault.getClaimDeadlineAt())
+                .createdAt(vault.getCreatedAt())
+                .updatedAt(vault.getUpdatedAt())
+                .totalDocuments(docCount)
+                .totalAssets(assetCount)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public VaultResponse updateVault(UUID vaultId, UUID ownerId, UpdateVaultRequest request) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+        }
+
+        if (vault.getStatus() != com.ltld.app.legacyvault.enums.VaultStatus.ACTIVE) {
+            throw new VaultException("Cannot update vault that is not in active state", HttpStatus.BAD_REQUEST);
+        }
+
+        vault.setName(request.getName());
+        vault.setDescription(request.getDescription());
+        Vault updated = vaultRepository.save(vault);
+
+        return VaultResponse.builder()
+                .id(updated.getId())
+                .name(updated.getName())
+                .description(updated.getDescription())
+                .status(updated.getStatus())
+                .createdAt(updated.getCreatedAt())
+                .updatedAt(updated.getUpdatedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<VaultResponse> getAllVaultsForAdmin(com.ltld.app.legacyvault.enums.VaultStatus status, org.springframework.data.domain.Pageable pageable) {
+        org.springframework.data.domain.Page<Vault> page = (status != null)
+                ? vaultRepository.findByStatus(status, pageable)
+                : vaultRepository.findAll(pageable);
+
+        return page.map(v -> VaultResponse.builder()
+                .id(v.getId())
+                .name(v.getName())
+                .description(v.getDescription())
+                .status(v.getStatus())
+                .createdAt(v.getCreatedAt())
+                .updatedAt(v.getUpdatedAt())
+                .build());
+    }
+
 }

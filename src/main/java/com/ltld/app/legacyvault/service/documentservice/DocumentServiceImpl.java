@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.documentservice;
 
+import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -95,5 +96,75 @@ public class DocumentServiceImpl implements DocumentService {
                 ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "Vault", vault.getId().toString(), "Document ID: " + saved.getId().toString());
         return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentResponse> getDocumentsByVault(UUID vaultId, UUID ownerId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+        }
+        return legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)
+                .stream()
+                .map(doc -> DocumentResponse.builder()
+                        .id(doc.getId())
+                        .vaultId(vaultId)
+                        .documentType(doc.getDocumentType())
+                        .fileName(doc.getFileName())
+                        .uploadedAt(doc.getUploadedAt())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse downloadDocumentForOwner(UUID documentId, UUID ownerId) throws Exception {
+        LegalDocument doc = legalDocumentRepository.findById(documentId)
+                .orElseThrow(() -> new VaultException("Document not found", HttpStatus.NOT_FOUND));
+        Vault vault = doc.getVault();
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            throw new VaultException("Unauthorized: You don't own this document", HttpStatus.FORBIDDEN);
+        }
+        byte[] encryptedBytes = fileStorageService.readFile(doc.getFileUrlEncrypted());
+        byte[] decryptedBytes = cryptoService.decryptBytes(encryptedBytes);
+
+        // Suy ra Content-Type dựa trên tên file
+        String contentType = org.springframework.http.MediaTypeFactory
+                .getMediaType(doc.getFileName())
+                .map(org.springframework.http.MediaType::toString)
+                .orElse("application/octet-stream");
+
+        // Ghi Audit Log thành công
+        auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.SUCCESS,
+                ownerId, vault.getOwner().getEmail(), vault.getId(),
+                "LegalDocument", doc.getId().toString(), "Owner downloaded document");
+        return com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse.builder()
+                .fileName(doc.getFileName())
+                .contentType(contentType)
+                .content(decryptedBytes)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteDocument(UUID documentId, UUID ownerId) throws Exception {
+        LegalDocument doc = legalDocumentRepository.findById(documentId)
+                .orElseThrow(() -> new VaultException("Document not found", HttpStatus.NOT_FOUND));
+        Vault vault = doc.getVault();
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            throw new VaultException("Unauthorized: You don't own this document", HttpStatus.FORBIDDEN);
+        }
+
+        if (vault.getStatus() != com.ltld.app.legacyvault.enums.VaultStatus.ACTIVE) {
+            throw new VaultException("Cannot delete document from vault in " + vault.getStatus() + " state", HttpStatus.BAD_REQUEST);
+        }
+
+        // 1. Xóa file vật lý trên đĩa
+        fileStorageService.deleteFile(doc.getFileUrlEncrypted());
+
+        // 2. Xóa bản ghi trong DB
+        legalDocumentRepository.delete(doc);
     }
 }

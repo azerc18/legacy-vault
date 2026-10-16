@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -45,5 +46,44 @@ public class DocumentController {
                 .build();
                 
         return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", response));
+    }
+
+    @GetMapping("/vault/{vaultId}")
+    @PreAuthorize("hasAuthority('VAULT_READ')")
+    public ResponseEntity<ApiResponse<List<DocumentResponse>>> getDocumentsByVault(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        List<DocumentResponse> documents = documentService.getDocumentsByVault(vaultId, ownerId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tài liệu thành công", documents));
+    }
+
+    @GetMapping("/{documentId}/download")
+    @PreAuthorize("hasAuthority('VAULT_READ')")
+    public ResponseEntity<byte[]> downloadDocument(
+            Principal principal,
+            @PathVariable UUID documentId) throws Exception {
+        UUID ownerId = UUID.fromString(principal.getName());
+        com.ltld.app.legacyvault.dto.documentdto.DocumentDownloadResponse file = documentService.downloadDocumentForOwner(documentId, ownerId);
+
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(file.getContentType()))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename(file.getFileName(), java.nio.charset.StandardCharsets.UTF_8)
+                                .build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(file.getContent());
+    }
+
+    @DeleteMapping("/{documentId}")
+    @PreAuthorize("hasAuthority('VAULT_DELETE')")
+    public ResponseEntity<ApiResponse<Void>> deleteDocument(
+            Principal principal,
+            @PathVariable UUID documentId) throws Exception {
+        UUID ownerId = UUID.fromString(principal.getName());
+        documentService.deleteDocument(documentId, ownerId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa tài liệu thành công"));
     }
 }
