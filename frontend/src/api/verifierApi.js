@@ -23,7 +23,9 @@ export const getRequestById = (id) => http.get(`${BASE}/${id}`).then(unwrap);
 
 // UC13: kiểm tra giấy chứng tử (mock) -> { requestId, valid, message }
 export const verifyDocument = (id) => http.get(`${BASE}/${id}/document/verify`).then(unwrap);
-
+// D1: tải giấy chứng tử (trả về file, nên cần responseType blob)
+export const getDocumentBlob = (id) =>
+    http.get(`${BASE}/${id}/document`, { responseType: 'blob' });
 // UC12: duyệt / từ chối (lý do bắt buộc, tối đa 1000 ký tự)
 export const approveRequest = (id) => http.post(`${BASE}/${id}/approve`).then(unwrap);
 export const rejectRequest = (id, reason) => http.post(`${BASE}/${id}/reject`, { reason }).then(unwrap);
