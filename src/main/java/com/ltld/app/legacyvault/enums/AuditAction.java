@@ -25,5 +25,7 @@ public enum AuditAction {
     LEGAL_VERIFICATION_REQUESTED,
     VERIFICATION_MESSAGE_SENT,
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)
-    EXECUTOR_ASSIGNED, EXECUTOR_REPLACED
+    EXECUTOR_ASSIGNED, EXECUTOR_REPLACED,
+    // FR-16 (Q25): Vault mở khóa khi Beneficiary chưa có tài khoản đã xác minh
+    BENEFICIARY_PENDING_NOTIFIED
 }
