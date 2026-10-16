@@ -6,11 +6,9 @@ import { getUser, logout } from './auth/auth.js';
 // Làm xong trang nào thì chỉ cần điền đường dẫn vào "to".
 const FEATURES = [
     // Vault Owner
-    { role: 'OWNER', icon: 'inventory_2', title: 'My vaults', text: 'Create a vault and manage its assets.', to: null },
-    { role: 'OWNER', icon: 'upload_file', title: 'Legal documents', text: 'Upload wills and legal papers to a vault.', to: null },
-    { role: 'OWNER', icon: 'favorite', title: "Dead Man's Switch", text: 'Set your check-in schedule and check in.', to: null },
-    { role: 'OWNER', icon: 'history', title: 'Activity log', text: 'See who accessed your vaults and when.', to: null },
-    // Beneficiary
+    { role: 'OWNER', icon: 'inventory_2', title: 'My vaults', text: 'Create vaults, add documents, choose beneficiaries.', to: '/owner/vaults' },
+    { role: 'OWNER', icon: 'favorite', title: "Dead Man's Switch", text: 'Set your check-in schedule and check in.', to: '/owner/dms' },
+    { role: 'OWNER', icon: 'badge', title: 'Executors', text: 'Assign your primary and backup executor.', to: '/owner/executors' },  // Beneficiary
     { role: 'BENEFICIARY', icon: 'redeem', title: 'Inherited vaults', text: 'Verify your identity and receive assets.', to: '/beneficiary' },
     // Executor
     { role: 'EXECUTOR', icon: 'badge', title: 'Executor duties', text: 'See vaults where you are the executor.', to: '/executor/home' },        // Legal Verifier

@@ -14,6 +14,11 @@ import VerifierHome from './LegalVerifier/VerifierHome.jsx';
 import ExecutorHome from './Executor/ExecutorHome.jsx';
 import BeneficiaryVaults from './Beneficiary/BeneficiaryVaults.jsx';
 import BeneficiaryVaultDetail from './Beneficiary/BeneficiaryVaultDetail.jsx';
+import OwnerVaults from './Owner/OwnerVaults.jsx';
+import CreateVault from './Owner/CreateVault.jsx';
+import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
+import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
+import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 
 function App() {
     return (
@@ -33,6 +38,11 @@ function App() {
                 <Route path="/verifier/history" element={<VerificationHistory />} />
                 <Route path="/beneficiary" element={<BeneficiaryVaults />} />
                 <Route path="/beneficiary/vaults/:vaultId" element={<BeneficiaryVaultDetail />} />
+                <Route path="/owner/vaults" element={<OwnerVaults />} />
+                <Route path="/owner/vaults/new" element={<CreateVault />} />
+                <Route path="/owner/vaults/:vaultId" element={<OwnerVaultDetail />} />
+                <Route path="/owner/dms" element={<DeadMansSwitch />} />
+                <Route path="/owner/executors" element={<OwnerExecutors />} />
             </Routes>
         </BrowserRouter>
     );
