@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.documentservice;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
+import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -9,8 +11,10 @@ import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +22,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,7 +42,8 @@ class DocumentServiceImplTest {
     @Mock private VaultRepository vaultRepository;
     @Mock private CryptoService cryptoService;
     @Mock private FileStorageService fileStorageService;
-    @Mock private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
+    @Mock private AuditLogService auditLogService;
+    @Mock private VaultModificationGuard vaultModificationGuard;
 
     @InjectMocks private DocumentServiceImpl documentService;
 
@@ -65,6 +73,8 @@ class DocumentServiceImplTest {
         );
     }
 
+    // ===== FR-04: uploadDocument =====
+
     @Test
     void uploadDocument_Success() throws Exception {
         byte[] encryptedBytes = "EncryptedBytes".getBytes();
@@ -74,7 +84,6 @@ class DocumentServiceImplTest {
         when(cryptoService.encryptBytes(any(byte[].class))).thenReturn(encryptedBytes);
         when(fileStorageService.storeFile(any(), any(byte[].class))).thenReturn(savedPath);
 
-        // Mẹo: Trả về chính cái object bị nhét vào hàm save, và set ID giả
         when(legalDocumentRepository.save(any(LegalDocument.class))).thenAnswer(i -> {
             LegalDocument doc = i.getArgument(0);
             doc.setId(UUID.randomUUID());
@@ -93,21 +102,18 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void uploadDocument_NotOwner_ThrowsException() throws Exception {
+    void uploadDocument_NotOwner_Returns404() throws Exception {
+        // Vault thuộc về người khác — trả 404 (không phải 403) để tránh lộ ID
         User fakeOwner = new User();
         fakeOwner.setId(UUID.randomUUID());
-        mockVault.setOwner(fakeOwner); // Cố tình đổi chủ
+        mockVault.setOwner(fakeOwner);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
-        // Mock userRepository cho trường hợp attacker tra cứu email của chính mình
-        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Phải văng lỗi VaultException (không còn là RuntimeException chung chung)
         assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
                 .isInstanceOf(VaultException.class)
-                .hasMessageContaining("Unauthorized");
+                .hasMessageContaining("Vault not found"); // 404, không phải "Unauthorized"
 
-        // Và đương nhiên file không bao giờ được phép đem đi mã hóa hay lưu
         verify(cryptoService, never()).encryptBytes(any());
     }
 
@@ -145,8 +151,176 @@ class DocumentServiceImplTest {
         mockVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
 
+        // VaultModificationGuard sẽ ném VaultException
+        doThrow(new VaultException("Cannot modify vault that is not in active state"))
+                .when(vaultModificationGuard).ensureModifiable(mockVault);
+
         assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
                 .isInstanceOf(VaultException.class)
-                .hasMessageContaining("Cannot upload document to vault in ARCHIVED_LOCKED state");
+                .hasMessageContaining("Cannot modify vault");
+    }
+
+    // ===== FR-04: listDocuments =====
+
+    @Test
+    void listDocuments_Success_ReturnsList() {
+        LegalDocument doc = new LegalDocument();
+        doc.setId(UUID.randomUUID());
+        doc.setDocumentType(DocumentType.WILL);
+        doc.setFileName("dichuc.pdf");
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(doc));
+
+        List<DocumentResponse> result = documentService.listDocuments(ownerId, vaultId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getFileName()).isEqualTo("dichuc.pdf");
+        assertThat(result.get(0).getDocumentType()).isEqualTo(DocumentType.WILL);
+    }
+
+    @Test
+    void listDocuments_NotOwner_Returns404() {
+        User fakeOwner = new User();
+        fakeOwner.setId(UUID.randomUUID());
+        mockVault.setOwner(fakeOwner);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+
+        assertThatThrownBy(() -> documentService.listDocuments(ownerId, vaultId))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Vault not found");
+    }
+
+    // ===== FR-04: deleteDocument =====
+
+    @Test
+    void deleteDocument_Success_FileDeletedAfterCommit() {
+        UUID documentId = UUID.randomUUID();
+        LegalDocument doc = new LegalDocument();
+        doc.setId(documentId);
+        doc.setFileUrlEncrypted("uploads/test.pdf");
+        doc.setVault(mockVault);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByIdAndVaultId(documentId, vaultId)).thenReturn(Optional.of(doc));
+
+        // Bật synchronization để registerSynchronization không ném IllegalStateException
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.deleteDocument(ownerId, vaultId, documentId);
+
+            // Chưa xóa file — DB chưa "commit" ở bước này
+            verify(fileStorageService, never()).deleteFile(any());
+
+            // Kích hoạt afterCommit callbacks thủ công để xác minh file bị xóa SAU KHI DB commit
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            // Bây giờ file mới bị xóa
+            verify(fileStorageService).deleteFile("uploads/test.pdf");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(legalDocumentRepository).delete(doc);
+    }
+
+    @Test
+    void deleteDocument_NotOwner_Returns404() {
+        User fakeOwner = new User();
+        fakeOwner.setId(UUID.randomUUID());
+        mockVault.setOwner(fakeOwner);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+
+        assertThatThrownBy(() -> documentService.deleteDocument(ownerId, vaultId, UUID.randomUUID()))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Vault not found");
+
+        verify(legalDocumentRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteDocument_DocumentNotFound_Returns404() {
+        UUID documentId = UUID.randomUUID();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByIdAndVaultId(documentId, vaultId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentService.deleteDocument(ownerId, vaultId, documentId))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Document not found");
+
+        verify(legalDocumentRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteDocument_FileDeleteFails_DoesNotThrow() {
+        // M2a: Lỗi xóa file trong afterCommit KHÔNG được làm request trả 500
+        UUID documentId = UUID.randomUUID();
+        LegalDocument doc = new LegalDocument();
+        doc.setId(documentId);
+        doc.setFileUrlEncrypted("uploads/gone.pdf");
+        doc.setVault(mockVault);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByIdAndVaultId(documentId, vaultId)).thenReturn(Optional.of(doc));
+        doThrow(new RuntimeException("disk full")).when(fileStorageService).deleteFile(any());
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.deleteDocument(ownerId, vaultId, documentId);
+
+            // afterCommit phải không ném exception ra ngoài (try/catch bên trong)
+            org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+                    TransactionSynchronizationManager.getSynchronizations()
+                            .forEach(TransactionSynchronization::afterCommit)
+            );
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    // ===== FR-18: downloadDocumentForOwner =====
+
+    @Test
+    void downloadDocumentForOwner_Success() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        LegalDocument doc = new LegalDocument();
+        doc.setId(documentId);
+        doc.setFileName("dichuc.pdf");
+        doc.setFileUrlEncrypted("uploads/enc_dichuc.pdf");
+
+        byte[] encryptedBytes = "EncryptedData".getBytes();
+        byte[] decryptedBytes = "DecryptedPdfContent".getBytes();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByIdAndVaultId(documentId, vaultId)).thenReturn(Optional.of(doc));
+        when(fileStorageService.readFile("uploads/enc_dichuc.pdf")).thenReturn(encryptedBytes);
+        when(cryptoService.decryptBytes(encryptedBytes)).thenReturn(decryptedBytes);
+
+        DocumentDownloadResponse result = documentService.downloadDocumentForOwner(ownerId, vaultId, documentId);
+
+        assertThat(result.getFileName()).isEqualTo("dichuc.pdf");
+        assertThat(result.getContentType()).isEqualTo("application/pdf");
+        assertThat(result.getContent()).isEqualTo(decryptedBytes);
+
+        verify(cryptoService).decryptBytes(encryptedBytes);
+        // Nội dung đã giải mã không được lưu lại disk — chỉ trong RAM
+        verify(fileStorageService, never()).storeFile(any(), any());
+    }
+
+    @Test
+    void downloadDocumentForOwner_NotOwner_Returns404() {
+        User fakeOwner = new User();
+        fakeOwner.setId(UUID.randomUUID());
+        mockVault.setOwner(fakeOwner);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+
+        assertThatThrownBy(() -> documentService.downloadDocumentForOwner(ownerId, vaultId, UUID.randomUUID()))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Vault not found");
     }
 }

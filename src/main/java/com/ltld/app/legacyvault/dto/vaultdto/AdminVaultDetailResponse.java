@@ -1,0 +1,25 @@
+package com.ltld.app.legacyvault.dto.vaultdto;
+
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Getter
+@Builder
+public class AdminVaultDetailResponse {
+    private final UUID id;
+    private final String name;
+    private final String description;
+    private final VaultStatus status;
+    private final UUID ownerId;
+    private final String ownerEmail;
+    private final LocalDateTime unlockedAt;
+    private final LocalDateTime claimDeadlineAt;
+    private final LocalDateTime createdAt;
+    private final LocalDateTime updatedAt;
+    private final int totalDocuments;
+    private final int totalAssets;
+}
