@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { getUser } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 
@@ -13,6 +14,9 @@ export default function Register() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Đã đăng nhập -> về trang chủ người dùng
+    if (getUser()) return <Navigate to="/home" replace />;
 
     const handleChange = (e) => {
         setFormData({
@@ -42,16 +46,16 @@ export default function Register() {
 
         setError('');
         setLoading(true);
-    try {
-        await authApi.register({ fullName, email: email.trim(), password, passwordConfirm });
-        // BE đã tự gửi OTP -> sang trang xác thực
-        navigate('/verify-email', { state: { email: email.trim() } });
-    } catch (err) {
-        setError(getErrorMessage(err, 'Registration failed.'));
-    } finally {
-        setLoading(false);
-    }
-};
+        try {
+            await authApi.register({ fullName, email: email.trim(), password, passwordConfirm });
+            // BE đã tự gửi OTP -> sang trang xác thực
+            navigate('/verify-email', { state: { email: email.trim() } });
+        } catch (err) {
+            setError(getErrorMessage(err, 'Registration failed.'));
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4 py-8">
