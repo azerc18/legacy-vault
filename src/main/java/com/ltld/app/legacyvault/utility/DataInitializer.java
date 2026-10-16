@@ -2,24 +2,33 @@ package com.ltld.app.legacyvault.utility;
 
 import com.ltld.app.legacyvault.entity.Authority;
 import com.ltld.app.legacyvault.entity.Role;
+import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.repository.AuthorityRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class DataInitializer {
     private final RoleRepository roleRepository;
     private final AuthorityRepository authorityRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${APP_ADMIN_EMAIL:}")    private String adminEmail;
+    @Value("${APP_ADMIN_PASSWORD:}") private String adminPassword;
 
     @Bean
     public CommandLineRunner initRolesAndAuthorities() {
@@ -98,5 +107,27 @@ public class DataInitializer {
             roleRepository.save(role);
 
         });
+    }
+
+    private void seedAdmin() {
+        if (adminEmail.isBlank() || adminPassword.isBlank()) {
+            log.info("APP_ADMIN_EMAIL/APP_ADMIN_PASSWORD not set, skip admin seeding");
+            return;
+        }
+        String email = adminEmail.trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            log.info("Admin account already exists, skip seeding");
+            return;
+        }
+        Role adminRole = roleRepository.findByCode("ADMIN")
+                .orElseThrow(() -> new IllegalStateException("Role not found: ADMIN"));
+        userRepository.save(User.builder()
+                .email(email)
+                .fullName("System Administrator")
+                .passwordHash(passwordEncoder.encode(adminPassword))
+                .status(UserStatus.ACTIVE)
+                .roles(new HashSet<>(Set.of(adminRole)))
+                .build());
+        log.info("Seeded admin account");
     }
 }

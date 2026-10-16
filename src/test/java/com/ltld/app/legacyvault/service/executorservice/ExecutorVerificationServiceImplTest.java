@@ -36,6 +36,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -54,6 +55,7 @@ class ExecutorVerificationServiceImplTest {
 
     @Mock private ExecutorAccessGuard executorAccessGuard;
     @Mock private DmsConfigRepository dmsConfigRepository;
+    @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
     @Mock private VerificationRequestVaultRepository verificationRequestVaultRepository;
     @Mock private VaultRepository vaultRepository;
@@ -160,9 +162,94 @@ class ExecutorVerificationServiceImplTest {
     }
 
     @Test
+    @DisplayName("B2: not yet acknowledged -> submit sets acknowledgedAt, flushes and audits EXECUTOR_ACKNOWLEDGED")
+    void submit_notAcknowledged_marksAcknowledgedAndAudits() throws Exception {
+        ExecutorAssignment active = assignment(ExecutorStatus.ACTIVE);
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN)).thenReturn(active);
+        stubDmsTriggered();
+        stubNoOpenRequest();
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+        when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
+        stubSave();
+
+        LocalDateTime before = LocalDateTime.now();
+        service.submit(assignmentId, LOGIN, pdf(), new CreateDeathVerificationRequest(List.of(vault1.getId()), null));
+
+        assertNotNull(active.getAcknowledgedAt());
+        assertFalse(active.getAcknowledgedAt().isBefore(before));
+        // Flush trước khi lưu file, để xung đột @Version với BR-03 không để lại file mồ côi.
+        var order = inOrder(executorAssignmentRepository, fileStorageService);
+        order.verify(executorAssignmentRepository).saveAndFlush(active);
+        order.verify(fileStorageService).storeFile(any(), any());
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), eq(AuditResult.SUCCESS),
+                eq(executor.getId()), eq(LOGIN), isNull(),
+                eq("ExecutorAssignment"), eq(assignmentId.toString()),
+                eq("ownerId=" + owner.getId() + ", executorType=PRIMARY, via=VERIFICATION_SUBMIT"));
+    }
+
+    @Test
+    @DisplayName("B2: already acknowledged -> acknowledgedAt kept, no save, no extra audit")
+    void submit_alreadyAcknowledged_keepsTimestampAndSkipsAudit() throws Exception {
+        LocalDateTime earlier = LocalDateTime.of(2026, 1, 1, 8, 0);
+        ExecutorAssignment active = assignment(ExecutorStatus.ACTIVE);
+        active.setAcknowledgedAt(earlier);
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN)).thenReturn(active);
+        stubDmsTriggered();
+        stubNoOpenRequest();
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+        when(cryptoService.encryptBytes(any())).thenReturn("cipher".getBytes(StandardCharsets.UTF_8));
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/files/cert.pdf");
+        stubSave();
+
+        service.submit(assignmentId, LOGIN, pdf(), new CreateDeathVerificationRequest(List.of(vault1.getId()), null));
+
+        assertEquals(earlier, active.getAcknowledgedAt());
+        verifyNoInteractions(executorAssignmentRepository);
+        verify(auditLogService, never()).log(eq(AuditAction.EXECUTOR_ACKNOWLEDGED), any(), any(), any(), any(),
+                any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("B2: DMS not triggered -> rejected and assignment not acknowledged")
+    void submit_dmsNotTriggered_doesNotAcknowledge() {
+        ExecutorAssignment active = assignment(ExecutorStatus.ACTIVE);
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN)).thenReturn(active);
+        DmsConfig config = new DmsConfig();
+        config.setStatus(DmsStatus.ACTIVE);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(owner.getId())).thenReturn(Optional.of(config));
+
+        assertThrows(DmsNotTriggeredException.class, () -> service.submit(assignmentId, LOGIN, pdf(),
+                new CreateDeathVerificationRequest(List.of(vault1.getId()), null)));
+
+        assertNull(active.getAcknowledgedAt());
+        verifyNoInteractions(executorAssignmentRepository);
+    }
+
+    @Test
+    @DisplayName("B2: vault already has an open request -> rejected and assignment not acknowledged")
+    void submit_vaultBusy_doesNotAcknowledge() {
+        ExecutorAssignment active = assignment(ExecutorStatus.ACTIVE);
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN)).thenReturn(active);
+        stubDmsTriggered();
+        when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));
+        when(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(any(), any()))
+                .thenReturn(List.of(vault1.getId()));
+
+        assertThrows(DuplicateVerificationRequestException.class, () -> service.submit(assignmentId, LOGIN, pdf(),
+                new CreateDeathVerificationRequest(List.of(vault1.getId()), null)));
+
+        assertNull(active.getAcknowledgedAt());
+        verifyNoInteractions(executorAssignmentRepository);
+    }
+
+    @Test
     @DisplayName("Two vaults -> one audit row per vault, each carrying its vaultId")
     void submit_twoVaults_auditsEachVault() throws Exception {
-        stubActiveAssignment();
+        // Đã xác nhận từ trước, để chỉ còn audit LEGAL_VERIFICATION_REQUESTED (B2 không ghi thêm).
+        ExecutorAssignment acknowledged = assignment(ExecutorStatus.ACTIVE);
+        acknowledged.setAcknowledgedAt(LocalDateTime.now().minusDays(1));
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN)).thenReturn(acknowledged);
         stubDmsTriggered();
         stubNoOpenRequest();
         when(vaultRepository.findById(vault1.getId())).thenReturn(Optional.of(vault1));

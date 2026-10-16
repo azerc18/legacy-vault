@@ -12,6 +12,8 @@ import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService;
+import com.ltld.app.legacyvault.dto.executordto.MyExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
@@ -36,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -53,12 +56,49 @@ class ExecutorControllerSecurityTest {
     @MockitoBean private VerificationExchangeService verificationExchangeService;
     @MockitoBean private ExecutorAssetService executorAssetService;
     @MockitoBean private ExecutorHandoverService executorHandoverService;
+    @MockitoBean private ExecutorSelfService executorSelfService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(UUID userId) {
         return jwt().jwt(j -> j.subject(userId.toString()));
     }
 
+
+    @Test
+    void myAssignments_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/executor-assignments/me"))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(executorSelfService);
+    }
+
+    @Test
+    void myAssignments_withJwt_passesSubjectAndReturnsList() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID assignmentId = UUID.randomUUID();
+        when(executorSelfService.listMyAssignments(userId.toString()))
+                .thenReturn(List.of(MyExecutorAssignmentResponse.builder()
+                        .assignmentId(assignmentId)
+                        .ownerFullName("Owner A")
+                        .executorType(ExecutorType.PRIMARY)
+                        .status(ExecutorStatus.INACTIVE)
+                        .build()));
+
+        mockMvc.perform(get("/api/executor-assignments/me").with(token(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].assignmentId").value(assignmentId.toString()))
+                .andExpect(jsonPath("$.data[0].ownerFullName").value("Owner A"));
+        verify(executorSelfService).listMyAssignments(userId.toString());
+    }
+
+    @Test
+    void myAssignments_none_returnsEmptyList() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(executorSelfService.listMyAssignments(userId.toString())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/executor-assignments/me").with(token(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
     @Test
     void acknowledge_noToken_returns401() throws Exception {
         mockMvc.perform(post(ACKNOWLEDGE_URL, UUID.randomUUID()))
