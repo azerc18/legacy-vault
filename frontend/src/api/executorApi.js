@@ -1,73 +1,62 @@
-// Lớp truy cập dữ liệu cho module Executor (góc nhìn của user có role EXECUTOR).
-// Các trang CHỈ gọi hàm trong file này, không tự gọi axios/fetch.
-// BE hiện có: POST /api/executor-assignments/{id}/acknowledge (FR-07).
-// BE CHƯA có: API lấy danh sách hồ sơ của executor, API nộp giấy chứng tử -> đang mock.
-
+// API cho Digital Executor — khớp ExecutorController (/api/executor-assignments)
+// Mọi API (trừ /me) cần assignmentId và chỉ dùng được khi assignment đã ACTIVE (DMS đã kích hoạt), nếu không BE trả 403.
 import http from './http.js';
 
-const USE_MOCK = true;
+const BASE = '/executor-assignments';
+const unwrap = (res) => res.data?.data;
 
-const delay = (ms = 400) => new Promise((r) => setTimeout(r, ms));
+export const executorApi = {
+    // B1: các assignment chưa REVOKED của người đang đăng nhập
+    // -> [{ assignmentId, ownerFullName, executorType, status, assignedAt, activatedAt, acknowledgedAt }]
+    listMine: () => http.get(`${BASE}/me`).then((r) => unwrap(r) ?? []),
 
-// ---------- DỮ LIỆU GIẢ ----------
-// Mỗi phần tử = 1 ExecutorAssignment mà user đang đăng nhập là executorUser.
-// status: INACTIVE (owner còn sống, chờ) | ACTIVE (DMS đã kích hoạt) | REVOKED
-// verificationStatus: NOT_SUBMITTED | PENDING | APPROVED | SIGNED | REJECTED (hồ sơ pháp lý gửi Legal Verifier)
-// vault.status: LOCKED | UNLOCKED
-let mockCases = [
-    {
-        id: 'a1',
-        ownerName: 'John Doe',
-        ownerEmail: 'john@example.com',
-        executorType: 'PRIMARY',
-        status: 'ACTIVE',
-        activatedAt: '2026-10-12T09:30:00',
-        acknowledgedAt: null,
-        verificationStatus: 'NOT_SUBMITTED',
-        vaults: [
-            { id: 'v1', name: 'Family Trust & Wills', status: 'LOCKED', assetCount: 4 },
-            { id: 'v2', name: 'Crypto & Digital Assets', status: 'LOCKED', assetCount: 7 },
-        ],
-    },
-    {
-        id: 'a3',
-        ownerName: 'Tran Van B',
-        ownerEmail: 'tvb@example.com',
-        executorType: 'PRIMARY',
-        status: 'ACTIVE',
-        activatedAt: '2026-09-20T08:00:00',
-        acknowledgedAt: '2026-09-21T10:15:00',
-        verificationStatus: 'SIGNED',
-        vaults: [{ id: 'v3', name: 'Personal Directives', status: 'UNLOCKED', assetCount: 3 }],
-    },
-    {
-        id: 'a2',
-        ownerName: 'Alice Smith',
-        ownerEmail: 'alice@example.com',
-        executorType: 'BACKUP',
-        status: 'INACTIVE',
-        activatedAt: null,
-        acknowledgedAt: null,
-        verificationStatus: 'NOT_SUBMITTED',
-        vaults: [],
-    },
-];
+    // FR-07: xác nhận đã nhận thông báo kích hoạt -> { id, executorType, status, activatedAt, acknowledgedAt }
+    acknowledge: (assignmentId) => http.post(`${BASE}/${assignmentId}/acknowledge`).then(unwrap),
 
-// ---------- HÀM CÔNG KHAI ----------
-export async function getMyCases() {
-    if (USE_MOCK) { await delay(); return mockCases.map((c) => ({ ...c, vaults: [...c.vaults] })); }
-    return (await http.get('/executor-assignments/me')).data.data; // TODO: BE chưa có endpoint này
+    // FR-08: vault + tài sản (chỉ metadata)
+    // -> { assignmentId, ownerFullName, vaults: [{ vaultId, name, status, handoverInstructions,
+    //      beneficiary: { id, fullName } | null, beneficiaryPending, assets: [{ assetId, assetType, assetName }] }] }
+    getVaults: (assignmentId) => http.get(`${BASE}/${assignmentId}/vaults`).then(unwrap),
+
+    // FR-10: tiến độ bàn giao từng vault
+    // -> [{ vaultId, vaultName, handoverStatus, requestId, requestedAt, decidedAt, rejectionReason, unlockedAt, claimDeadlineAt }]
+    getProgress: (assignmentId) => http.get(`${BASE}/${assignmentId}/handover-progress`).then((r) => unwrap(r) ?? []),
+
+    // FR-09: nộp giấy chứng tử (PDF/PNG/JPG thật, ≤10MB) cho 1..50 vault
+    submitVerification: (assignmentId, { file, vaultIds, notes }) => {
+        const form = new FormData();
+        form.append('file', file);
+        vaultIds.forEach((id) => form.append('vaultIds', id)); // Spring bind List<UUID> từ tham số lặp
+        if (notes) form.append('notes', notes);
+        return http.post(`${BASE}/${assignmentId}/verification-requests`, form).then(unwrap);
+    },
+
+    // FR-11: trao đổi với Legal Verifier (nội dung ≤2000 ký tự và/hoặc 1 tệp)
+    getMessages: (assignmentId, requestId) =>
+        http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`).then((r) => unwrap(r) ?? []),
+    sendMessage: (assignmentId, requestId, { content, file }) => {
+        const form = new FormData();
+        if (content) form.append('content', content);
+        if (file) form.append('file', file);
+        return http.post(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`, form).then(unwrap);
+    },
+};
+
+// Bước hiện tại của 1 hồ sơ, dựa trên assignment + tiến độ bàn giao
+// 0 = cần acknowledge, 1 = cần nộp giấy tờ, 2 = chờ xác minh, 3 = đã mở khoá / bàn giao
+export function caseStep(assignment, progress = []) {
+    if (!assignment.acknowledgedAt) return 0;
+    const live = progress.filter((p) => p.handoverStatus !== 'REJECTED');
+    if (live.length === 0) return 1;
+    if (live.some((p) => ['PENDING', 'VERIFIED'].includes(p.handoverStatus))) return 2;
+    return 3;
 }
 
-// FR-07: executor xác nhận đã nhận thông báo kích hoạt
-export async function acknowledgeAssignment(id) {
-    if (USE_MOCK) {
-        await delay();
-        const c = mockCases.find((x) => x.id === id);
-        if (!c) throw new Error('Assignment not found');
-        if (c.status !== 'ACTIVE') throw new Error('Only active assignments can be acknowledged');
-        c.acknowledgedAt = new Date().toISOString();
-        return { id: c.id, status: c.status, acknowledgedAt: c.acknowledgedAt };
-    }
-    return (await http.post(`/executor-assignments/${id}/acknowledge`)).data.data;
-}
+export const HANDOVER_LABEL = {
+    PENDING: { label: 'Waiting for verifier', cls: 'bg-warning-container text-on-warning-container' },
+    VERIFIED: { label: 'Approved, awaiting signature', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
+    REJECTED: { label: 'Rejected', cls: 'bg-error-container text-on-error-container' },
+    UNLOCKED: { label: 'Unlocked for beneficiary', cls: 'bg-success-container text-on-success-container' },
+    CLAIMED: { label: 'Received by beneficiary', cls: 'bg-success-container text-on-success-container' },
+    ARCHIVED_LOCKED: { label: 'Expired', cls: 'bg-surface-container text-outline' },
+};

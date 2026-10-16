@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { saveSession, ROLES } from '../auth/auth.js';
+import { saveSession, ROLES, getUser } from '../auth/auth.js';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -12,6 +12,12 @@ export default function Login() {
     const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [needVerify, setNeedVerify] = useState(false);
+
+    // Đã đăng nhập -> không cho vào lại trang login
+    const current = getUser();
+    if (current) {
+        return <Navigate to={current.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home' : '/home'} replace />;
+    }
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -100,7 +106,7 @@ export default function Login() {
                         className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
                     >
                         <span className="material-symbols-outlined text-[18px]">login</span>
-                        Sign in
+                        {loading ? 'Signing in...' : 'Sign in'}
                     </button>
                 </form>
 

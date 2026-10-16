@@ -8,7 +8,8 @@ const FEATURES = [
     // Vault Owner
     { role: 'OWNER', icon: 'inventory_2', title: 'My vaults', text: 'Create vaults, add documents, choose beneficiaries.', to: '/owner/vaults' },
     { role: 'OWNER', icon: 'favorite', title: "Dead Man's Switch", text: 'Set your check-in schedule and check in.', to: '/owner/dms' },
-    { role: 'OWNER', icon: 'badge', title: 'Executors', text: 'Assign your primary and backup executor.', to: '/owner/executors' },  // Beneficiary
+    { role: 'OWNER', icon: 'badge', title: 'Executors', text: 'Assign your primary and backup executor.', to: '/owner/executors' },
+    // Beneficiary
     { role: 'BENEFICIARY', icon: 'redeem', title: 'Inherited vaults', text: 'Verify your identity and receive assets.', to: '/beneficiary' },
     // Executor
     { role: 'EXECUTOR', icon: 'badge', title: 'Executor duties', text: 'See vaults where you are the executor.', to: '/executor/home' },        // Legal Verifier
@@ -76,7 +77,7 @@ export default function UserHome() {
             {/* Top bar */}
             <header className="bg-surface-container-lowest border-b border-outline-variant/30">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
+                    <Link to="/home" className="flex items-center gap-2">
                         <span className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
                             <Icon name="shield_locked" className="text-[20px]" />
                         </span>
