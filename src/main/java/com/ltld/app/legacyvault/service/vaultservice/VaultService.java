@@ -29,4 +29,3 @@ public interface VaultService {
     Page<VaultResponse> getAllVaultsForAdmin(VaultStatus status, Pageable pageable);
     AdminVaultDetailResponse getAdminVaultDetail(UUID vaultId, UUID adminId);
 }
-

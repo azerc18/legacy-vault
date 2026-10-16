@@ -44,6 +44,7 @@ class DocumentServiceImplTest {
     @Mock private CryptoService cryptoService;
     @Mock private FileStorageService fileStorageService;
     @Mock private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
+    @Mock private com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard vaultModificationGuard;
 
     @InjectMocks private DocumentServiceImpl documentService;
 
@@ -248,8 +249,8 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    @DisplayName("deleteDocument: Xóa file vật lý và xóa bản ghi DB khi két ACTIVE")
-    void deleteDocument_Success() throws Exception {
+    @DisplayName("deleteDocument (M2b): Chỉ xóa file vật lý SAU KHI transaction commit thành công")
+    void deleteDocument_deletesFileOnlyAfterCommit() throws Exception {
         UUID docId = UUID.randomUUID();
         LegalDocument doc = LegalDocument.builder()
                 .id(docId)
@@ -260,13 +261,98 @@ class DocumentServiceImplTest {
 
         when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
 
-        documentService.deleteDocument(docId, ownerId);
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.deleteDocument(docId, ownerId);
 
-        verify(fileStorageService).deleteFile("uploads/encrypted_dichuc.bin");
-        verify(legalDocumentRepository).delete(doc);
-        verify(auditLogService).log(eq(AuditAction.DOCUMENT_DELETED), eq(AuditResult.SUCCESS),
-                eq(ownerId), eq("owner@example.com"), eq(vaultId),
-                eq("LegalDocument"), eq(docId.toString()), any());
+            // DB record bị xóa trong transaction
+            verify(legalDocumentRepository).delete(doc);
+            verify(legalDocumentRepository).flush();
+            // Nhưng TRƯỚC KHI commit thì file vật lý TUYỆT ĐỐI CHƯA ĐƯỢC XÓA
+            verify(fileStorageService, never()).deleteFile(any());
+
+            // Giả lập Spring commit transaction
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .getSynchronizations().forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+
+            // Sau commit thì file vật lý mới được xóa
+            verify(fileStorageService).deleteFile("uploads/encrypted_dichuc.bin");
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("deleteDocument (M2a): Lỗi xóa file vật lý trong afterCommit không làm hỏng request (không ném 500)")
+    void deleteDocument_fileDeleteFails_afterCommit_doesNotThrow() throws Exception {
+        UUID docId = UUID.randomUUID();
+        LegalDocument doc = LegalDocument.builder()
+                .id(docId)
+                .vault(mockVault)
+                .fileName("dichuc_2026.pdf")
+                .fileUrlEncrypted("uploads/encrypted_dichuc.bin")
+                .build();
+
+        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
+        doThrow(new RuntimeException("Disk error on file deletion")).when(fileStorageService).deleteFile(any());
+
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.deleteDocument(docId, ownerId);
+            verify(legalDocumentRepository).delete(doc);
+
+            // Giả lập commit: afterCommit bị lỗi xóa file nhưng KHÔNG ném exception ra ngoài
+            org.junit.jupiter.api.Assertions.assertDoesNotThrow(() ->
+                    org.springframework.transaction.support.TransactionSynchronizationManager
+                            .getSynchronizations().forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit));
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("deleteDocument (M2 - Khóa ngoại): DB flush ném DataIntegrityViolationException -> Trả 409 CONFLICT")
+    void deleteDocument_foreignKeyConflict_throwsConflict() {
+        UUID docId = UUID.randomUUID();
+        LegalDocument doc = LegalDocument.builder()
+                .id(docId)
+                .vault(mockVault)
+                .fileName("dichuc_2026.pdf")
+                .fileUrlEncrypted("uploads/encrypted_dichuc.bin")
+                .build();
+
+        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
+        doThrow(new org.springframework.dao.DataIntegrityViolationException("FK constraint violation"))
+                .when(legalDocumentRepository).flush();
+
+        assertThatThrownBy(() -> documentService.deleteDocument(docId, ownerId))
+                .isInstanceOf(VaultException.class)
+                .hasMessageContaining("Tài liệu đang được dùng trong hồ sơ xác minh, không thể xóa.")
+                .extracting("status").isEqualTo(HttpStatus.CONFLICT);
+
+        // Đảm bảo không đăng ký xóa file
+        verify(fileStorageService, never()).deleteFile(any());
+    }
+
+    @Test
+    @DisplayName("deleteDocument (m3): Bị chặn bởi VaultModificationGuard (DMS triggered / có hồ sơ xác minh mở) -> Trả 409 CONFLICT")
+    void deleteDocument_guardBlocked_throwsConflict() {
+        UUID docId = UUID.randomUUID();
+        LegalDocument doc = LegalDocument.builder()
+                .id(docId)
+                .vault(mockVault)
+                .build();
+
+        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
+        doThrow(new VaultException("Cannot modify vault while a verification request is pending or approved", HttpStatus.CONFLICT))
+                .when(vaultModificationGuard).ensureModifiable(mockVault);
+
+        assertThatThrownBy(() -> documentService.deleteDocument(docId, ownerId))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.CONFLICT);
+
+        verify(legalDocumentRepository, never()).delete(any());
+        verify(fileStorageService, never()).deleteFile(any());
     }
 
     @Test
@@ -284,26 +370,6 @@ class DocumentServiceImplTest {
         assertThatThrownBy(() -> documentService.deleteDocument(docId, attackerId))
                 .isInstanceOf(VaultException.class)
                 .extracting("status").isEqualTo(HttpStatus.NOT_FOUND);
-
-        verify(fileStorageService, never()).deleteFile(any());
-        verify(legalDocumentRepository, never()).delete(any());
-    }
-
-    @Test
-    @DisplayName("deleteDocument: Két đã UNLOCKED -> Chặn 400 Bad Request")
-    void deleteDocument_NotActive_ThrowsBadRequest() {
-        UUID docId = UUID.randomUUID();
-        mockVault.setStatus(VaultStatus.UNLOCKED);
-        LegalDocument doc = LegalDocument.builder()
-                .id(docId)
-                .vault(mockVault)
-                .build();
-
-        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
-
-        assertThatThrownBy(() -> documentService.deleteDocument(docId, ownerId))
-                .isInstanceOf(VaultException.class)
-                .extracting("status").isEqualTo(HttpStatus.BAD_REQUEST);
 
         verify(fileStorageService, never()).deleteFile(any());
         verify(legalDocumentRepository, never()).delete(any());

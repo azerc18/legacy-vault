@@ -11,7 +11,6 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.MediaTypeFactory;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +28,6 @@ public class DocumentController {
 
     private final DocumentService documentService;
 
-    // FR-04: Owner upload tài liệu pháp lý vào Vault (mã hóa trước khi lưu)
     // Phải khai báo consumes = "multipart/form-data" vì gửi file khác với gửi JSON bình thường
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
@@ -39,9 +37,12 @@ public class DocumentController {
             @RequestParam("type") DocumentType type,
             @RequestParam("file") MultipartFile file) throws Exception {
 
+        // Lấy UUID của người dùng đang gọi API từ JWT Token
         UUID ownerId = UUID.fromString(principal.getName());
-        LegalDocument document = documentService.uploadDocument(ownerId, vaultId, type, file);
 
+        // Ném dữ liệu cho Service xử lý
+        LegalDocument document = documentService.uploadDocument(ownerId, vaultId, type, file);
+        
         DocumentResponse response = DocumentResponse.builder()
                 .id(document.getId())
                 .vaultId(document.getVault().getId())
@@ -49,7 +50,7 @@ public class DocumentController {
                 .fileName(document.getFileName())
                 .uploadedAt(document.getUploadedAt())
                 .build();
-
+                
         return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", response));
     }
 

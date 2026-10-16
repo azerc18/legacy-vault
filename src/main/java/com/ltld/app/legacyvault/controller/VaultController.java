@@ -15,6 +15,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,29 +32,31 @@ public class VaultController {
 
     private final VaultService vaultService;
 
-    // FR-01: Owner tạo Vault mới
+    // Khi Client gọi POST /api/vaults, hàm này chạy
     @PostMapping
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<VaultResponse>> createVault(
             Principal principal,
             @RequestBody CreateVaultRequest request) throws Exception {
 
+        // Lấy UUID của người dùng đang đăng nhập (chứng thực qua JWT)
         UUID ownerId = UUID.fromString(principal.getName());
         Vault vault = vaultService.createVault(ownerId, request);
-
+        
         VaultResponse response = VaultResponse.builder()
                 .id(vault.getId())
                 .name(vault.getName())
                 .description(vault.getDescription())
                 .status(vault.getStatus())
+                .ownerId(ownerId)
                 .createdAt(vault.getCreatedAt())
                 .updatedAt(vault.getUpdatedAt())
                 .build();
-
+                
         return ResponseEntity.ok(ApiResponse.success("Vault created successfully", response));
     }
 
-    // FR-01: Owner xóa Vault (chỉ khi ACTIVE)
+    // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy
     @DeleteMapping("/{vaultId}")
     @PreAuthorize("hasAuthority('VAULT_DELETE')")
     public ResponseEntity<ApiResponse<Void>> deleteVault(
@@ -110,14 +114,13 @@ public class VaultController {
     }
 
     // FR-20/Admin: Admin xem toàn bộ Vault, lọc theo trạng thái, phân trang
-    // Endpoint tách biệt /admin/all để không xung đột với /{vaultId} của Owner
     @GetMapping("/admin/all")
     @PreAuthorize("hasAuthority('ADMIN_MANAGE')")
-    public ResponseEntity<ApiResponse<Page<VaultResponse>>> getAllVaultsAdmin(
+    public ResponseEntity<ApiResponse<Page<VaultResponse>>> getAllVaultsForAdmin(
             @RequestParam(required = false) VaultStatus status,
-            Pageable pageable) {
+            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<VaultResponse> page = vaultService.getAllVaultsForAdmin(status, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault cho Admin thành công", page));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault thành công", page));
     }
 
     // FR-20/Admin: Admin xem chi tiết một Vault bất kỳ
@@ -130,5 +133,4 @@ public class VaultController {
         AdminVaultDetailResponse response = vaultService.getAdminVaultDetail(vaultId, adminId);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết Vault thành công", response));
     }
-
 }

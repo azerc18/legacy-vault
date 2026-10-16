@@ -84,6 +84,7 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             """)
     int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
                          @Param("purgeAt") LocalDateTime purgeAt);
+
     // Lấy danh sách Vault của Owner (mới nhất xếp trước)
     List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 

@@ -75,9 +75,7 @@ class VaultServiceImplTest {
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock
-    private DmsConfigRepository dmsConfigRepository;
-    @Mock
-    private VerificationRequestVaultRepository verificationRequestVaultRepository;
+    private VaultModificationGuard vaultModificationGuard;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -576,7 +574,7 @@ class VaultServiceImplTest {
     }
 
     @Test
-    @DisplayName("getAdminVaultDetail: Admin xem chi tiết bất kỳ két nào thành công")
+    @DisplayName("getAdminVaultDetail: Admin xem chi tiết bất kỳ két nào thành công và có ghi audit log")
     void getAdminVaultDetail_AsAdmin_Success() {
         Vault vault = activeVault();
         UUID vId = vault.getId();
@@ -585,10 +583,16 @@ class VaultServiceImplTest {
         when(digitalAssetRepository.countByVaultIdAndStatus(vId, AssetStatus.ACTIVE)).thenReturn(0L);
 
         UUID adminId = UUID.randomUUID();
+        User adminUser = userWith("admin@example.com", UserStatus.ACTIVE);
+        when(userRepository.findById(adminId)).thenReturn(Optional.of(adminUser));
+
         AdminVaultDetailResponse detail = vaultService.getAdminVaultDetail(vId, adminId);
 
         assertEquals(vId, detail.getId());
         assertEquals("owner@example.com", detail.getOwnerEmail());
+        verify(auditLogService).log(eq(AuditAction.ADMIN_VAULT_VIEWED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.com"), eq(vId),
+                eq("Vault"), eq(vId.toString()), any());
     }
 
     @Test
@@ -627,6 +631,7 @@ class VaultServiceImplTest {
 
         assertEquals("Tên két mới", response.getName());
         assertEquals("Mô tả mới", response.getDescription());
+        verify(vaultModificationGuard).ensureModifiable(vault);
         verify(vaultRepository).save(vault);
         verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId),
@@ -645,14 +650,34 @@ class VaultServiceImplTest {
                 () -> vaultService.updateVault(vault.getId(), attackerId, request));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
         verify(vaultRepository, never()).save(any());
+        verifyNoInteractions(vaultModificationGuard);
     }
 
     @Test
-    @DisplayName("updateVault: Két đã UNLOCKED -> Chặn 400 Bad Request")
+    @DisplayName("updateVault (m3): Két bị chặn bởi guard (DMS triggered / có xác minh mở) -> Chặn 409 CONFLICT")
+    void updateVault_guardBlocked_throwsConflict() {
+        Vault vault = activeVault();
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        doThrow(new VaultException("Cannot modify vault while a verification request is pending or approved", HttpStatus.CONFLICT))
+                .when(vaultModificationGuard).ensureModifiable(vault);
+
+        UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.updateVault(vault.getId(), ownerId, request));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateVault: Két không ACTIVE -> Guard ném 400 Bad Request")
     void updateVault_NotActive_ThrowsBadRequest() {
         Vault vault = activeVault();
         vault.setStatus(VaultStatus.UNLOCKED);
         when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        doThrow(new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST))
+                .when(vaultModificationGuard).ensureModifiable(vault);
+
         UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
 
         VaultException ex = assertThrows(VaultException.class,

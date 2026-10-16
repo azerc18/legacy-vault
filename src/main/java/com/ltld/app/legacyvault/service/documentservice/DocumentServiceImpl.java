@@ -5,28 +5,34 @@ import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DocumentType;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.exception.VaultException;
-import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
@@ -40,12 +46,22 @@ public class DocumentServiceImpl implements DocumentService {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
 
+    // Whitelist Content-Type cho file tải về (khớp với FR-04/FR-18)
+    private static final Map<String, String> DOCUMENT_MIME_TYPES = Map.of(
+            "pdf", "application/pdf",
+            "doc", "application/msword",
+            "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "png", "image/png");
+
     private final LegalDocumentRepository legalDocumentRepository;
     private final UserRepository userRepository;
     private final VaultRepository vaultRepository;
     private final CryptoService cryptoService;
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
+    private final VaultModificationGuard vaultModificationGuard;
 
     @Override
     @Transactional
@@ -135,11 +151,8 @@ public class DocumentServiceImpl implements DocumentService {
         byte[] encryptedBytes = fileStorageService.readFile(doc.getFileUrlEncrypted());
         byte[] decryptedBytes = cryptoService.decryptBytes(encryptedBytes);
 
-        // Suy ra Content-Type dựa trên tên file
-        String contentType = org.springframework.http.MediaTypeFactory
-                .getMediaType(doc.getFileName())
-                .map(org.springframework.http.MediaType::toString)
-                .orElse("application/octet-stream");
+        // m5: Whitelist Content-Type dựa trên đuôi file, mặc định application/octet-stream
+        String contentType = resolveContentType(doc.getFileName());
 
         // Ghi Audit Log thành công
         auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.SUCCESS,
@@ -164,31 +177,42 @@ public class DocumentServiceImpl implements DocumentService {
             throw new VaultException("Document not found", HttpStatus.NOT_FOUND);
         }
 
-        if (vault.getStatus() != com.ltld.app.legacyvault.enums.VaultStatus.ACTIVE) {
-            throw new VaultException("Cannot delete document from vault in " + vault.getStatus() + " state",
-                    HttpStatus.BAD_REQUEST);
-        }
+        // m3: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS, hồ sơ xác minh mở)
+        vaultModificationGuard.ensureModifiable(vault);
 
-        // M2: Xóa bản ghi DB TRONG transaction; xóa file vật lý SAU KHI commit thành công
-        // Nếu DB rollback → file vẫn còn nguyên, không mất tài liệu pháp lý
+        // M2: Xóa bản ghi DB TRONG transaction; bắt khóa ngoại ném 409 CONFLICT
         String fileUrl = doc.getFileUrlEncrypted();
-        legalDocumentRepository.delete(doc);
-        legalDocumentRepository.flush();
-
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    fileStorageService.deleteFile(fileUrl);
-                }
-            });
-        } else {
-            // Khi chạy ngoài Spring transaction (ví dụ: trong unit test)
-            fileStorageService.deleteFile(fileUrl);
+        try {
+            legalDocumentRepository.delete(doc);
+            legalDocumentRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new VaultException("Tài liệu đang được dùng trong hồ sơ xác minh, không thể xóa.", HttpStatus.CONFLICT);
         }
+
+        // M2a & M2b: Xóa file vật lý SAU KHI transaction commit thành công
+        // Nếu lỗi xóa file vật lý -> chỉ log warning, không để ném exception làm request trả 500
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    fileStorageService.deleteFile(fileUrl);
+                } catch (RuntimeException e) {
+                    log.warn("FR-04: document {} deleted but file not removed: {}", documentId, e.getMessage());
+                }
+            }
+        });
 
         auditLogService.log(AuditAction.DOCUMENT_DELETED, AuditResult.SUCCESS,
                 ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "LegalDocument", documentId.toString(), null);
+    }
+
+    private String resolveContentType(String fileName) {
+        if (fileName == null) {
+            return "application/octet-stream";
+        }
+        int dot = fileName.lastIndexOf('.');
+        String ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
+        return DOCUMENT_MIME_TYPES.getOrDefault(ext, "application/octet-stream");
     }
 }

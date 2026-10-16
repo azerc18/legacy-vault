@@ -98,6 +98,7 @@ public class VaultActivityLogServiceImpl implements VaultActivityLogService {
             case VAULT_DELETE_DENIED -> "Từ chối xóa két sắt: " + (detail != null ? detail : "");
             case DOCUMENT_UPLOADED -> "Tải lên tài liệu mới thành công.";
             case DOCUMENT_DELETED -> "Xóa tài liệu thành công.";
+            case ADMIN_VAULT_VIEWED -> "Quản trị viên xem chi tiết két sắt.";
             default -> "Thực hiện hành động: " + log.getAction();
         };
     }
