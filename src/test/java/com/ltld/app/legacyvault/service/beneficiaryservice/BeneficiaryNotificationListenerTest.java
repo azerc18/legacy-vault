@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -9,11 +10,14 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -21,6 +25,7 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -63,6 +68,7 @@ class BeneficiaryNotificationListenerTest {
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private NotificationRepository notificationRepository;
 
     private BeneficiaryNotificationListener listener;
 
@@ -79,7 +85,7 @@ class BeneficiaryNotificationListenerTest {
     void setUp() {
         listener = new BeneficiaryNotificationListener(vaultRepository, claimRepository,
                 executorAssignmentRepository, emailSender, executorNotificationService,
-                auditLogService, transactionManager);
+                auditLogService, notificationRepository, transactionManager);
     }
 
     private User beneficiary(UserStatus status) {
@@ -401,5 +407,89 @@ class BeneficiaryNotificationListenerTest {
             total = total.plus(BeneficiaryNotificationListener.retryDelay(attempts));
         }
         assertTrue(total.compareTo(Duration.ofDays(7)) >= 0);
+    }
+
+    @Test
+    void firstAttempt_mailOk_createsInAppNotification() {   // T1
+        User user = beneficiary(UserStatus.ACTIVE);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, user)));
+        stubNewClaimPersistence();
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification n = captor.getValue();
+        assertEquals(NotificationChannel.IN_APP, n.getChannel());
+        assertEquals(NotificationType.VAULT_UNLOCKED, n.getType());
+        assertEquals(vaultId, n.getReferenceId());
+        assertEquals(user, n.getRecipient());
+    }
+
+    @Test
+    void firstAttempt_mailFails_stillCreatesInApp() {        // T2 (chốt M1)
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, beneficiary(UserStatus.ACTIVE))));
+        stubNewClaimPersistence();
+        mailFails();
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    void retryAttempt_inAppAlreadyExists_notDuplicated() {   // T3
+        User user = beneficiary(UserStatus.ACTIVE);
+        Vault vault = unlockedVault(vaultId, user);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        stubExistingClaim(claim(vault, user, 1, null, LocalDateTime.now().minusHours(2)));
+        when(notificationRepository
+                .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
+                        user.getId(), NotificationType.VAULT_UNLOCKED, "Vault", vaultId))
+                .thenReturn(Optional.of(new Notification()));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        assertEquals(2, storedClaim.getNotifyAttempts());
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void retryAttempt_inAppMissing_isCreatedAsSelfHeal() {
+        User user = beneficiary(UserStatus.ACTIVE);
+        Vault vault = unlockedVault(vaultId, user);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        stubExistingClaim(claim(vault, user, 1, null, LocalDateTime.now().minusHours(2)));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    void firstAttempt_inAppAlreadyExists_notDuplicated() {   // T4
+        User user = beneficiary(UserStatus.ACTIVE);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, user)));
+        stubNewClaimPersistence();
+        when(notificationRepository
+                .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
+                        user.getId(), NotificationType.VAULT_UNLOCKED, "Vault", vaultId))
+                .thenReturn(Optional.of(new Notification()));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void inAppSaveFails_emailStillSent() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, beneficiary(UserStatus.ACTIVE))));
+        stubNewClaimPersistence();
+        when(notificationRepository.save(any(Notification.class))).thenThrow(new RuntimeException("db down"));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        assertEquals(1, storedClaim.getNotifyAttempts());
+        assertNotNull(storedClaim.getNotifiedAt());   // mail đã gửi, pha 3 vẫn chạy
     }
 }

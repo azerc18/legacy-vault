@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
@@ -17,6 +18,7 @@ import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.IdentityVerification;
 import com.ltld.app.legacyvault.entity.LegalDocument;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
@@ -25,6 +27,9 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.DocumentType;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -34,6 +39,7 @@ import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
@@ -95,6 +101,8 @@ public class BeneficiaryServiceImplTest {
     @Mock
     private OtpGenerator otpGenerator;
     @Mock private AuditLogService auditLogService;
+    @Mock
+    private NotificationRepository notificationRepository;
     @InjectMocks
     private BeneficiaryServiceImpl beneficiaryService;
     @Mock
@@ -1808,6 +1816,53 @@ public class BeneficiaryServiceImplTest {
         assertThat(beneficiaryService.listMyVaults(currentUserId)).isEmpty();
 
         verify(claimRepository, never()).findByVaultIdIn(any());
+    }
+
+    @Test
+    void listMyNotifications_returnsInAppNotificationsOfCaller() {
+        UUID vid = UUID.randomUUID();
+        Notification unread = Notification.builder().id(UUID.randomUUID()).type(NotificationType.VAULT_UNLOCKED)
+                .channel(NotificationChannel.IN_APP).referenceType("Vault").referenceId(vid)
+                .content("Hồ sơ A đã được bàn giao").status(NotificationStatus.SENT)
+                .createdAt(LocalDateTime.now()).build();
+        Notification read = Notification.builder().id(UUID.randomUUID()).type(NotificationType.VAULT_UNLOCKED)
+                .channel(NotificationChannel.IN_APP).referenceType("Vault").referenceId(UUID.randomUUID())
+                .content("Hồ sơ B đã được bàn giao").status(NotificationStatus.READ)
+                .createdAt(LocalDateTime.now().minusDays(1)).build();
+        when(notificationRepository.findTop50ByRecipientIdAndChannelOrderByCreatedAtDesc(
+                currentUserId, NotificationChannel.IN_APP)).thenReturn(List.of(unread, read));
+
+        List<BeneficiaryNotificationResponse> result = beneficiaryService.listMyNotifications(currentUserId);
+
+        assertEquals(2, result.size());
+        assertEquals(vid, result.get(0).getVaultId());
+        assertThat(result.get(0).isRead()).isFalse();
+        assertThat(result.get(1).isRead()).isTrue();
+    }
+
+    @Test
+    void markNotificationRead_setsStatusRead() {
+        UUID nid = UUID.randomUUID();
+        Notification n = Notification.builder().id(nid).type(NotificationType.VAULT_UNLOCKED)
+                .channel(NotificationChannel.IN_APP).status(NotificationStatus.SENT).build();
+        when(notificationRepository.findByIdAndRecipientIdAndChannel(nid, currentUserId, NotificationChannel.IN_APP))
+                .thenReturn(Optional.of(n));
+
+        beneficiaryService.markNotificationRead(nid, currentUserId);
+
+        assertEquals(NotificationStatus.READ, n.getStatus());
+        verify(notificationRepository).save(n);
+    }
+
+    @Test
+    void markNotificationRead_notOwned_throws404() {
+        UUID nid = UUID.randomUUID();
+        when(notificationRepository.findByIdAndRecipientIdAndChannel(nid, currentUserId, NotificationChannel.IN_APP))
+                .thenReturn(Optional.empty());
+
+        expectError(HttpStatus.NOT_FOUND, () -> beneficiaryService.markNotificationRead(nid, currentUserId));
+
+        verify(notificationRepository, never()).save(any());
     }
 
 }

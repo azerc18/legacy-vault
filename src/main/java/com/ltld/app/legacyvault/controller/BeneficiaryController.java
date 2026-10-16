@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
@@ -26,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,6 +64,22 @@ public class BeneficiaryController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(beneficiaryService.listMyVaults(currentUserId(principal))));
+    }
+
+    // FR-16: thông báo trong hệ thống
+    @GetMapping("/notifications")
+    public ResponseEntity<ApiResponse<List<BeneficiaryNotificationResponse>>> listMyNotifications(Principal principal) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.listMyNotifications(currentUserId(principal))));
+    }
+
+    // FR-16: đánh dấu thông báo đã đọc
+    @PatchMapping("/notifications/{notificationId}/read")
+    public ResponseEntity<ApiResponse<Void>> markNotificationRead(
+            Principal principal, @PathVariable UUID notificationId) {
+        beneficiaryService.markNotificationRead(notificationId, currentUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu đã đọc."));
     }
 
     // FR-17: Gửi OTP xác thực danh tính qua email
