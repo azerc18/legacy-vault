@@ -239,4 +239,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(e.getMessage()));
     }
+
+    @ExceptionHandler(AdminException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAdmin(AdminException e) {
+        return ResponseEntity.status(e.getStatus()).body(ApiResponse.error(e.getMessage()));
+    }
 }
