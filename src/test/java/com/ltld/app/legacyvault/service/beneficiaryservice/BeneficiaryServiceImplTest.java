@@ -100,8 +100,7 @@ public class BeneficiaryServiceImplTest {
     private EmailSender emailSender;
     @Mock
     private OtpGenerator otpGenerator;
-    @Mock
-    private AuditLogService auditLogService;
+    @Mock private AuditLogService auditLogService;
     @Mock
     private NotificationRepository notificationRepository;
     @InjectMocks

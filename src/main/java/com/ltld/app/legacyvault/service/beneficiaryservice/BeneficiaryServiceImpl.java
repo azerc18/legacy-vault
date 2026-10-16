@@ -69,6 +69,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     private static final int VERIFICATION_TTL_MINUTES = 15;
     private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
+    // Trùng với BeneficiaryNotificationListener.ENTITY_VAULT
+    private static final String REF_VAULT = "Vault";
     private static final int CLAIM_TIMEOUT_DAYS = 60;
 
     // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
@@ -159,7 +161,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                         .id(n.getId())
                         .type(n.getType())
                         .content(n.getContent())
-                        .vaultId("Vault".equals(n.getReferenceType()) ? n.getReferenceId() : null)
+                        .vaultId(REF_VAULT.equals(n.getReferenceType()) ? n.getReferenceId() : null)
                         .read(n.getStatus() == NotificationStatus.READ)
                         .createdAt(n.getCreatedAt())
                         .build())

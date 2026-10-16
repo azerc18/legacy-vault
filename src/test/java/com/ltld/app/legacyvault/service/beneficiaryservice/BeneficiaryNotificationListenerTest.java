@@ -438,17 +438,32 @@ class BeneficiaryNotificationListenerTest {
     }
 
     @Test
-    void retryAttempt_doesNotCreateAnotherInApp() {          // T3
+    void retryAttempt_inAppAlreadyExists_notDuplicated() {   // T3
         User user = beneficiary(UserStatus.ACTIVE);
         Vault vault = unlockedVault(vaultId, user);
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
-        // đã thử 1 lần, cách đây 2h (> retryDelay(1) = 1h) nên lượt này được phép chạy
         stubExistingClaim(claim(vault, user, 1, null, LocalDateTime.now().minusHours(2)));
+        when(notificationRepository
+                .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
+                        user.getId(), NotificationType.VAULT_UNLOCKED, "Vault", vaultId))
+                .thenReturn(Optional.of(new Notification()));
 
         listener.onVaultsUnlocked(event(vaultId));
 
         assertEquals(2, storedClaim.getNotifyAttempts());
         verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void retryAttempt_inAppMissing_isCreatedAsSelfHeal() {
+        User user = beneficiary(UserStatus.ACTIVE);
+        Vault vault = unlockedVault(vaultId, user);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        stubExistingClaim(claim(vault, user, 1, null, LocalDateTime.now().minusHours(2)));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(notificationRepository).save(any(Notification.class));
     }
 
     @Test
@@ -464,5 +479,17 @@ class BeneficiaryNotificationListenerTest {
         listener.onVaultsUnlocked(event(vaultId));
 
         verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void inAppSaveFails_emailStillSent() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, beneficiary(UserStatus.ACTIVE))));
+        stubNewClaimPersistence();
+        when(notificationRepository.save(any(Notification.class))).thenThrow(new RuntimeException("db down"));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        assertEquals(1, storedClaim.getNotifyAttempts());
+        assertNotNull(storedClaim.getNotifiedAt());   // mail đã gửi, pha 3 vẫn chạy
     }
 }

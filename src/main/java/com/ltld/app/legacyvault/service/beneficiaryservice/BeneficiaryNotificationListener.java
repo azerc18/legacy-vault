@@ -39,8 +39,8 @@ import java.util.UUID;
 /**
  * FR-16: khi Legal Verifier ký mở khóa (FR-14 phát VaultsUnlockedEvent), thông báo cho Beneficiary
  * của từng Vault. Mỗi Vault đi qua 3 pha:
- *  1. Chuẩn bị (giao dịch riêng): kiểm tra, tạo BeneficiaryClaim PENDING nếu chưa có, đếm lượt thử,
- *     ghi thông báo in-app ở lượt đầu (không phụ thuộc email), commit.
+ *  1. Chuẩn bị (giao dịch riêng): kiểm tra, tạo BeneficiaryClaim PENDING nếu chưa có, đếm lượt thử, commit.
+ *  1b. Thông báo in-app (giao dịch riêng, có try/catch): lỗi ở đây không được chặn email.
  *  2. Gửi mail (ngoài giao dịch, đồng bộ): lỗi thì không ghi notifiedAt, ghi audit FAILED.
  *  3. Ghi nhận (giao dịch riêng): chỉ khi gửi thành công mới set notifiedAt và ghi audit SUCCESS.
  * Vault chưa gửi được sẽ được BeneficiaryNotificationRetryScheduler gửi lại theo lịch giãn dần
@@ -126,6 +126,13 @@ public class BeneficiaryNotificationListener {
             return;
         }
 
+        // Pha 1b: thông báo trong hệ thống, giao dịch riêng; lỗi ở đây không được chặn email
+        try {
+            requiresNewTx.executeWithoutResult(status -> createInAppNotification(mail));
+        } catch (RuntimeException e) {
+            log.warn("FR-16: vault {} - in-app notification not saved: {}", vaultId, e.getClass().getSimpleName(), e);
+        }
+
         // Pha 2: gửi mail ngoài mọi giao dịch
         try {
             emailSender.sendVaultUnlockedNotification(mail.email(), mail.fullName(), mail.ownerName(),
@@ -141,7 +148,7 @@ public class BeneficiaryNotificationListener {
 
         // Pha 3: gửi thành công mới ghi notifiedAt
         try {
-            requiresNewTx.executeWithoutResult(status -> markNotified(mail));
+            requiresNewTx.executeWithoutResult(status -> markNotified(mail.claimId));
         } catch (RuntimeException e) {
             recordFailure(vaultId, "recipient=" + mail.email()
                     + ", mail sent but notifiedAt not saved: " + e.getClass().getSimpleName(), e);
@@ -239,11 +246,6 @@ public class BeneficiaryNotificationListener {
         String ownerName = owner != null && owner.getFullName() != null && !owner.getFullName().isBlank()
                 ? owner.getFullName() : OWNER_FALLBACK;
 
-        // FR-16: thông báo trong hệ thống ghi một lần ở lượt đầu, không phụ thuộc email gửi được hay không
-        if (claim.getNotifyAttempts() == 1) {
-            createInAppNotification(beneficiary, vault, claim, ownerName);
-        }
-
         // Chỉ cần danh sách Executor ở lần thử cuối (để báo khi bỏ cuộc)
         List<String> executorEmails = claim.getNotifyAttempts() >= MAX_NOTIFY_ATTEMPTS
                 ? activeExecutorEmails(owner) : List.of();
@@ -251,7 +253,8 @@ public class BeneficiaryNotificationListener {
         return new MailData(claim.getId(), vaultId, beneficiary.getEmail(), beneficiary.getFullName(),
                 ownerName, vault.getName(), claim.getClaimDeadlineAt(),
                 beneficiary.getStatus() != UserStatus.PENDING,   // nhánh 2a: PENDING = chưa kích hoạt
-                beneficiary.getStatus(), claim.getNotifyAttempts(), executorEmails);
+                beneficiary.getStatus(), claim.getNotifyAttempts(), executorEmails,
+                beneficiary);
     }
 
     private List<String> activeExecutorEmails(User owner) {
@@ -266,30 +269,30 @@ public class BeneficiaryNotificationListener {
     }
 
     // Pha 3: set notifiedAt (email đã gửi)
-    private void markNotified(MailData mail) {
-        claimRepository.findById(mail.claimId()).ifPresent(claim -> {
+    private void markNotified(UUID claimId) {
+        claimRepository.findById(claimId).ifPresent(claim -> {
             claim.setNotifiedAt(LocalDateTime.now());
             claimRepository.save(claim);
         });
     }
 
-    private void createInAppNotification(User beneficiary, Vault vault, BeneficiaryClaim claim, String ownerName) {
-        // Chống trùng khi sự kiện bị phát lại
+    // Idempotent: đã có thông báo VAULT_UNLOCKED cho Vault này thì bỏ qua; lượt thử lại tự bù nếu lượt trước lỗi
+    private void createInAppNotification(MailData mail) {
         boolean exists = notificationRepository
                 .findFirstByRecipientIdAndTypeAndReferenceTypeAndReferenceIdOrderByCreatedAtDesc(
-                        beneficiary.getId(), NotificationType.VAULT_UNLOCKED, ENTITY_VAULT, vault.getId())
+                        mail.beneficiary().getId(), NotificationType.VAULT_UNLOCKED, ENTITY_VAULT, mail.vaultId())
                 .isPresent();
         if (exists) {
             return;
         }
         notificationRepository.save(Notification.builder()
-                .recipient(beneficiary)
+                .recipient(mail.beneficiary())
                 .type(NotificationType.VAULT_UNLOCKED)
                 .channel(NotificationChannel.IN_APP)
                 .referenceType(ENTITY_VAULT)
-                .referenceId(vault.getId())
-                .content(String.format(MSG_IN_APP, vault.getName(), ownerName,
-                        EmailSender.formatDeadline(claim.getClaimDeadlineAt())))
+                .referenceId(mail.vaultId())
+                .content(String.format(MSG_IN_APP, mail.vaultName(), mail.ownerName(),
+                        EmailSender.formatDeadline(mail.claimDeadlineAt())))
                 .status(NotificationStatus.SENT)
                 .sentAt(LocalDateTime.now())
                 .build());
@@ -308,6 +311,7 @@ public class BeneficiaryNotificationListener {
     // Dữ liệu cần để gửi mail, lấy xong trong pha 1 để pha 2 không phải chạm vào entity lazy
     private record MailData(UUID claimId, UUID vaultId, String email, String fullName, String ownerName,
                             String vaultName, LocalDateTime claimDeadlineAt, boolean accountActive,
-                            UserStatus accountStatus, int attempt, List<String> executorEmails) {
+                            UserStatus accountStatus, int attempt, List<String> executorEmails,
+                            User beneficiary) {
     }
 }
