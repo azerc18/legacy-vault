@@ -93,9 +93,11 @@ public class VaultActivityLogServiceImpl implements VaultActivityLogService {
         }
         return switch (log.getAction()) {
             case VAULT_CREATED -> "Khởi tạo két sắt mới.";
+            case VAULT_UPDATED -> "Cập nhật thông tin két sắt.";
             case VAULT_DELETED -> "Xóa két sắt thành công.";
             case VAULT_DELETE_DENIED -> "Từ chối xóa két sắt: " + (detail != null ? detail : "");
             case DOCUMENT_UPLOADED -> "Tải lên tài liệu mới thành công.";
+            case DOCUMENT_DELETED -> "Xóa tài liệu thành công.";
             default -> "Thực hiện hành động: " + log.getAction();
         };
     }
