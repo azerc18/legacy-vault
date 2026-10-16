@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,7 +28,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -65,7 +65,6 @@ class DmsActivationProcessorTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
 
-    @InjectMocks
     private DmsActivationProcessor processor;
 
     private UUID ownerId;
@@ -79,6 +78,11 @@ class DmsActivationProcessorTest {
 
     @BeforeEach
     void setUp() {
+        // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
+        processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
+                notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
+                auditLogService, executorNotificationService);
+
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
         backupUserId = UUID.randomUUID();

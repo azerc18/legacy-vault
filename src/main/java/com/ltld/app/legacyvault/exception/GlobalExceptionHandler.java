@@ -113,6 +113,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
+    @ExceptionHandler(ExecutorManagementException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExecutorManagement(ExecutorManagementException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error("Malformed request body"));

@@ -92,4 +92,12 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // Admin tìm kiếm và lọc Vault theo trạng thái
     org.springframework.data.domain.Page<Vault> findByStatus(com.ltld.app.legacyvault.enums.VaultStatus status, org.springframework.data.domain.Pageable pageable);
 
+
+    // FR-06 (Q26): email này có đang là người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Vault nào của Owner không
+    @Query("""
+           select count(v) > 0 from Vault v left join v.beneficiary b
+           where v.owner.id = :ownerId
+             and (lower(b.email) = :email or lower(v.beneficiaryEmail) = :email)
+           """)
+    boolean existsBeneficiaryWithEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
 }
