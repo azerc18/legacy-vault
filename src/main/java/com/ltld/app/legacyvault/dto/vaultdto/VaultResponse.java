@@ -11,6 +11,7 @@ import java.util.UUID;
 @Builder
 public class VaultResponse {
     private UUID id;
+    private UUID ownerId;
     private String name;
     private String description;
     private VaultStatus status;

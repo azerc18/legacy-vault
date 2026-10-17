@@ -18,4 +18,7 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
 
     // FR-18 (phần 2): danh sách có thứ tự ổn định (mới nhất trước)
     List<LegalDocument> findByVaultIdOrderByUploadedAtDescIdDesc(UUID vaultId);
+
+    // Đếm số tài liệu trong Vault
+    int countByVaultId(UUID vaultId);
 }
