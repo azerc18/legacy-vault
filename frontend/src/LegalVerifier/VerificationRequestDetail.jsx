@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
     getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
+    getDocumentBlob,
 } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
-
+import VerificationMessages from './VerificationMessages.jsx';
 const RESEND_SECONDS = 60; // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 
 export default function VerificationRequestDetail() {
@@ -66,6 +67,22 @@ export default function VerificationRequestDetail() {
         try { setDocCheck(await verifyDocument(req.id)); }
         catch (e) { setError(getErrorMessage(e, 'Could not check the document.')); }
         finally { setBusy(false); }
+    };
+
+    // D1: mở giấy chứng tử trong tab mới
+    const handleViewDocument = async () => {
+        setError('');
+        // Mở tab trống ngay lúc bấm (trình duyệt không chặn), rồi nạp file vào sau
+        const tab = window.open('', '_blank');
+        try {
+            const res = await getDocumentBlob(req.id);
+            const url = URL.createObjectURL(res.data);
+            if (tab) tab.location.href = url;
+            else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
+        } catch (e) {
+            if (tab) tab.close();
+            setError(getErrorMessage(e, `Could not open the document (HTTP ${e.response?.status ?? 'no response'}).`));
+        }
     };
 
     const handleSendCode = async () => {
@@ -161,6 +178,13 @@ export default function VerificationRequestDetail() {
                                     className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
                                 >
                                     Check document
+                                </button>
+                                <button
+                                    onClick={handleViewDocument}
+                                    disabled={busy}
+                                    className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
+                                >
+                                    View document
                                 </button>
                             </div>
                         ) : (
@@ -277,6 +301,7 @@ export default function VerificationRequestDetail() {
                             </div>
                         )}
 
+                        <VerificationMessages requestId={req.id} status={req.status} />
                         <p className="text-xs text-outline mt-6 pt-6 border-t border-outline-variant/20 text-center">
                             This decision will be recorded in the system history.
                         </p>

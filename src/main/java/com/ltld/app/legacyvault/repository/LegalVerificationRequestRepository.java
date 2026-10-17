@@ -31,7 +31,7 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
         WHERE r.verifier.id = :verifierId
           AND r.status IN :statuses
           AND r.decidedAt >= :fromTime AND r.decidedAt < :toTime
-        ORDER BY r.decidedAt DESC
+                ORDER BY r.decidedAt DESC, r.id DESC
     """)
     List<LegalVerificationRequest> findHistory(@Param("verifierId") UUID verifierId,
                                                @Param("statuses") Collection<LegalVerificationStatus> statuses,

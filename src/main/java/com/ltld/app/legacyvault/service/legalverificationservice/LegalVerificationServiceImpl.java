@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.legalverificationservice;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.entity.DigitalSignature;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
@@ -11,6 +12,8 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -25,10 +28,14 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
@@ -72,6 +79,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
     private final EmailSender emailSender;
+    private final FileStorageService fileStorageService;
+    private final CryptoService cryptoService;
+    private final DmsConfigRepository dmsConfigRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -102,8 +113,66 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .valid(valid)
                 .message(valid
                         ? "Tài liệu hợp lệ"
-                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .png)")
+                        : "Tài liệu không hợp lệ (chỉ chấp nhận .pdf, .jpg, .jpeg, .png)")
                 .build();
+    }
+
+    // D1: Verifier xem giấy chứng tử
+    @Override
+    @Transactional(readOnly = true)
+    public VerificationDocumentDto getDocument(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = findRequestOrThrow(requestId);
+        assertNotConflictOfInterestForRead(request, verifierId);   // xung đột -> 404
+
+        // PENDING: verifier nào cũng xem được. Đã quyết định: chỉ verifier được giao
+        if (request.getStatus() != LegalVerificationStatus.PENDING
+                && (request.getVerifier() == null
+                || !verifierId.equals(request.getVerifier().getId()))) {
+            throw new NotAssignedVerifierException(
+                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được xem tài liệu.");
+        }
+
+        String email = emailOf(verifierId);
+        byte[] plain;
+        try {
+            plain = cryptoService.decryptBytes(
+                    fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
+        } catch (Exception e) {
+            log.error("Death certificate read/decrypt failed for request {}", requestId, e);
+            auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.FAILURE,
+                    verifierId, email, "LegalVerificationRequest", requestId.toString(),
+                    "Read or decrypt failed");
+            throw new IllegalStateException("Không thể đọc tài liệu. Vui lòng thử lại sau.");
+        }
+
+        String contentType = detectContentType(plain);
+        auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.SUCCESS,
+                verifierId, email, "LegalVerificationRequest", requestId.toString(), null);
+
+        return VerificationDocumentDto.builder()
+                .content(plain)
+                .contentType(contentType)
+                .fileName("giay-chung-tu-" + requestId + extensionOf(contentType))
+                .build();
+    }
+
+    private String detectContentType(byte[] b) {
+        if (b.length >= 4 && b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46)
+            return "application/pdf";                       // %PDF
+        if (b.length >= 4 && (b[0] & 0xFF) == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47)
+            return "image/png";
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF)
+            return "image/jpeg";
+        return "application/octet-stream";
+    }
+
+    private String extensionOf(String contentType) {
+        return switch (contentType) {
+            case "application/pdf" -> ".pdf";
+            case "image/png" -> ".png";
+            case "image/jpeg" -> ".jpg";
+            default -> ".bin";
+        };
     }
 
     // UC12: phê duyệt hồ sơ (chưa mở khóa Vault)
@@ -255,6 +324,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         // Xác thực thành công: hủy mã OTP đã dùng
         request.setSignOtpHash(null);
 
+        // D3: kiểm tra lại DMS và Executor trước khi mở khóa
+        assertHandoverStillValid(request);
+
         // Mọi Vault phải ACTIVE và thuộc đúng chủ sở hữu; sai 1 cái hủy cả lô
         List<VerificationRequestVault> links =
                 requestVaultRepository.findByRequestIdFetchVault(requestId);
@@ -342,11 +414,12 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 verifierId, statuses, fromTime, toTime, PageRequest.of(safePage, safeSize)));
     }
 
-    // Mock FR-13: hợp lệ nếu đường dẫn kết thúc bằng .pdf, .jpg hoặc .png
+    // Mock FR-13: hợp lệ nếu đường dẫn kết thúc bằng .pdf, .jpg, .jpeg hoặc .png
     private boolean mockVerifyDocument(String documentRef) {
         if (documentRef == null) return false;
         String ref = documentRef.toLowerCase();
-        return ref.endsWith(".pdf") || ref.endsWith(".jpg") || ref.endsWith(".png");
+        return ref.endsWith(".pdf") || ref.endsWith(".jpg")
+                || ref.endsWith(".jpeg") || ref.endsWith(".png");
     }
 
     private LegalVerificationRequest findRequestOrThrow(UUID requestId) {
@@ -358,6 +431,24 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private void assertPending(LegalVerificationRequest request) {
         if (request.getStatus() != LegalVerificationStatus.PENDING) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
+        }
+    }
+
+    // D3: kiểm tra lại ngay trước khi mở khóa (phòng dữ liệu bị chèn tay hoặc đổi sau khi duyệt)
+    private void assertHandoverStillValid(LegalVerificationRequest request) {
+        UUID ownerId = request.getOwner().getId();
+
+        boolean dmsTriggered = dmsConfigRepository.findByOwnerId(ownerId)
+                .map(c -> c.getStatus() == DmsStatus.TRIGGERED)
+                .orElse(false);
+        if (!dmsTriggered) {
+            throw new VaultStateConflictException("Dead Man's Switch của Owner chưa được kích hoạt.");
+        }
+
+        boolean executorActive = executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
+                ownerId, request.getExecutor().getId(), ExecutorStatus.ACTIVE);
+        if (!executorActive) {
+            throw new VaultStateConflictException("Executor của hồ sơ không còn quyền hoạt động với Owner này.");
         }
     }
 
@@ -397,8 +488,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // M3: lấy email người thao tác để ghi audit
     private String emailOf(UUID userId) {
-        User user = userRepository.getReferenceById(userId);
-        return user == null ? null : user.getEmail();
+        return userRepository.findById(userId).map(User::getEmail).orElse(null);
     }
 
     // 1 hồ sơ: lấy vault riêng

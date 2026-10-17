@@ -4,12 +4,15 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationRes
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -23,6 +26,8 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
@@ -30,6 +35,9 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +92,18 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private EmailSender emailSender;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @Mock
+    private CryptoService cryptoService;
+
+    @Mock
+    private DmsConfigRepository dmsConfigRepository;
+
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -221,9 +241,18 @@ public class LegalVerificationServiceImplTest {
         return Vault.builder().id(UUID.randomUUID()).status(status).owner(pendingRequest.getOwner()).build();
     }
 
+    // D3: giả lập DMS của Owner đã TRIGGERED và Executor của hồ sơ còn ACTIVE
+    private void handoverStillValid() {
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.TRIGGERED).build()));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
+                ownerId, pendingRequest.getExecutor().getId(), ExecutorStatus.ACTIVE)).thenReturn(true);
+    }
+
     @Test
     void sign_success_savesSignatureUnlocksVaultAndSetsClaimDeadline() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -426,6 +455,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultNotActive_throwsAndDoesNotSignOrUnlock() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -446,6 +476,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_vaultOfAnotherOwner_throwsConflict() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -466,6 +497,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_noVaultLinked_throwsConflict() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -477,6 +509,63 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
+    }
+
+    // ---------- D3: kiểm tra lại DMS và Executor khi ký ----------
+
+    @Test
+    void sign_dmsNotTriggered_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.ACTIVE).build()));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
+    void sign_noDmsConfig_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
+    }
+
+    @Test
+    void sign_executorNoLongerActive_throwsConflictAndDoesNotSignOrUnlock() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.TRIGGERED).build()));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
+                ownerId, pendingRequest.getExecutor().getId(), ExecutorStatus.ACTIVE)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(signatureRepository, never()).save(any());
+        verifyNoInteractions(requestVaultRepository);
     }
 
     // ---------- UC13: verifyDocument (với kiểm tra N6) ----------
@@ -496,6 +585,14 @@ public class LegalVerificationServiceImplTest {
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThat(service.verifyDocument(requestId, verifierId).isValid()).isFalse();
+    }
+
+    @Test
+    void verifyDocument_jpegFormat_returnsValid() {
+        pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.jpeg");
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThat(service.verifyDocument(requestId, verifierId).isValid()).isTrue();
     }
 
     @Test
@@ -650,5 +747,47 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.getHistory(verifierId, null, from, to, 0, 20))
                 .isInstanceOf(InvalidDateRangeException.class);
+    }
+
+    // ---------- getDocument (D1) ----------
+
+    @Test
+    void getDocument_verifierIsOwner_throwsNotFoundAndNeverReadsFile() throws Exception {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.getDocument(requestId, ownerId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+
+        verify(fileStorageService, never()).readFile(any());
+    }
+
+    @Test
+    void getDocument_pending_returnsDecryptedBytesAndPdfContentType() throws Exception {
+        byte[] cipher = "cipher-bytes".getBytes();
+        byte[] plain = "%PDF-1.4 noi dung giay chung tu".getBytes();
+
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+
+        VerificationDocumentDto dto = service.getDocument(requestId, verifierId);
+
+        assertThat(dto.getContent()).isEqualTo(plain);
+        assertThat(dto.getContentType()).isEqualTo("application/pdf");
+        assertThat(dto.getFileName()).endsWith(".pdf");
+        verify(auditLogService).log(eq(AuditAction.LEGAL_DOCUMENT_VIEWED), eq(AuditResult.SUCCESS),
+                eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
+    }
+
+    @Test
+    void getDocument_approvedByAnotherVerifier_throwsNotAssigned() throws Exception {
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        pendingRequest.setVerifier(User.builder().id(UUID.randomUUID()).build());
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.getDocument(requestId, verifierId))
+                .isInstanceOf(NotAssignedVerifierException.class);
+
+        verify(fileStorageService, never()).readFile(any());
     }
 }

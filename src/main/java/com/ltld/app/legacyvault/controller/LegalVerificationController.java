@@ -7,6 +7,14 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResp
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
+import java.nio.charset.StandardCharsets;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
+
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -61,6 +70,21 @@ public class LegalVerificationController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(service.verifyDocument(id, verifierId(jwt))));
+    }
+
+    // D1: xem/tải giấy chứng tử (đã giải mã)
+    @GetMapping("/{id}/document")
+    public ResponseEntity<byte[]> downloadDocument(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        VerificationDocumentDto doc = service.getDocument(id, verifierId(jwt));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(doc.getFileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(doc.getContent());
     }
 
     // UC12: phê duyệt (không cần body)

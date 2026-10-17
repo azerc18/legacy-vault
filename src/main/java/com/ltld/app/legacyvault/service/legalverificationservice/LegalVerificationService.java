@@ -5,7 +5,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationReque
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
-
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -37,4 +37,7 @@ public interface LegalVerificationService {
     List<VerificationRequestResponseDto> getHistory(
             UUID verifierId, LegalVerificationStatus status, LocalDate from, LocalDate to,
             int page, int size);
+
+    // D1: tải/xem giấy chứng tử (đã giải mã)
+    VerificationDocumentDto getDocument(UUID requestId, UUID verifierId);
 }
