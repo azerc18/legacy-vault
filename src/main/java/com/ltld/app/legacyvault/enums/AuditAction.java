@@ -28,7 +28,7 @@ public enum AuditAction {
     EXECUTOR_ASSIGNED, EXECUTOR_REPLACED,
     // D1: Verifier xem giấy chứng tử
     LEGAL_DOCUMENT_VIEWED,
-    VERIFICATION_ATTACHMENT_VIEWED
+    VERIFICATION_ATTACHMENT_VIEWED,
     // FR-01/FR-27: Cập nhật thông tin Két sắt
     VAULT_UPDATED,
     // FR-04: Xóa tài liệu pháp lý
