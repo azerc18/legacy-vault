@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
+import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
@@ -69,6 +70,7 @@ class BeneficiaryNotificationListenerTest {
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private NotificationRepository notificationRepository;
+    @Mock private AuditLogRepository auditLogRepository;
 
     private BeneficiaryNotificationListener listener;
 
@@ -85,7 +87,7 @@ class BeneficiaryNotificationListenerTest {
     void setUp() {
         listener = new BeneficiaryNotificationListener(vaultRepository, claimRepository,
                 executorAssignmentRepository, emailSender, executorNotificationService,
-                auditLogService, notificationRepository, transactionManager);
+                auditLogService, notificationRepository, auditLogRepository, transactionManager);
     }
 
     private User beneficiary(UserStatus status) {
@@ -95,6 +97,11 @@ class BeneficiaryNotificationListenerTest {
     private Vault unlockedVault(UUID id, User beneficiary) {
         return Vault.builder().id(id).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
                 .beneficiary(beneficiary).claimDeadlineAt(deadline).build();
+    }
+
+    private Vault pendingVault(String beneficiaryEmail) {
+        return Vault.builder().id(vaultId).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
+                .beneficiary(null).beneficiaryEmail(beneficiaryEmail).claimDeadlineAt(deadline).build();
     }
 
     private VaultsUnlockedEvent event(UUID... ids) {
@@ -251,7 +258,7 @@ class BeneficiaryNotificationListenerTest {
     }
 
     @Test
-    void noBeneficiary_sendsNothing_andAuditsFailure() {
+    void noBeneficiaryAndNoEmail_sendsNothing_andAuditsFailure() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault(vaultId, null)));
 
         listener.onVaultsUnlocked(event(vaultId));
@@ -491,5 +498,80 @@ class BeneficiaryNotificationListenerTest {
 
         assertEquals(1, storedClaim.getNotifyAttempts());
         assertNotNull(storedClaim.getNotifiedAt());   // mail đã gửi, pha 3 vẫn chạy
+    }
+
+    @Test
+    void pendingRegistration_sendsInvite_noClaim_notifiesActiveExecutors_andAudits() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
+        when(executorAssignmentRepository.findAllByOwnerId(owner.getId())).thenReturn(List.of(
+                executor("ex1@example.com", ExecutorStatus.ACTIVE),
+                executor("ex2@example.com", ExecutorStatus.REVOKED)));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender).sendVaultUnlockedNotification("an@example.com", null, "Bình", "Hồ sơ A", deadline, false, vaultId);
+        verify(claimRepository, never()).save(any());
+        verify(executorNotificationService).send(eq("ex1@example.com"), contains("Hồ sơ \"Hồ sơ A\""));
+        verify(executorNotificationService, never()).send(eq("ex2@example.com"), anyString());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                contains("pendingRegistration=true"));
+    }
+
+    @Test
+    void pendingRegistration_inviteMailFails_stillNotifiesExecutors_andAuditsFailure() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
+        when(executorAssignmentRepository.findAllByOwnerId(owner.getId()))
+                .thenReturn(List.of(executor("ex1@example.com", ExecutorStatus.ACTIVE)));
+        mailFails();
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(executorNotificationService).send(eq("ex1@example.com"), anyString());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
+                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                contains("pendingRegistration=true"));
+        verify(auditLogService, never()).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), any(), any(), any(),
+                any(), any(), any(), any());
+        verify(claimRepository, never()).save(any());
+    }
+
+    @Test
+    void pendingRegistration_noActiveExecutor_noError_auditsZeroOfZero() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
+        when(executorAssignmentRepository.findAllByOwnerId(owner.getId())).thenReturn(List.of());
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
+        verify(executorNotificationService, never()).send(any(), any());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                contains("executorsNotified=0/0"));
+    }
+
+    @Test
+    void pendingRegistration_eventReplayed_skipsDuplicate() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
+        when(auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED))
+                .thenReturn(true);
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
+        verify(executorNotificationService, never()).send(any(), any());
+    }
+
+    @Test
+    void pendingRegistration_missingClaimDeadline_auditsFailure() {
+        Vault vault = pendingVault("an@example.com");
+        vault.setClaimDeadlineAt(null);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
+                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()), contains("claimDeadlineAt"));
     }
 }
