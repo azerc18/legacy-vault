@@ -29,4 +29,10 @@ public enum AuditAction {
     // D1: Verifier xem giấy chứng tử
     LEGAL_DOCUMENT_VIEWED,
     VERIFICATION_ATTACHMENT_VIEWED
+    // FR-01/FR-27: Cập nhật thông tin Két sắt
+    VAULT_UPDATED,
+    // FR-04: Xóa tài liệu pháp lý
+    DOCUMENT_DELETED,
+    // FR-20: Admin xem chi tiết Két sắt
+    ADMIN_VAULT_VIEWED
 }
