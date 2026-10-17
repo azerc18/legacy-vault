@@ -29,6 +29,8 @@ public enum AuditAction {
     // D1: Verifier xem giấy chứng tử
     LEGAL_DOCUMENT_VIEWED,
     VERIFICATION_ATTACHMENT_VIEWED,
+    // FR-16 (Q25): Vault mở khóa khi Beneficiary chưa có tài khoản đã xác minh
+    BENEFICIARY_PENDING_NOTIFIED,
     // FR-01/FR-27: Cập nhật thông tin Két sắt
     VAULT_UPDATED,
     // FR-04: Xóa tài liệu pháp lý

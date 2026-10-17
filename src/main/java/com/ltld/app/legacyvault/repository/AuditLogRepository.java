@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.AuditLog;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.Repository;
@@ -9,6 +10,7 @@ import java.util.UUID;
 
 public interface AuditLogRepository extends Repository<AuditLog, UUID> {
     AuditLog save(AuditLog log);
+    boolean existsByVaultIdAndAction(UUID vaultId, AuditAction action);
     Page<AuditLog> findByActor_IdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
 
     @org.springframework.data.jpa.repository.Query(

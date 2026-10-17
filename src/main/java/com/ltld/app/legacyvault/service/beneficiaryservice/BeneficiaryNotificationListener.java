@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
+import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
@@ -46,6 +47,8 @@ import java.util.UUID;
  * Vault chưa gửi được sẽ được BeneficiaryNotificationRetryScheduler gửi lại theo lịch giãn dần
  * (retryDelay), tối đa MAX_NOTIFY_ATTEMPTS lần. Hết lượt thì ghi audit GAVE_UP và báo Executor ACTIVE
  * để liên hệ Beneficiary ngoài hệ thống.
+ *  * Q25: nếu Beneficiary chưa có tài khoản đã xác minh (chỉ có beneficiaryEmail) thì gửi mail mời đăng ký
+ *  * và báo Executor ACTIVE, không tạo claim; khi họ xác minh email, scheduler gửi thông báo bàn giao thường.
  */
 @Slf4j
 @Component
@@ -69,6 +72,10 @@ public class BeneficiaryNotificationListener {
             "Hệ thống không gửi được thông báo bàn giao hồ sơ \"%s\" của %s tới người thụ hưởng (%s) sau %d lần thử.%n"
                     + "Vui lòng liên hệ người thụ hưởng và hướng dẫn họ đăng nhập LegacyVault để nhận tài sản "
                     + "trước hạn %s (GMT+7).";
+    // Tham số: tên Vault, tên Owner, hạn nhận
+    private static final String MSG_PENDING_REGISTRATION =
+            "Hồ sơ \"%s\" của %s đã được mở khóa nhưng người thụ hưởng chưa có tài khoản đã xác minh.%n"
+                    + "Vui lòng liên hệ để họ đăng ký và xác minh email trước hạn nhận %s (GMT+7).";
 
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;
@@ -77,6 +84,7 @@ public class BeneficiaryNotificationListener {
     private final ExecutorNotificationService executorNotificationService;
     private final AuditLogService auditLogService;
     private final NotificationRepository notificationRepository;
+    private final AuditLogRepository auditLogRepository;
     private final TransactionTemplate requiresNewTx;
 
     public BeneficiaryNotificationListener(VaultRepository vaultRepository,
@@ -86,6 +94,7 @@ public class BeneficiaryNotificationListener {
                                            ExecutorNotificationService executorNotificationService,
                                            AuditLogService auditLogService,
                                            NotificationRepository notificationRepository,
+                                           AuditLogRepository auditLogRepository,
                                            PlatformTransactionManager transactionManager) {
         this.vaultRepository = vaultRepository;
         this.claimRepository = claimRepository;
@@ -94,6 +103,7 @@ public class BeneficiaryNotificationListener {
         this.executorNotificationService = executorNotificationService;
         this.auditLogService = auditLogService;
         this.notificationRepository = notificationRepository;
+        this.auditLogRepository = auditLogRepository;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -123,6 +133,10 @@ public class BeneficiaryNotificationListener {
     private void processVault(UUID vaultId, LocalDateTime now) {
         final MailData mail = tryPrepare(vaultId, now);
         if (mail == null) {
+            return;
+        }
+        if (mail.pendingRegistration()) {
+            notifyPendingRegistration(mail);
             return;
         }
 
@@ -182,6 +196,58 @@ public class BeneficiaryNotificationListener {
                         + ", executorsNotified=" + notified + "/" + mail.executorEmails().size());
     }
 
+    // Q25: Beneficiary chưa có tài khoản đã xác minh nên không có claim để theo dõi và không có retry.
+    // Mail mời lỗi vẫn phải báo Executor (đường dự phòng). Audit không ghi email bên thứ ba.
+    private void notifyPendingRegistration(MailData mail) {
+        UUID vaultId = mail.vaultId();
+        boolean mailSent = true;
+        try {
+            emailSender.sendVaultUnlockedNotification(mail.email(), null, mail.ownerName(),
+                    mail.vaultName(), mail.claimDeadlineAt(), false, vaultId);
+        } catch (RuntimeException e) {
+            mailSent = false;
+            recordFailure(vaultId, "pendingRegistration=true, invite send failed: "
+                    + e.getClass().getSimpleName(), e);
+        }
+
+        String content = String.format(MSG_PENDING_REGISTRATION, mail.vaultName(), mail.ownerName(),
+                EmailSender.formatDeadline(mail.claimDeadlineAt()));
+        int notified = notifyExecutors(vaultId, mail.executorEmails(), content);
+
+        if (mailSent) {
+            auditLogService.log(AuditAction.BENEFICIARY_PENDING_NOTIFIED, AuditResult.SUCCESS, null, null,
+                    vaultId, ENTITY_VAULT, vaultId.toString(),
+                    "pendingRegistration=true, executorsNotified=" + notified + "/" + mail.executorEmails().size());
+        }
+    }
+
+    private int notifyExecutors(UUID vaultId, List<String> executorEmails, String content) {
+        int notified = 0;
+        for (String executorEmail : executorEmails) {
+            try {
+                executorNotificationService.send(executorEmail, content);
+                notified++;
+            } catch (RuntimeException e) {
+                log.warn("FR-16: could not tell executor about vault {}: {}", vaultId, e.getMessage());
+            }
+        }
+        return notified;
+    }
+
+    // Pha 1 cho nhánh chờ đăng ký: không tạo claim, chỉ chặn phát lại sự kiện
+    private MailData preparePendingRegistration(Vault vault) {
+        UUID vaultId = vault.getId();
+        if (auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED)) {
+            log.info("FR-16: Vault {} already notified (pending registration), skip", vaultId);
+            return null;
+        }
+        User owner = vault.getOwner();
+        String ownerName = owner != null && owner.getFullName() != null && !owner.getFullName().isBlank()
+                ? owner.getFullName() : OWNER_FALLBACK;
+        return new MailData(null, vaultId, vault.getBeneficiaryEmail(), null, ownerName, vault.getName(),
+                vault.getClaimDeadlineAt(), false, null, 0, activeExecutorEmails(owner), null, true);
+    }
+
     private MailData tryPrepare(UUID vaultId, LocalDateTime now) {
         try {
             return requiresNewTx.execute(status -> prepare(vaultId, now));
@@ -199,9 +265,11 @@ public class BeneficiaryNotificationListener {
             return null;
         }
 
-        // SRS FR-16 precondition: Vault phải có Beneficiary được gán
+        // SRS FR-16 precondition: Vault phải có Beneficiary được gán, hoặc email đang chờ đăng ký (Q25)
         User beneficiary = vault.getBeneficiary();
-        if (beneficiary == null) {
+        boolean pendingRegistration = beneficiary == null
+                && vault.getBeneficiaryEmail() != null && !vault.getBeneficiaryEmail().isBlank();
+        if (beneficiary == null && !pendingRegistration) {
             auditFailure(vaultId, "no beneficiary assigned");
             return null;
         }
@@ -209,6 +277,9 @@ public class BeneficiaryNotificationListener {
         if (vault.getClaimDeadlineAt() == null) {
             auditFailure(vaultId, "vault has no claimDeadlineAt");
             return null;
+        }
+        if (pendingRegistration) {
+            return preparePendingRegistration(vault);
         }
 
         // Tạo claim PENDING nếu chưa có; initializeClaim sẽ dùng lại claim này
@@ -254,7 +325,7 @@ public class BeneficiaryNotificationListener {
                 ownerName, vault.getName(), claim.getClaimDeadlineAt(),
                 beneficiary.getStatus() != UserStatus.PENDING,   // nhánh 2a: PENDING = chưa kích hoạt
                 beneficiary.getStatus(), claim.getNotifyAttempts(), executorEmails,
-                beneficiary);
+                beneficiary, false);
     }
 
     private List<String> activeExecutorEmails(User owner) {
@@ -312,6 +383,6 @@ public class BeneficiaryNotificationListener {
     private record MailData(UUID claimId, UUID vaultId, String email, String fullName, String ownerName,
                             String vaultName, LocalDateTime claimDeadlineAt, boolean accountActive,
                             UserStatus accountStatus, int attempt, List<String> executorEmails,
-                            User beneficiary) {
+                            User beneficiary, boolean pendingRegistration) {
     }
 }
