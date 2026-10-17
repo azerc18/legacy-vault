@@ -33,6 +33,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
@@ -107,6 +109,8 @@ class DmsConfigIntegrationTest {
     private NotificationRepository notificationRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     private static final int INTERVAL_DAYS = 30;
     private static final int GRACE_DAYS = 7;
@@ -403,6 +407,33 @@ class DmsConfigIntegrationTest {
         }
         log.info("FR-03 concurrent first upsert: rounds with 409={} / {} (others: second call saw the row and updated it)",
                 conflictRounds, rounds);
+    }
+
+    // ---------- 7. Hàm chặn dùng chung (O1) ----------
+
+    @Test
+    void assertHandoverNotStarted_outsideTransaction_throwsIllegalTransactionState() {
+        Seed s = seed(true, false);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+
+        // MANDATORY: gọi ngoài transaction thì khóa FOR UPDATE vô nghĩa, phải bị từ chối ngay.
+        assertThatThrownBy(() -> dmsConfigService.assertHandoverNotStarted(s.ownerId))
+                .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    @Test
+    void assertHandoverNotStarted_insideTransaction_whenTriggered_returns409() {
+        Seed s = seed(true, false);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        DmsConfig config = config(s);
+        config.setStatus(DmsStatus.TRIGGERED);
+        dmsConfigRepository.saveAndFlush(config);
+
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(
+                tx -> dmsConfigService.assertHandoverNotStarted(s.ownerId)))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
     }
 
     // ---------- helpers ----------

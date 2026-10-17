@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -32,6 +33,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.";
+    static final String HANDOVER_STARTED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -135,6 +137,18 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
                 "nextCheckinDueAt=" + config.getNextCheckinDueAt());
         return toResponse(config);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void assertHandoverNotStarted(UUID ownerId) {
+        // Khóa như ensureDmsNotTriggered (FR-06): trigger FR-07 ghi trước thì chờ commit rồi thấy TRIGGERED;
+        // khóa trước thì trigger lỗi @Version và rollback. Chưa có DmsConfig thì không có gì để chặn.
+        dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
+                .filter(c -> c.getStatus() == DmsStatus.TRIGGERED)
+                .ifPresent(c -> {
+                    throw new DmsException(HANDOVER_STARTED_MESSAGE, HttpStatus.CONFLICT);
+                });
     }
 
     private DmsConfig findConfig(UUID ownerId) {

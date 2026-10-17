@@ -16,6 +16,14 @@ public interface DmsConfigService {
     /** Owner xác nhận còn sống: bắt đầu chu kỳ mới, lùi hạn trigger (FR-03). */
     DmsConfigResponse checkIn(UUID ownerId);
 
+    /**
+     * Chặn thao tác của Owner khi DMS đã kích hoạt quy trình bàn giao (TRIGGERED) -> DmsException 409.
+     * Dùng ở ĐẦU các thao tác của Owner bị cấm sau khi DMS kích hoạt (FR-02/FR-04/FR-27). Hàm khóa DmsConfig
+     * (PESSIMISTIC_FORCE_INCREMENT) để không chạy đua với trigger FR-07. Nơi gọi PHẢI đang trong transaction
+     * (MANDATORY), nếu không sẽ ném IllegalTransactionStateException. Chưa có DmsConfig hoặc trạng thái khác thì cho qua.
+     */
+    void assertHandoverNotStarted(UUID ownerId);
+
     /** Kết quả upsert; created = true khi vừa tạo cấu hình lần đầu (controller trả 201). */
     record UpsertResult(DmsConfigResponse config, boolean created) {
     }
