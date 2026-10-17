@@ -27,5 +27,11 @@ public enum AuditAction {
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)
     EXECUTOR_ASSIGNED, EXECUTOR_REPLACED,
     // FR-16 (Q25): Vault mở khóa khi Beneficiary chưa có tài khoản đã xác minh
-    BENEFICIARY_PENDING_NOTIFIED
+    BENEFICIARY_PENDING_NOTIFIED,
+    // FR-01/FR-27: Cập nhật thông tin Két sắt
+    VAULT_UPDATED,
+    // FR-04: Xóa tài liệu pháp lý
+    DOCUMENT_DELETED,
+    // FR-20: Admin xem chi tiết Két sắt
+    ADMIN_VAULT_VIEWED
 }
