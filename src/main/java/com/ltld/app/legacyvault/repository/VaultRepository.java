@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -83,6 +84,12 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             """)
     int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
                          @Param("purgeAt") LocalDateTime purgeAt);
+
+    // Lấy danh sách Vault của Owner (mới nhất xếp trước)
+    List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
+
+    // Admin tìm kiếm và lọc Vault theo trạng thái
+    Page<Vault> findByStatus(VaultStatus status, Pageable pageable);
 
     // FR-06 (Q26): email này có đang là người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Vault nào của Owner không
     @Query("""

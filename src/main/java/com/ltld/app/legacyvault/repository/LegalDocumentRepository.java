@@ -25,4 +25,6 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM LegalDocument d WHERE d.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+    // FR-27/FR-20: Đếm số lượng tài liệu trong Vault
+    long countByVaultId(UUID vaultId);
 }

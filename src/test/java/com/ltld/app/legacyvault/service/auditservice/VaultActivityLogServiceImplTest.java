@@ -12,6 +12,9 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -179,5 +183,82 @@ class VaultActivityLogServiceImplTest {
                 vaultId, ownerId, from, to, pageable))
                 .isInstanceOf(VaultException.class)
                 .satisfies(ex -> assertThat(((VaultException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    // Trả về description của một log duy nhất do owner thực hiện
+    private String describe(AuditAction action, Map<String, Object> metadata) {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        AuditLog log = AuditLog.builder()
+                .id(UUID.randomUUID())
+                .actor(owner)
+                .action(action)
+                .vaultId(vaultId)
+                .metadata(metadata)
+                .createdAt(Instant.now())
+                .build();
+        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), eq(pageable)))
+                .thenReturn(new PageImpl<>(List.of(log)));
+
+        return vaultActivityLogService.getVaultActivityLogs(vaultId, ownerId, null, null, pageable)
+                .getContent().get(0).getDescription();
+    }
+
+    static Stream<Arguments> newDescriptions() {
+        return Stream.of(
+                Arguments.of(AuditAction.BENEFICIARY_ASSIGNED, "Chỉ định người thụ hưởng cho két sắt."),
+                Arguments.of(AuditAction.BENEFICIARY_REPLACED, "Thay đổi người thụ hưởng của két sắt."),
+                Arguments.of(AuditAction.BENEFICIARY_ASSIGN_DENIED, "Từ chối chỉ định người thụ hưởng."),
+                Arguments.of(AuditAction.BENEFICIARY_LINKED, "Người thụ hưởng đã liên kết tài khoản với két sắt."),
+                Arguments.of(AuditAction.VAULT_UNLOCK, "Két sắt được mở khóa sau khi xác minh pháp lý."),
+                Arguments.of(AuditAction.VAULT_ARCHIVED, "Két sắt được lưu trữ do hết hạn nhận bàn giao."),
+                Arguments.of(AuditAction.CLAIM_COMPLETED, "Người thụ hưởng đã hoàn tất nhận bàn giao."),
+                Arguments.of(AuditAction.ASSET_VIEWED, "Xem chi tiết tài sản số."),
+                Arguments.of(AuditAction.ASSET_DOWNLOADED, "Tải xuống tài sản số."),
+                Arguments.of(AuditAction.DOCUMENT_DOWNLOADED, "Tải xuống tài liệu."),
+                Arguments.of(AuditAction.LEGAL_VERIFICATION_REQUESTED, "Gửi yêu cầu xác minh pháp lý."),
+                Arguments.of(AuditAction.BENEFICIARY_NOTIFIED, "Đã gửi thông báo bàn giao cho người thụ hưởng."),
+                Arguments.of(AuditAction.BENEFICIARY_NOTIFY_FAILED, "Gửi thông báo cho người thụ hưởng thất bại."),
+                Arguments.of(AuditAction.BENEFICIARY_NOTIFY_GAVE_UP,
+                        "Ngừng gửi thông báo cho người thụ hưởng sau nhiều lần thất bại."),
+                Arguments.of(AuditAction.BENEFICIARY_PENDING_NOTIFIED,
+                        "Đã gửi lời mời đăng ký tới người thụ hưởng (chưa có tài khoản)."),
+                Arguments.of(AuditAction.IDENTITY_OTP_SENT, "Gửi mã OTP xác minh danh tính người thụ hưởng."),
+                Arguments.of(AuditAction.IDENTITY_VERIFIED, "Người thụ hưởng xác minh danh tính thành công."),
+                Arguments.of(AuditAction.IDENTITY_VERIFY_FAILED, "Người thụ hưởng xác minh danh tính thất bại."),
+                Arguments.of(AuditAction.IDENTITY_LOCKED, "Tạm khóa xác minh danh tính do nhập sai quá số lần cho phép.")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("newDescriptions")
+    void buildDescription_vaultActions_haveVietnameseSentence(AuditAction action, String expected) {
+        String description = describe(action, Map.of("result", "SUCCESS"));
+
+        assertThat(description)
+                .isEqualTo(expected)
+                .doesNotStartWith("Thực hiện hành động");
+    }
+
+    @Test
+    void buildDescription_beneficiaryAssignDenied_doesNotLeakDetail() {
+        String beneficiaryUserId = UUID.randomUUID().toString();
+        String detail = "beneficiaryUserId=" + beneficiaryUserId + ", vault status LOCKED";
+
+        String description = describe(AuditAction.BENEFICIARY_ASSIGN_DENIED,
+                Map.of("result", "FAILURE", "email", "owner@example.com", "detail", detail));
+
+        assertThat(description)
+                .isEqualTo("Từ chối chỉ định người thụ hưởng.")
+                .doesNotContain(detail)
+                .doesNotContain(beneficiaryUserId)
+                .doesNotContain("owner@example.com");
+    }
+
+    @Test
+    void buildDescription_documentDownloadFailure_saysFailed() {
+        String description = describe(AuditAction.DOCUMENT_DOWNLOADED,
+                Map.of("result", "FAILURE", "detail", "Read or decrypt failed"));
+
+        assertThat(description).isEqualTo("Tải xuống tài liệu thất bại.");
     }
 }
