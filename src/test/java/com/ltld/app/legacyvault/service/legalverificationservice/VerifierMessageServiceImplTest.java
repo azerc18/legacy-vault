@@ -271,6 +271,7 @@ public class VerifierMessageServiceImplTest {
         when(messageRepository.findByIdAndRequestId(messageId, requestId)).thenReturn(Optional.of(m));
         when(fileStorageService.readFile("enc://att.pdf")).thenReturn(cipher);
         when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
 
         VerificationDocumentDto dto = service.getAttachment(requestId, messageId, verifierId);
 
@@ -278,7 +279,7 @@ public class VerifierMessageServiceImplTest {
         assertThat(dto.getContentType()).isEqualTo("application/pdf");
         assertThat(dto.getFileName()).isEqualTo("bosung.pdf");
         verify(auditLogService).log(eq(AuditAction.VERIFICATION_ATTACHMENT_VIEWED), eq(AuditResult.SUCCESS),
-                eq(verifierId), isNull(), eq("VerificationExchangeMessage"),
+                eq(verifierId), eq("v@test.com"), eq("VerificationExchangeMessage"),
                 eq(messageId.toString()), isNull());
     }
 

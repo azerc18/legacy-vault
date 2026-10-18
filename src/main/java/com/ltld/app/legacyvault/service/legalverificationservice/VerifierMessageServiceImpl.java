@@ -87,45 +87,36 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
                 .orElseThrow(() -> new IllegalStateException("Verifier not found."));
 
         String storedPath = null;
-        try {
-            if (hasFile) {
+        if (hasFile) {
+            try {
                 storedPath = fileStorageService.storeFile(file, encrypted);
-                registerCleanupOnRollback(storedPath);
+            } catch (Exception e) {
+                // bọc exception đã kiểm tra thành RuntimeException để transaction rollback
+                throw new IllegalStateException("Failed to send verification message", e);
             }
-
-            VerificationExchangeMessage saved = messageRepository.saveAndFlush(
-                    VerificationExchangeMessage.builder()
-                            .request(request)
-                            .sender(verifier)
-                            .senderRole(ExchangeSenderRole.VERIFIER)
-                            .content(content)
-                            .attachmentPath(storedPath)
-                            .attachmentName(hasFile ? sanitizeFileName(file.getOriginalFilename()) : null)
-                            .attachmentSize(hasFile ? file.getSize() : null)
-                            .build());
-
-            auditLogService.log(AuditAction.VERIFICATION_MESSAGE_SENT, AuditResult.SUCCESS,
-                    verifierId, verifier.getEmail(),
-                    "LegalVerificationRequest", requestId.toString(),
-                    "role=VERIFIER, hasAttachment=" + hasFile);
-
-            eventPublisher.publishEvent(
-                    new VerifierReplyPostedEvent(requestId, request.getExecutor().getId()));
-
-            return toResponse(saved, verifier);
-        } catch (Exception e) {
-            if (storedPath != null && !TransactionSynchronizationManager.isSynchronizationActive()) {
-                try {
-                    fileStorageService.deleteFile(storedPath);
-                } catch (Exception ex) {
-                    log.error("Failed to delete orphaned file after failure: {}", storedPath, ex);
-                }
-            }
-            if (e instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new IllegalStateException("Failed to send verification message", e);
+            registerCleanupOnRollback(storedPath);
         }
+
+        VerificationExchangeMessage saved = messageRepository.saveAndFlush(
+                VerificationExchangeMessage.builder()
+                        .request(request)
+                        .sender(verifier)
+                        .senderRole(ExchangeSenderRole.VERIFIER)
+                        .content(content)
+                        .attachmentPath(storedPath)
+                        .attachmentName(hasFile ? sanitizeFileName(file.getOriginalFilename()) : null)
+                        .attachmentSize(hasFile ? file.getSize() : null)
+                        .build());
+
+        auditLogService.log(AuditAction.VERIFICATION_MESSAGE_SENT, AuditResult.SUCCESS,
+                verifierId, verifier.getEmail(),
+                "LegalVerificationRequest", requestId.toString(),
+                "role=VERIFIER, hasAttachment=" + hasFile);
+
+        eventPublisher.publishEvent(
+                new VerifierReplyPostedEvent(requestId, request.getExecutor().getId()));
+
+        return toResponse(saved, verifier);
     }
 
     @Override
@@ -145,8 +136,9 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
             throw new IllegalStateException("Không thể đọc tệp đính kèm. Vui lòng thử lại sau.");
         }
 
+        String email = userRepository.findById(verifierId).map(User::getEmail).orElse(null);
         auditLogService.log(AuditAction.VERIFICATION_ATTACHMENT_VIEWED, AuditResult.SUCCESS,
-                verifierId, null, "VerificationExchangeMessage", messageId.toString(), null);
+                verifierId, email, "VerificationExchangeMessage", messageId.toString(), null);
 
         String name = message.getAttachmentName() != null ? message.getAttachmentName() : "attachment";
         return VerificationDocumentDto.builder()
