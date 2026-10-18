@@ -1,8 +1,12 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
+import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
@@ -24,6 +28,9 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +40,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VaultServiceImpl implements VaultService {
@@ -46,6 +54,7 @@ public class VaultServiceImpl implements VaultService {
     private final AuditLogService auditLogService;
     private final EmailSender emailSender;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final VaultModificationGuard vaultModificationGuard;
 
     @Override
     @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
@@ -94,9 +103,8 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        // 2. Bảo mật: Két của ai người nấy xóa
+        // 2. Chỉ chủ sở hữu mới được xóa
         if (!vault.getOwner().getId().equals(ownerId)) {
-            // Tra cứu email của kẻ gọi (caller/stranger), không lấy nhầm email của chủ két
             String callerEmail = userRepository.findById(ownerId)
                     .map(User::getEmail).orElse("unknown");
             auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
@@ -126,17 +134,20 @@ public class VaultServiceImpl implements VaultService {
 
         // N1: Chỉ xóa file vật lý SAU KHI DB commit thành công
         // Nếu bước trên rollback → file vẫn còn nguyên, không mất dữ liệu pháp lý
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    filesToDelete.forEach(fileStorageService::deleteFile);
-                }
-            });
-        } else {
-            // Khi chạy ngoài Spring transaction (ví dụ: trong unit test)
-            filesToDelete.forEach(fileStorageService::deleteFile);
-        }
+        // Method có @Transactional nên synchronization luôn active trong production
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                filesToDelete.forEach(url -> {
+                    try {
+                        fileStorageService.deleteFile(url);
+                    } catch (RuntimeException e) {
+                        // DB đã commit: để lại file mồ côi (vô hại), không làm hỏng request
+                        log.warn("FR-27/deleteVault: file not removed after vault deleted: {}", e.getMessage());
+                    }
+                });
+            }
+        });
 
         auditLogService.log(AuditAction.VAULT_DELETED, AuditResult.SUCCESS,
                 ownerId, ownerEmail, vault.getId(),
@@ -255,5 +266,144 @@ public class VaultServiceImpl implements VaultService {
                 .pendingRegistration(beneficiary == null)
                 .replaced(replaced)
                 .build();
+    }
+
+    // FR-27: Owner xem danh sách Vault của mình
+    @Override
+    @Transactional(readOnly = true)
+    public List<VaultResponse> getMyVaults(UUID ownerId) {
+        return vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
+                .stream()
+                .map(vault -> VaultResponse.builder()
+                        .id(vault.getId())
+                        .name(vault.getName())
+                        .description(vault.getDescription())
+                        .status(vault.getStatus())
+                        .ownerId(vault.getOwner() != null ? vault.getOwner().getId() : ownerId)
+                        .createdAt(vault.getCreatedAt())
+                        .updatedAt(vault.getUpdatedAt())
+                        .build())
+                .toList();
+    }
+
+    // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu)
+    @Override
+    @Transactional(readOnly = true)
+    public VaultDetailResponse getVaultDetail(UUID vaultId, UUID ownerId) {
+        // n3: Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
+        Vault vault = loadOwnedVault(vaultId, ownerId);
+
+        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
+
+        return VaultDetailResponse.builder()
+                .id(vault.getId())
+                .name(vault.getName())
+                .description(vault.getDescription())
+                .status(vault.getStatus())
+                .ownerId(vault.getOwner().getId())
+                .ownerEmail(vault.getOwner().getEmail())
+                .beneficiaryId(vault.getBeneficiary() != null ? vault.getBeneficiary().getId() : null)
+                .beneficiaryEmail(vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail())
+                .unlockedAt(vault.getUnlockedAt())
+                .claimDeadlineAt(vault.getClaimDeadlineAt())
+                .createdAt(vault.getCreatedAt())
+                .updatedAt(vault.getUpdatedAt())
+                .totalDocuments(docCount)
+                .totalAssets(assetCount)
+                .build();
+    }
+
+    // FR-27: Owner cập nhật tên/mô tả Vault
+    @Override
+    @Transactional
+    public VaultResponse updateVault(UUID vaultId, UUID ownerId, UpdateVaultRequest request) {
+        // m1: Trả 404 thay vì 403 để tránh lộ sự tồn tại của vault khi non-owner tra cứu
+        Vault vault = loadOwnedVault(vaultId, ownerId);
+
+        // m3: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS, hồ sơ xác minh mở)
+        vaultModificationGuard.ensureModifiable(vault);
+
+        vault.setName(request.getName());
+        vault.setDescription(request.getDescription());
+        Vault updated = vaultRepository.save(vault);
+
+        // m4: Ghi nhật ký cập nhật để audit trail đầy đủ
+        auditLogService.log(AuditAction.VAULT_UPDATED, AuditResult.SUCCESS,
+                ownerId, vault.getOwner().getEmail(), vaultId,
+                "Vault", vaultId.toString(), null);
+
+        return VaultResponse.builder()
+                .id(updated.getId())
+                .name(updated.getName())
+                .description(updated.getDescription())
+                .status(updated.getStatus())
+                .ownerId(updated.getOwner() != null ? updated.getOwner().getId() : ownerId)
+                .createdAt(updated.getCreatedAt())
+                .updatedAt(updated.getUpdatedAt())
+                .build();
+    }
+
+    // FR-20/Admin: Admin xem toàn bộ Vault, lọc theo trạng thái, phân trang
+    @Override
+    @Transactional(readOnly = true)
+    public Page<VaultResponse> getAllVaultsForAdmin(VaultStatus status, Pageable pageable) {
+        Page<Vault> page = (status != null)
+                ? vaultRepository.findByStatus(status, pageable)
+                : vaultRepository.findAll(pageable);
+
+        return page.map(v -> VaultResponse.builder()
+                .id(v.getId())
+                .name(v.getName())
+                .description(v.getDescription())
+                .status(v.getStatus())
+                .ownerId(v.getOwner().getId())
+                .createdAt(v.getCreatedAt())
+                .updatedAt(v.getUpdatedAt())
+                .build());
+    }
+
+    // FR-20/Admin: Xem chi tiết một Vault bất kỳ
+    @Override
+    @Transactional(readOnly = true)
+    public AdminVaultDetailResponse getAdminVaultDetail(UUID vaultId, UUID adminId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+
+        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
+
+        // m2: Ghi audit log khi Admin xem chi tiết Vault
+        String adminEmail = userRepository.findById(adminId)
+                .map(User::getEmail).orElse("unknown-admin");
+        auditLogService.log(AuditAction.ADMIN_VAULT_VIEWED, AuditResult.SUCCESS,
+                adminId, adminEmail, vaultId,
+                "Vault", vaultId.toString(), "Admin viewed vault detail");
+
+        return AdminVaultDetailResponse.builder()
+                .id(vault.getId())
+                .name(vault.getName())
+                .description(vault.getDescription())
+                .status(vault.getStatus())
+                .ownerId(vault.getOwner().getId())
+                .ownerEmail(vault.getOwner().getEmail())
+                .unlockedAt(vault.getUnlockedAt())
+                .claimDeadlineAt(vault.getClaimDeadlineAt())
+                .createdAt(vault.getCreatedAt())
+                .updatedAt(vault.getUpdatedAt())
+                .totalDocuments(docCount)
+                .totalAssets(assetCount)
+                .build();
+    }
+
+    // Tải Vault và kiểm tra quyền sở hữu — trả 404 (không phải 403) để tránh lộ sự tồn tại của vault (m1, n3)
+    private Vault loadOwnedVault(UUID vaultId, UUID ownerId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            // Không phân biệt "vault không tồn tại" và "không phải chủ" để chống ID enumeration
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
+        }
+        return vault;
     }
 }
