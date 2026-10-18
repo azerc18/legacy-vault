@@ -44,6 +44,20 @@ public class UploadedDocumentValidator {
         return bytes;
     }
 
+    /** Nhận diện content type theo magic bytes, dùng khi trả file đã giải mã về cho client. */
+    public static String detectContentType(byte[] b) {
+        if (b.length >= 4 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F') {
+            return "application/pdf";
+        }
+        if (b.length >= 4 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+            return "image/png";
+        }
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        return "application/octet-stream";
+    }
+
     private static String detectExtensionByMagicBytes(byte[] b) {
         if (b.length >= 4 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F') {
             return ".pdf";

@@ -15,7 +15,6 @@ import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.VerificationRequestClosedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
-import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationExchangeMessageRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -52,7 +51,7 @@ import static org.mockito.Mockito.when;
 public class VerifierMessageServiceImplTest {
 
     @Mock
-    private LegalVerificationRequestRepository requestRepository;
+    private VerifierAccessGuard verifierAccessGuard;
 
     @Mock
     private VerificationExchangeMessageRepository messageRepository;
@@ -102,9 +101,9 @@ public class VerifierMessageServiceImplTest {
                 .build();
     }
 
-    private void approvedByThisVerifier() {
-        request.setStatus(LegalVerificationStatus.APPROVED);
-        request.setVerifier(verifier);
+    // Guard cho phép verifierId truy cập hồ sơ
+    private void guardAllows(UUID forVerifierId) {
+        when(verifierAccessGuard.requireReadable(requestId, forVerifierId)).thenReturn(request);
     }
 
     private SendVerificationMessageRequest body(String content) {
@@ -115,7 +114,8 @@ public class VerifierMessageServiceImplTest {
 
     @Test
     void history_verifierIsOwner_throwsNotFound() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(verifierAccessGuard.requireReadable(requestId, ownerId))
+                .thenThrow(new VerificationRequestNotFoundException("not found"));
 
         assertThatThrownBy(() -> service.history(requestId, ownerId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
@@ -135,7 +135,7 @@ public class VerifierMessageServiceImplTest {
                 .attachmentSize(10L)
                 .createdAt(LocalDateTime.of(2026, 10, 16, 21, 0))
                 .build();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(messageRepository.findHistory(requestId)).thenReturn(List.of(m));
 
         List<VerificationMessageResponse> result = service.history(requestId, verifierId);
@@ -149,9 +149,8 @@ public class VerifierMessageServiceImplTest {
 
     @Test
     void history_approvedByAnotherVerifier_throwsNotAssigned() {
-        request.setStatus(LegalVerificationStatus.APPROVED);
-        request.setVerifier(User.builder().id(UUID.randomUUID()).build());
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(verifierAccessGuard.requireReadable(requestId, verifierId))
+                .thenThrow(new NotAssignedVerifierException("not assigned"));
 
         assertThatThrownBy(() -> service.history(requestId, verifierId))
                 .isInstanceOf(NotAssignedVerifierException.class);
@@ -163,7 +162,7 @@ public class VerifierMessageServiceImplTest {
 
     @Test
     void send_textOnly_savesVerifierMessageAuditsAndNotifiesExecutor() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
         when(messageRepository.saveAndFlush(any(VerificationExchangeMessage.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -196,7 +195,7 @@ public class VerifierMessageServiceImplTest {
     void send_requestRejected_throwsClosedAndDoesNotSave() {
         request.setStatus(LegalVerificationStatus.REJECTED);
         request.setVerifier(verifier);
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
 
         assertThatThrownBy(() -> service.send(requestId, verifierId, null, body("hi")))
                 .isInstanceOf(VerificationRequestClosedException.class);
@@ -207,7 +206,8 @@ public class VerifierMessageServiceImplTest {
 
     @Test
     void send_verifierIsExecutor_throwsNotFoundAndDoesNotSave() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(verifierAccessGuard.requireReadable(requestId, executorId))
+                .thenThrow(new VerificationRequestNotFoundException("not found"));
 
         assertThatThrownBy(() -> service.send(requestId, executorId, null, body("hi")))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
@@ -218,9 +218,8 @@ public class VerifierMessageServiceImplTest {
 
     @Test
     void send_approvedByAnotherVerifier_throwsNotAssigned() {
-        request.setStatus(LegalVerificationStatus.APPROVED);
-        request.setVerifier(User.builder().id(UUID.randomUUID()).build());
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(verifierAccessGuard.requireReadable(requestId, verifierId))
+                .thenThrow(new NotAssignedVerifierException("not assigned"));
 
         assertThatThrownBy(() -> service.send(requestId, verifierId, null, body("hi")))
                 .isInstanceOf(NotAssignedVerifierException.class);
@@ -237,7 +236,7 @@ public class VerifierMessageServiceImplTest {
 
         when(uploadedDocumentValidator.readAndValidate(file)).thenReturn(plain);
         when(cryptoService.encryptBytes(plain)).thenReturn(encrypted);
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
         when(fileStorageService.storeFile(file, encrypted)).thenReturn("enc://stored.pdf");
         when(messageRepository.saveAndFlush(any(VerificationExchangeMessage.class)))
@@ -267,7 +266,7 @@ public class VerifierMessageServiceImplTest {
                 .senderRole(ExchangeSenderRole.EXECUTOR)
                 .attachmentPath("enc://att.pdf").attachmentName("bosung.pdf").build();
 
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(messageRepository.findByIdAndRequestId(messageId, requestId)).thenReturn(Optional.of(m));
         when(fileStorageService.readFile("enc://att.pdf")).thenReturn(cipher);
         when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
@@ -290,7 +289,7 @@ public class VerifierMessageServiceImplTest {
                 .id(messageId).request(request).sender(verifier)
                 .senderRole(ExchangeSenderRole.VERIFIER).content("chỉ có chữ").build();
 
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(messageRepository.findByIdAndRequestId(messageId, requestId)).thenReturn(Optional.of(m));
 
         assertThatThrownBy(() -> service.getAttachment(requestId, messageId, verifierId))
@@ -302,7 +301,7 @@ public class VerifierMessageServiceImplTest {
     @Test
     void getAttachment_messageOfAnotherRequest_throwsNotFound() throws Exception {
         UUID messageId = UUID.randomUUID();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        guardAllows(verifierId);
         when(messageRepository.findByIdAndRequestId(messageId, requestId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getAttachment(requestId, messageId, verifierId))
