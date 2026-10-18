@@ -26,6 +26,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
+import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -55,6 +57,7 @@ public class VaultServiceImpl implements VaultService {
     private final EmailSender emailSender;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final VaultModificationGuard vaultModificationGuard;
+    private final DmsConfigService dmsConfigService;
 
     @Override
     @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
@@ -155,9 +158,16 @@ public class VaultServiceImpl implements VaultService {
     }
 
     // FR-02: Owner chỉ định (hoặc thay thế) người thụ hưởng cho Vault
+    // READ_COMMITTED: MySQL mặc định REPEATABLE READ nên câu đọc thường có thể thấy snapshot cũ. Sau khi khóa DmsConfig,
+    // existsLiveExecutorWithEmail phải thấy Executor mà FR-06 vừa commit (FR-06 cũng khóa DmsConfig trước khi kiểm),
+    // để Q26 không bị write-skew giữa FR-02 và FR-06 (giống ExecutorManagementServiceImpl).
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public AssignBeneficiaryResponse assignBeneficiary(UUID ownerId, UUID vaultId, AssignBeneficiaryRequest request) {
+        // Khóa DmsConfig TRƯỚC Vault (DmsConfig -> Vault -> User), cùng thứ tự với FR-06/FR-07 để không deadlock;
+        // DMS đã kích hoạt bàn giao thì không được đổi người thụ hưởng -> DmsException 409.
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+
         // Khóa dòng Vault để 2 request gán đồng thời không cùng vượt qua bước xác nhận ghi đè
         Vault vault = vaultRepository.findByIdForUpdate(vaultId)
                 .orElseThrow(() -> new VaultException("Không tìm thấy Vault", HttpStatus.NOT_FOUND));
