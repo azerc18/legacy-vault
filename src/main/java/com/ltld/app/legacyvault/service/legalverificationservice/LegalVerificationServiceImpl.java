@@ -36,6 +36,7 @@ import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
@@ -83,6 +84,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final CryptoService cryptoService;
     private final DmsConfigRepository dmsConfigRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final VerifierAccessGuard verifierAccessGuard;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -121,16 +123,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Override
     @Transactional(readOnly = true)
     public VerificationDocumentDto getDocument(UUID requestId, UUID verifierId) {
-        LegalVerificationRequest request = findRequestOrThrow(requestId);
-        assertNotConflictOfInterestForRead(request, verifierId);   // xung đột -> 404
-
-        // PENDING: verifier nào cũng xem được. Đã quyết định: chỉ verifier được giao
-        if (request.getStatus() != LegalVerificationStatus.PENDING
-                && (request.getVerifier() == null
-                || !verifierId.equals(request.getVerifier().getId()))) {
-            throw new NotAssignedVerifierException(
-                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được xem tài liệu.");
-        }
+        // Xung đột lợi ích -> 404; đã xử lý -> chỉ verifier được giao (m2: dùng chung guard)
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
 
         String email = emailOf(verifierId);
         byte[] plain;
@@ -145,7 +139,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             throw new IllegalStateException("Không thể đọc tài liệu. Vui lòng thử lại sau.");
         }
 
-        String contentType = detectContentType(plain);
+        String contentType = UploadedDocumentValidator.detectContentType(plain);
         auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.SUCCESS,
                 verifierId, email, "LegalVerificationRequest", requestId.toString(), null);
 
@@ -154,16 +148,6 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .contentType(contentType)
                 .fileName("giay-chung-tu-" + requestId + extensionOf(contentType))
                 .build();
-    }
-
-    private String detectContentType(byte[] b) {
-        if (b.length >= 4 && b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46)
-            return "application/pdf";                       // %PDF
-        if (b.length >= 4 && (b[0] & 0xFF) == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47)
-            return "image/png";
-        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF)
-            return "image/jpeg";
-        return "application/octet-stream";
     }
 
     private String extensionOf(String contentType) {
@@ -296,6 +280,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó");
         }
 
+        // D3 (n1): kiểm tra DMS và Executor trước khi xác thực OTP,
+        // để Verifier biết ngay hồ sơ không ký được, khỏi nhập mã rồi mới bị báo lỗi
+        assertHandoverStillValid(request);
+
         // FR-14 bước 3: xác thực OTP ký số
         if (request.getSignOtpHash() == null
                 || request.getSignOtpExpiresAt() == null
@@ -323,9 +311,6 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
         // Xác thực thành công: hủy mã OTP đã dùng
         request.setSignOtpHash(null);
-
-        // D3: kiểm tra lại DMS và Executor trước khi mở khóa
-        assertHandoverStillValid(request);
 
         // Mọi Vault phải ACTIVE và thuộc đúng chủ sở hữu; sai 1 cái hủy cả lô
         List<VerificationRequestVault> links =

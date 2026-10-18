@@ -7,6 +7,8 @@ import {
 import { getErrorMessage } from '../api/http.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
 import VerificationMessages from './VerificationMessages.jsx';
+import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
+
 const RESEND_SECONDS = 60; // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 
 export default function VerificationRequestDetail() {
@@ -76,12 +78,11 @@ export default function VerificationRequestDetail() {
         const tab = window.open('', '_blank');
         try {
             const res = await getDocumentBlob(req.id);
-            const url = URL.createObjectURL(res.data);
-            if (tab) tab.location.href = url;
+            if (tab) showBlobInTab(tab, res.data);
             else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
         } catch (e) {
             if (tab) tab.close();
-            setError(getErrorMessage(e, `Could not open the document (HTTP ${e.response?.status ?? 'no response'}).`));
+            setError(await getBlobErrorMessage(e, `Could not open the document (HTTP ${e.response?.status ?? 'no response'}).`));
         }
     };
 

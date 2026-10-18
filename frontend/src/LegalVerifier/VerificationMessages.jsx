@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { getMessages, sendMessage, getAttachmentBlob } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatDate } from './verifierUi.js';
+import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 
 export default function VerificationMessages({ requestId, status }) {
     const [messages, setMessages] = useState([]);
@@ -45,12 +46,11 @@ export default function VerificationMessages({ requestId, status }) {
         const tab = window.open('', '_blank');
         try {
             const res = await getAttachmentBlob(requestId, messageId);
-            const url = URL.createObjectURL(res.data);
-            if (tab) tab.location.href = url;
+            if (tab) showBlobInTab(tab, res.data);
             else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
         } catch (err) {
             if (tab) tab.close();
-            setError(getErrorMessage(err, 'Could not open the attachment.'));
+            setError(await getBlobErrorMessage(err, 'Could not open the attachment.'));
         }
     };
 
