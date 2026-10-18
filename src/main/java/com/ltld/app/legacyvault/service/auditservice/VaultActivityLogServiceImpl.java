@@ -99,7 +99,33 @@ public class VaultActivityLogServiceImpl implements VaultActivityLogService {
             case DOCUMENT_UPLOADED -> "Tải lên tài liệu mới thành công.";
             case DOCUMENT_DELETED -> "Xóa tài liệu thành công.";
             case ADMIN_VAULT_VIEWED -> "Quản trị viên xem chi tiết két sắt.";
+            // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
+            case BENEFICIARY_ASSIGNED -> "Chỉ định người thụ hưởng cho két sắt.";
+            case BENEFICIARY_REPLACED -> "Thay đổi người thụ hưởng của két sắt.";
+            case BENEFICIARY_ASSIGN_DENIED -> "Từ chối chỉ định người thụ hưởng.";
+            case BENEFICIARY_LINKED -> "Người thụ hưởng đã liên kết tài khoản với két sắt.";
+            case VAULT_UNLOCK -> "Két sắt được mở khóa sau khi xác minh pháp lý.";
+            case VAULT_ARCHIVED -> "Két sắt được lưu trữ do hết hạn nhận bàn giao.";
+            case CLAIM_COMPLETED -> "Người thụ hưởng đã hoàn tất nhận bàn giao.";
+            case ASSET_VIEWED -> "Xem chi tiết tài sản số.";
+            case ASSET_DOWNLOADED -> "Tải xuống tài sản số.";
+            case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Tải xuống tài liệu thất bại." : "Tải xuống tài liệu.";
+            case LEGAL_VERIFICATION_REQUESTED -> "Gửi yêu cầu xác minh pháp lý.";
+            // FR-16: detail chứa email người nhận, không được hiển thị
+            case BENEFICIARY_NOTIFIED -> "Đã gửi thông báo bàn giao cho người thụ hưởng.";
+            case BENEFICIARY_NOTIFY_FAILED -> "Gửi thông báo cho người thụ hưởng thất bại.";
+            case BENEFICIARY_NOTIFY_GAVE_UP -> "Ngừng gửi thông báo cho người thụ hưởng sau nhiều lần thất bại.";
+            case BENEFICIARY_PENDING_NOTIFIED -> "Đã gửi lời mời đăng ký tới người thụ hưởng (chưa có tài khoản).";
+            case IDENTITY_OTP_SENT -> "Gửi mã OTP xác minh danh tính người thụ hưởng.";
+            case IDENTITY_VERIFIED -> "Người thụ hưởng xác minh danh tính thành công.";
+            case IDENTITY_VERIFY_FAILED -> "Người thụ hưởng xác minh danh tính thất bại.";
+            case IDENTITY_LOCKED -> "Tạm khóa xác minh danh tính do nhập sai quá số lần cho phép.";
             default -> "Thực hiện hành động: " + log.getAction();
         };
+    }
+
+    // AuditLogServiceImpl luôn ghi "result" (SUCCESS/FAILURE) vào metadata
+    private boolean isFailure(AuditLog log) {
+        return log.getMetadata() != null && "FAILURE".equals(log.getMetadata().get("result"));
     }
 }
