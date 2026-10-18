@@ -1,11 +1,13 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
+import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
@@ -13,6 +15,7 @@ import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -28,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
@@ -108,6 +112,8 @@ class DmsConfigIntegrationTest {
     @Autowired
     private NotificationRepository notificationRepository;
     @Autowired
+    private AuditLogRepository auditLogRepository;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -118,6 +124,7 @@ class DmsConfigIntegrationTest {
 
     // Dữ liệu test tạo ra, để @AfterEach chỉ xóa đúng phần của mình.
     private final List<Seed> seeds = new ArrayList<>();
+    private final List<UUID> adminIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
@@ -139,6 +146,9 @@ class DmsConfigIntegrationTest {
             userRepository.deleteAllById(userIds);
         }
         seeds.clear();
+        // Audit của Admin đã bị xóa ở trên (detail chứa ownerId), giờ mới xóa được user Admin.
+        userRepository.deleteAllById(adminIds);
+        adminIds.clear();
     }
 
     // ---------- 1. Lưu cấu hình lần đầu ----------
@@ -436,6 +446,84 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
     }
 
+    // ---------- 8. Admin tạm dừng / mở lại (O5) ----------
+
+    @Test
+    void suspendedOwner_isSkippedByReminderAndTriggerScans() {
+        Seed s = seed(true, true);
+        UUID adminId = admin();
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        LocalDateTime deadline = config(s).getNextCheckinDueAt();
+
+        dmsConfigService.suspendByAdmin(s.ownerId, adminId, "Owner yêu cầu tạm dừng");
+
+        // Đã tới lúc nhắc và đã quá hạn chót: job nhắc và trigger FR-07 vẫn bỏ qua Owner bị tạm dừng.
+        dmsReminderService.sendDueReminders(deadline.minusMinutes(1));
+        dmsAutomationService.processOverdueDms(deadline.plusDays(1));
+
+        DmsConfig config = config(s);
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getTriggeredAt()).isNull();
+        assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId())).isEmpty();
+        assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
+                .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
+        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+    }
+
+    @Test
+    void resumeAfterOverdue_startsNewCycleAndDoesNotTriggerImmediately() {
+        Seed s = seed(true, true);
+        UUID adminId = admin();
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        // Chu kỳ cũ đã quá hạn chót (40 > 30 + 7 ngày) trong lúc bị tạm dừng.
+        backdateCycle(s, 40);
+        dmsConfigService.suspendByAdmin(s.ownerId, adminId, "Kiểm tra hồ sơ");
+        LocalDateTime before = LocalDateTime.now();
+
+        dmsConfigService.resumeByAdmin(s.ownerId, adminId);
+
+        DmsConfig config = config(s);
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getTriggerDeferrals()).isZero();
+        // DATETIME(6) làm tròn tới micro giây nên nới biên 1 ms.
+        assertThat(config.getLastCheckinAt()).isAfterOrEqualTo(before.minusNanos(1_000_000));
+        LocalDateTime start = config.getLastCheckinAt();
+        assertThat(config.getNextCheckinDueAt()).isEqualTo(start.plusDays(INTERVAL_DAYS + GRACE_DAYS));
+        assertThat(config.getNextReminderAt()).isEqualTo(start.plusDays(INTERVAL_DAYS));
+
+        // Quét ngay sau khi mở lại: hạn cũ không còn, không kích hoạt, không nhắc.
+        LocalDateTime now = LocalDateTime.now();
+        dmsReminderService.sendDueReminders(now);
+        dmsAutomationService.processOverdueDms(now);
+
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
+                .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        assertThat(auditLogRepository.findByActor_IdOrderByCreatedAtDesc(adminId, Pageable.unpaged()))
+                .extracting(AuditLog::getAction)
+                .containsExactlyInAnyOrder(AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED);
+    }
+
+    @Test
+    void suspendTriggeredOwner_returns409AndKeepsHandover() {
+        Seed s = seed(true, true);
+        UUID adminId = admin();
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        dmsAutomationService.processOverdueDms(config(s).getNextCheckinDueAt().plusMinutes(1));
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+
+        assertThatThrownBy(() -> dmsConfigService.suspendByAdmin(s.ownerId, adminId, "lý do"))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(auditLogRepository.findByActor_IdOrderByCreatedAtDesc(adminId, Pageable.unpaged())).isEmpty();
+    }
+
     // ---------- helpers ----------
 
     private record Seed(UUID ownerId, String ownerEmail, UUID primaryId, UUID primaryUserId, String primaryEmail,
@@ -468,6 +556,13 @@ class DmsConfigIntegrationTest {
         }
         seeds.add(s);
         return s;
+    }
+
+    /** Admin thực hiện O5; phải là User thật vì audit_logs.actor_id là khóa ngoại. */
+    private UUID admin() {
+        UUID id = user("admin-" + UUID.randomUUID().toString().substring(0, 8)).getId();
+        adminIds.add(id);
+        return id;
     }
 
     private User user(String name) {

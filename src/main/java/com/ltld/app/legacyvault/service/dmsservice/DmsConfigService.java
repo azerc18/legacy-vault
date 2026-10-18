@@ -24,6 +24,22 @@ public interface DmsConfigService {
      */
     void assertHandoverNotStarted(UUID ownerId);
 
+    /**
+     * Q28/O5: Admin tạm dừng DMS của Owner (ACTIVE -> SUSPENDED), dùng cho A5. Nơi gọi PHẢI kiểm quyền ADMIN.
+     * Khóa DmsConfig (PESSIMISTIC_FORCE_INCREMENT) để không chạy đua với trigger FR-07 / nhắc check-in / leo thang;
+     * các job đó chỉ quét DMS ACTIVE nên bỏ qua Owner bị tạm dừng.
+     * Chưa có DmsConfig -> DmsException 404; TRIGGERED hoặc đã SUSPENDED -> 409. reason được ghi vào audit.
+     */
+    DmsConfigResponse suspendByAdmin(UUID ownerId, UUID adminId, String reason);
+
+    /**
+     * Q28/O5: Admin mở lại DMS (SUSPENDED -> ACTIVE), dùng cho A5. Nơi gọi PHẢI kiểm quyền ADMIN.
+     * Bắt đầu chu kỳ mới tính từ lúc mở lại (như check-in) để không bị kích hoạt ngay vì hạn cũ đã qua.
+     * Khóa DmsConfig như suspendByAdmin. Chưa có DmsConfig -> 404; không phải SUSPENDED hoặc cấu hình
+     * chưa đầy đủ -> 409.
+     */
+    DmsConfigResponse resumeByAdmin(UUID ownerId, UUID adminId);
+
     /** Kết quả upsert; created = true khi vừa tạo cấu hình lần đầu (controller trả 201). */
     record UpsertResult(DmsConfigResponse config, boolean created) {
     }

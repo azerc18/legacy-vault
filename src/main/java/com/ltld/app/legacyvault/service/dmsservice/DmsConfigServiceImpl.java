@@ -34,6 +34,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.";
     static final String HANDOVER_STARTED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.";
+    static final String INCOMPLETE_CONFIG_MESSAGE = "Cấu hình Dead Man's Switch chưa đầy đủ, vui lòng lưu lại cấu hình.";
+    static final String SUSPEND_TRIGGERED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể tạm dừng.";
+    static final String ALREADY_SUSPENDED_MESSAGE = "Dead Man's Switch đã ở trạng thái tạm dừng.";
+    static final String NOT_SUSPENDED_MESSAGE = "Dead Man's Switch không ở trạng thái tạm dừng.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -118,12 +122,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 default -> "Dead Man's Switch không ở trạng thái hoạt động.";
             }, HttpStatus.CONFLICT);
         }
-        if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
-                || config.getReminderCount() == null) {
-            // Dòng tạo trước FR-03 chưa có thời gian chờ: không tính được lịch, yêu cầu lưu lại cấu hình.
-            throw new DmsException("Cấu hình Dead Man's Switch chưa đầy đủ, vui lòng lưu lại cấu hình.",
-                    HttpStatus.CONFLICT);
-        }
+        assertScheduleComplete(config);
 
         LocalDateTime now = LocalDateTime.now();
         startNewCycle(config, now);
@@ -151,9 +150,63 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 });
     }
 
+    @Override
+    @Transactional
+    public DmsConfigResponse suspendByAdmin(UUID ownerId, UUID adminId, String reason) {
+        DmsConfig config = findConfigForUpdate(ownerId);
+        if (config.getStatus() == DmsStatus.TRIGGERED) {
+            // Không tạm dừng quy trình bàn giao đã kích hoạt.
+            throw new DmsException(SUSPEND_TRIGGERED_MESSAGE, HttpStatus.CONFLICT);
+        }
+        if (config.getStatus() == DmsStatus.SUSPENDED) {
+            throw new DmsException(ALREADY_SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
+        }
+
+        // Giữ nguyên các mốc lịch: job chỉ quét ACTIVE, resume sẽ tính lại chu kỳ mới.
+        config.setStatus(DmsStatus.SUSPENDED);
+        config = dmsConfigRepository.saveAndFlush(config);
+
+        String trimmedReason = reason == null || reason.isBlank() ? null : reason.trim();
+        auditByAdmin(AuditAction.DMS_SUSPENDED, adminId, config,
+                trimmedReason == null ? null : "reason=" + trimmedReason);
+        return toResponse(config);
+    }
+
+    @Override
+    @Transactional
+    public DmsConfigResponse resumeByAdmin(UUID ownerId, UUID adminId) {
+        DmsConfig config = findConfigForUpdate(ownerId);
+        if (config.getStatus() != DmsStatus.SUSPENDED) {
+            throw new DmsException(NOT_SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
+        }
+        assertScheduleComplete(config);
+
+        // Chu kỳ mới từ lúc mở lại: hạn cũ có thể đã qua trong thời gian tạm dừng, không được trigger ngay.
+        config.setStatus(DmsStatus.ACTIVE);
+        startNewCycle(config, LocalDateTime.now());
+        config = dmsConfigRepository.saveAndFlush(config);
+
+        auditByAdmin(AuditAction.DMS_RESUMED, adminId, config, "nextCheckinDueAt=" + config.getNextCheckinDueAt());
+        return toResponse(config);
+    }
+
     private DmsConfig findConfig(UUID ownerId) {
         return dmsConfigRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+    }
+
+    // Khóa PESSIMISTIC_FORCE_INCREMENT: trigger FR-07 / nhắc check-in đang ghi cùng lúc sẽ lỗi @Version và rollback.
+    private DmsConfig findConfigForUpdate(UUID ownerId) {
+        return dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
+                .orElseThrow(() -> new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+    }
+
+    // Dòng tạo trước FR-03 chưa có thời gian chờ: không tính được lịch, yêu cầu lưu lại cấu hình.
+    private void assertScheduleComplete(DmsConfig config) {
+        if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
+                || config.getReminderCount() == null) {
+            throw new DmsException(INCOMPLETE_CONFIG_MESSAGE, HttpStatus.CONFLICT);
+        }
     }
 
     // Chu kỳ mới bắt đầu từ now: nextCheckinDueAt là hạn chót trigger (triggerAt), không phải hạn check-in.
@@ -172,6 +225,15 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         auditLogService.log(action, AuditResult.SUCCESS, owner.getId(), owner.getEmail(), null,
                 DmsActivationProcessor.ENTITY_DMS_CONFIG, config.getId().toString(),
                 DmsActivationProcessor.ownerDetail(owner.getId()) + ", " + detail);
+    }
+
+    // Actor là Admin; email là của chính Admin, không ghi email Owner vào detail.
+    private void auditByAdmin(AuditAction action, UUID adminId, DmsConfig config, String detail) {
+        String adminEmail = userRepository.findById(adminId).map(User::getEmail).orElse(null);
+        String ownerDetail = DmsActivationProcessor.ownerDetail(config.getOwner().getId());
+        auditLogService.log(action, AuditResult.SUCCESS, adminId, adminEmail, null,
+                DmsActivationProcessor.ENTITY_DMS_CONFIG, config.getId().toString(),
+                detail == null ? ownerDetail : ownerDetail + ", " + detail);
     }
 
     private DmsConfigResponse toResponse(DmsConfig config) {
