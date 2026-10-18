@@ -58,4 +58,8 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
                                           @Param("excludeId") UUID excludeId,
                                           @Param("after") LocalDateTime after);
 
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM IdentityVerification v WHERE v.vault.id = :vaultId")
+    int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
 }

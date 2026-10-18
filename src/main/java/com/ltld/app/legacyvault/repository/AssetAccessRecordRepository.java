@@ -22,4 +22,8 @@ public interface AssetAccessRecordRepository extends JpaRepository<AssetAccessRe
             """, nativeQuery = true)
     int insertIfAbsent(@Param("id") UUID id, @Param("claimId") UUID claimId,
                        @Param("assetId") UUID assetId, @Param("now") LocalDateTime now);
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM AssetAccessRecord r WHERE r.claim.id IN (SELECT c.id FROM BeneficiaryClaim c WHERE c.vault.id = :vaultId)")
+    int deleteByVaultId(@Param("vaultId") UUID vaultId);
 }

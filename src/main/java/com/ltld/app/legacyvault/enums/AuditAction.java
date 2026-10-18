@@ -36,5 +36,7 @@ public enum AuditAction {
     // FR-04: Xóa tài liệu pháp lý
     DOCUMENT_DELETED,
     // FR-20: Admin xem chi tiết Két sắt
-    ADMIN_VAULT_VIEWED
+    ADMIN_VAULT_VIEWED,
+    // BR-05: xóa vĩnh viễn Vault sau 2 năm lưu trữ
+    VAULT_PURGED
 }

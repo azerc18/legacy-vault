@@ -47,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false",
         "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false",
         "app.storage.upload-dir=target/it-uploads/"
 })
 @Testcontainers(disabledWithoutDocker = true)

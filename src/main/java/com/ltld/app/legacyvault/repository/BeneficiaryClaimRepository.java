@@ -38,4 +38,8 @@ public interface BeneficiaryClaimRepository extends JpaRepository<BeneficiaryCla
             WHERE c.vault.id = :vaultId AND c.status = com.ltld.app.legacyvault.enums.ClaimStatus.PENDING
             """)
     int markExpiredByVaultId(@Param("vaultId") UUID vaultId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM BeneficiaryClaim c WHERE c.vault.id = :vaultId")
+    int deleteByVaultId(@Param("vaultId") UUID vaultId);
 }
