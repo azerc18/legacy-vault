@@ -73,7 +73,8 @@ import static org.mockito.Mockito.verify;
         "spring.mail.password=test",
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false",
-        "app.beneficiary.notify-retry.enabled=false"
+        "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class DmsEscalationIntegrationTest {

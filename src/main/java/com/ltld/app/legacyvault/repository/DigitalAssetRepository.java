@@ -48,4 +48,8 @@ public interface DigitalAssetRepository extends JpaRepository<DigitalAsset, UUID
             WHERE a.vault.id = :vaultId
             """)
     int wipeContentByVaultId(@Param("vaultId") UUID vaultId, @Param("now") LocalDateTime now);
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM DigitalAsset a WHERE a.vault.id = :vaultId")
+    int deleteByVaultId(@Param("vaultId") UUID vaultId);
 }

@@ -2,6 +2,9 @@ package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,4 +21,8 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
 
     // FR-18 (phần 2): danh sách có thứ tự ổn định (mới nhất trước)
     List<LegalDocument> findByVaultIdOrderByUploadedAtDescIdDesc(UUID vaultId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM LegalDocument d WHERE d.vault.id = :vaultId")
+    int deleteByVaultId(@Param("vaultId") UUID vaultId);
 }

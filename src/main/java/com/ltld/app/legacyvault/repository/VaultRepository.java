@@ -91,4 +91,13 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
              and (lower(b.email) = :email or lower(v.beneficiaryEmail) = :email)
            """)
     boolean existsBeneficiaryWithEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
+
+    // BR-05: Vault đã lưu trữ và tới hạn xóa vĩnh viễn
+    @Query("""
+            SELECT v.id FROM Vault v
+            WHERE v.status = com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED
+              AND v.purgeEligibleAt <= :now
+            ORDER BY v.purgeEligibleAt ASC
+            """)
+    List<UUID> findPurgeableVaultIds(@Param("now") LocalDateTime now, Pageable pageable);
 }

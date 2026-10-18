@@ -41,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.mail.password=test",
         "spring.jpa.hibernate.ddl-auto=create",
         "app.dms.scheduler.enabled=false",
-        "app.beneficiary.notify-retry.enabled=false"
+        "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional

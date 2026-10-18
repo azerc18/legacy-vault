@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "spring.jpa.hibernate.ddl-auto=create",
         "app.dms.scheduler.enabled=false",
         "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
