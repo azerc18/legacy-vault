@@ -99,4 +99,30 @@ public class VerifierAccessGuardTest {
 
         assertThat(guard.requireReadable(requestId, verifierId)).isSameAs(request);
     }
+
+    @Test
+    void rejectedByThisVerifier_isAllowed() {
+        request.setStatus(LegalVerificationStatus.REJECTED);
+        request.setVerifier(User.builder().id(verifierId).build());
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+        assertThat(guard.requireReadable(requestId, verifierId)).isSameAs(request);
+    }
+
+    @Test
+    void approvedButNoVerifierSet_throwsNotAssigned() {
+        request.setStatus(LegalVerificationStatus.APPROVED);
+        request.setVerifier(null);
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+
+        assertThatThrownBy(() -> guard.requireReadable(requestId, verifierId))
+                .isInstanceOf(NotAssignedVerifierException.class);
+    }
+
+    @Test
+    void isConflict_trueForOwnerAndExecutor_falseForOthers() {
+        assertThat(VerifierAccessGuard.isConflict(request, ownerId)).isTrue();
+        assertThat(VerifierAccessGuard.isConflict(request, executorId)).isTrue();
+        assertThat(VerifierAccessGuard.isConflict(request, verifierId)).isFalse();
+    }
 }

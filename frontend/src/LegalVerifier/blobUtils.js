@@ -1,10 +1,11 @@
 import { getErrorMessage } from '../api/http.js';
 
-// Nạp blob vào tab đã mở sẵn, rồi thu hồi URL sau 1 phút để khỏi rò bộ nhớ
+// Nạp blob vào tab đã mở sẵn, rồi thu hồi URL sau 5 phút để khỏi rò bộ nhớ
+// (không thu hồi sớm: nút tải/lưu hoặc F5 trong trình xem PDF của tab cần URL còn sống)
 export function showBlobInTab(tab, blob) {
     const url = URL.createObjectURL(blob);
     tab.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60_000);
 }
 
 // Với responseType 'blob', JSON lỗi của BE cũng bị bọc trong Blob -> đọc ra để lấy đúng message

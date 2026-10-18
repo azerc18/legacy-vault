@@ -71,14 +71,15 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
             throw new InvalidVerificationDocumentException("Message content or attachment is required.");
         }
 
-        byte[] encrypted = null;
-        if (hasFile) {
-            encrypted = encrypt(uploadedDocumentValidator.readAndValidate(file));
-        }
-
+        // n2: kiểm quyền trước, người không có quyền không làm server tốn công đọc/mã hóa file
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         if (!OPEN_STATUSES.contains(request.getStatus())) {
             throw new VerificationRequestClosedException("This verification request is closed.");
+        }
+
+        byte[] encrypted = null;
+        if (hasFile) {
+            encrypted = encrypt(uploadedDocumentValidator.readAndValidate(file));
         }
 
         User verifier = userRepository.findById(verifierId)
@@ -88,8 +89,10 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
         if (hasFile) {
             try {
                 storedPath = fileStorageService.storeFile(file, encrypted);
+            } catch (RuntimeException e) {
+                throw e; // giữ nguyên kiểu, để handler map đúng mã lỗi
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to send verification message", e);
+                throw new IllegalStateException("Failed to store verification attachment", e);
             }
             registerCleanupOnRollback(storedPath);
         }

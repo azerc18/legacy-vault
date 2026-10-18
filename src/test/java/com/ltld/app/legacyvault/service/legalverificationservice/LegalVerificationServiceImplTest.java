@@ -387,6 +387,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sendSignOtp_success_generatesAndSendsOtp() {
         approvedByVerifier();
+        handoverStillValid();
         User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
 
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
@@ -410,6 +411,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sendSignOtp_resendWithin60Seconds_throwsTooManyRequests() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpSentAt(LocalDateTime.now().minusSeconds(10));
         User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
 
@@ -421,6 +423,20 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(TooManyOtpRequestsException.class);
 
         verifyNoInteractions(emailSender);
+    }
+
+    // n1: sendSignOtp cũng kiểm D3, không gửi mã cho hồ sơ không thể ký
+    @Test
+    void sendSignOtp_dmsNotTriggered_throwsConflictAndDoesNotSendEmail() {
+        approvedByVerifier();
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.ACTIVE).build()));
+
+        assertThatThrownBy(() -> service.sendSignOtp(requestId, verifierId))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verifyNoInteractions(emailSender, otpGenerator, otpHasher);
     }
 
     @Test
@@ -574,11 +590,15 @@ public class LegalVerificationServiceImplTest {
         verifyNoInteractions(requestVaultRepository);
     }
 
-    // ---------- UC13: verifyDocument (với kiểm tra N6) ----------
+    // ---------- UC13: verifyDocument + getById (quyền đọc do VerifierAccessGuard, test ở VerifierAccessGuardTest) ----------
+
+    private void guardAllowsReading() {
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+    }
 
     @Test
     void verifyDocument_supportedFormat_returnsValid() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        guardAllowsReading();
 
         DocumentVerificationResponseDto result = service.verifyDocument(requestId, verifierId);
 
@@ -588,7 +608,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void verifyDocument_unsupportedFormat_returnsInvalid() {
         pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.exe");
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        guardAllowsReading();
 
         assertThat(service.verifyDocument(requestId, verifierId).isValid()).isFalse();
     }
@@ -596,41 +616,45 @@ public class LegalVerificationServiceImplTest {
     @Test
     void verifyDocument_jpegFormat_returnsValid() {
         pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.jpeg");
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        guardAllowsReading();
 
         assertThat(service.verifyDocument(requestId, verifierId).isValid()).isTrue();
     }
 
     @Test
-    void verifyDocument_requestNotFound_throwsNotFoundException() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.empty());
+    void verifyDocument_guardRejects_throws() {
+        when(verifierAccessGuard.requireReadable(requestId, verifierId))
+                .thenThrow(new VerificationRequestNotFoundException("not found"));
 
         assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
     }
 
-    // N6: Xung đột lợi ích khi xem chi tiết hoặc verifyDocument -> 404
     @Test
-    void getById_verifierIsOwner_throwsNotFoundException() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+    void getById_guardRejects_throwsAndLoadsNoVaults() {
+        when(verifierAccessGuard.requireReadable(requestId, ownerId))
+                .thenThrow(new VerificationRequestNotFoundException("not found"));
 
         assertThatThrownBy(() -> service.getById(requestId, ownerId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
+
+        verifyNoInteractions(requestVaultRepository);
     }
 
     @Test
-    void verifyDocument_verifierIsExecutor_throwsNotFoundException() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+    void getById_approvedByAnotherVerifier_propagatesNotAssigned() {
+        when(verifierAccessGuard.requireReadable(requestId, verifierId))
+                .thenThrow(new NotAssignedVerifierException("not assigned"));
 
-        assertThatThrownBy(() -> service.verifyDocument(requestId, pendingRequest.getExecutor().getId()))
-                .isInstanceOf(VerificationRequestNotFoundException.class);
+        assertThatThrownBy(() -> service.getById(requestId, verifierId))
+                .isInstanceOf(NotAssignedVerifierException.class);
     }
 
     // R1: toDto phải trả đúng createdAt
     @Test
     void getById_returnsCreatedAt() {
         pendingRequest.setCreatedAt(LocalDateTime.of(2026, 10, 1, 9, 0));
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        guardAllowsReading();
 
         assertThat(service.getById(requestId, verifierId).getCreatedAt())
                 .isEqualTo(LocalDateTime.of(2026, 10, 1, 9, 0));

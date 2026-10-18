@@ -254,6 +254,61 @@ public class VerifierMessageServiceImplTest {
         verify(eventPublisher).publishEvent(eq(new VerifierReplyPostedEvent(requestId, executorId)));
     }
 
+    // n2: người không có quyền bị chặn trước khi server đọc/mã hóa file
+    @Test
+    void send_withFileButNoAccess_rejectsBeforeReadingOrEncryptingFile() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "giay-to.pdf", "application/pdf", "%PDF-1.4 abc".getBytes());
+        when(verifierAccessGuard.requireReadable(requestId, executorId))
+                .thenThrow(new VerificationRequestNotFoundException("not found"));
+
+        assertThatThrownBy(() -> service.send(requestId, executorId, file, null))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+
+        verifyNoInteractions(uploadedDocumentValidator, cryptoService, fileStorageService);
+        verify(messageRepository, never()).saveAndFlush(any());
+    }
+
+    // m2: lỗi runtime của storeFile giữ nguyên kiểu, lỗi checked mới bọc thành IllegalStateException
+    @Test
+    void send_storeFileThrowsRuntime_keepsOriginalExceptionType() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "giay-to.pdf", "application/pdf", "%PDF-1.4 abc".getBytes());
+        byte[] plain = "%PDF-1.4 abc".getBytes();
+        byte[] encrypted = "cipher".getBytes();
+
+        when(uploadedDocumentValidator.readAndValidate(file)).thenReturn(plain);
+        when(cryptoService.encryptBytes(plain)).thenReturn(encrypted);
+        guardAllows(verifierId);
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
+        when(fileStorageService.storeFile(file, encrypted))
+                .thenThrow(new InvalidVerificationDocumentException("boom"));
+
+        assertThatThrownBy(() -> service.send(requestId, verifierId, file, null))
+                .isInstanceOf(InvalidVerificationDocumentException.class);
+
+        verify(messageRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void send_storeFileThrowsChecked_wrapsInIllegalState() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "giay-to.pdf", "application/pdf", "%PDF-1.4 abc".getBytes());
+        byte[] plain = "%PDF-1.4 abc".getBytes();
+        byte[] encrypted = "cipher".getBytes();
+
+        when(uploadedDocumentValidator.readAndValidate(file)).thenReturn(plain);
+        when(cryptoService.encryptBytes(plain)).thenReturn(encrypted);
+        guardAllows(verifierId);
+        when(userRepository.findById(verifierId)).thenReturn(Optional.of(verifier));
+        when(fileStorageService.storeFile(file, encrypted)).thenThrow(new java.io.IOException("disk full"));
+
+        assertThatThrownBy(() -> service.send(requestId, verifierId, file, null))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(messageRepository, never()).saveAndFlush(any());
+    }
+
     // ---------- getAttachment ----------
 
     @Test

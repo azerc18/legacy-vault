@@ -26,17 +26,21 @@ public class VerifierAccessGuard {
         LegalVerificationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + requestId));
 
-        boolean conflict = (request.getOwner() != null && verifierId.equals(request.getOwner().getId()))
-                || (request.getExecutor() != null && verifierId.equals(request.getExecutor().getId()));
-        if (conflict) {
+        if (isConflict(request, verifierId)) {
             throw new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + requestId);
         }
 
         if (request.getStatus() != LegalVerificationStatus.PENDING
                 && (request.getVerifier() == null || !verifierId.equals(request.getVerifier().getId()))) {
             throw new NotAssignedVerifierException(
-                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được xem hoặc trả lời tin nhắn.");
+                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được truy cập hồ sơ này.");
         }
         return request;
+    }
+
+    /** Verifier là Owner hoặc Executor của hồ sơ (xung đột lợi ích). */
+    public static boolean isConflict(LegalVerificationRequest request, UUID verifierId) {
+        return (request.getOwner() != null && verifierId.equals(request.getOwner().getId()))
+                || (request.getExecutor() != null && verifierId.equals(request.getExecutor().getId()));
     }
 }
