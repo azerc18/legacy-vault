@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** R1: logic role EXECUTOR dùng chung cho FR-06 và FR-07. */
@@ -103,6 +104,18 @@ class ExecutorRoleManagerTest {
 
         executorRoleManager.revokeIfUnused(user, excludedId);
 
+        assertThat(user.getRoles()).containsExactly(executorRole);
+    }
+
+    @Test
+    @DisplayName("revokeIfUnused: excludedAssignmentId null -> NullPointerException, không truy vấn, giữ nguyên roles")
+    void revokeIfUnused_nullExcludedId_throwsNpe() {
+        user.getRoles().add(executorRole);
+
+        assertThatThrownBy(() -> executorRoleManager.revokeIfUnused(user, null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("excludedAssignmentId");
+        verifyNoInteractions(executorAssignmentRepository);
         assertThat(user.getRoles()).containsExactly(executorRole);
     }
 }
