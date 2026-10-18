@@ -280,6 +280,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_wrongCode_throwsInvalidSignCode_andDoesNotUnlock() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
@@ -300,6 +301,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_expiredOtp_throwsInvalidSignCode() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().minusMinutes(1)); // hết hạn
 
@@ -315,6 +317,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void sign_tooManyAttempts_invalidatesOtpAndAudits() {
         approvedByVerifier();
+        handoverStillValid();
         pendingRequest.setSignOtpHash("hashedOtp");
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
         pendingRequest.setSignAttempts(5); // lần thứ 6 vượt giới hạn
@@ -520,7 +523,6 @@ public class LegalVerificationServiceImplTest {
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
-        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(dmsConfigRepository.findByOwnerId(ownerId))
                 .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.ACTIVE).build()));
 
@@ -528,6 +530,7 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
+        verify(otpHasher, never()).matches(any(), any(), any());
         verifyNoInteractions(requestVaultRepository);
     }
 
@@ -538,13 +541,13 @@ public class LegalVerificationServiceImplTest {
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
-        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
                 .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
+        verify(otpHasher, never()).matches(any(), any(), any());
         verifyNoInteractions(requestVaultRepository);
     }
 
@@ -555,7 +558,6 @@ public class LegalVerificationServiceImplTest {
         pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
 
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
-        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
         when(dmsConfigRepository.findByOwnerId(ownerId))
                 .thenReturn(Optional.of(DmsConfig.builder().status(DmsStatus.TRIGGERED).build()));
         when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
@@ -565,6 +567,7 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VaultStateConflictException.class);
 
         verify(signatureRepository, never()).save(any());
+        verify(otpHasher, never()).matches(any(), any(), any());
         verifyNoInteractions(requestVaultRepository);
     }
 

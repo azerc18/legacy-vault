@@ -296,6 +296,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó");
         }
 
+        // D3 (n1): kiểm tra DMS và Executor trước khi xác thực OTP,
+        // để Verifier biết ngay hồ sơ không ký được, khỏi nhập mã rồi mới bị báo lỗi
+        assertHandoverStillValid(request);
+
         // FR-14 bước 3: xác thực OTP ký số
         if (request.getSignOtpHash() == null
                 || request.getSignOtpExpiresAt() == null
@@ -323,9 +327,6 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
         // Xác thực thành công: hủy mã OTP đã dùng
         request.setSignOtpHash(null);
-
-        // D3: kiểm tra lại DMS và Executor trước khi mở khóa
-        assertHandoverStillValid(request);
 
         // Mọi Vault phải ACTIVE và thuộc đúng chủ sở hữu; sai 1 cái hủy cả lô
         List<VerificationRequestVault> links =
