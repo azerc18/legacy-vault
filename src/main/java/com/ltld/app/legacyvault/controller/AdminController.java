@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.AdminUserResponse;
+import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;

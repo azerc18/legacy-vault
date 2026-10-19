@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.service.adminuserservice;
 
-import com.ltld.app.legacyvault.dto.AdminUserResponse;
+import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;

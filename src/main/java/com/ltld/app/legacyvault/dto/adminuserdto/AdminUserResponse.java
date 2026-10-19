@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.dto;
+package com.ltld.app.legacyvault.dto.adminuserdto;
 
 import com.ltld.app.legacyvault.enums.UserStatus;
 import lombok.Builder;
