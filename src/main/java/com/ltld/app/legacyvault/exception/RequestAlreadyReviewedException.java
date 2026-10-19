@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class RequestAlreadyReviewedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class RequestAlreadyReviewedException extends BusinessException {
     public RequestAlreadyReviewedException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

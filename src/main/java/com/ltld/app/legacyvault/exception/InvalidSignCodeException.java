@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class InvalidSignCodeException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidSignCodeException extends BusinessException {
     public InvalidSignCodeException(String message) {
-        super(message);
+        super(message, HttpStatus.BAD_REQUEST);
     }
 }

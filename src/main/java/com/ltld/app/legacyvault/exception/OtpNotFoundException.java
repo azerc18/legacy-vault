@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class OtpNotFoundException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class OtpNotFoundException extends BusinessException {
     public OtpNotFoundException(String message) {
-        super(message);
+        super(message, HttpStatus.BAD_REQUEST);
     }
 }

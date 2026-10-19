@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class InvalidCredentialException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidCredentialException extends BusinessException  {
     public InvalidCredentialException() {
-        super("Invalid email or password");
+        super("Invalid email or password", HttpStatus.UNAUTHORIZED);
     }
 }

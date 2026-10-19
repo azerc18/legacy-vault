@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class InvalidVerificationDocumentException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class InvalidVerificationDocumentException extends BusinessException {
     public InvalidVerificationDocumentException(String message) {
-        super(message);
+        super(message, HttpStatus.BAD_REQUEST);
     }
 }

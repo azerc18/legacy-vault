@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class ExpiredOtpException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class ExpiredOtpException extends BusinessException {
     public ExpiredOtpException(String message) {
-        super(message);
+        super(message, HttpStatus.BAD_REQUEST);
     }
 }

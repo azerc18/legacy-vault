@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class TooManyAttemptsException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class TooManyAttemptsException extends BusinessException {
     public TooManyAttemptsException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }
