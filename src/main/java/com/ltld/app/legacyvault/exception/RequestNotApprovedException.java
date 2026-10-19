@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class RequestNotApprovedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class RequestNotApprovedException extends BusinessException {
     public RequestNotApprovedException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

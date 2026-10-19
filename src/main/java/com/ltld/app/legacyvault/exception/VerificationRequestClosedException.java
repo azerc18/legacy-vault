@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class VerificationRequestClosedException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class VerificationRequestClosedException extends BusinessException {
     public VerificationRequestClosedException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

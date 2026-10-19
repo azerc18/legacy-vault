@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class DuplicateVerificationRequestException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class DuplicateVerificationRequestException extends BusinessException {
     public DuplicateVerificationRequestException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

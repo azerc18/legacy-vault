@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class DmsNotTriggeredException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class DmsNotTriggeredException extends BusinessException {
     public DmsNotTriggeredException(String message) {
-        super(message);
+        super(message, HttpStatus.CONFLICT);
     }
 }

@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class LockedAccountException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class LockedAccountException extends BusinessException {
     public LockedAccountException() {
-        super("Your account is locked. Try again later.");
+        super("Your account is locked. Try again later.", HttpStatus.FORBIDDEN);
     }
 }

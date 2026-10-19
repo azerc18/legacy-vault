@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class ExecutorNotActiveException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class ExecutorNotActiveException extends BusinessException {
     public ExecutorNotActiveException(String message) {
-        super(message);
+        super(message, HttpStatus.FORBIDDEN);
     }
 }

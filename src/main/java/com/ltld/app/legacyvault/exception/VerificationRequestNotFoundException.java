@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.exception;
 
-public class VerificationRequestNotFoundException extends RuntimeException {
+import org.springframework.http.HttpStatus;
+
+public class VerificationRequestNotFoundException extends BusinessException {
     public VerificationRequestNotFoundException(String message) {
-        super(message);
+        super(message, HttpStatus.NOT_FOUND);
     }
 }
