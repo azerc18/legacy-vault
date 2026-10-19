@@ -36,6 +36,7 @@ public class DataInitializer {
             seedAuthorities();
             seedRoles();
             mapRoleAuthorities();
+            seedAdmin();
         };
     }
 
