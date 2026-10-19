@@ -2,15 +2,8 @@ package com.ltld.app.legacyvault.exception;
 
 import org.springframework.http.HttpStatus;
 
-public class BeneficiaryException extends RuntimeException {
-    private final HttpStatus status;
-
+public class BeneficiaryException extends BusinessException {
     public BeneficiaryException(String message, HttpStatus status) {
-        super(message);
-        this.status = status;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
+        super(message, status);
     }
 }

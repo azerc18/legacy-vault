@@ -244,4 +244,5 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleAdmin(AdminException e) {
         return ResponseEntity.status(e.getStatus()).body(ApiResponse.error(e.getMessage()));
     }
+
 }
