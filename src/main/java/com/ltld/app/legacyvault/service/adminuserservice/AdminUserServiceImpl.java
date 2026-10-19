@@ -13,6 +13,10 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +33,8 @@ public class AdminUserServiceImpl implements AdminUserService{
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final AuditLogService auditLogService;
+
+    private static final int MAX_PAGE_SIZE = 100;
 
     @Override
     @Transactional
@@ -79,6 +85,28 @@ public class AdminUserServiceImpl implements AdminUserService{
             throw new AdminException("Chỉ quản lý được role LEGAL_VERIFIER và ADMIN", HttpStatus.BAD_REQUEST);
         }
         return code;
+    }
+
+    @Override
+    @Transactional(readOnly = true)   // bắt buộc: toResponse đọc roles (LAZY)
+    public Page<AdminUserResponse> listUsers(String q, String role, String status, int page, int size) {
+        String pattern = (q == null || q.isBlank()) ? null : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        String roleCode = (role == null || role.isBlank()) ? null : role.trim().toUpperCase(Locale.ROOT);
+        UserStatus st = (status == null || status.isBlank()) ? null : parseStatus(status);
+
+        Pageable pageable = PageRequest.of(Math.max(page, 0),
+                Math.min(Math.max(size, 1), MAX_PAGE_SIZE),
+                Sort.by(Sort.Direction.DESC, "createdAt"));
+        return userRepository.searchForAdmin(pattern, roleCode, st, pageable)
+                .map(AdminUserServiceImpl::toResponse);
+    }
+
+    private static UserStatus parseStatus(String s) {
+        try {
+            return UserStatus.valueOf(s.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new AdminException("Trạng thái không hợp lệ (PENDING, ACTIVE, LOCKED)", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private static AdminUserResponse toResponse(User u) {

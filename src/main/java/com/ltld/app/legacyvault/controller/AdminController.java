@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -32,5 +33,16 @@ public class AdminController {
         UUID adminId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Gỡ role thành công",
                 adminUserService.revokeRole(adminId, userId, roleCode)));
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<ApiResponse<Page<AdminUserResponse>>> listUsers(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách người dùng thành công",
+                adminUserService.listUsers(q, role, status, page, size)));
     }
 }
