@@ -1,8 +1,10 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
+import com.ltld.app.legacyvault.dto.adminuserdto.UpdateUserStatusRequest;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -44,5 +46,14 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách người dùng thành công",
                 adminUserService.listUsers(q, role, status, page, size)));
+    }
+
+    @PatchMapping("/users/{userId}/status")
+    public ResponseEntity<ApiResponse<AdminUserResponse>> updateStatus(
+            Principal principal, @PathVariable UUID userId,
+            @Valid @RequestBody UpdateUserStatusRequest request) {
+        UUID adminId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thành công",
+                adminUserService.updateStatus(adminId, userId, request)));
     }
 }
