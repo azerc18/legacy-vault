@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.adminuserservice;
 
 import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
+import com.ltld.app.legacyvault.dto.adminuserdto.UpdateUserStatusRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -101,11 +102,44 @@ public class AdminUserServiceImpl implements AdminUserService{
                 .map(AdminUserServiceImpl::toResponse);
     }
 
+    @Override
+    @Transactional
+    public AdminUserResponse updateStatus(UUID adminId, UUID userId, UpdateUserStatusRequest req) {
+        UserStatus target = parseStatus(req.getStatus());
+        if (target == UserStatus.PENDING) {
+            throw new AdminException("Only changing between ACTIVE and LOCKED", HttpStatus.BAD_REQUEST);
+        }
+        if (adminId.equals(userId)) {
+            throw new AdminException("Can not change status myself", HttpStatus.CONFLICT);
+        }
+        User user = lockUser(userId);
+        if (user.getStatus() == UserStatus.PENDING) {
+            throw new AdminException("Account is not email verified", HttpStatus.CONFLICT);
+        }
+        if (user.getStatus() == target) {
+            return toResponse(user);              // idempotent
+        }
+
+        UserStatus old = user.getStatus();
+        user.setStatus(target);
+        if (target == UserStatus.LOCKED) {
+            tokenService.revokeAllUserTokens(userId, RevokedReason.ADMIN_REVOKE);
+        } else {
+            user.setFailedLoginAttempts(0);       // xóa luôn khóa tạm do sai mật khẩu
+            user.setLockedUntil(null);
+        }
+
+        String reason = req.getReason() == null || req.getReason().isBlank() ? "" : " reason=" + req.getReason().trim();
+        auditLogService.log(AuditAction.RBAC_CHANGE, AuditResult.SUCCESS, adminId, null,
+                "User", userId.toString(), "STATUS " + old + "->" + target + reason);
+        return toResponse(user);
+    }
+
     private static UserStatus parseStatus(String s) {
         try {
             return UserStatus.valueOf(s.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new AdminException("Trạng thái không hợp lệ (PENDING, ACTIVE, LOCKED)", HttpStatus.BAD_REQUEST);
+            throw new AdminException("Invalid status (PENDING, ACTIVE, LOCKED)", HttpStatus.BAD_REQUEST);
         }
     }
 
