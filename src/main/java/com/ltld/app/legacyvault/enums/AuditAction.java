@@ -37,5 +37,7 @@ public enum AuditAction {
     // FR-20: Admin xem chi tiết Két sắt
     ADMIN_VAULT_VIEWED,
     // BR-05: xóa vĩnh viễn Vault sau 2 năm lưu trữ
-    VAULT_PURGED
+    VAULT_PURGED,
+    // O5: Admin tạm dừng / mở lại DMS
+    DMS_SUSPENDED, DMS_RESUMED
 }

@@ -66,13 +66,17 @@ class DmsConfigServiceImplTest {
 
     private UUID ownerId;
     private User owner;
+    private UUID adminId;
 
     @BeforeEach
     void setUp() {
         ownerId = UUID.randomUUID();
         owner = User.builder().id(ownerId).email("owner@example.test").build();
+        adminId = UUID.randomUUID();
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(userRepository.findById(adminId))
+                .thenReturn(Optional.of(User.builder().id(adminId).email("admin@example.test").build()));
         when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(true);
         when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
         // saveAndFlush giả lập DB: gán id cho bản ghi mới, trả lại chính entity.
@@ -422,9 +426,158 @@ class DmsConfigServiceImplTest {
         verifyLockedLookupOnly();
     }
 
-    private void lockedConfig(DmsStatus status) {
+    // ---------- suspendByAdmin / resumeByAdmin (O5) ----------
+
+    @Test
+    @DisplayName("O5: Admin tạm dừng DMS ACTIVE -> SUSPENDED, giữ lịch, audit DMS_SUSPENDED với actor là Admin")
+    void suspendByAdmin_active_suspendsAndAuditsDmsSuspended() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+        LocalDateTime nextReminder = existing.getNextReminderAt();
+
+        DmsConfigResponse response = service.suspendByAdmin(ownerId, adminId, "  Owner yêu cầu tạm dừng  ");
+
+        assertThat(response.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        assertThat(existing.getNextReminderAt()).isEqualTo(nextReminder);
+        assertThat(existing.getRemindersSent()).isEqualTo(2);
+
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        InOrder order = inOrder(dmsConfigRepository, auditLogService);
+        order.verify(dmsConfigRepository).saveAndFlush(existing);
+        order.verify(auditLogService).log(eq(AuditAction.DMS_SUSPENDED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.test"), isNull(),
+                eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()), detail.capture());
+        assertThat(detail.getValue())
+                .isEqualTo("ownerId=" + ownerId + ", reason=Owner yêu cầu tạm dừng")
+                .doesNotContain("owner@example.test");
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+        verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @Test
+    @DisplayName("O5: tạm dừng không có lý do -> detail chỉ có ownerId")
+    void suspendByAdmin_withoutReason_auditsOwnerOnly() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+
+        service.suspendByAdmin(ownerId, adminId, "  ");
+
+        verify(auditLogService).log(eq(AuditAction.DMS_SUSPENDED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.test"), isNull(),
+                eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()),
+                eq("ownerId=" + ownerId));
+    }
+
+    @Test
+    @DisplayName("O5: tạm dừng DMS đã TRIGGERED -> 409, không ghi gì")
+    void suspendByAdmin_whenTriggered_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.TRIGGERED);
+
+        assertThatThrownBy(() -> service.suspendByAdmin(ownerId, adminId, "lý do"))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.SUSPEND_TRIGGERED_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O5: tạm dừng DMS đã SUSPENDED -> 409, không ghi gì")
+    void suspendByAdmin_whenAlreadySuspended_returns409() {
+        lockedConfig(DmsStatus.SUSPENDED);
+
+        assertThatThrownBy(() -> service.suspendByAdmin(ownerId, adminId, "lý do"))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.ALREADY_SUSPENDED_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O5: tạm dừng khi chưa cấu hình -> 404")
+    void suspendByAdmin_withoutConfig_returns404() {
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.suspendByAdmin(ownerId, adminId, "lý do"))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O5: Admin mở lại DMS SUSPENDED -> ACTIVE, chu kỳ mới từ lúc mở lại, audit DMS_RESUMED")
+    void resumeByAdmin_suspended_startsNewCycleAndAuditsDmsResumed() {
+        DmsConfig existing = lockedConfig(DmsStatus.SUSPENDED);
+        existing.setTriggerDeferrals(1);
+        LocalDateTime before = LocalDateTime.now();
+
+        DmsConfigResponse response = service.resumeByAdmin(ownerId, adminId);
+
+        LocalDateTime after = LocalDateTime.now();
+        LocalDateTime now = existing.getLastCheckinAt();
+        assertThat(now).isBetween(before, after);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(now.plusDays(37));
+        assertThat(existing.getNextReminderAt()).isEqualTo(now.plusDays(30));
+        assertThat(existing.getRemindersSent()).isZero();
+        assertThat(existing.getTriggerDeferrals()).isZero();
+        assertThat(response.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(response.getTriggerAt()).isEqualTo(now.plusDays(37));
+
+        InOrder order = inOrder(dmsConfigRepository, auditLogService);
+        order.verify(dmsConfigRepository).saveAndFlush(existing);
+        order.verify(auditLogService).log(eq(AuditAction.DMS_RESUMED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.test"), isNull(),
+                eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()),
+                eq("ownerId=" + ownerId + ", nextCheckinDueAt=" + now.plusDays(37)));
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+        // Owner không phản hồi nên không ghi DmsCheckin.
+        verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = "SUSPENDED", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("O5: mở lại DMS không ở trạng thái SUSPENDED -> 409, không ghi gì")
+    void resumeByAdmin_whenNotSuspended_returns409(DmsStatus status) {
+        lockedConfig(status);
+
+        assertThatThrownBy(() -> service.resumeByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.NOT_SUSPENDED_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O5: mở lại với cấu hình chưa đầy đủ -> 409, vẫn SUSPENDED")
+    void resumeByAdmin_incompleteConfig_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.SUSPENDED);
+        existing.setGracePeriodDays(null);
+
+        assertThatThrownBy(() -> service.resumeByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.INCOMPLETE_CONFIG_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("O5: mở lại khi chưa cấu hình -> 404")
+    void resumeByAdmin_withoutConfig_returns404() {
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resumeByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+        verifyLockedLookupOnly();
+    }
+
+    private DmsConfig lockedConfig(DmsStatus status) {
         DmsConfig config = existingConfig(status);
         when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(config));
+        return config;
     }
 
     // Phải đọc bằng khóa PESSIMISTIC_FORCE_INCREMENT, không phải findByOwnerId thường.
