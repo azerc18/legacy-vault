@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -17,6 +18,7 @@ import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
@@ -36,6 +38,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -76,6 +79,8 @@ class VaultServiceImplTest {
     private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock
     private VaultModificationGuard vaultModificationGuard;
+    @Mock
+    private DmsConfigService dmsConfigService;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -545,6 +550,35 @@ class VaultServiceImplTest {
         assertSame(ben, vault.getBeneficiary());
         verify(vaultRepository, never()).save(any());
         verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    void assignBeneficiary_dmsTriggered_returns409WithoutTouchingVault() {
+        UUID vaultId = UUID.randomUUID();
+        doThrow(new DmsException("Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        DmsException ex = assertThrows(DmsException.class,
+                () -> vaultService.assignBeneficiary(ownerId, vaultId, assignRequest("ben@example.com", null)));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(vaultRepository, never()).findByIdForUpdate(any());
+        verify(vaultRepository, never()).save(any());
+        verifyNoInteractions(auditLogService, emailSender, executorAssignmentRepository, userRepository);
+    }
+
+    @Test
+    void assignBeneficiary_locksDmsConfigBeforeVault() {
+        Vault vault = activeVault();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(userRepository.findByEmail("ben@example.com")).thenReturn(Optional.empty());
+
+        vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("ben@example.com", null));
+
+        // Thứ tự khóa DmsConfig -> Vault, cùng thứ tự với FR-06 để không deadlock
+        InOrder inOrder = inOrder(dmsConfigService, vaultRepository);
+        inOrder.verify(dmsConfigService).assertHandoverNotStarted(ownerId);
+        inOrder.verify(vaultRepository).findByIdForUpdate(vault.getId());
     }
 
     // ===== FR-01/FR-27/FR-20: Vault CRUD & Admin Detail Tests =====
