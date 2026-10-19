@@ -150,13 +150,30 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    void uploadDocument_VaultNotActive_ThrowsException() {
+    void uploadDocument_VaultNotActive_ThrowsException() throws Exception {
         mockVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        doThrow(new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST))
+                .when(vaultModificationGuard).ensureModifiable(mockVault);
 
         assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
                 .isInstanceOf(VaultException.class)
-                .hasMessageContaining("Cannot upload document to vault in ARCHIVED_LOCKED state");
+                .hasMessageContaining("Cannot modify vault that is not in active state");
+    }
+
+    @Test
+    @DisplayName("uploadDocument (m3): DMS đã TRIGGERED -> Guard chặn upload -> CONFLICT 409")
+    void uploadDocument_DmsTriggered_ThrowsConflict() throws Exception {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        doThrow(new VaultException("Cannot modify vault: dead-man switch has been triggered", HttpStatus.CONFLICT))
+                .when(vaultModificationGuard).ensureModifiable(mockVault);
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.CONFLICT);
+
+        verify(cryptoService, never()).encryptBytes(any());
+        verify(fileStorageService, never()).storeFile(any(), any());
     }
 
     // ===== FR-04: Document List, Download & Safe Deletion Tests =====

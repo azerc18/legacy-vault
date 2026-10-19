@@ -32,7 +32,7 @@ public class VaultModificationGuard {
             throw new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST);
         }
 
-        dmsConfigRepository.findByOwnerId(vault.getOwner().getId()).ifPresent(dms -> {
+        dmsConfigRepository.findByOwnerIdForUpdate(vault.getOwner().getId()).ifPresent(dms -> {
             if (dms.getStatus() == DmsStatus.TRIGGERED) {
                 throw new VaultException(
                         "Cannot modify vault: dead-man switch has been triggered", HttpStatus.CONFLICT);

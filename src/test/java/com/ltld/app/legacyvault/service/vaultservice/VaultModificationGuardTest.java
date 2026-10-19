@@ -72,7 +72,7 @@ class VaultModificationGuardTest {
     @DisplayName("DMS của Owner đã TRIGGERED -> Ném CONFLICT 409")
     void ensureModifiable_dmsTriggered_throwsConflict() {
         DmsConfig dms = DmsConfig.builder().status(DmsStatus.TRIGGERED).build();
-        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.of(dms));
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dms));
 
         VaultException ex = assertThrows(VaultException.class, () -> guard.ensureModifiable(vault));
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
@@ -82,7 +82,7 @@ class VaultModificationGuardTest {
     @Test
     @DisplayName("Két đang có hồ sơ xác minh mở (PENDING/APPROVED) -> Ném CONFLICT 409")
     void ensureModifiable_openVerificationExists_throwsConflict() {
-        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
         when(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(anyList(), anyList()))
                 .thenReturn(List.of(vaultId));
 
@@ -95,7 +95,7 @@ class VaultModificationGuardTest {
     @DisplayName("Két ACTIVE, DMS không TRIGGERED, không có hồ sơ mở -> Cho phép sửa đổi")
     void ensureModifiable_valid_doesNotThrow() {
         DmsConfig dms = DmsConfig.builder().status(DmsStatus.ACTIVE).build();
-        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.of(dms));
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dms));
         when(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(anyList(), anyList()))
                 .thenReturn(List.of());
 

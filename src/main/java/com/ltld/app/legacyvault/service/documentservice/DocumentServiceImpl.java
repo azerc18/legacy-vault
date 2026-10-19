@@ -8,7 +8,6 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DocumentType;
-import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -89,10 +88,8 @@ public class DocumentServiceImpl implements DocumentService {
             throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
         }
 
-        // Chỉ cho phép upload khi Vault đang ACTIVE (chưa bị DMS kích hoạt, chưa bàn giao)
-        if (vault.getStatus() != VaultStatus.ACTIVE) {
-            throw new VaultException("Cannot upload document to vault in " + vault.getStatus() + " state");
-        }
+        // m3: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS triggered, hồ sơ xác minh mở)
+        vaultModificationGuard.ensureModifiable(vault);
 
         // 2. Ép file thành mảng byte gốc, rồi ném vào CryptoService để MÃ HÓA
         byte[] encryptedFileData = cryptoService.encryptBytes(file.getBytes());

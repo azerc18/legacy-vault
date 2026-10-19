@@ -118,9 +118,14 @@ public class VaultServiceImpl implements VaultService {
 
         String ownerEmail = vault.getOwner().getEmail();
 
-        // 3. Nghiệp vụ: Trạng thái không phải ACTIVE thì từ chối xóa
+        // 3. Nghiệp vụ: Chặn xóa nếu quy trình bàn giao (DMS) đã kích hoạt (V3 - O1)
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+
+        // Trạng thái không phải ACTIVE thì từ chối xóa — ghi audit kèm vaultId (V7)
         if (vault.getStatus() != VaultStatus.ACTIVE) {
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, ownerEmail, "Cannot delete vault that is not in active state");
+            auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
+                    ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
+                    "Cannot delete vault that is not in active state");
             throw new VaultException("Cannot delete vault that is not in active state");
         }
 
