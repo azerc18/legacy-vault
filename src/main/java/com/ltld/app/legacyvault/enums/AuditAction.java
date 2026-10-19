@@ -26,7 +26,7 @@ public enum AuditAction {
     VERIFICATION_MESSAGE_SENT,
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)
     EXECUTOR_ASSIGNED, EXECUTOR_REPLACED,
-    // FR-11: Verifier xem giấy chứng tử và tệp đính kèm trong trao đổi với Executor
+    // FR-12: Verifier xem giấy chứng tử; FR-11: Verifier xem tệp đính kèm trong trao đổi với Executor
     LEGAL_DOCUMENT_VIEWED, VERIFICATION_ATTACHMENT_VIEWED,
     // FR-16 (Q25): Vault mở khóa khi Beneficiary chưa có tài khoản đã xác minh
     BENEFICIARY_PENDING_NOTIFIED,

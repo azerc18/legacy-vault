@@ -8,6 +8,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class UploadedDocumentValidatorTest {
@@ -63,5 +64,19 @@ class UploadedDocumentValidatorTest {
         assertThrows(InvalidVerificationDocumentException.class, () -> validator.readAndValidate(file("fake.pdf", PNG)));
         assertThrows(InvalidVerificationDocumentException.class, () -> validator.readAndValidate(file("fake.png", PDF)));
         assertThrows(InvalidVerificationDocumentException.class, () -> validator.readAndValidate(file(null, PDF)));
+    }
+
+    @Test
+    @DisplayName("detectContentType maps PDF, PNG and JPG by magic bytes and anything else to octet-stream")
+    void detectContentType_usesSameTableAsValidation() {
+        assertEquals("application/pdf", UploadedDocumentValidator.detectContentType(PDF));
+        assertEquals("image/png", UploadedDocumentValidator.detectContentType(PNG));
+        assertEquals("image/jpeg", UploadedDocumentValidator.detectContentType(JPG));
+        assertEquals("application/octet-stream", UploadedDocumentValidator.detectContentType(new byte[0]));
+        assertEquals("application/octet-stream",
+                UploadedDocumentValidator.detectContentType("<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8)));
+        // PNG chỉ có 4 byte đầu thì chưa đủ chữ ký 8 byte -> không nhận
+        assertEquals("application/octet-stream",
+                UploadedDocumentValidator.detectContentType(new byte[]{(byte) 0x89, 'P', 'N', 'G'}));
     }
 }

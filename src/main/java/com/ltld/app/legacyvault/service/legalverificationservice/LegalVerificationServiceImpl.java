@@ -93,21 +93,19 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         return toDtos(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId));
     }
 
-    // UC12: xem chi tiết 1 hồ sơ (N6: trả 404 nếu verifier là owner hoặc executor để không lộ thông tin)
+    // UC12: xem chi tiết 1 hồ sơ (404 nếu xung đột lợi ích; đã xử lý -> chỉ verifier được giao)
     @Override
     @Transactional(readOnly = true)
     public VerificationRequestResponseDto getById(UUID requestId, UUID verifierId) {
-        LegalVerificationRequest request = findRequestOrThrow(requestId);
-        assertNotConflictOfInterestForRead(request, verifierId);
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         return toDto(request);
     }
 
-    // UC13: xác thực tài liệu (mock) (N6: trả 404 nếu xung đột lợi ích)
+    // UC13: xác thực tài liệu (mock) (cùng luật đọc với getById)
     @Override
     @Transactional(readOnly = true)
     public DocumentVerificationResponseDto verifyDocument(UUID requestId, UUID verifierId) {
-        LegalVerificationRequest request = findRequestOrThrow(requestId);
-        assertNotConflictOfInterestForRead(request, verifierId);
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         boolean valid = mockVerifyDocument(request.getDeathCertificateFileUrlEncrypted());
 
         return DocumentVerificationResponseDto.builder()
@@ -218,6 +216,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (signatureRepository.existsByRequestId(requestId)) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó.");
         }
+
+        // D3 (n1): không gửi mã ký cho hồ sơ không thể ký, cũng không tốn lượt cooldown 60 giây
+        assertHandoverStillValid(request);
 
         User verifier = userRepository.findById(verifierId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy thông tin verifier."));
@@ -439,22 +440,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // Verifier không được xử lý hồ sơ của chính mình (là owner hoặc executor)
     private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
-        if (isConflict(request, verifierId)) {
+        if (VerifierAccessGuard.isConflict(request, verifierId)) {
             throw new ConflictOfInterestException(
                     "Bạn không được xử lý hồ sơ có liên quan đến chính mình.");
         }
-    }
-
-    // N6 / Q23-b: Khi đọc chi tiết/kiểm tra tài liệu, nếu xung đột lợi ích thì trả 404 để không lộ sự tồn tại
-    private void assertNotConflictOfInterestForRead(LegalVerificationRequest request, UUID verifierId) {
-        if (isConflict(request, verifierId)) {
-            throw new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + request.getId());
-        }
-    }
-
-    private boolean isConflict(LegalVerificationRequest request, UUID verifierId) {
-        return (request.getOwner() != null && verifierId.equals(request.getOwner().getId()))
-                || (request.getExecutor() != null && verifierId.equals(request.getExecutor().getId()));
     }
 
     // Gửi/ghi sau khi transaction commit; ngoài transaction (unit test) thì chạy ngay
