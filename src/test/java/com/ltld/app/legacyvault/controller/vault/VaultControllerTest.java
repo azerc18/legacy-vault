@@ -1,6 +1,7 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.vault;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ltld.app.legacyvault.controller.VaultController;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;

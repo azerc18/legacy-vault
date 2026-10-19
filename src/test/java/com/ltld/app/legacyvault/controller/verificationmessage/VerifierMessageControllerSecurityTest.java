@@ -1,5 +1,7 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.verificationmessage;
 
+import com.ltld.app.legacyvault.controller.LegalVerificationController;
+import com.ltld.app.legacyvault.controller.VerifierMessageController;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.enums.ExchangeSenderRole;

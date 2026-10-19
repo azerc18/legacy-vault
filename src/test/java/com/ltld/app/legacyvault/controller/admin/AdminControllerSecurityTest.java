@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.admin;
 
+import com.ltld.app.legacyvault.controller.AdminController;
 import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
 import com.ltld.app.legacyvault.dto.adminuserdto.UpdateUserStatusRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;

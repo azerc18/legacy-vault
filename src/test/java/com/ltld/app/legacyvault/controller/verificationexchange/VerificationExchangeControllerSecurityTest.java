@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.verificationexchange;
 
+import com.ltld.app.legacyvault.controller.ExecutorController;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;

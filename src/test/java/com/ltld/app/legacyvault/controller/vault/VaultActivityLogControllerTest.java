@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.vault;
 
+import com.ltld.app.legacyvault.controller.VaultActivityLogController;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.auditservice.VaultActivityLogService;
 import org.junit.jupiter.api.Test;
