@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -41,6 +42,7 @@ public class ExecutorRoleManager {
      * excludedAssignmentId là dòng vừa bị thu hồi/thay người, loại ra vì trạng thái mới của nó chưa được flush.
      */
     public void revokeIfUnused(User user, UUID excludedAssignmentId) {
+        Objects.requireNonNull(excludedAssignmentId, "excludedAssignmentId");
         boolean stillAssigned = executorAssignmentRepository
                 .existsByExecutorUserIdAndStatusNotAndIdNot(user.getId(), ExecutorStatus.REVOKED, excludedAssignmentId);
         if (!stillAssigned) {

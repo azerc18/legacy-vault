@@ -127,6 +127,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setAcknowledgedAt(null);
         assignment.setRevokedAt(null);
 
+        // Không đọc user.getRoles() trước dòng này: roles (LAZY) phải được nạp SAU khi giữ khóa User,
+        // nếu không grant/revokeIfUnused sẽ quyết định trên dữ liệu cũ (findByIdForUpdate không làm mới entity đã nạp).
         lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
         executorRoleManager.grant(candidate);
         if (previous != null) {
@@ -167,6 +169,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setStatus(ExecutorStatus.REVOKED);
         assignment.setRevokedAt(LocalDateTime.now());
         User executor = assignment.getExecutorUser();
+        // Không đọc executor.getRoles() trước dòng này (xem comment ở assignExecutor).
         lockUsersInOrder(executor.getId());
         executorRoleManager.revokeIfUnused(executor, assignment.getId());
 
