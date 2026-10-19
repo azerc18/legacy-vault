@@ -1,8 +1,11 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.adminuserdto.AdminUserResponse;
+import com.ltld.app.legacyvault.dto.adminuserdto.SuspendDmsRequest;
 import com.ltld.app.legacyvault.dto.adminuserdto.UpdateUserStatusRequest;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
+import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +23,7 @@ import java.util.UUID;
 @PreAuthorize("hasAuthority('ADMIN_MANAGE')")
 public class AdminController {
     private final AdminUserService adminUserService;
+    private final DmsConfigService dmsConfigService;
 
     @PostMapping("/users/{userId}/roles/{roleCode}")
     public ResponseEntity<ApiResponse<AdminUserResponse>> grantRole(
@@ -55,5 +59,23 @@ public class AdminController {
         UUID adminId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thành công",
                 adminUserService.updateStatus(adminId, userId, request)));
+    }
+
+    @PutMapping("/dms/{ownerId}/suspend")
+    public ResponseEntity<ApiResponse<DmsConfigResponse>> suspendDms(
+            Principal principal, @PathVariable UUID ownerId,
+            @Valid @RequestBody(required = false) SuspendDmsRequest request) {
+        UUID adminId = UUID.fromString(principal.getName());
+        String reason = request == null ? null : request.getReason();
+        return ResponseEntity.ok(ApiResponse.success("Tạm dừng DMS thành công",
+                dmsConfigService.suspendByAdmin(ownerId, adminId, reason)));
+    }
+
+    @PutMapping("/dms/{ownerId}/resume")
+    public ResponseEntity<ApiResponse<DmsConfigResponse>> resumeDms(
+            Principal principal, @PathVariable UUID ownerId) {
+        UUID adminId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Mở lại DMS thành công",
+                dmsConfigService.resumeByAdmin(ownerId, adminId)));
     }
 }
