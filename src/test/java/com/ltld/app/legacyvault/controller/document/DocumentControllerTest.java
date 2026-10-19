@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.document;
 
+import com.ltld.app.legacyvault.controller.DocumentController;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.DocumentType;

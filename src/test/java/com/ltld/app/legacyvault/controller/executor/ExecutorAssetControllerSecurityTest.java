@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.executor;
 
+import com.ltld.app.legacyvault.controller.ExecutorController;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorVaultAssetResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorVaultBeneficiaryResponse;

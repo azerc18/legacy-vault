@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.verificationtokentest;
+package com.ltld.app.legacyvault.service.verificationtokenservice;
 
 import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;

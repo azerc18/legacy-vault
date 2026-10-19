@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.owner;
 
+import com.ltld.app.legacyvault.controller.OwnerExecutorController;
 import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;

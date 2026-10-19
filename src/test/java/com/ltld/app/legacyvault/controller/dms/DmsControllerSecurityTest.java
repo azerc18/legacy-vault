@@ -1,5 +1,6 @@
-package com.ltld.app.legacyvault.controller;
+package com.ltld.app.legacyvault.controller.dms;
 
+import com.ltld.app.legacyvault.controller.DmsController;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
