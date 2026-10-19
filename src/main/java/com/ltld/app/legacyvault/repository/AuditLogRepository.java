@@ -31,4 +31,35 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
         @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
         Pageable pageable
     );
+
+    // FR-05: nhật ký cấp Owner — sự kiện DMS / Executor (vaultId = null) của DmsConfig và mọi ExecutorAssignment
+    // (kể cả REVOKED) thuộc Owner. Subquery rỗng => trang rỗng, không sinh "IN ()".
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT a FROM AuditLog a " +
+                "LEFT JOIN FETCH a.actor " +
+                "WHERE a.vaultId IS NULL " +
+                "AND ((a.entityType = :dmsConfigType " +
+                "AND a.entityId IN (SELECT c.id FROM DmsConfig c WHERE c.owner.id = :ownerId)) " +
+                "OR (a.entityType = :assignmentType " +
+                "AND a.entityId IN (SELECT e.id FROM ExecutorAssignment e WHERE e.owner.id = :ownerId))) " +
+                "AND a.createdAt >= :startDate " +
+                "AND a.createdAt <= :endDate " +
+                "ORDER BY a.createdAt DESC, a.id DESC",
+        countQuery = "SELECT COUNT(a) FROM AuditLog a " +
+                     "WHERE a.vaultId IS NULL " +
+                     "AND ((a.entityType = :dmsConfigType " +
+                     "AND a.entityId IN (SELECT c.id FROM DmsConfig c WHERE c.owner.id = :ownerId)) " +
+                     "OR (a.entityType = :assignmentType " +
+                     "AND a.entityId IN (SELECT e.id FROM ExecutorAssignment e WHERE e.owner.id = :ownerId))) " +
+                     "AND a.createdAt >= :startDate " +
+                     "AND a.createdAt <= :endDate"
+    )
+    Page<AuditLog> findOwnerActivity(
+        @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
+        @org.springframework.data.repository.query.Param("dmsConfigType") String dmsConfigType,
+        @org.springframework.data.repository.query.Param("assignmentType") String assignmentType,
+        @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate,
+        @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
+        Pageable pageable
+    );
 }
