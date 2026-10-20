@@ -4,6 +4,7 @@ import {getUser, logout, ROLES} from '../auth/auth.js';
 import {getRequests, getHistory} from '../api/verifierApi.js';
 import {getErrorMessage} from '../api/http.js';
 import {formatDate} from './verifierUi.js';
+import UserAvatar from '../Common/UserAvatar.jsx';
 
 // Trang home của Legal Verifier — cùng bố cục với UserHome.
 // to = null => chưa làm, hiện "Coming soon".
@@ -137,10 +138,7 @@ export default function VerifierHome() {
                         <Link to="/me"
                               className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
                               title={user?.email}>
-    <span
-        className="w-8 h-8 rounded-full bg-primary-fixed text-primary flex items-center justify-center text-sm font-bold">
-        {(user?.name || '?')[0].toUpperCase()}
-    </span>
+                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
                             <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
                         </Link>
                         <button

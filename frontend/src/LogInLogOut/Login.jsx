@@ -3,7 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { saveSession, ROLES, getUser, updateStoredUser } from '../auth/auth.js';
-import { userApi } from '../api/userApi.js';
+import { userApi, toStoredUser } from '../api/userApi.js';
 
 // Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
 const homeFor = (u) =>
@@ -36,7 +36,7 @@ export default function Login() {
         try {
             const { accessToken } = await authApi.login(email.trim(), password);
             const me = await userApi.getMe();
-            updateStoredUser({ name: me.fullName });
+            updateStoredUser(toStoredUser(me));
             const user = saveSession(accessToken, email.trim());
             // Legal Verifier vào portal riêng, các role khác vào UserHome
             navigate(homeFor(user));

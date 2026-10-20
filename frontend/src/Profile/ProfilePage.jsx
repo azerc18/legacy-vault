@@ -1,7 +1,8 @@
 // Trang hồ sơ cá nhân (/me) — dùng chung cho mọi role
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { userApi } from '../api/userApi.js';
+import { userApi, toStoredUser } from '../api/userApi.js';
+import UserAvatar from '../Common/UserAvatar.jsx';
 import { getErrorMessage } from '../api/http.js';
 import { logout, updateStoredUser } from '../auth/auth.js';
 import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
@@ -23,8 +24,7 @@ const STATUS_STYLE = {
 // Giống regex ở UpdateProfileRequest (BE)
 const PHONE_RE = /^[0-9+()\-\s]{8,20}$/;
 
-const initials = (name = '') =>
-    name.trim().split(/\s+/).filter(Boolean).slice(-2).map((w) => w[0].toUpperCase()).join('') || '?';
+const MAX_AVATAR = 2 * 1024 * 1024; // khớp giới hạn 2MB ở BE
 
 function Field({ label, hint, children }) {
     return (
@@ -61,13 +61,83 @@ function PasswordInput({ value, onChange, autoComplete }) {
 }
 
 // ---------- Cột trái: thẻ tóm tắt ----------
-function SummaryCard({ profile }) {
+// Ảnh đại diện + nút đổi / xoá ảnh
+function AvatarEditor({ profile, onChanged }) {
+    const inputRef = useRef(null);
+    const [preview, setPreview] = useState(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const pick = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = ''; // cho phép chọn lại cùng 1 file
+        if (!file) return;
+        setError('');
+        if (!['image/png', 'image/jpeg'].includes(file.type)) return setError('Only PNG or JPG images.');
+        if (file.size > MAX_AVATAR) return setError('Image must be 2MB or smaller.');
+
+        const localUrl = URL.createObjectURL(file);
+        setPreview(localUrl); // hiện ngay ảnh vừa chọn trong lúc upload
+        setBusy(true);
+        try {
+            onChanged(await userApi.uploadAvatar(file));
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not upload image.'));
+        } finally {
+            setBusy(false);
+            setPreview(null);
+            URL.revokeObjectURL(localUrl);
+        }
+    };
+
+    const remove = async () => {
+        setError('');
+        setBusy(true);
+        try {
+            onChanged(await userApi.deleteAvatar());
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not remove image.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="flex flex-col items-center">
+            <div className="relative">
+                <UserAvatar
+                    size="lg"
+                    name={profile.fullName}
+                    hasAvatar={profile.hasAvatar}
+                    version={profile.avatarUpdatedAt}
+                    previewUrl={preview}
+                />
+                <button
+                    type="button"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={busy}
+                    title="Change photo"
+                    className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-primary text-on-primary border-4 border-surface-container-lowest flex items-center justify-center hover:bg-primary-container disabled:opacity-60"
+                >
+                    <Icon name={busy ? 'progress_activity' : 'photo_camera'} className={`text-[18px] ${busy ? 'animate-spin' : ''}`} />
+                </button>
+                <input ref={inputRef} type="file" accept="image/png,image/jpeg" onChange={pick} className="hidden" />
+            </div>
+            {profile.hasAvatar && !busy && (
+                <button type="button" onClick={remove} className="mt-2 text-xs font-semibold text-error hover:underline">
+                    Remove photo
+                </button>
+            )}
+            {error && <p className="mt-2 text-xs text-error text-center">{error}</p>}
+        </div>
+    );
+}
+
+function SummaryCard({ profile, onChanged }) {
     return (
         <Card>
             <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-full bg-primary text-on-primary flex items-center justify-center text-2xl font-bold">
-                    {initials(profile.fullName)}
-                </div>
+                <AvatarEditor profile={profile} onChanged={onChanged} />
                 <h2 className="mt-4 font-title-lg text-title-lg break-all">{profile.fullName}</h2>
                 <p className="text-sm text-on-surface-variant break-all">{profile.email}</p>
                 <span className={`mt-3 text-xs font-semibold px-3 py-1 rounded-full ${STATUS_STYLE[profile.status] || 'bg-surface-container'}`}>
@@ -228,14 +298,14 @@ export default function ProfilePage() {
         userApi.getMe()
             .then((p) => {
                 setProfile(p);
-                updateStoredUser({ name: p.fullName });
+                updateStoredUser(toStoredUser(p));
             })
             .catch((e) => setError(getErrorMessage(e, 'Could not load your profile.')));
     }, []);
 
     const handleSaved = (p) => {
         setProfile(p);
-        updateStoredUser({ name: p.fullName });
+        updateStoredUser(toStoredUser(p));
     };
 
     const handleLogout = () => { logout(); navigate('/login'); };
@@ -267,7 +337,7 @@ export default function ProfilePage() {
 
                 {profile && (
                     <div className="grid lg:grid-cols-3 gap-6 items-start">
-                        <SummaryCard profile={profile} />
+                        <SummaryCard profile={profile} onChanged={handleSaved} />
                         <div className="lg:col-span-2 space-y-6">
                             <ProfileForm profile={profile} onSaved={handleSaved} />
                             <ChangePasswordForm />

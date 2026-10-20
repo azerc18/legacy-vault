@@ -19,4 +19,8 @@ public class UserProfileResponse {
     private List<String> roles;
     private Instant createdAt;
     private Instant lastLoginAt;
+    // true nếu đã có ảnh đại diện -> FE gọi GET /api/users/me/avatar để lấy ảnh
+    private boolean hasAvatar;
+    // Thời điểm đổi ảnh gần nhất, FE dùng làm "version" để biết khi nào cần tải lại ảnh
+    private Instant avatarUpdatedAt;
 }

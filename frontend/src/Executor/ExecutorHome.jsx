@@ -3,6 +3,7 @@ import {Link, Navigate, useNavigate} from 'react-router-dom';
 import {getUser, logout} from '../auth/auth.js';
 import {getErrorMessage} from '../api/http.js';
 import {executorApi, caseStep} from '../api/executorApi.js';
+import UserAvatar from '../Common/UserAvatar.jsx';
 
 const EXECUTOR = 'EXECUTOR';
 const STEPS = ['Acknowledge', 'Submit documents', 'Legal verification', 'Hand-over'];
@@ -168,11 +169,7 @@ export default function ExecutorHome() {
                         <Link to="/me"
                               className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
                               title={user?.email}>
-    <span
-        className="w-8 h-8 rounded-full bg-primary-fixed text-primary flex items-center justify-center text-sm font-bold">
-        {(user?.name || '?')[0].toUpperCase()}
-    </span>
-                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
+                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
                         </Link>
                         <button onClick={handleLogout}
                                 className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low">
