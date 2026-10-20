@@ -64,6 +64,12 @@ public class User {
     @Column(name = "locked_until")
     private Instant lockedUntil;
 
+    @Column(name = "avatar_path")
+    private String avatarPath;
+
+    @Column(name = "avatar_updated_at")
+    private Instant avatarUpdatedAt;
+
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

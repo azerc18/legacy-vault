@@ -3,6 +3,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import NotificationBell from './NotificationBell.jsx';
+import UserAvatar from '../Common/UserAvatar.jsx';
 
 export function Icon({ name, className = '' }) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -81,7 +82,10 @@ export function BeneficiaryLayout({ title, subtitle, back, children }) {
                     </Link>
                     <div className="flex items-center gap-4">
                         <NotificationBell />
-                        <span className="hidden sm:block text-sm text-on-surface-variant">{user?.email}</span>
+                        <Link to="/me" className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low" title={user?.email}>
+                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
+                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
+                        </Link>
                         <button onClick={handleLogout} className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low">
                             <Icon name="logout" className="text-[18px]" /> Log out
                         </button>

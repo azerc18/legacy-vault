@@ -43,5 +43,7 @@ public enum AuditAction {
     // Q27 (B3): FR-07 hoãn kích hoạt vì Owner chưa nhận được lần nhắc nào
     DMS_TRIGGER_DEFERRED,
     // V4: Owner thêm / sửa / xóa tài sản số
-    ASSET_CREATED, ASSET_UPDATED, ASSET_DELETED
+    ASSET_CREATED, ASSET_UPDATED, ASSET_DELETED,
+    // Hồ sơ cá nhân
+    PROFILE_UPDATED, PASSWORD_CHANGED, PASSWORD_CHANGE_FAILED, AVATAR_DELETED, AVATAR_UPDATED
 }
