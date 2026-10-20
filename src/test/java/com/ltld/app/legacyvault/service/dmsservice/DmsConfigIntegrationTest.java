@@ -287,6 +287,7 @@ class DmsConfigIntegrationTest {
     void noCheckIn_triggersAtNewDeadline_thenCheckInRejected() {
         Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
+        markReminderReceived(s);
         LocalDateTime deadline = config(s).getNextCheckinDueAt();
 
         // Ngay trước hạn chót: chưa kích hoạt.
@@ -306,6 +307,55 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
     }
 
+    @Test
+    void q27_noReminderEverDelivered_defersThreeTimesWithCatchUpReminder_thenTriggers() {
+        Seed s = seed(true, true);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        doThrow(new MailSendException("SMTP down")).when(emailSender)
+                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        LocalDateTime deadline = config(s).getNextCheckinDueAt();
+
+        for (int i = 1; i <= 3; i++) {
+            LocalDateTime scan = deadline.plusMinutes(1);
+            dmsAutomationService.processOverdueDms(scan);
+
+            DmsConfig config = config(s);
+            assertThat(config.getStatus()).as("lần hoãn %d", i).isEqualTo(DmsStatus.ACTIVE);
+            assertThat(config.getTriggerDeferrals()).isEqualTo(i);
+            assertThat(config.getNextCheckinDueAt()).isEqualTo(scan.plusHours(24));
+            assertThat(config.getNextReminderAt()).isEqualTo(scan);
+            deadline = config.getNextCheckinDueAt();
+
+            // Lần nhắc bù được thử với hạn mới nhưng vẫn lỗi -> remindersSent giữ 0.
+            dmsReminderService.sendDueReminders(scan);
+            verify(emailSender).sendDmsCheckinReminder(eq(s.ownerEmail), any(), eq(deadline),
+                    anyInt(), anyInt());
+            assertThat(config(s).getRemindersSent()).isZero();
+        }
+
+        dmsAutomationService.processOverdueDms(deadline.plusMinutes(1));
+
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(config(s).getTriggerDeferrals()).isEqualTo(3);
+        assertThat(assignment(s.primaryId).getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+    }
+
+    @Test
+    void q27_catchUpReminderDelivered_triggersAtDeferredDeadline() {
+        Seed s = seed(true, true);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        LocalDateTime scan = config(s).getNextCheckinDueAt().plusMinutes(1);
+
+        dmsAutomationService.processOverdueDms(scan);
+        dmsReminderService.sendDueReminders(scan);
+
+        assertThat(config(s).getRemindersSent()).isPositive();
+        assertThat(reminderCheckins(s)).hasSize(1);
+        dmsAutomationService.processOverdueDms(scan.plusHours(24).plusMinutes(1));
+        assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(config(s).getTriggerDeferrals()).isEqualTo(1);
+    }
+
     // ---------- 5. Race check-in và trigger ----------
 
     @Test
@@ -321,6 +371,7 @@ class DmsConfigIntegrationTest {
                 dmsConfigService.upsertConfig(s.ownerId, request());
                 DmsConfig overdue = config(s);
                 overdue.setNextCheckinDueAt(LocalDateTime.now().minusMinutes(1));
+                overdue.setRemindersSent(1);
                 dmsConfigRepository.saveAndFlush(overdue);
                 LocalDateTime now = LocalDateTime.now();
                 // check-in ít truy vấn hơn trigger nên gần như luôn tới flush trước; lệch xuất phát 0–18 ms theo vòng
@@ -514,6 +565,7 @@ class DmsConfigIntegrationTest {
         Seed s = seed(true, true);
         UUID adminId = admin();
         dmsConfigService.upsertConfig(s.ownerId, request());
+        markReminderReceived(s);
         dmsAutomationService.processOverdueDms(config(s).getNextCheckinDueAt().plusMinutes(1));
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
 
@@ -592,6 +644,13 @@ class DmsConfigIntegrationTest {
 
     private DmsConfig config(Seed s) {
         return dmsConfigRepository.findByOwnerId(s.ownerId).orElseThrow();
+    }
+
+    // Owner đã nhận được ít nhất 1 lần nhắc: trigger không bị hoãn theo Q27 (B3).
+    private void markReminderReceived(Seed s) {
+        DmsConfig config = config(s);
+        config.setRemindersSent(1);
+        dmsConfigRepository.saveAndFlush(config);
     }
 
     private ExecutorAssignment assignment(UUID id) {
