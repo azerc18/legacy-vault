@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -29,9 +30,9 @@ public class ExecutorUnlockNotificationListener {
 
     // Tham số: Owner, danh sách tên Vault
     private static final String MSG_UNLOCKED =
-            "Hồ sơ xác minh của %s đã được Legal Verifier ký duyệt. Các Vault sau đã được mở khóa "
-                    + "và bàn giao cho người thụ hưởng: %s.%n"
-                    + "Vui lòng đăng nhập LegacyVault để theo dõi quá trình bàn giao.";
+            "Hồ sơ xác minh của %s đã được Legal Verifier ký duyệt. Các Vault sau đã được mở khóa: %s.%n"
+                    + "Hệ thống sẽ thông báo cho người thụ hưởng. Vui lòng đăng nhập LegacyVault để theo dõi "
+                    + "quá trình bàn giao.";
 
     private final LegalVerificationRequestRepository requestRepository;
     private final VaultRepository vaultRepository;
@@ -47,6 +48,8 @@ public class ExecutorUnlockNotificationListener {
         this.executorNotificationService = executorNotificationService;
         this.readOnlyTx = new TransactionTemplate(transactionManager);
         this.readOnlyTx.setReadOnly(true);
+        // REQUIRES_NEW: nếu listener chạy đồng bộ (không @Async) thì không nhập vào transaction vừa commit.
+        this.readOnlyTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     record UnlockMail(String executorEmail, String content) {

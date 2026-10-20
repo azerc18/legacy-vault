@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -71,7 +72,25 @@ class ExecutorUnlockNotificationListenerTest {
         verify(executorNotificationService).send(eq("executor@example.test"), content.capture());
         assertThat(content.getValue())
                 .contains("Nguyễn Văn A (owner@example.test)")
-                .contains("\"Tài khoản ngân hàng\"");
+                .contains("\"Tài khoản ngân hàng\"")
+                // Q25: Beneficiary có thể chưa đăng ký, nên không được khẳng định đã bàn giao.
+                .doesNotContain("bàn giao cho người thụ hưởng");
+    }
+
+    @Test
+    @DisplayName("B4: đọc dữ liệu trong transaction read-only REQUIRES_NEW")
+    void readsInReadOnlyRequiresNewTransaction() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(vaultRepository.findAllById(List.of(vaultId)))
+                .thenReturn(List.of(Vault.builder().id(vaultId).name("V").build()));
+
+        listener.onVaultsUnlocked(new VaultsUnlockedEvent(requestId, List.of(vaultId)));
+
+        ArgumentCaptor<TransactionDefinition> definition = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(definition.capture());
+        assertThat(definition.getValue().isReadOnly()).isTrue();
+        assertThat(definition.getValue().getPropagationBehavior())
+                .isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Test
