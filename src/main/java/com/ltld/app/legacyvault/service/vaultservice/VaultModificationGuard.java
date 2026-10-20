@@ -1,12 +1,11 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
-import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -17,14 +16,14 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VaultModificationGuard {
 
-    private final DmsConfigRepository dmsConfigRepository;
+    private final DmsConfigService dmsConfigService;
     private final VerificationRequestVaultRepository verificationRequestVaultRepository;
 
     /**
-     * Quy tắc nghiệp vụ dùng chung (m3):
+     * Quy tắc nghiệp vụ dùng chung (m3 / g1 / n2):
      * Két sắt không được phép thay đổi (sửa thông tin, thêm/xóa tài liệu) khi:
      * 1. Két không ở trạng thái ACTIVE (BAD_REQUEST)
-     * 2. Dead Man's Switch của Owner đã TRIGGERED (CONFLICT)
+     * 2. Dead Man's Switch của Owner đã TRIGGERED (gọi assertHandoverNotStarted) (CONFLICT)
      * 3. Két đang có hồ sơ xác minh quyền thừa kế mở (PENDING hoặc APPROVED) (CONFLICT)
      */
     public void ensureModifiable(Vault vault) {
@@ -32,12 +31,8 @@ public class VaultModificationGuard {
             throw new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST);
         }
 
-        dmsConfigRepository.findByOwnerIdForUpdate(vault.getOwner().getId()).ifPresent(dms -> {
-            if (dms.getStatus() == DmsStatus.TRIGGERED) {
-                throw new VaultException(
-                        "Cannot modify vault: dead-man switch has been triggered", HttpStatus.CONFLICT);
-            }
-        });
+        // n2: gọi assertHandoverNotStarted để dùng chung một quy tắc và khóa DmsConfig
+        dmsConfigService.assertHandoverNotStarted(vault.getOwner().getId());
 
         boolean hasOpenVerification = !verificationRequestVaultRepository
                 .findVaultIdsWithOpenRequest(

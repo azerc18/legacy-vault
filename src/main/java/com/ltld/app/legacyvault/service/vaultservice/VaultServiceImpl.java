@@ -118,8 +118,15 @@ public class VaultServiceImpl implements VaultService {
 
         String ownerEmail = vault.getOwner().getEmail();
 
-        // 3. Nghiệp vụ: Chặn xóa nếu quy trình bàn giao (DMS) đã kích hoạt (V3 - O1)
-        dmsConfigService.assertHandoverNotStarted(ownerId);
+        // 3. Nghiệp vụ: Chặn xóa nếu quy trình bàn giao (DMS) đã kích hoạt (n3: ghi audit khi bị chặn)
+        try {
+            dmsConfigService.assertHandoverNotStarted(ownerId);
+        } catch (Exception ex) {
+            auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
+                    ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
+                    "DMS handover started: " + ex.getMessage());
+            throw ex;
+        }
 
         // Trạng thái không phải ACTIVE thì từ chối xóa — ghi audit kèm vaultId (V7)
         if (vault.getStatus() != VaultStatus.ACTIVE) {

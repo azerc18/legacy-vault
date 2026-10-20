@@ -267,6 +267,35 @@ class VaultServiceImplTest {
         verify(vaultRepository, never()).delete(any());
     }
 
+    @Test
+    @DisplayName("deleteVault (n3): DMS đã kích hoạt -> Chặn xóa và ghi audit VAULT_DELETE_DENIED")
+    void deleteVault_dmsTriggered_writesAuditAndThrows() {
+        UUID vaultId = UUID.randomUUID();
+        Vault vault = new Vault();
+        vault.setId(vaultId);
+        vault.setOwner(mockOwner);
+        vault.setStatus(VaultStatus.ACTIVE);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        doThrow(new DmsException("DMS triggered", HttpStatus.CONFLICT))
+                .when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        DmsException ex = assertThrows(DmsException.class, () -> vaultService.deleteVault(vaultId, ownerId));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+
+        verify(vaultRepository, never()).delete(any());
+        verify(auditLogService).log(
+                eq(AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditResult.FAILURE),
+                eq(ownerId),
+                eq(mockOwner.getEmail()),
+                eq(vaultId),
+                eq("Vault"),
+                eq(vaultId.toString()),
+                contains("DMS handover started")
+        );
+    }
+
     // ===== FR-02: Chỉ định người thụ hưởng =====
 
     private Vault activeVault() {
