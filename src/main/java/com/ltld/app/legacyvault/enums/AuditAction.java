@@ -41,5 +41,7 @@ public enum AuditAction {
     // O5: Admin tạm dừng / mở lại DMS
     DMS_SUSPENDED, DMS_RESUMED,
     // Q27 (B3): FR-07 hoãn kích hoạt vì Owner chưa nhận được lần nhắc nào
-    DMS_TRIGGER_DEFERRED
+    DMS_TRIGGER_DEFERRED,
+    // V4: Owner thêm / sửa / xóa tài sản số
+    ASSET_CREATED, ASSET_UPDATED, ASSET_DELETED
 }

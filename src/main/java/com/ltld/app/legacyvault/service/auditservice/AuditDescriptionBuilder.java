@@ -75,6 +75,10 @@ public class AuditDescriptionBuilder {
             case CLAIM_COMPLETED -> "Người thụ hưởng đã hoàn tất nhận bàn giao.";
             case ASSET_VIEWED -> "Xem chi tiết tài sản số.";
             case ASSET_DOWNLOADED -> "Tải xuống tài sản số.";
+            // FR-27: Owner quản lý tài sản số; không nối detail
+            case ASSET_CREATED -> "Thêm tài sản số mới.";
+            case ASSET_UPDATED -> "Cập nhật tài sản số.";
+            case ASSET_DELETED -> "Xóa tài sản số.";
             case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Tải xuống tài liệu thất bại." : "Tải xuống tài liệu.";
             case LEGAL_VERIFICATION_REQUESTED -> "Gửi yêu cầu xác minh pháp lý.";
             // FR-16: detail chứa email người nhận, không được hiển thị
