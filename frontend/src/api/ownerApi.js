@@ -1,49 +1,59 @@
-// API cho Vault Owner — khớp VaultController, DocumentController, VaultActivityLogController,
+// API cho Vault Owner — khớp VaultController, DigitalAssetController, DocumentController, VaultActivityLogController,
 // DmsController, OwnerExecutorController. Dùng http.js chung (tự gắn token + refresh).
 import http from './http.js';
-import { getUser } from '../auth/auth.js';
 
 const unwrap = (res) => res.data?.data;
 
-/* ------------------------------------------------------------------
-   Danh sách vault: BE CHƯA có GET /api/vaults.
-   Tạm thời FE tự nhớ các vault do chính trình duyệt này tạo (localStorage, theo user).
-   Khi BE thêm API: chỉ cần sửa listVaults() thành
-       listVaults: () => http.get('/vaults').then(unwrap)
-   ------------------------------------------------------------------ */
-const storeKey = () => `lv_owner_vaults_${getUser()?.id || 'anon'}`;
-
-function readLocalVaults() {
-    try { return JSON.parse(localStorage.getItem(storeKey())) || []; } catch { return []; }
-}
-function writeLocalVaults(list) {
-    try { localStorage.setItem(storeKey(), JSON.stringify(list)); } catch { /* bỏ qua */ }
-}
-function rememberVault(v) {
-    writeLocalVaults([v, ...readLocalVaults().filter((x) => x.id !== v.id)]);
-}
-function forgetVault(id) {
-    writeLocalVaults(readLocalVaults().filter((x) => x.id !== id));
+// Lấy tên file từ Content-Disposition rồi cho trình duyệt tải về
+async function saveBlob(url, fallbackName) {
+    try {
+        const res = await http.get(url, { responseType: 'blob' });
+        const cd = res.headers['content-disposition'] || '';
+        const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+        const plain = cd.match(/filename="?([^";]+)"?/i);
+        const name = star ? decodeURIComponent(star[1]) : plain ? plain[1] : fallbackName;
+        const href = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = href; a.download = name; a.click();
+        URL.revokeObjectURL(href);
+    } catch (err) {
+        // Lỗi trả về dạng Blob JSON -> đọc lại để lấy message của BE
+        const blob = err.response?.data;
+        if (blob instanceof Blob) {
+            try { err.response.data = JSON.parse(await blob.text()); } catch { /* giữ nguyên */ }
+        }
+        throw err;
+    }
 }
 
 export const ownerApi = {
-    /* ---------- Vault ---------- */
-    listVaults: async () => readLocalVaults(),
-    getLocalVault: (id) => readLocalVaults().find((v) => v.id === id) || null,
+    /* ---------- Vault (FR-01, FR-27) ---------- */
+    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt }]
+    listVaults: () => http.get('/vaults').then((r) => unwrap(r) ?? []),
 
-    // FR-01: tạo vault kèm tài sản. assets: [{ assetType, assetName, secret, notes }]
-    // -> VaultResponse { id, name, description, status, createdAt, updatedAt }
-    createVault: async ({ name, description, assets }) => {
-        const vault = await http.post('/vaults', { name, description, assets }).then(unwrap);
-        rememberVault(vault);
-        return vault;
-    },
+    // -> VaultDetailResponse { id, name, description, status, ownerEmail, beneficiaryId, beneficiaryEmail,
+    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
+    getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
+
+    // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
+    createVault: ({ name, description, assets }) => http.post('/vaults', { name, description, assets }).then(unwrap),
+
+    // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
+    updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
 
     // Chỉ xoá được khi vault ACTIVE
-    deleteVault: async (vaultId) => {
-        await http.delete(`/vaults/${vaultId}`);
-        forgetVault(vaultId);
-    },
+    deleteVault: (vaultId) => http.delete(`/vaults/${vaultId}`),
+
+    /* ---------- Tài sản số (FR-27) ---------- */
+    // Danh sách KHÔNG có secret -> [{ id, assetType, assetName, status, createdAt, updatedAt }]
+    listAssets: (vaultId) => http.get(`/vaults/${vaultId}/assets`).then((r) => unwrap(r) ?? []),
+    // Chi tiết CÓ secret + notes đã giải mã (BE ghi audit ASSET_VIEWED mỗi lần xem)
+    getAsset: (vaultId, assetId) => http.get(`/vaults/${vaultId}/assets/${assetId}`).then(unwrap),
+    // { assetType, assetName, secret (bắt buộc khi thêm), notes }
+    addAsset: (vaultId, asset) => http.post(`/vaults/${vaultId}/assets`, asset).then(unwrap),
+    // Cập nhật: secret null/rỗng = giữ nguyên; notes null = giữ nguyên, "" = xoá ghi chú
+    updateAsset: (vaultId, assetId, asset) => http.put(`/vaults/${vaultId}/assets/${assetId}`, asset).then(unwrap),
+    deleteAsset: (vaultId, assetId) => http.delete(`/vaults/${vaultId}/assets/${assetId}`),
 
     // FR-02: chỉ định / thay người thụ hưởng. 409 + "confirmReplace" => gửi lại với confirmReplace=true
     // -> { vaultId, beneficiaryEmail, beneficiaryName, pendingRegistration, replaced }
@@ -59,6 +69,11 @@ export const ownerApi = {
         form.append('file', file);
         return http.post('/documents/upload', form).then(unwrap);
     },
+    // -> [{ id, vaultId, documentType, fileName, uploadedAt }]
+    listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
+    downloadDocument: (docId, fileName) => saveBlob(`/documents/${docId}/download`, fileName || 'document'),
+    // 409 nếu tài liệu đang nằm trong hồ sơ xác minh
+    deleteDocument: (docId) => http.delete(`/documents/${docId}`),
 
     // Nhật ký hoạt động: trả Page { content[], totalPages, totalElements, number, size }
     // startDate/endDate: ISO date-time (vd 2026-10-01T00:00:00Z), tối đa 1 năm
