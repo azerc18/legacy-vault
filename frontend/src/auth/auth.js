@@ -47,3 +47,9 @@ export function logout() {
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     clearAuth();
 }
+
+// Cập nhật một phần thông tin user đã lưu (vd: tên sau khi sửa hồ sơ)
+export function updateStoredUser(patch) {
+    const user = getUser();
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify({ ...user, ...patch }));
+}

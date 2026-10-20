@@ -134,7 +134,15 @@ export default function VerifierHome() {
                                 <Icon name="swap_horiz" className="text-[18px]"/> User home
                             </Link>
                         )}
-                        <span className="hidden sm:block text-sm text-on-surface-variant">{user.email}</span>
+                        <Link to="/me"
+                              className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
+                              title={user?.email}>
+    <span
+        className="w-8 h-8 rounded-full bg-primary-fixed text-primary flex items-center justify-center text-sm font-bold">
+        {(user?.name || '?')[0].toUpperCase()}
+    </span>
+                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
+                        </Link>
                         <button
                             onClick={handleLogout}
                             className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low"
