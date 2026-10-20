@@ -4,7 +4,7 @@ import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
 import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
 // Dùng lại thành phần giao diện chung của module Owner
-import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../owner/ownerUi.jsx';
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
