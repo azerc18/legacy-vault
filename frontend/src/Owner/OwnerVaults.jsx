@@ -2,13 +2,21 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
+import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
 
 export default function OwnerVaults() {
     const user = getUser();
     const [vaults, setVaults] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    useEffect(() => { ownerApi.listVaults().then(setVaults); }, []);
+    useEffect(() => {
+        ownerApi.listVaults()
+            .then(setVaults)
+            .catch((e) => setError(getErrorMessage(e, 'Could not load your vaults.')))
+            .finally(() => setLoading(false));
+    }, []);
 
     if (!user) return <Navigate to="/login" replace />;
 
@@ -22,12 +30,11 @@ export default function OwnerVaults() {
                 </Link>
             }
         >
-            {/* Tạm thời: BE chưa có GET /api/vaults nên chỉ hiện vault tạo từ trình duyệt này */}
-            <Alert type="info">
-                This list shows vaults created from this browser. A full list will appear once the server supports it.
-            </Alert>
+            <Alert>{error}</Alert>
 
-            {vaults.length === 0 ? (
+            {loading ? (
+                <p className="text-on-surface-variant">Loading...</p>
+            ) : vaults.length === 0 ? (
                 <div className="text-center py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     <Icon name="inventory_2" className="text-[40px] text-outline" />
                     <p className="mt-3 text-on-surface-variant">You have not created any vault yet.</p>

@@ -61,12 +61,12 @@ export default function CreateVault() {
                     <div className="space-y-4">
                         <label className="block">
                             <span className="text-sm font-semibold text-on-surface-variant">Name *</span>
-                            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Family finances" className={`${inputClass} mt-1`} />
+                            <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} placeholder="e.g. Family finances" className={`${inputClass} mt-1`} />
                         </label>
                         <label className="block">
                             <span className="text-sm font-semibold text-on-surface-variant">Description</span>
-                            <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)}
-                                className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
+                            <textarea rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)}
+                                      className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
                         </label>
                     </div>
                 </Card>
@@ -87,12 +87,13 @@ export default function CreateVault() {
                                     <select value={a.assetType} onChange={(e) => updateAsset(i, 'assetType', e.target.value)} className={inputClass}>
                                         {ASSET_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                                     </select>
-                                    <input value={a.assetName} onChange={(e) => updateAsset(i, 'assetName', e.target.value)} placeholder="Asset name (e.g. Vietcombank)" className={inputClass} />
+                                    <input value={a.assetName} maxLength={200} onChange={(e) => updateAsset(i, 'assetName', e.target.value)} placeholder="Asset name (e.g. Vietcombank)" className={inputClass} />
                                 </div>
                                 <div className="relative">
                                     <input
                                         type={showSecret[i] ? 'text' : 'password'}
                                         value={a.secret}
+                                        maxLength={5000}
                                         onChange={(e) => updateAsset(i, 'secret', e.target.value)}
                                         placeholder="Secret (password, seed phrase, account number...)"
                                         className={`${inputClass} pr-12`}
@@ -102,10 +103,10 @@ export default function CreateVault() {
                                         <Icon name={showSecret[i] ? 'visibility_off' : 'visibility'} className="text-[20px]" />
                                     </button>
                                 </div>
-                                <input value={a.notes} onChange={(e) => updateAsset(i, 'notes', e.target.value)} placeholder="Notes for the beneficiary (optional)" className={inputClass} />
+                                <input value={a.notes} maxLength={2000} onChange={(e) => updateAsset(i, 'notes', e.target.value)} placeholder="Notes for the beneficiary (optional)" className={inputClass} />
                             </div>
                         ))}
-                        <button type="button" onClick={() => setAssets((l) => [...l, emptyAsset()])} className={btnOutline}>
+                        <button type="button" disabled={assets.length >= 50} onClick={() => setAssets((l) => [...l, emptyAsset()])} className={btnOutline}>
                             <Icon name="add" className="text-[18px]" /> Add asset
                         </button>
                     </div>
