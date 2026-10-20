@@ -91,6 +91,7 @@ class DmsActivationProcessorTest {
         User owner = User.builder().id(ownerId).fullName("Nguyễn Văn A").email("owner@example.test").build();
         config = DmsConfig.builder().id(UUID.randomUUID()).owner(owner).status(DmsStatus.ACTIVE)
                 .nextCheckinDueAt(now.minusDays(1)).backupActivationWaitDays(14)
+                .lastCheckinAt(now.minusDays(38)).checkinIntervalDays(30).gracePeriodDays(7).reminderCount(3)
                 // Đã gửi được 1 lần nhắc: các test trigger không rơi vào nhánh hoãn Q27 (B3).
                 .remindersSent(1).build();
         primary = assignment(owner, primaryUserId, "primary@example.test", ExecutorType.PRIMARY);
@@ -317,6 +318,18 @@ class DmsActivationProcessorTest {
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         assertThat(config.getTriggerDeferrals()).isZero();
         verify(dmsConfigRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("B3: dòng tạo trước FR-03 (thiếu lịch nhắc) -> không hoãn, kích hoạt ngay")
+    void trigger_noReminderSchedule_doesNotDefer() {
+        config.setRemindersSent(0);
+        config.setReminderCount(null);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(config.getTriggerDeferrals()).isZero();
     }
 
     @Test

@@ -76,7 +76,8 @@ public class DmsActivationProcessor {
         }
 
         UUID ownerId = config.getOwner().getId();
-        if (config.getRemindersSent() == 0 && config.getTriggerDeferrals() < MAX_TRIGGER_DEFERRALS) {
+        if (config.getRemindersSent() == 0 && config.getTriggerDeferrals() < MAX_TRIGGER_DEFERRALS
+                && hasReminderSchedule(config)) {
             defer(config, now);
             return;
         }
@@ -179,6 +180,13 @@ public class DmsActivationProcessor {
         audit(AuditAction.DMS_TRIGGER_DEFERRED, ENTITY_DMS_CONFIG, config.getId(),
                 ownerDetail(config.getOwner().getId()) + ", deferral=" + config.getTriggerDeferrals()
                         + ", nextCheckinDueAt=" + config.getNextCheckinDueAt());
+    }
+
+    // Cùng điều kiện với DmsReminderProcessor.prepareReminder: thiếu lịch (dòng tạo trước FR-03) thì không bao giờ
+    // gửi được lần nhắc nào, hoãn chỉ làm chậm bàn giao 3 ngày.
+    private static boolean hasReminderSchedule(DmsConfig config) {
+        return config.getLastCheckinAt() != null && config.getCheckinIntervalDays() != null
+                && config.getGracePeriodDays() != null && config.getReminderCount() != null;
     }
 
     private void markActive(ExecutorAssignment assignment, LocalDateTime now) {
