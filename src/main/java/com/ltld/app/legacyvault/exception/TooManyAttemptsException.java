@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class TooManyAttemptsException extends BusinessException {
     public TooManyAttemptsException(String message) {
-        super(message, HttpStatus.CONFLICT);
+        super(message, HttpStatus.TOO_MANY_REQUESTS);
     }
 }

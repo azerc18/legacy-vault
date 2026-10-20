@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './Dashboard.jsx';
 import UserHome from './UserHome.jsx';
 import Login from './LogInLogOut/Login.jsx';
@@ -12,6 +12,7 @@ import VerificationRequestDetail from './LegalVerifier/VerificationRequestDetail
 import VerificationHistory from './LegalVerifier/VerificationHistory.jsx';
 import VerifierHome from './LegalVerifier/VerifierHome.jsx';
 import ExecutorHome from './Executor/ExecutorHome.jsx';
+import ExecutorCase from './Executor/ExecutorCase.jsx';
 import BeneficiaryVaults from './Beneficiary/BeneficiaryVaults.jsx';
 import BeneficiaryVaultDetail from './Beneficiary/BeneficiaryVaultDetail.jsx';
 import OwnerVaults from './Owner/OwnerVaults.jsx';
@@ -19,6 +20,8 @@ import CreateVault from './Owner/CreateVault.jsx';
 import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
+import AdminUsers from './Admin/AdminUsers.jsx';
+import AdminVaults from './Admin/AdminVaults.jsx';
 
 function App() {
     return (
@@ -33,6 +36,7 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verifier/home" element={<VerifierHome />} />
                 <Route path="/executor/home" element={<ExecutorHome />} />
+                <Route path="/executor/cases/:assignmentId" element={<ExecutorCase />} />
                 <Route path="/verifier" element={<LegalVerifierDashboard />} />
                 <Route path="/verifier/request/:requestId" element={<VerificationRequestDetail />} />
                 <Route path="/verifier/history" element={<VerificationHistory />} />
@@ -43,6 +47,9 @@ function App() {
                 <Route path="/owner/vaults/:vaultId" element={<OwnerVaultDetail />} />
                 <Route path="/owner/dms" element={<DeadMansSwitch />} />
                 <Route path="/owner/executors" element={<OwnerExecutors />} />
+                <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/admin/vaults" element={<AdminVaults />} />
             </Routes>
         </BrowserRouter>
     );

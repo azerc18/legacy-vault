@@ -15,6 +15,9 @@ const FEATURES = [
     { role: 'EXECUTOR', icon: 'badge', title: 'Executor duties', text: 'See vaults where you are the executor.', to: '/executor/home' },        // Legal Verifier
     { role: 'LEGAL_VERIFIER', icon: 'gavel', title: 'Verification requests', text: 'Review and sign pending requests.', to: '/verifier' },
     { role: 'LEGAL_VERIFIER', icon: 'manage_search', title: 'Verification history', text: 'Requests you have already handled.', to: '/verifier/history' },
+    // System Admin
+    { role: 'ADMIN', icon: 'group', title: 'Users', text: 'Lock accounts, grant Legal Verifier access, hold DMS.', to: '/admin/users' },
+    { role: 'ADMIN', icon: 'inventory_2', title: 'All vaults', text: 'Browse every vault and its status.', to: '/admin/vaults' },
 ];
 
 const ROLE_LABEL = {

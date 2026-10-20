@@ -4,6 +4,12 @@ import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { saveSession, ROLES, getUser } from '../auth/auth.js';
 
+// Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
+const homeFor = (u) =>
+    u.roles?.includes('ADMIN') ? '/admin/users'
+        : u.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home'
+            : '/home';
+
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -16,7 +22,7 @@ export default function Login() {
     // Đã đăng nhập -> không cho vào lại trang login
     const current = getUser();
     if (current) {
-        return <Navigate to={current.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home' : '/home'} replace />;
+        return <Navigate to={homeFor(current)} replace />;
     }
 
     const handleLogin = async (e) => {
@@ -30,7 +36,7 @@ export default function Login() {
             const { accessToken } = await authApi.login(email.trim(), password);
             const user = saveSession(accessToken, email.trim());
             // Legal Verifier vào portal riêng, các role khác vào UserHome
-            navigate(user.roles.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home' : '/home');
+            navigate(homeFor(user));
         } catch (err) {
             setError(getErrorMessage(err, 'Login failed.'));
             // 403 = chưa xác thực email hoặc tài khoản bị khoá
