@@ -20,36 +20,64 @@ import CreateVault from './Owner/CreateVault.jsx';
 import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
+import OwnerActivity from './Owner/OwnerActivity.jsx';
 import AdminUsers from './Admin/AdminUsers.jsx';
 import AdminVaults from './Admin/AdminVaults.jsx';
+import RequireRole from './Common/RequireRole.jsx';
+import NotFound from './Common/NotFound.jsx';
+
+// Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
+const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
+
+const OWNER = ['OWNER'];
+const BENEFICIARY = ['BENEFICIARY'];
+const EXECUTOR = ['EXECUTOR'];
+const VERIFIER = ['LEGAL_VERIFIER'];
+const ADMIN = ['ADMIN'];
 
 function App() {
     return (
         <BrowserRouter>
             <Routes>
+                {/* Công khai */}
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/home" element={<UserHome />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/verifier/home" element={<VerifierHome />} />
-                <Route path="/executor/home" element={<ExecutorHome />} />
-                <Route path="/executor/cases/:assignmentId" element={<ExecutorCase />} />
-                <Route path="/verifier" element={<LegalVerifierDashboard />} />
-                <Route path="/verifier/request/:requestId" element={<VerificationRequestDetail />} />
-                <Route path="/verifier/history" element={<VerificationHistory />} />
-                <Route path="/beneficiary" element={<BeneficiaryVaults />} />
-                <Route path="/beneficiary/vaults/:vaultId" element={<BeneficiaryVaultDetail />} />
-                <Route path="/owner/vaults" element={<OwnerVaults />} />
-                <Route path="/owner/vaults/new" element={<CreateVault />} />
-                <Route path="/owner/vaults/:vaultId" element={<OwnerVaultDetail />} />
-                <Route path="/owner/dms" element={<DeadMansSwitch />} />
-                <Route path="/owner/executors" element={<OwnerExecutors />} />
+
+                {/* Đã đăng nhập */}
+                <Route path="/home" element={guard(null, <UserHome />)} />
+
+                {/* Vault Owner */}
+                <Route path="/owner/vaults" element={guard(OWNER, <OwnerVaults />)} />
+                <Route path="/owner/vaults/new" element={guard(OWNER, <CreateVault />)} />
+                <Route path="/owner/vaults/:vaultId" element={guard(OWNER, <OwnerVaultDetail />)} />
+                <Route path="/owner/dms" element={guard(OWNER, <DeadMansSwitch />)} />
+                <Route path="/owner/executors" element={guard(OWNER, <OwnerExecutors />)} />
+                <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
+
+                {/* Beneficiary */}
+                <Route path="/beneficiary" element={guard(BENEFICIARY, <BeneficiaryVaults />)} />
+                <Route path="/beneficiary/vaults/:vaultId" element={guard(BENEFICIARY, <BeneficiaryVaultDetail />)} />
+
+                {/* Executor */}
+                <Route path="/executor/home" element={guard(EXECUTOR, <ExecutorHome />)} />
+                <Route path="/executor/cases/:assignmentId" element={guard(EXECUTOR, <ExecutorCase />)} />
+
+                {/* Legal Verifier */}
+                <Route path="/verifier/home" element={guard(VERIFIER, <VerifierHome />)} />
+                <Route path="/verifier" element={guard(VERIFIER, <LegalVerifierDashboard />)} />
+                <Route path="/verifier/request/:requestId" element={guard(VERIFIER, <VerificationRequestDetail />)} />
+                <Route path="/verifier/history" element={guard(VERIFIER, <VerificationHistory />)} />
+
+                {/* System Admin */}
                 <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/vaults" element={<AdminVaults />} />
+                <Route path="/admin/users" element={guard(ADMIN, <AdminUsers />)} />
+                <Route path="/admin/vaults" element={guard(ADMIN, <AdminVaults />)} />
+
+                <Route path="*" element={<NotFound />} />
             </Routes>
         </BrowserRouter>
     );

@@ -9,6 +9,7 @@ const FEATURES = [
     { role: 'OWNER', icon: 'inventory_2', title: 'My vaults', text: 'Create vaults, add documents, choose beneficiaries.', to: '/owner/vaults' },
     { role: 'OWNER', icon: 'favorite', title: "Dead Man's Switch", text: 'Set your check-in schedule and check in.', to: '/owner/dms' },
     { role: 'OWNER', icon: 'badge', title: 'Executors', text: 'Assign your primary and backup executor.', to: '/owner/executors' },
+    { role: 'OWNER', icon: 'history', title: 'Activity log', text: "Dead Man's Switch and executor events.", to: '/owner/activity' },
     // Beneficiary
     { role: 'BENEFICIARY', icon: 'redeem', title: 'Inherited vaults', text: 'Verify your identity and receive assets.', to: '/beneficiary' },
     // Executor

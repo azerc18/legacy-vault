@@ -84,6 +84,14 @@ export const ownerApi = {
         return http.get(`/vaults/${vaultId}/activity-logs`, { params }).then(unwrap);
     },
 
+    // Nhật ký cấp Owner (sự kiện DMS / Executor, không gắn vault). Cùng định dạng Page như nhật ký vault
+    getOwnerActivityLogs: ({ startDate, endDate, page = 0, size = 20 } = {}) => {
+        const params = { page, size };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        return http.get('/owner/activity-logs', { params }).then(unwrap);
+    },
+
     /* ---------- Dead Man's Switch (FR-03) ---------- */
     // 404 = chưa cấu hình
     getDms: () => http.get('/dms').then(unwrap),
