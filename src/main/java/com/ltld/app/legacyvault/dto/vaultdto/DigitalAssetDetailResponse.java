@@ -9,12 +9,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Response trả về cho Owner khi xem chi tiết 1 tài sản (V2).
+ * Response trả về cho Owner khi xem chi tiết 1 tài sản (FR-27).
  * Bao gồm secret đã giải mã và notes đã giải mã — chỉ Owner của vault được xem.
- *
- * TODO (cần hỏi leader): Có nên thêm cơ chế xác nhận (OTP/password) trước khi trả secret không?
- *   - Phương án A: Trả thẳng qua HTTPS (hiện tại) — đơn giản, đủ với JWT.
- *   - Phương án B: Yêu cầu OTP trước khi giải mã — bảo mật hơn nhưng UX phức tạp.
+ * Q36: Owner xem secret của tài sản bằng JWT hợp lệ qua HTTPS; mỗi lần xem ghi audit ASSET_VIEWED
+ * (hiển thị trong nhật ký Vault); response không được cache (no-store). Không yêu cầu OTP.
  */
 @Getter
 @Builder

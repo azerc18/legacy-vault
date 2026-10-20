@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * FR-27 / V1, V2, V4 – Owner quản lý tài sản số.
+ * FR-27 – Owner quản lý tài sản số.
  *
  * <pre>
  * GET    /api/vaults/{vaultId}/assets              → danh sách (không có secret)
@@ -27,7 +27,7 @@ import java.util.UUID;
  * DELETE /api/vaults/{vaultId}/assets/{assetId}    → xóa cứng
  * </pre>
  *
- * Tất cả endpoint yêu cầu authority VAULT_CREATE (Owner).
+ * Endpoint GET yêu cầu authority VAULT_READ; POST/PUT/DELETE yêu cầu authority VAULT_CREATE.
  * Kiểm tra ownership tại service layer; sai chủ → 404.
  */
 @RestController
@@ -37,7 +37,7 @@ public class DigitalAssetController {
 
     private final DigitalAssetService digitalAssetService;
 
-    // V1: Danh sách tài sản ACTIVE (không trả secret)
+    // FR-27: Danh sách tài sản ACTIVE (không trả secret)
     @GetMapping
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<List<DigitalAssetResponse>>> listAssets(
@@ -49,7 +49,7 @@ public class DigitalAssetController {
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tài sản thành công", list));
     }
 
-    // V2: Chi tiết 1 tài sản (kèm secret đã giải mã)
+    // FR-27: Chi tiết 1 tài sản (kèm secret đã giải mã)
     @GetMapping("/{assetId}")
     @PreAuthorize("hasAuthority('VAULT_READ')")
     public ResponseEntity<ApiResponse<DigitalAssetDetailResponse>> getAsset(
@@ -62,7 +62,7 @@ public class DigitalAssetController {
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tài sản thành công", detail));
     }
 
-    // V4a: Thêm tài sản mới
+    // FR-27: Thêm tài sản mới
     @PostMapping
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<DigitalAssetResponse>> addAsset(
@@ -76,7 +76,7 @@ public class DigitalAssetController {
                 .body(ApiResponse.success("Thêm tài sản thành công", response));
     }
 
-    // V4b: Cập nhật tài sản
+    // FR-27: Cập nhật tài sản
     @PutMapping("/{assetId}")
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<DigitalAssetResponse>> updateAsset(
@@ -90,7 +90,7 @@ public class DigitalAssetController {
         return ResponseEntity.ok(ApiResponse.success("Cập nhật tài sản thành công", response));
     }
 
-    // V4c: Xóa cứng tài sản
+    // FR-27: Xóa cứng tài sản
     @DeleteMapping("/{assetId}")
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<Void>> deleteAsset(

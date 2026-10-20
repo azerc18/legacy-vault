@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -34,7 +35,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     private final VaultModificationGuard vaultModificationGuard;
 
     // =========================================================
-    // V1: Xem danh sách tài sản ACTIVE của Vault
+    // FR-27: Xem danh sách tài sản ACTIVE của Vault
     // =========================================================
     @Override
     @Transactional(readOnly = true)
@@ -47,21 +48,32 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     }
 
     // =========================================================
-    // V2: Xem chi tiết 1 tài sản (giải mã secret)
+    // FR-27: Xem chi tiết 1 tài sản (giải mã secret)
     // =========================================================
     @Override
     @Transactional(readOnly = true)
     public DigitalAssetDetailResponse getAsset(UUID ownerId, UUID vaultId, UUID assetId) throws Exception {
-        loadOwnedVault(vaultId, ownerId);
+        Vault vault = loadOwnedVault(vaultId, ownerId);
+        if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
+            throw new VaultException("Nội dung két đã bị xóa theo chính sách lưu trữ.", HttpStatus.GONE);
+        }
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
-        String secret = cryptoService.decrypt(asset.getEncryptedSecret());
-        String notes = asset.getNotesEncrypted() != null
-                ? cryptoService.decrypt(asset.getNotesEncrypted())
-                : null;
+        String secret;
+        String notes;
+        try {
+            secret = cryptoService.decrypt(asset.getEncryptedSecret());
+            notes = asset.getNotesEncrypted() != null
+                    ? cryptoService.decrypt(asset.getNotesEncrypted())
+                    : null;
+        } catch (Exception ex) {
+            log.error("Failed to decrypt digital asset {}: {}", assetId, ex.getMessage());
+            throw new VaultException("Không thể giải mã nội dung tài sản số", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
+        String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
         auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS,
-                ownerId, null, vaultId, "DigitalAsset", assetId.toString(), null);
+                ownerId, ownerEmail, vaultId, "DigitalAsset", assetId.toString(), null);
 
         return DigitalAssetDetailResponse.builder()
                 .id(asset.getId())
@@ -76,7 +88,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     }
 
     // =========================================================
-    // V4a: Thêm tài sản mới
+    // FR-27: Thêm tài sản mới
     // =========================================================
     @Override
     @Transactional
@@ -95,20 +107,22 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                 .assetName(request.getAssetName())
                 .encryptedSecret(cryptoService.encrypt(request.getSecret()))
                 .encryptionKeyRef(CryptoService.CURRENT_KEY_REF)
-                .notesEncrypted(request.getNotes() != null ? cryptoService.encrypt(request.getNotes()) : null)
+                .notesEncrypted(request.getNotes() != null && !request.getNotes().isBlank()
+                        ? cryptoService.encrypt(request.getNotes()) : null)
                 .status(AssetStatus.ACTIVE)
                 .build();
 
-        asset = digitalAssetRepository.save(asset);
+        asset = digitalAssetRepository.saveAndFlush(asset);
 
+        String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
         auditLogService.log(AuditAction.ASSET_CREATED, AuditResult.SUCCESS,
-                ownerId, null, vaultId, "DigitalAsset", asset.getId().toString(), null);
+                ownerId, ownerEmail, vaultId, "DigitalAsset", asset.getId().toString(), null);
 
         return toResponse(asset);
     }
 
     // =========================================================
-    // V4b: Cập nhật tài sản
+    // FR-27: Cập nhật tài sản
     // =========================================================
     @Override
     @Transactional
@@ -128,21 +142,22 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
             asset.setEncryptionKeyRef(CryptoService.CURRENT_KEY_REF);
         }
 
-        // Cập nhật notes (null = xóa ghi chú cũ)
-        asset.setNotesEncrypted(
-                request.getNotes() != null ? cryptoService.encrypt(request.getNotes()) : null
-        );
+        // FR-27: null = giữ nguyên, "" = xóa ghi chú cũ
+        if (request.getNotes() != null) {
+            asset.setNotesEncrypted(request.getNotes().isBlank() ? null : cryptoService.encrypt(request.getNotes()));
+        }
 
-        asset = digitalAssetRepository.save(asset);
+        asset = digitalAssetRepository.saveAndFlush(asset);
 
+        String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
         auditLogService.log(AuditAction.ASSET_UPDATED, AuditResult.SUCCESS,
-                ownerId, null, vaultId, "DigitalAsset", assetId.toString(), null);
+                ownerId, ownerEmail, vaultId, "DigitalAsset", assetId.toString(), null);
 
         return toResponse(asset);
     }
 
     // =========================================================
-    // V4c: Xóa cứng tài sản (hard-delete, nhất quán với deleteVault)
+    // FR-27: Xóa cứng tài sản (hard-delete, nhất quán với deleteVault)
     // =========================================================
     @Override
     @Transactional
@@ -152,11 +167,13 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
-        // Ghi audit TRƯỚC khi xóa (sau khi xóa không còn entity để tham chiếu)
-        auditLogService.log(AuditAction.ASSET_DELETED, AuditResult.SUCCESS,
-                ownerId, null, vaultId, "DigitalAsset", assetId.toString(), null);
-
+        // Xóa và flush DB thành công trước khi ghi audit (tránh audit ma khi rollback)
         digitalAssetRepository.delete(asset);
+        digitalAssetRepository.flush();
+
+        String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
+        auditLogService.log(AuditAction.ASSET_DELETED, AuditResult.SUCCESS,
+                ownerId, ownerEmail, vaultId, "DigitalAsset", assetId.toString(), null);
     }
 
     // =========================================================

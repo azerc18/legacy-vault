@@ -9,9 +9,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Response trả về cho Owner khi xem danh sách tài sản (V1).
+ * Response trả về cho Owner khi xem danh sách tài sản (FR-27).
  * KHÔNG chứa encryptedSecret, không chứa đường dẫn file.
- * Xem chi tiết (V2) dùng DigitalAssetDetailResponse để trả thêm secret đã giải mã.
+ * Xem chi tiết dùng DigitalAssetDetailResponse để trả thêm secret đã giải mã.
  */
 @Getter
 @Builder

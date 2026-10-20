@@ -8,6 +8,8 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -33,7 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("DigitalAssetServiceImpl – V1/V2/V4")
+@DisplayName("DigitalAssetServiceImpl – FR-27")
 class DigitalAssetServiceImplTest {
 
     @Mock private DigitalAssetRepository digitalAssetRepository;
@@ -81,10 +83,10 @@ class DigitalAssetServiceImplTest {
                 .build();
     }
 
-    // ===== V1: listAssets =====
+    // ===== FR-27: listAssets =====
 
     @Test
-    @DisplayName("V1: Owner xem danh sách tài sản → trả list, không có secret")
+    @DisplayName("FR-27: Owner xem danh sách tài sản → trả list, không có secret")
     void listAssets_ownerAndActiveAssets_returnsList() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
@@ -98,7 +100,7 @@ class DigitalAssetServiceImplTest {
     }
 
     @Test
-    @DisplayName("V1: Owner A xem vault của Owner B → 404")
+    @DisplayName("FR-27: Owner A xem vault của Owner B → 404")
     void listAssets_wrongOwner_throws404() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
 
@@ -107,10 +109,10 @@ class DigitalAssetServiceImplTest {
                 .extracting("status").isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    // ===== V2: getAsset =====
+    // ===== FR-27: getAsset =====
 
     @Test
-    @DisplayName("V2: Owner xem chi tiết asset → trả secret đã giải mã")
+    @DisplayName("FR-27: Owner xem chi tiết asset → trả secret đã giải mã, audit ASSET_VIEWED kèm email")
     void getAsset_validOwner_returnsDecryptedSecret() throws Exception {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
@@ -122,11 +124,46 @@ class DigitalAssetServiceImplTest {
 
         assertThat(detail.getSecret()).isEqualTo("my-plain-secret");
         assertThat(detail.getNotes()).isEqualTo("plain notes");
-        verify(auditLogService).log(any(), any(), eq(ownerId), any(), eq(vaultId), any(), any(), any());
+        verify(auditLogService).log(eq(AuditAction.ASSET_VIEWED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@test.com"), eq(vaultId), eq("DigitalAsset"), eq(assetId.toString()), isNull());
     }
 
     @Test
-    @DisplayName("V2: Asset không thuộc vault → 404")
+    @DisplayName("FR-27: Vault ở trạng thái ARCHIVED_LOCKED → trả 410 GONE")
+    void getAsset_vaultArchivedLocked_throwsGone410() {
+        Vault archivedVault = Vault.builder()
+                .id(vaultId)
+                .owner(mockOwner)
+                .status(VaultStatus.ARCHIVED_LOCKED)
+                .build();
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(archivedVault));
+
+        assertThatThrownBy(() -> assetService.getAsset(ownerId, vaultId, assetId))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.GONE);
+
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("FR-27: Lỗi giải mã secret → bọc thành 500 INTERNAL_SERVER_ERROR")
+    void getAsset_decryptFails_throwsInternalServerError() throws Exception {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(mockAsset));
+        when(cryptoService.decrypt("ENC:abc123")).thenThrow(new RuntimeException("Bad key"));
+
+        assertThatThrownBy(() -> assetService.getAsset(ownerId, vaultId, assetId))
+                .isInstanceOf(VaultException.class)
+                .hasMessage("Không thể giải mã nội dung tài sản số")
+                .extracting("status").isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("FR-27: Asset không thuộc vault → 404")
     void getAsset_assetNotInVault_throws404() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
@@ -137,10 +174,10 @@ class DigitalAssetServiceImplTest {
                 .extracting("status").isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    // ===== V4a: addAsset =====
+    // ===== FR-27: addAsset =====
 
     @Test
-    @DisplayName("V4a: Thêm asset hợp lệ → lưu DB, trả response, ghi audit")
+    @DisplayName("FR-27: Thêm asset hợp lệ → saveAndFlush DB, trả response, ghi audit ASSET_CREATED kèm email")
     void addAsset_validRequest_savesAndReturns() throws Exception {
         DigitalAssetRequest req = new DigitalAssetRequest();
         req.setAssetType(AssetType.CRYPTO_WALLET);
@@ -151,31 +188,33 @@ class DigitalAssetServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(cryptoService.encrypt("my-seed-phrase")).thenReturn("ENC:seed");
         when(cryptoService.encrypt("cold wallet")).thenReturn("ENC:notes");
-        when(digitalAssetRepository.save(any())).thenAnswer(inv -> {
+        when(digitalAssetRepository.saveAndFlush(any())).thenAnswer(inv -> {
             DigitalAsset a = inv.getArgument(0);
-            a = DigitalAsset.builder()
+            return DigitalAsset.builder()
                     .id(UUID.randomUUID())
                     .vault(mockVault)
                     .assetType(a.getAssetType())
                     .assetName(a.getAssetName())
                     .encryptedSecret(a.getEncryptedSecret())
                     .encryptionKeyRef(a.getEncryptionKeyRef())
+                    .notesEncrypted(a.getNotesEncrypted())
                     .status(AssetStatus.ACTIVE)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
-            return a;
         });
 
         DigitalAssetResponse resp = assetService.addAsset(ownerId, vaultId, req);
 
         assertThat(resp.getAssetName()).isEqualTo("BTC Wallet");
         assertThat(resp.getAssetType()).isEqualTo(AssetType.CRYPTO_WALLET);
-        verify(auditLogService).log(any(), any(), eq(ownerId), any(), eq(vaultId), any(), any(), any());
+        verify(digitalAssetRepository).saveAndFlush(any());
+        verify(auditLogService).log(eq(AuditAction.ASSET_CREATED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@test.com"), eq(vaultId), eq("DigitalAsset"), any(), isNull());
     }
 
     @Test
-    @DisplayName("V4a: Secret rỗng khi thêm mới → BAD_REQUEST 400")
+    @DisplayName("FR-27: Secret rỗng khi thêm mới → BAD_REQUEST 400")
     void addAsset_blankSecret_throwsBadRequest() {
         DigitalAssetRequest req = new DigitalAssetRequest();
         req.setAssetType(AssetType.BANK_ACCOUNT);
@@ -188,11 +227,11 @@ class DigitalAssetServiceImplTest {
                 .isInstanceOf(VaultException.class)
                 .extracting("status").isEqualTo(HttpStatus.BAD_REQUEST);
 
-        verify(digitalAssetRepository, never()).save(any());
+        verify(digitalAssetRepository, never()).saveAndFlush(any());
     }
 
     @Test
-    @DisplayName("V4a: DMS đã TRIGGERED → Guard chặn thêm asset → CONFLICT 409")
+    @DisplayName("FR-27: DMS đã TRIGGERED → Guard chặn thêm asset → CONFLICT 409")
     void addAsset_dmsTriggered_throwsConflict() {
         DigitalAssetRequest req = new DigitalAssetRequest();
         req.setAssetType(AssetType.BANK_ACCOUNT);
@@ -207,35 +246,38 @@ class DigitalAssetServiceImplTest {
                 .isInstanceOf(VaultException.class)
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
 
-        verify(digitalAssetRepository, never()).save(any());
+        verify(digitalAssetRepository, never()).saveAndFlush(any());
     }
 
-    // ===== V4b: updateAsset =====
+    // ===== FR-27: updateAsset =====
 
     @Test
-    @DisplayName("V4b: Cập nhật asset hợp lệ (có secret mới) → lưu và trả response")
+    @DisplayName("FR-27: Cập nhật asset hợp lệ (có secret mới, notes=null giữ nguyên) → saveAndFlush, audit ASSET_UPDATED kèm email")
     void updateAsset_withNewSecret_updatesAndReturns() throws Exception {
         DigitalAssetRequest req = new DigitalAssetRequest();
         req.setAssetType(AssetType.BANK_ACCOUNT);
         req.setAssetName("MB Bank Updated");
         req.setSecret("new-password");
-        req.setNotes(null);
+        req.setNotes(null); // null = giữ nguyên notes cũ
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
                 .thenReturn(Optional.of(mockAsset));
         when(cryptoService.encrypt("new-password")).thenReturn("ENC:new");
-        when(digitalAssetRepository.save(any())).thenReturn(mockAsset);
+        when(digitalAssetRepository.saveAndFlush(any())).thenReturn(mockAsset);
 
         DigitalAssetResponse resp = assetService.updateAsset(ownerId, vaultId, assetId, req);
 
         assertThat(resp).isNotNull();
+        assertThat(mockAsset.getNotesEncrypted()).isEqualTo("ENC:notes"); // notes cũ được giữ nguyên
         verify(cryptoService).encrypt("new-password");
-        verify(auditLogService).log(any(), any(), eq(ownerId), any(), eq(vaultId), any(), any(), any());
+        verify(digitalAssetRepository).saveAndFlush(any());
+        verify(auditLogService).log(eq(AuditAction.ASSET_UPDATED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@test.com"), eq(vaultId), eq("DigitalAsset"), eq(assetId.toString()), isNull());
     }
 
     @Test
-    @DisplayName("V4b: Cập nhật asset không gửi secret → giữ nguyên secret cũ")
+    @DisplayName("FR-27: Cập nhật asset không gửi secret → giữ nguyên secret cũ")
     void updateAsset_nullSecret_keepsOldSecret() throws Exception {
         DigitalAssetRequest req = new DigitalAssetRequest();
         req.setAssetType(AssetType.BANK_ACCOUNT);
@@ -245,18 +287,77 @@ class DigitalAssetServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
                 .thenReturn(Optional.of(mockAsset));
-        when(digitalAssetRepository.save(any())).thenReturn(mockAsset);
+        when(digitalAssetRepository.saveAndFlush(any())).thenReturn(mockAsset);
 
         assetService.updateAsset(ownerId, vaultId, assetId, req);
 
         // cryptoService.encrypt KHÔNG được gọi (secret cũ giữ nguyên)
         verify(cryptoService, never()).encrypt(any());
+        verify(digitalAssetRepository).saveAndFlush(any());
     }
 
-    // ===== V4c: deleteAsset =====
+    @Test
+    @DisplayName("M1: Cập nhật asset với notes = null → giữ nguyên notes cũ")
+    void updateAsset_nullNotes_keepsOldNotes() throws Exception {
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.BANK_ACCOUNT);
+        req.setAssetName("MB Bank");
+        req.setNotes(null);
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(mockAsset));
+        when(digitalAssetRepository.saveAndFlush(any())).thenReturn(mockAsset);
+
+        assetService.updateAsset(ownerId, vaultId, assetId, req);
+
+        assertThat(mockAsset.getNotesEncrypted()).isEqualTo("ENC:notes");
+        verify(cryptoService, never()).encrypt(any());
+    }
 
     @Test
-    @DisplayName("V4c: Xóa asset hợp lệ → ghi audit rồi hard-delete")
+    @DisplayName("M1: Cập nhật asset với notes = \"\" (hoặc blank) → xóa ghi chú cũ (notesEncrypted = null)")
+    void updateAsset_blankNotes_clearsNotes() throws Exception {
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.BANK_ACCOUNT);
+        req.setAssetName("MB Bank");
+        req.setNotes("   "); // chuỗi rỗng / blank
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(mockAsset));
+        when(digitalAssetRepository.saveAndFlush(any())).thenReturn(mockAsset);
+
+        assetService.updateAsset(ownerId, vaultId, assetId, req);
+
+        assertThat(mockAsset.getNotesEncrypted()).isNull();
+        verify(cryptoService, never()).encrypt(any());
+    }
+
+    @Test
+    @DisplayName("M1: Cập nhật asset với notes có giá trị mới → mã hóa notes mới")
+    void updateAsset_newNotes_encryptsNewNotes() throws Exception {
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.BANK_ACCOUNT);
+        req.setAssetName("MB Bank");
+        req.setNotes("Ghi chú mới");
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(mockAsset));
+        when(cryptoService.encrypt("Ghi chú mới")).thenReturn("ENC:notes-new");
+        when(digitalAssetRepository.saveAndFlush(any())).thenReturn(mockAsset);
+
+        assetService.updateAsset(ownerId, vaultId, assetId, req);
+
+        assertThat(mockAsset.getNotesEncrypted()).isEqualTo("ENC:notes-new");
+        verify(cryptoService).encrypt("Ghi chú mới");
+    }
+
+    // ===== FR-27: deleteAsset =====
+
+    @Test
+    @DisplayName("FR-27: Xóa asset hợp lệ → delete, flush DB rồi ghi audit ASSET_DELETED kèm email")
     void deleteAsset_validOwner_deletesFromDb() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
@@ -264,12 +365,14 @@ class DigitalAssetServiceImplTest {
 
         assetService.deleteAsset(ownerId, vaultId, assetId);
 
-        verify(auditLogService).log(any(), any(), eq(ownerId), any(), eq(vaultId), any(), eq(assetId.toString()), any());
         verify(digitalAssetRepository).delete(mockAsset);
+        verify(digitalAssetRepository).flush();
+        verify(auditLogService).log(eq(AuditAction.ASSET_DELETED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@test.com"), eq(vaultId), eq("DigitalAsset"), eq(assetId.toString()), isNull());
     }
 
     @Test
-    @DisplayName("V4c: DMS TRIGGERED → Guard chặn xóa asset")
+    @DisplayName("FR-27: DMS TRIGGERED → Guard chặn xóa asset")
     void deleteAsset_dmsTriggered_throwsConflict() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
         doThrow(new VaultException("DMS triggered", HttpStatus.CONFLICT))
@@ -280,5 +383,6 @@ class DigitalAssetServiceImplTest {
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
 
         verify(digitalAssetRepository, never()).delete(any());
+        verify(digitalAssetRepository, never()).flush();
     }
 }

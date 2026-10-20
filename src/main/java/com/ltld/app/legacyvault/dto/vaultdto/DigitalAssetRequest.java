@@ -27,6 +27,10 @@ public class DigitalAssetRequest {
     @Size(max = 5000, message = "Secret tối đa 5000 ký tự")
     private String secret;
 
+    /**
+     * Ghi chú bổ sung (hướng dẫn truy cập, mã PIN phụ...).
+     * Khi cập nhật: null = giữ nguyên, chuỗi rỗng ("") = xóa ghi chú cũ, có giá trị = mã hóa giá trị mới.
+     */
     @Size(max = 2000, message = "Ghi chú tối đa 2000 ký tự")
     private String notes;
 }
