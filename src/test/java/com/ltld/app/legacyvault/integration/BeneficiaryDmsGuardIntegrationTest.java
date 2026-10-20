@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.integration;
 
 import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -123,6 +124,18 @@ class BeneficiaryDmsGuardIntegrationTest {
         assertThat(vaultRepository.existsBeneficiaryWithEmail(owner.getId(), "ben@example.com")).isFalse();
         assertThat(auditLogRepository.existsByVaultIdAndAction(vault.getId(), AuditAction.BENEFICIARY_ASSIGNED)).isFalse();
         verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    void dmsTriggered_updateVault_blockedByGuardWith409() {
+        // n3: Kiểm thử guard trong transaction thực tế - assertHandoverNotStarted MANDATORY hoạt động
+        dmsConfigRepository.save(DmsConfig.builder()
+                .owner(owner).status(DmsStatus.TRIGGERED).triggeredAt(LocalDateTime.now()).build());
+
+        assertThatThrownBy(() -> vaultService.updateVault(vault.getId(), owner.getId(),
+                new UpdateVaultRequest("Tên mới", "Mô tả mới")))
+                .isInstanceOfSatisfying(DmsException.class,
+                        e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.CONFLICT));
     }
 
     @Test

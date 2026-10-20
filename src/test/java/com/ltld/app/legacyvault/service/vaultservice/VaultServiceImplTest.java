@@ -265,10 +265,20 @@ class VaultServiceImplTest {
 
         assertEquals("Cannot delete vault that is not in active state", exception.getMessage());
         verify(vaultRepository, never()).delete(any());
+        verify(auditLogService).log(
+                eq(AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditResult.FAILURE),
+                eq(ownerId),
+                eq(mockOwner.getEmail()),
+                eq(vaultId),
+                eq("Vault"),
+                eq(vaultId.toString()),
+                eq("Két không ở trạng thái hoạt động")
+        );
     }
 
     @Test
-    @DisplayName("deleteVault (n3): DMS đã kích hoạt -> Chặn xóa và ghi audit VAULT_DELETE_DENIED")
+    @DisplayName("deleteVault (FR-01): DMS đã kích hoạt -> Chặn xóa và ghi audit VAULT_DELETE_DENIED")
     void deleteVault_dmsTriggered_writesAuditAndThrows() {
         UUID vaultId = UUID.randomUUID();
         Vault vault = new Vault();
@@ -292,7 +302,7 @@ class VaultServiceImplTest {
                 eq(vaultId),
                 eq("Vault"),
                 eq(vaultId.toString()),
-                contains("DMS handover started")
+                eq("Quy trình bàn giao đã bắt đầu")
         );
     }
 

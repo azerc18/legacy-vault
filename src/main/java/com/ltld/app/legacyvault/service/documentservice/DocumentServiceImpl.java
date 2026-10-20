@@ -88,7 +88,7 @@ public class DocumentServiceImpl implements DocumentService {
             throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
         }
 
-        // m3: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS triggered, hồ sơ xác minh mở)
+        // FR-04: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS triggered, hồ sơ xác minh mở)
         vaultModificationGuard.ensureModifiable(vault);
 
         // 2. Ép file thành mảng byte gốc, rồi ném vào CryptoService để MÃ HÓA

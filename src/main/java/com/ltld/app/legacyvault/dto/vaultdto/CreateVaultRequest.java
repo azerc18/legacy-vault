@@ -14,10 +14,11 @@ public class CreateVaultRequest {
     @Size(max = 100, message = "Tên két sắt tối đa 100 ký tự")
     private String name;
 
-    @Size(max = 1000, message = "Mô tả két sắt tối đa 1000 ký tự")
+    @Size(max = 500, message = "Mô tả két sắt tối đa 500 ký tự")
     private String description;
 
-    // Danh sách tài sản số sẽ lưu vào Vault (n9: thêm @Valid)
+    // FR-01: Danh sách tài sản số sẽ lưu vào Vault (tối đa 50, validate từng phần tử)
+    @Size(max = 50, message = "Số lượng tài sản tối đa 50")
     private List<@Valid DigitalAssetDto> assets;
 
     @Data
@@ -29,7 +30,8 @@ public class CreateVaultRequest {
         @Size(max = 200, message = "Tên tài sản tối đa 200 ký tự")
         private String assetName;
 
-        // Dữ liệu người dùng gõ vào (Text gốc)
+        // FR-01: tài sản tạo kèm Vault phải có secret (cột encrypted_secret NOT NULL)
+        @NotBlank(message = "Secret không được để trống")
         @Size(max = 5000, message = "Secret tối đa 5000 ký tự")
         private String secret;
 

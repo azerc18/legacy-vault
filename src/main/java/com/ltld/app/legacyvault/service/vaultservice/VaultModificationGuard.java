@@ -20,7 +20,7 @@ public class VaultModificationGuard {
     private final VerificationRequestVaultRepository verificationRequestVaultRepository;
 
     /**
-     * Quy tắc nghiệp vụ dùng chung (m3 / g1 / n2):
+     * Quy tắc nghiệp vụ dùng chung (FR-04 / FR-27):
      * Két sắt không được phép thay đổi (sửa thông tin, thêm/xóa tài liệu) khi:
      * 1. Két không ở trạng thái ACTIVE (BAD_REQUEST)
      * 2. Dead Man's Switch của Owner đã TRIGGERED (gọi assertHandoverNotStarted) (CONFLICT)
@@ -31,7 +31,7 @@ public class VaultModificationGuard {
             throw new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST);
         }
 
-        // n2: gọi assertHandoverNotStarted để dùng chung một quy tắc và khóa DmsConfig
+        // FR-04 / FR-27: gọi assertHandoverNotStarted để dùng chung một quy tắc và khóa DmsConfig
         dmsConfigService.assertHandoverNotStarted(vault.getOwner().getId());
 
         boolean hasOpenVerification = !verificationRequestVaultRepository
