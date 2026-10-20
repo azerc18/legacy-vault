@@ -53,6 +53,10 @@ public class DmsActivationProcessor {
     // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), giãn cách theo retryDelay.
     static final int MAX_ATTEMPTS = 20;
 
+    // Q27 (B3): Owner chưa nhận được lần nhắc nào thì hoãn kích hoạt tối đa 3 lần, mỗi lần 24 giờ.
+    static final int MAX_TRIGGER_DEFERRALS = 3;
+    static final Duration TRIGGER_DEFERRAL = Duration.ofHours(24);
+
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
@@ -72,6 +76,10 @@ public class DmsActivationProcessor {
         }
 
         UUID ownerId = config.getOwner().getId();
+        if (config.getRemindersSent() == 0 && config.getTriggerDeferrals() < MAX_TRIGGER_DEFERRALS) {
+            defer(config, now);
+            return;
+        }
         config.setStatus(DmsStatus.TRIGGERED);
         config.setTriggeredAt(now);
         dmsConfigRepository.save(config);
@@ -156,6 +164,21 @@ public class DmsActivationProcessor {
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
         notifyActivated(config, backup, now);
+    }
+
+    /**
+     * Q27 (B3): lùi hạn kích hoạt 24 giờ và đặt nextReminderAt = now để FR-03 gửi ngay một lần nhắc bù
+     * với hạn mới. Hết MAX_TRIGGER_DEFERRALS lần thì trigger vẫn kích hoạt như bình thường.
+     */
+    private void defer(DmsConfig config, LocalDateTime now) {
+        config.setTriggerDeferrals(config.getTriggerDeferrals() + 1);
+        config.setNextCheckinDueAt(now.plus(TRIGGER_DEFERRAL));
+        config.setNextReminderAt(now);
+        // Flush trước khi ghi audit, cùng lý do với flushBeforeSideEffects.
+        dmsConfigRepository.saveAndFlush(config);
+        audit(AuditAction.DMS_TRIGGER_DEFERRED, ENTITY_DMS_CONFIG, config.getId(),
+                ownerDetail(config.getOwner().getId()) + ", deferral=" + config.getTriggerDeferrals()
+                        + ", nextCheckinDueAt=" + config.getNextCheckinDueAt());
     }
 
     private void markActive(ExecutorAssignment assignment, LocalDateTime now) {

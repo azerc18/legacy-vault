@@ -90,7 +90,8 @@ public class AuditDescriptionBuilder {
             case DMS_CONFIGURED -> "Lưu cấu hình Dead Man's Switch.";
             case DMS_CHECKIN -> "Check-in xác nhận vẫn còn hoạt động.";
             case DMS_TRIGGERED -> "Dead Man's Switch được kích hoạt do quá hạn check-in.";
-            case DMS_TRIGGERED_NO_EXECUTOR -> "Dead Man's Switch được kích hoạt nhưng không có người thi hành khả dụng.";
+            case DMS_TRIGGER_DEFERRED -> "Hoãn kích hoạt Dead Man's Switch 24 giờ do chủ hồ sơ chưa nhận được lần nhắc nào.";
+            case DMS_TRIGGERED_NO_EXECUTOR ->"Dead Man's Switch được kích hoạt nhưng không có người thi hành khả dụng.";
             case EXECUTOR_ASSIGNED -> "Chỉ định người thi hành.";
             case EXECUTOR_REPLACED -> "Thay đổi người thi hành.";
             // Owner thu hồi luôn ghi actor = Owner; BR-03 (FR-07 tự thu hồi Primary) ghi actor = null

@@ -90,7 +90,9 @@ class DmsActivationProcessorTest {
 
         User owner = User.builder().id(ownerId).fullName("Nguyễn Văn A").email("owner@example.test").build();
         config = DmsConfig.builder().id(UUID.randomUUID()).owner(owner).status(DmsStatus.ACTIVE)
-                .nextCheckinDueAt(now.minusDays(1)).backupActivationWaitDays(14).build();
+                .nextCheckinDueAt(now.minusDays(1)).backupActivationWaitDays(14)
+                // Đã gửi được 1 lần nhắc: các test trigger không rơi vào nhánh hoãn Q27 (B3).
+                .remindersSent(1).build();
         primary = assignment(owner, primaryUserId, "primary@example.test", ExecutorType.PRIMARY);
         backup = assignment(owner, backupUserId, "backup@example.test", ExecutorType.BACKUP);
 
@@ -256,6 +258,77 @@ class DmsActivationProcessorTest {
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         verify(executorNotificationService, never()).send(anyString(), anyString());
         assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "DMS_TRIGGERED_NO_EXECUTOR");
+    }
+
+    // ---------- B3: Q27 hoãn kích hoạt khi Owner chưa nhận được lần nhắc nào ----------
+
+    @Test
+    @DisplayName("B3: chưa gửi được lần nhắc nào -> hoãn 24h, nhắc bù ngay, không kích hoạt")
+    void trigger_noReminderSent_defersTwentyFourHours() {
+        config.setRemindersSent(0);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(config.getTriggerDeferrals()).isEqualTo(1);
+        assertThat(config.getNextCheckinDueAt()).isEqualTo(now.plusHours(24));
+        assertThat(config.getNextReminderAt()).isEqualTo(now);
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(dmsConfigRepository).saveAndFlush(config);
+        verify(dmsCheckinRepository, never()).save(any());
+        verifyNoInteractions(executorNotificationService);
+        assertThat(auditActions()).containsExactly("DMS_TRIGGER_DEFERRED");
+        verify(auditLogService).log(eq(AuditAction.DMS_TRIGGER_DEFERRED), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), isNull(), eq("DmsConfig"), eq(config.getId().toString()),
+                contains("deferral=1"));
+    }
+
+    @Test
+    @DisplayName("B3: đã hoãn 2 lần -> lần thứ 3 vẫn hoãn")
+    void trigger_thirdDeferralStillDefers() {
+        config.setRemindersSent(0);
+        config.setTriggerDeferrals(2);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(config.getTriggerDeferrals()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("B3: đã hoãn đủ 3 lần -> kích hoạt dù chưa gửi được lần nhắc nào")
+    void trigger_afterMaxDeferrals_triggers() {
+        config.setRemindersSent(0);
+        config.setTriggerDeferrals(3);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(config.getTriggerDeferrals()).isEqualTo(3);
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "EXECUTOR_ACTIVATED");
+    }
+
+    @Test
+    @DisplayName("B3: đã gửi được lần nhắc -> kích hoạt ngay, không hoãn")
+    void trigger_reminderSent_doesNotDefer() {
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(config.getTriggerDeferrals()).isZero();
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("B3: DMS không còn quá hạn -> không hoãn, không ghi audit")
+    void trigger_notOverdue_doesNotDefer() {
+        config.setRemindersSent(0);
+        config.setNextCheckinDueAt(now.plusDays(1));
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getTriggerDeferrals()).isZero();
+        verifyNoInteractions(auditLogService);
     }
 
     // ---------- escalate ----------

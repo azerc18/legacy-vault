@@ -39,5 +39,7 @@ public enum AuditAction {
     // BR-05: xóa vĩnh viễn Vault sau 2 năm lưu trữ
     VAULT_PURGED,
     // O5: Admin tạm dừng / mở lại DMS
-    DMS_SUSPENDED, DMS_RESUMED
+    DMS_SUSPENDED, DMS_RESUMED,
+    // Q27 (B3): FR-07 hoãn kích hoạt vì Owner chưa nhận được lần nhắc nào
+    DMS_TRIGGER_DEFERRED
 }
