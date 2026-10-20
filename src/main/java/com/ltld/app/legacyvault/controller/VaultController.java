@@ -37,7 +37,7 @@ public class VaultController {
     @PreAuthorize("hasAuthority('VAULT_CREATE')")
     public ResponseEntity<ApiResponse<VaultResponse>> createVault(
             Principal principal,
-            @RequestBody CreateVaultRequest request) throws Exception {
+            @Valid @RequestBody CreateVaultRequest request) throws Exception {
 
         // Lấy UUID của người dùng đang đăng nhập (chứng thực qua JWT)
         UUID ownerId = UUID.fromString(principal.getName());

@@ -6,8 +6,10 @@ import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -18,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -59,6 +62,105 @@ public class VaultControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Vault created successfully"));
+    }
+
+    @Test
+    @DisplayName("createVault: Tên két trống -> 400 Bad Request")
+    void createVault_blankName_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("   "); // blank
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (m2): Mô tả dài hơn 500 ký tự -> 400 Bad Request")
+    void createVault_descriptionTooLong_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        request.setDescription("a".repeat(501));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault: Asset con thiếu tên/loại -> 400 Bad Request")
+    void createVault_invalidNestedAsset_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        CreateVaultRequest.DigitalAssetDto asset = new CreateVaultRequest.DigitalAssetDto();
+        // thiếu assetType và assetName
+        asset.setSecret("secret123");
+        request.setAssets(List.of(asset));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (m1): Asset con thiếu secret -> 400 Bad Request")
+    void createVault_nestedAssetMissingSecret_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        CreateVaultRequest.DigitalAssetDto asset = new CreateVaultRequest.DigitalAssetDto();
+        asset.setAssetType(AssetType.BANK_ACCOUNT);
+        asset.setAssetName("MB Bank");
+        asset.setSecret(""); // trống secret
+        request.setAssets(List.of(asset));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (n4): Quá 50 tài sản số -> 400 Bad Request")
+    void createVault_tooManyAssets_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        List<CreateVaultRequest.DigitalAssetDto> assets = java.util.stream.IntStream.range(0, 51)
+                .mapToObj(i -> {
+                    CreateVaultRequest.DigitalAssetDto dto = new CreateVaultRequest.DigitalAssetDto();
+                    dto.setAssetType(AssetType.BANK_ACCOUNT);
+                    dto.setAssetName("Bank " + i);
+                    dto.setSecret("secret " + i);
+                    return dto;
+                }).toList();
+        request.setAssets(assets);
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
     }
 
     @Test

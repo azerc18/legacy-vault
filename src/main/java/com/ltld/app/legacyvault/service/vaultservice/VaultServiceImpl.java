@@ -23,6 +23,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
@@ -118,9 +119,21 @@ public class VaultServiceImpl implements VaultService {
 
         String ownerEmail = vault.getOwner().getEmail();
 
-        // 3. Nghiệp vụ: Trạng thái không phải ACTIVE thì từ chối xóa
+        // 3. Nghiệp vụ: Chặn xóa nếu quy trình bàn giao (DMS) đã kích hoạt (FR-01)
+        try {
+            dmsConfigService.assertHandoverNotStarted(ownerId);
+        } catch (DmsException ex) {
+            auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
+                    ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
+                    "Quy trình bàn giao đã bắt đầu");
+            throw ex;
+        }
+
+        // Trạng thái không phải ACTIVE thì từ chối xóa — ghi audit kèm vaultId (FR-01)
         if (vault.getStatus() != VaultStatus.ACTIVE) {
-            auditLogService.failure(AuditAction.VAULT_DELETE_DENIED, ownerId, ownerEmail, "Cannot delete vault that is not in active state");
+            auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
+                    ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
+                    "Két không ở trạng thái hoạt động");
             throw new VaultException("Cannot delete vault that is not in active state");
         }
 
@@ -146,7 +159,7 @@ public class VaultServiceImpl implements VaultService {
                         fileStorageService.deleteFile(url);
                     } catch (RuntimeException e) {
                         // DB đã commit: để lại file mồ côi (vô hại), không làm hỏng request
-                        log.warn("FR-27/deleteVault: file not removed after vault deleted: {}", e.getMessage());
+                        log.warn("FR-01/deleteVault: file not removed after vault deleted: {}", e.getMessage());
                     }
                 });
             }
