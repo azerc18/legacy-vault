@@ -502,6 +502,8 @@ class DmsEscalationIntegrationTest {
                 .owner(owner)
                 .backupActivationWaitDays(waitDays)
                 .nextCheckinDueAt(nextCheckinDueAt)
+                // Đã gửi được 1 lần nhắc: trigger không bị hoãn theo Q27 (B3).
+                .remindersSent(1)
                 .build());
 
         User primaryUser = withPrimary ? user("primary-" + tag) : null;

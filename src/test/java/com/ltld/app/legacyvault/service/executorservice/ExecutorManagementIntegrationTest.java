@@ -559,6 +559,8 @@ class ExecutorManagementIntegrationTest {
                     .owner(owner)
                     .backupActivationWaitDays(14)
                     .nextCheckinDueAt(nextCheckinDueAt)
+                    // Đã gửi được 1 lần nhắc: trigger không bị hoãn theo Q27 (B3).
+                    .remindersSent(1)
                     .build()).getId();
             configIds.add(configId);
         }
