@@ -33,7 +33,7 @@ async function downloadBlob(url, fallbackName) {
 
 export const beneficiaryApi = {
     // FR-16: danh sách vault được bàn giao
-        listVaults: () => http.get('/beneficiaries/vaults').then((res) => res.data?.data ?? []),
+    listVaults: () => http.get('/beneficiaries/vaults').then((res) => res.data?.data ?? []),
 
     // FR-16: khởi tạo yêu cầu nhận (tạo phiên xác thực PENDING, sống 15 phút)
     initClaim: (vaultId, verificationMethod) =>
@@ -57,6 +57,10 @@ export const beneficiaryApi = {
     listDocuments: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/documents`).then(unwrap),
     downloadDocument: (vaultId, docId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/documents/${docId}/download`, name || 'document'),
+
+    // FR-16: thông báo trong app -> [{ id, type, content, vaultId, read, createdAt }]
+    listNotifications: () => http.get('/beneficiaries/notifications').then((r) => r.data?.data ?? []),
+    markNotificationRead: (id) => http.patch(`/beneficiaries/notifications/${id}/read`),
 
     // FR-19: đóng hồ sơ
     closePreview: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/close-preview`).then(unwrap),

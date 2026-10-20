@@ -90,6 +90,7 @@ const NAV = [
     { to: '/owner/vaults', label: 'My vaults', icon: 'inventory_2' },
     { to: '/owner/dms', label: "Dead Man's Switch", icon: 'favorite' },
     { to: '/owner/executors', label: 'Executors', icon: 'badge' },
+    { to: '/owner/activity', label: 'Activity', icon: 'history' },
 ];
 
 export function OwnerLayout({ title, subtitle, actions, children }) {
