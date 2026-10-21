@@ -53,6 +53,7 @@ export default function VerificationRequestDetail() {
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [viewing, setViewing] = useState(false);
+    const [checking, setChecking] = useState(false);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
     const [rejectChoice, setRejectChoice] = useState('');   // '' | một lý do có sẵn | REJECT_REASON_OTHER
@@ -135,10 +136,11 @@ export default function VerificationRequestDetail() {
     };
 
     const handleCheckDocument = async () => {
-        setBusy(true); setError('');
+        setBusy(true); setChecking(true); setError('');
+        setDocCheck(null);   // kiểm tra lại thì ẩn nút View cho tới khi có kết quả mới
         try { setDocCheck(await verifyDocument(req.id)); }
         catch (e) { setError(getErrorMessage(e, 'Could not check the document.')); }
-        finally { setBusy(false); }
+        finally { setBusy(false); setChecking(false); }
     };
 
     // D1: mở giấy chứng tử trong tab mới
@@ -248,15 +250,18 @@ export default function VerificationRequestDetail() {
                                     disabled={busy}
                                     className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
                                 >
-                                    Check document
+                                    {checking ? 'Checking...' : 'Check document'}
                                 </button>
-                                <button
-                                    onClick={handleViewDocument}
-                                    disabled={busy || viewing}
-                                    className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
-                                >
-                                    {viewing ? 'Opening...' : 'View document'}
-                                </button>
+                                {/* Chỉ cho xem file khi đã kiểm tra và kết quả là hợp lệ */}
+                                {docCheck?.valid && (
+                                    <button
+                                        onClick={handleViewDocument}
+                                        disabled={busy || viewing}
+                                        className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
+                                    >
+                                        {viewing ? 'Opening...' : 'View document'}
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">No death certificate attached.</p>
