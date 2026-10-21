@@ -5,11 +5,46 @@ import {
     getDocumentBlob,
 } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
+import {
+    STATUS_LABEL, STATUS_CLASS, formatDate, shortId, REJECT_REASONS, REJECT_REASON_OTHER,
+} from './verifierUi.js';
 import VerificationMessages from './VerificationMessages.jsx';
+import VerifierHeader from './VerifierHeader.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 
-const RESEND_SECONDS = 60; // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
+const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
+const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
+const otpKey = (id) => `lv_sign_otp_${id}`;
+
+// Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
+const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
+const forgetOtpSent = (id) => { try { sessionStorage.removeItem(otpKey(id)); } catch { /* ignore */ } };
+const secondsSinceOtpSent = (id) => {
+    try {
+        const t = Number(sessionStorage.getItem(otpKey(id)));
+        return t ? Math.floor((Date.now() - t) / 1000) : null;
+    } catch { return null; }
+};
+
+const CONFIRM_TEXT = {
+    approve: {
+        title: 'Approve this request?',
+        message: 'You confirm the documents are valid. After approval you still need to sign with a one-time code to unlock the vault(s).',
+        confirmText: 'Approve',
+    },
+    reject: {
+        title: 'Reject this request?',
+        message: 'This cannot be undone. The Executor will be notified with your reason.',
+        confirmText: 'Reject',
+        danger: true,
+    },
+    sign: {
+        title: 'Sign and unlock the vault(s)?',
+        message: 'This cannot be undone. All vaults of this request will be unlocked for their beneficiaries.',
+        confirmText: 'Sign and unlock',
+    },
+};
 
 export default function VerificationRequestDetail() {
     const { requestId } = useParams();
@@ -17,13 +52,16 @@ export default function VerificationRequestDetail() {
     const [req, setReq] = useState(null);
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
+    const [viewing, setViewing] = useState(false);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
-    const [rejectReason, setRejectReason] = useState('');
+    const [rejectChoice, setRejectChoice] = useState('');   // '' | một lý do có sẵn | REJECT_REASON_OTHER
+    const [rejectOther, setRejectOther] = useState('');
     const [docCheck, setDocCheck] = useState(null);   // { valid, message }
     const [codeSent, setCodeSent] = useState(false);
     const [code, setCode] = useState('');
     const [cooldown, setCooldown] = useState(0);
+    const [confirm, setConfirm] = useState(null);     // null | 'approve' | 'reject' | 'sign'
 
     const load = useCallback(() => {
         return getRequestById(requestId)
@@ -32,6 +70,16 @@ export default function VerificationRequestDetail() {
     }, [requestId]);
 
     useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
+
+    // Khôi phục trạng thái "đã gửi mã" nếu vừa tải lại trang khi đang chờ ký
+    useEffect(() => {
+        if (req?.status !== 'APPROVED') return;
+        const elapsed = secondsSinceOtpSent(req.id);
+        if (elapsed !== null && elapsed < OTP_VALID_SECONDS) {
+            setCodeSent(true);
+            setCooldown(Math.max(0, RESEND_SECONDS - elapsed));
+        }
+    }, [req?.id, req?.status]);
 
     useEffect(() => {
         if (cooldown <= 0) return;
@@ -55,13 +103,35 @@ export default function VerificationRequestDetail() {
         }
     };
 
-    const handleApprove = () => run(() => approveRequest(req.id), 'Could not approve.');
+    // Lý do từ chối cuối cùng: lý do có sẵn hoặc nội dung tự nhập
+    const rejectReason = rejectChoice === REJECT_REASON_OTHER ? rejectOther.trim() : rejectChoice;
 
-    const handleReject = () => {
-        const reason = rejectReason.trim();
-        if (!reason) return setError('Please enter a rejection reason.');
-        if (reason.length > 1000) return setError('Reason must be at most 1000 characters.');
-        run(() => rejectRequest(req.id, reason), 'Could not reject.');
+    const askApprove = () => { setError(''); setConfirm('approve'); };
+
+    const askReject = () => {
+        if (!rejectChoice) return setError('Please select a rejection reason.');
+        if (!rejectReason) return setError('Please enter a rejection reason.');
+        if (rejectReason.length > 1000) return setError('Reason must be at most 1000 characters.');
+        setError('');
+        setConfirm('reject');
+    };
+
+    const askSign = (e) => {
+        e?.preventDefault();
+        if (!/^\d{6}$/.test(code)) return setError('The code must be exactly 6 digits.');
+        setError('');
+        setConfirm('sign');
+    };
+
+    const doConfirmed = async () => {
+        const action = confirm;
+        if (action === 'approve') await run(() => approveRequest(req.id), 'Could not approve.');
+        if (action === 'reject') await run(() => rejectRequest(req.id, rejectReason), 'Could not reject.');
+        if (action === 'sign') {
+            const ok = await run(() => signRequest(req.id, code), 'Could not sign.');
+            if (ok) forgetOtpSent(req.id);
+        }
+        setConfirm(null);
     };
 
     const handleCheckDocument = async () => {
@@ -73,7 +143,9 @@ export default function VerificationRequestDetail() {
 
     // D1: mở giấy chứng tử trong tab mới
     const handleViewDocument = async () => {
+        if (viewing) return;
         setError('');
+        setViewing(true);
         // Mở tab trống ngay lúc bấm (trình duyệt không chặn), rồi nạp file vào sau
         const tab = window.open('', '_blank');
         try {
@@ -83,21 +155,19 @@ export default function VerificationRequestDetail() {
         } catch (e) {
             if (tab) tab.close();
             setError(await getBlobErrorMessage(e, `Could not open the document (HTTP ${e.response?.status ?? 'no response'}).`));
+        } finally {
+            setViewing(false);
         }
     };
 
     const handleSendCode = async () => {
         const ok = await run(async () => { await sendSignOtp(req.id); return null; }, 'Could not send the code.');
         if (ok) {
+            rememberOtpSent(req.id);
             setCodeSent(true);
             setCooldown(RESEND_SECONDS);
             setInfo('A 6-digit code has been sent to your email. It expires in 5 minutes.');
         }
-    };
-
-    const handleSign = () => {
-        if (!/^\d{6}$/.test(code)) return setError('The code must be exactly 6 digits.');
-        run(() => signRequest(req.id, code), 'Could not sign.');
     };
 
     if (loading) return <div className="p-8">Loading...</div>;
@@ -110,25 +180,22 @@ export default function VerificationRequestDetail() {
         );
     }
 
+    const dialog = confirm ? CONFIRM_TEXT[confirm] : null;
+    // BE mới trả vaults (id + tên); dự phòng về vaultIds nếu thiếu
+    const vaultList = req.vaults ?? (req.vaultIds ?? []).map((id) => ({ id, name: null }));
+
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased">
-            {/* Header */}
-            <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-outline-variant/30">
-                <div className="max-w-[1600px] mx-auto px-5 h-20 flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                        <Link to="/verifier" className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant">
-                            <span className="material-symbols-outlined">arrow_back</span>
-                        </Link>
-                        <div>
-                            <h1 className="font-headline-sm text-primary font-bold tracking-tight">Request #{shortId(req.id)}</h1>
-                            <p className="text-sm text-on-surface-variant mt-0.5">Exclusive to the Legal Verifier role</p>
-                        </div>
-                    </div>
+            <VerifierHeader
+                title={`Request #${shortId(req.id)}`}
+                subtitle={req.ownerName ? `Vault owner: ${req.ownerName}` : undefined}
+                backTo="/verifier"
+                right={
                     <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${STATUS_CLASS[req.status]}`}>
                         {STATUS_LABEL[req.status]}
                     </span>
-                </div>
-            </header>
+                }
+            />
 
             <main className="max-w-[1600px] mx-auto p-5 grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
                 {/* Left column: case information */}
@@ -153,10 +220,13 @@ export default function VerificationRequestDetail() {
                         </h2>
                         <p className="text-sm text-on-surface-variant mb-5">Signing this request will unlock all vaults below for their beneficiaries.</p>
                         <div className="space-y-3">
-                            {(req.vaultIds ?? []).map((v) => (
-                                <div key={v} className="flex items-center gap-4 p-4 rounded-xl bg-surface-container-high border border-outline-variant/50">
+                            {vaultList.map((v) => (
+                                <div key={v.id} className="flex items-center gap-4 p-4 rounded-xl bg-surface-container-high border border-outline-variant/50">
                                     <span className="material-symbols-outlined text-[28px] text-outline">inventory_2</span>
-                                    <p className="font-mono text-sm">{v}</p>
+                                    <div className="min-w-0">
+                                        <p className="font-semibold truncate">{v.name || 'Unnamed vault'}</p>
+                                        <p className="font-mono text-xs text-on-surface-variant">#{shortId(v.id)}</p>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -182,10 +252,10 @@ export default function VerificationRequestDetail() {
                                 </button>
                                 <button
                                     onClick={handleViewDocument}
-                                    disabled={busy}
+                                    disabled={busy || viewing}
                                     className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
                                 >
-                                    View document
+                                    {viewing ? 'Opening...' : 'View document'}
                                 </button>
                             </div>
                         ) : (
@@ -197,6 +267,11 @@ export default function VerificationRequestDetail() {
                             </div>
                         )}
                     </section>
+
+                    {/* Trao đổi với Executor — nằm ở cột trái để thẻ hành động bên phải luôn vừa màn hình */}
+                    <section className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30">
+                        <VerificationMessages requestId={req.id} status={req.status} />
+                    </section>
                 </div>
 
                 {/* Right column: actions */}
@@ -207,33 +282,50 @@ export default function VerificationRequestDetail() {
                             Legal Actions
                         </h2>
 
-                        {error && <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
+                        {error && <div role="alert" className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
                         {info && <div className="mb-4 p-3 rounded-lg bg-secondary-fixed text-on-secondary-fixed text-sm">{info}</div>}
 
                         {/* PENDING: approve or reject */}
                         {req.status === 'PENDING' && (
                             <div className="space-y-4">
                                 <button
-                                    onClick={handleApprove}
+                                    onClick={askApprove}
                                     disabled={busy}
                                     className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
                                 >
-                                    {busy ? 'Processing...' : 'Approve request'}
+                                    Approve request
                                 </button>
 
                                 <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-2">
-                                    <label className="text-sm text-on-surface-variant">Rejection reason</label>
-                                    <textarea
-                                        rows={3}
-                                        maxLength={1000}
-                                        placeholder="Enter reason here..."
-                                        value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
-                                        className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
-                                    />
-                                    <span className="text-xs text-outline text-right">{rejectReason.length}/1000</span>
+                                    <label htmlFor="reject-reason" className="text-sm text-on-surface-variant">Rejection reason</label>
+                                    <select
+                                        id="reject-reason"
+                                        value={rejectChoice}
+                                        onChange={(e) => setRejectChoice(e.target.value)}
+                                        className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+                                    >
+                                        <option value="">Select a reason...</option>
+                                        {REJECT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                                        <option value={REJECT_REASON_OTHER}>Other (enter your own)</option>
+                                    </select>
+
+                                    {rejectChoice === REJECT_REASON_OTHER && (
+                                        <>
+                                            <textarea
+                                                rows={3}
+                                                maxLength={1000}
+                                                placeholder="Enter reason here..."
+                                                value={rejectOther}
+                                                onChange={(e) => setRejectOther(e.target.value)}
+                                                aria-label="Other rejection reason"
+                                                className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+                                            />
+                                            <span className="text-xs text-outline text-right">{rejectOther.length}/1000</span>
+                                        </>
+                                    )}
+
                                     <button
-                                        onClick={handleReject}
+                                        onClick={askReject}
                                         disabled={busy}
                                         className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
                                     >
@@ -259,10 +351,12 @@ export default function VerificationRequestDetail() {
                                         {busy ? 'Sending...' : 'Send signing code to my email'}
                                     </button>
                                 ) : (
-                                    <>
-                                        <label className="text-sm text-on-surface-variant">Signing code (6 digits)</label>
+                                    <form onSubmit={askSign} className="space-y-4">
+                                        <label htmlFor="sign-code" className="text-sm text-on-surface-variant block">Signing code (6 digits)</label>
                                         <input
+                                            id="sign-code"
                                             inputMode="numeric"
+                                            autoComplete="one-time-code"
                                             maxLength={6}
                                             placeholder="• • • • • •"
                                             value={code}
@@ -270,6 +364,7 @@ export default function VerificationRequestDetail() {
                                             className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-lg text-center tracking-[0.5em] focus:outline-none focus:border-primary"
                                         />
                                         <button
+                                            type="button"
                                             onClick={handleSendCode}
                                             disabled={busy || cooldown > 0}
                                             className="text-sm font-semibold text-secondary disabled:text-outline"
@@ -277,13 +372,13 @@ export default function VerificationRequestDetail() {
                                             {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
                                         </button>
                                         <button
-                                            onClick={handleSign}
+                                            type="submit"
                                             disabled={busy}
                                             className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
                                         >
-                                            {busy ? 'Signing...' : 'Sign and unlock Vault'}
+                                            Sign and unlock vault(s)
                                         </button>
-                                    </>
+                                    </form>
                                 )}
                             </div>
                         )}
@@ -302,13 +397,25 @@ export default function VerificationRequestDetail() {
                             </div>
                         )}
 
-                        <VerificationMessages requestId={req.id} status={req.status} />
-                        <p className="text-xs text-outline mt-6 pt-6 border-t border-outline-variant/20 text-center">
-                            This decision will be recorded in the system history.
-                        </p>
+                        {(req.status === 'PENDING' || req.status === 'APPROVED') && (
+                            <p className="text-xs text-outline mt-6 pt-6 border-t border-outline-variant/20 text-center">
+                                Your decision will be recorded in the system history.
+                            </p>
+                        )}
                     </section>
                 </div>
             </main>
+
+            <ConfirmDialog
+                open={!!dialog}
+                title={dialog?.title}
+                message={dialog?.message}
+                confirmText={dialog?.confirmText}
+                danger={dialog?.danger}
+                busy={busy}
+                onConfirm={doConfirmed}
+                onCancel={() => setConfirm(null)}
+            />
         </div>
     );
 }

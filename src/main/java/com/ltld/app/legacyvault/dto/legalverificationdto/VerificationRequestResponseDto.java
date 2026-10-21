@@ -21,6 +21,7 @@ public class VerificationRequestResponseDto {
     private LegalVerificationStatus status;
     private boolean hasDeathCertificate;   // true/false thay vì lộ URL nội bộ
     private List<UUID> vaultIds;           // verifier biết sẽ mở khóa vault nào
+    private List<VerificationVaultDto> vaults; // cùng danh sách, kèm tên vault
     private String rejectionReason;
     private LocalDateTime decidedAt;
     private LocalDateTime createdAt;

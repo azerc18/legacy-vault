@@ -1,9 +1,9 @@
 import React, {useEffect, useState} from 'react';
 import {Link, Navigate, useNavigate} from 'react-router-dom';
 import {getUser, logout, ROLES} from '../auth/auth.js';
-import {getRequests, getHistory} from '../api/verifierApi.js';
+import {getRequests, getSummary} from '../api/verifierApi.js';
 import {getErrorMessage} from '../api/http.js';
-import {formatDate} from './verifierUi.js';
+import {formatDate, STATUS_LABEL} from './verifierUi.js';
 import UserAvatar from '../Common/UserAvatar.jsx';
 
 // Trang home của Legal Verifier — cùng bố cục với UserHome.
@@ -21,15 +21,7 @@ const FEATURES = [
         text: 'Requests you have already signed or rejected.',
         to: '/verifier/history'
     },
-    {icon: 'description', title: 'Document checks', text: 'Verify death certificates and legal papers.', to: null},
 ];
-
-const STATUS_LABEL = {
-    PENDING: 'Pending review',
-    APPROVED: 'Awaiting signature',
-    SIGNED: 'Signed',
-    REJECTED: 'Rejected',
-};
 
 function Icon({name, className = ''}) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -83,7 +75,7 @@ export default function VerifierHome() {
     const navigate = useNavigate();
     const user = getUser();
     const [requests, setRequests] = useState(null);
-    const [history, setHistory] = useState(null);
+    const [summary, setSummary] = useState(null);
     const [error, setError] = useState('');
 
     const roles = user?.roles?.length ? user.roles : [user?.role];
@@ -91,19 +83,19 @@ export default function VerifierHome() {
 
     useEffect(() => {
         if (!isVerifier) return;
-        Promise.all([getRequests(), getHistory({size: 100})])
-            .then(([reqs, hist]) => {
-                setRequests(reqs);
-                setHistory(hist);
-            })
-            .catch((e) => setError(getErrorMessage(e, 'Could not load data.')));
+        // Hai nguồn độc lập: một bên lỗi thì bên kia vẫn hiển thị
+        getRequests()
+            .then(setRequests)
+            .catch((e) => setError(getErrorMessage(e, 'Could not load requests.')));
+        getSummary()
+            .then(setSummary)
+            .catch((e) => setError((prev) => prev || getErrorMessage(e, 'Could not load statistics.')));
     }, [isVerifier]);
 
     // Chưa đăng nhập -> login; không phải verifier -> home thường
     if (!user) return <Navigate to="/login" replace/>;
     if (!isVerifier) return <Navigate to="/home" replace/>;
 
-    const count = (status) => requests?.filter((r) => r.status === status).length;
     const todo = (requests ?? []).filter((r) => r.status === 'PENDING' || r.status === 'APPROVED').slice(0, 5);
     const hasOtherRoles = roles.some((r) => r !== ROLES.LEGAL_VERIFIER);
 
@@ -170,12 +162,12 @@ export default function VerifierHome() {
 
                 {/* Thống kê nhanh */}
                 <section className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard icon="pending_actions" label="Pending review" value={count('PENDING')} to="/verifier"/>
-                    <StatCard icon="draw" label="Awaiting signature" value={count('APPROVED')} to="/verifier"/>
+                    <StatCard icon="pending_actions" label="Pending review" value={summary?.pending} to="/verifier"/>
+                    <StatCard icon="draw" label="Awaiting signature" value={summary?.awaitingSignature} to="/verifier"/>
                     <StatCard icon="task_alt" label="Signed"
-                              value={history?.filter((h) => h.status === 'SIGNED').length} to="/verifier/history"/>
+                              value={summary?.signed} to="/verifier/history"/>
                     <StatCard icon="block" label="Rejected"
-                              value={history?.filter((h) => h.status === 'REJECTED').length} to="/verifier/history"/>
+                              value={summary?.rejected} to="/verifier/history"/>
                 </section>
 
                 {/* Chức năng */}

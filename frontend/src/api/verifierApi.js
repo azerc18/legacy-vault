@@ -48,6 +48,9 @@ export async function getHistory({ status, from, to, page = 0, size = 20 } = {})
     return (await http.get(`${BASE}/history`, { params }).then(unwrap)) ?? [];
 }
 
+// Số lượng hồ sơ theo trạng thái (đếm trong DB): { pending, awaitingSignature, signed, rejected }
+export const getSummary = () => http.get(`${BASE}/summary`).then(unwrap);
+
 // D2: trao đổi tin nhắn với Executor
 export const getMessages = (id) => http.get(`${BASE}/${id}/messages`).then(unwrap);
 

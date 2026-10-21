@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationRes
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
@@ -54,6 +55,13 @@ public class LegalVerificationController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
                 service.getHistory(verifierId(jwt), status, from, to, page, size)));
+    }
+
+    // Số lượng hồ sơ theo trạng thái của verifier (cho trang Home)
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<VerifierSummaryResponseDto>> getSummary(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(service.getSummary(verifierId(jwt))));
     }
 
     // UC12: xem chi tiết 1 hồ sơ (trả 404 nếu xung đột lợi ích)
