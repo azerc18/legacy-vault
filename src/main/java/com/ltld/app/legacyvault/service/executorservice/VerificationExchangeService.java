@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.executorservice;
 
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -14,4 +15,7 @@ public interface VerificationExchangeService {
                                      MultipartFile file, SendVerificationMessageRequest request);
 
     List<VerificationMessageResponse> history(UUID assignmentId, UUID requestId, String executorLogin);
+
+    /** B5: tải tệp đính kèm (đã giải mã) của một tin nhắn trong yêu cầu xác minh của mình. */
+    VerificationDocumentDto getAttachment(UUID assignmentId, UUID requestId, UUID messageId, String executorLogin);
 }

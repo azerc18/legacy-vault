@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.executorservice;
 
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
@@ -127,6 +128,39 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
         return verificationExchangeMessageRepository.findHistory(requestId).stream()
                 .map(message -> toResponse(message, message.getSender()))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public VerificationDocumentDto getAttachment(UUID assignmentId, UUID requestId, UUID messageId,
+                                                 String executorLogin) {
+        ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
+        findOwnRequest(assignment, requestId);
+
+        VerificationExchangeMessage message = verificationExchangeMessageRepository
+                .findByIdAndRequestId(messageId, requestId)
+                .filter(m -> m.getAttachmentPath() != null)
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Attachment not found."));
+
+        // Cùng cách giải mã với phía Verifier (VerifierMessageServiceImpl.getAttachment).
+        byte[] plain;
+        try {
+            plain = cryptoService.decryptBytes(fileStorageService.readFile(message.getAttachmentPath()));
+        } catch (Exception e) {
+            log.error("Attachment read/decrypt failed for message {}", messageId, e);
+            throw new IllegalStateException("Không thể đọc tệp đính kèm. Vui lòng thử lại sau.");
+        }
+
+        User executor = assignment.getExecutorUser();
+        auditLogService.log(AuditAction.VERIFICATION_ATTACHMENT_VIEWED, AuditResult.SUCCESS,
+                executor.getId(), executor.getEmail(), "VerificationExchangeMessage", messageId.toString(),
+                "assignmentId=" + assignment.getId() + ", requestId=" + requestId);
+
+        return VerificationDocumentDto.builder()
+                .content(plain)
+                .contentType(UploadedDocumentValidator.detectContentType(plain))
+                .fileName(message.getAttachmentName() != null ? message.getAttachmentName() : "attachment")
+                .build();
     }
 
     private LegalVerificationRequest findOwnRequest(ExecutorAssignment assignment, UUID requestId) {

@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.executorservice;
 
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
@@ -43,6 +44,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -370,5 +372,112 @@ class VerificationExchangeServiceImplTest {
         assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.history(assignmentId, requestId, LOGIN));
 
         verifyNoInteractions(legalVerificationRequestRepository, verificationExchangeMessageRepository);
+    }
+
+    // ---------- B5: tải tệp đính kèm ----------
+
+    private VerificationExchangeMessage messageWithAttachment(UUID messageId, String path, String name) {
+        VerificationExchangeMessage m = VerificationExchangeMessage.builder()
+                .id(messageId).request(verificationRequest).sender(verifier)
+                .senderRole(ExchangeSenderRole.VERIFIER).attachmentPath(path).attachmentName(name).build();
+        when(verificationExchangeMessageRepository.findByIdAndRequestId(messageId, requestId))
+                .thenReturn(Optional.of(m));
+        return m;
+    }
+
+    @Test
+    @DisplayName("Attachment: decrypted bytes, content type from magic bytes, original name, audit VIEWED")
+    void attachment_returnsDecryptedBytesAndAudits() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        stubGuardAllows();
+        stubRequestFound();
+        messageWithAttachment(messageId, "stored/a.enc", "giay-to.pdf");
+        byte[] cipher = "cipher".getBytes(StandardCharsets.US_ASCII);
+        when(fileStorageService.readFile("stored/a.enc")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(PDF);
+
+        VerificationDocumentDto doc = service.getAttachment(assignmentId, requestId, messageId, LOGIN);
+
+        assertArrayEquals(PDF, doc.getContent());
+        assertEquals("application/pdf", doc.getContentType());
+        assertEquals("giay-to.pdf", doc.getFileName());
+        verify(auditLogService).log(eq(AuditAction.VERIFICATION_ATTACHMENT_VIEWED), eq(AuditResult.SUCCESS),
+                eq(executor.getId()), eq(LOGIN), eq("VerificationExchangeMessage"), eq(messageId.toString()),
+                anyString());
+    }
+
+    @Test
+    @DisplayName("Attachment without a stored name falls back to 'attachment'")
+    void attachment_withoutName_usesFallbackName() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        stubGuardAllows();
+        stubRequestFound();
+        messageWithAttachment(messageId, "stored/a.enc", null);
+        when(fileStorageService.readFile("stored/a.enc")).thenReturn(new byte[]{1});
+        when(cryptoService.decryptBytes(any())).thenReturn(PDF);
+
+        assertEquals("attachment", service.getAttachment(assignmentId, requestId, messageId, LOGIN).getFileName());
+    }
+
+    @Test
+    @DisplayName("Text-only message or message of another request -> 404, no file is read")
+    void attachment_missingOrTextOnly_isNotFound() throws Exception {
+        UUID textOnly = UUID.randomUUID();
+        UUID unknown = UUID.randomUUID();
+        stubGuardAllows();
+        stubRequestFound();
+        messageWithAttachment(textOnly, null, null);
+        when(verificationExchangeMessageRepository.findByIdAndRequestId(unknown, requestId))
+                .thenReturn(Optional.empty());
+
+        assertThrows(VerificationRequestNotFoundException.class,
+                () -> service.getAttachment(assignmentId, requestId, textOnly, LOGIN));
+        assertThrows(VerificationRequestNotFoundException.class,
+                () -> service.getAttachment(assignmentId, requestId, unknown, LOGIN));
+
+        verifyNoInteractions(fileStorageService, cryptoService, auditLogService);
+    }
+
+    @Test
+    @DisplayName("Attachment of a request filed by another executor -> 404, message is never looked up")
+    void attachment_ofForeignRequest_isNotFound() {
+        stubGuardAllows();
+        User otherExecutor = User.builder().id(UUID.randomUUID()).build();
+        when(legalVerificationRequestRepository.findById(requestId)).thenReturn(Optional.of(
+                LegalVerificationRequest.builder().id(requestId).owner(owner).executor(otherExecutor)
+                        .status(LegalVerificationStatus.PENDING).build()));
+
+        assertThrows(VerificationRequestNotFoundException.class,
+                () -> service.getAttachment(assignmentId, requestId, UUID.randomUUID(), LOGIN));
+
+        verifyNoInteractions(verificationExchangeMessageRepository, fileStorageService);
+    }
+
+    @Test
+    @DisplayName("Attachment with a guard rejection (wrong user / not active) reads nothing")
+    void attachment_guardRejection_readsNothing() {
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+
+        assertThrows(ExecutorNotActiveException.class,
+                () -> service.getAttachment(assignmentId, requestId, UUID.randomUUID(), LOGIN));
+
+        verifyNoInteractions(legalVerificationRequestRepository, verificationExchangeMessageRepository,
+                fileStorageService);
+    }
+
+    @Test
+    @DisplayName("Decrypt failure -> generic IllegalStateException, no audit")
+    void attachment_decryptFailure_isGenericError() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        stubGuardAllows();
+        stubRequestFound();
+        messageWithAttachment(messageId, "stored/a.enc", "a.pdf");
+        when(fileStorageService.readFile("stored/a.enc")).thenReturn(new byte[]{1});
+        when(cryptoService.decryptBytes(any())).thenThrow(new javax.crypto.AEADBadTagException("tag"));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.getAttachment(assignmentId, requestId, messageId, LOGIN));
+        verifyNoInteractions(auditLogService);
     }
 }
