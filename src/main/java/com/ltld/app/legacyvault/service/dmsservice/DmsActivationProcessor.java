@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -25,9 +26,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -50,6 +54,12 @@ public class DmsActivationProcessor {
             "Dead Man's Switch của %s đã được kích hoạt. Bạn là Executor %s.%n"
                     + "Vui lòng đăng nhập LegacyVault và xác nhận đã nhận thông báo (mã: %s).";
 
+    // B6: báo Admin khi DMS kích hoạt mà Owner không có Executor khả dụng. Tham số: Owner, mã DmsConfig.
+    private static final String MSG_ADMIN_NO_EXECUTOR =
+            "Dead Man's Switch của %s đã được kích hoạt nhưng không có Executor khả dụng "
+                    + "(chưa chỉ định hoặc đã bị thu hồi). Hồ sơ cần được xử lý thủ công (mã DmsConfig: %s).";
+    static final String ADMIN_ROLE_CODE = "ADMIN";
+
     // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), giãn cách theo retryDelay.
     static final int MAX_ATTEMPTS = 20;
 
@@ -64,6 +74,7 @@ public class DmsActivationProcessor {
     private final ExecutorRoleManager executorRoleManager;
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
+    private final UserRepository userRepository;
 
     /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
     @Transactional
@@ -109,6 +120,42 @@ public class DmsActivationProcessor {
 
         log.warn("FR-07: dmsConfig {} triggered but owner {} has no usable executor", config.getId(), ownerId);
         audit(AuditAction.DMS_TRIGGERED_NO_EXECUTOR, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
+        notifyAdminsAfterCommit(config);
+    }
+
+    /** B6: gửi mail cho mọi Admin ACTIVE sau commit, để hồ sơ không kẹt im lặng; lỗi gửi chỉ ghi log. */
+    private void notifyAdminsAfterCommit(DmsConfig config) {
+        String content = String.format(MSG_ADMIN_NO_EXECUTOR, ownerLabel(config.getOwner()), config.getId());
+        Runnable send = () -> {
+            List<User> admins;
+            try {
+                admins = userRepository.findActiveByRoleCode(ADMIN_ROLE_CODE);
+            } catch (RuntimeException e) {
+                log.warn("B6: cannot load admins to notify for dmsConfig {}", config.getId(), e);
+                return;
+            }
+            if (admins.isEmpty()) {
+                log.warn("B6: dmsConfig {} has no executor and there is no active admin to notify", config.getId());
+            }
+            for (User admin : admins) {
+                try {
+                    executorNotificationService.send(admin.getEmail(), content);
+                } catch (RuntimeException e) {
+                    log.warn("B6: notifying admin {} for dmsConfig {} failed: {}", admin.getId(), config.getId(),
+                            e.getMessage());
+                }
+            }
+        };
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            send.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                send.run();
+            }
+        });
     }
 
     /**
@@ -241,11 +288,14 @@ public class DmsActivationProcessor {
 
     // Nội dung lưu vào Notification.content nên lần gửi lại dùng đúng nội dung này.
     static String activationMessage(User owner, ExecutorAssignment assignment) {
-        String ownerLabel = owner.getFullName() == null || owner.getFullName().isBlank()
+        String executorType = assignment.getExecutorType() == ExecutorType.PRIMARY ? "Primary" : "Backup";
+        return String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel(owner), executorType, assignment.getId());
+    }
+
+    private static String ownerLabel(User owner) {
+        return owner.getFullName() == null || owner.getFullName().isBlank()
                 ? owner.getEmail()
                 : owner.getFullName() + " (" + owner.getEmail() + ")";
-        String executorType = assignment.getExecutorType() == ExecutorType.PRIMARY ? "Primary" : "Backup";
-        return String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel, executorType, assignment.getId());
     }
 
     private Optional<Notification> findActivationNotification(DmsConfig config, UUID recipientId) {

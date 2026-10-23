@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.dto.executordto.MyExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
@@ -17,6 +18,9 @@ import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeServ
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
@@ -121,5 +126,22 @@ public class ExecutorController {
         List<VerificationMessageResponse> response =
                 verificationExchangeService.history(assignmentId, requestId, principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Verification messages retrieved", response));
+    }
+
+    // B5: Executor tải tệp đính kèm của một tin nhắn trong yêu cầu xác minh của mình
+    @GetMapping("/{assignmentId}/verification-requests/{requestId}/messages/{messageId}/attachment")
+    public ResponseEntity<byte[]> getVerificationAttachment(
+            @PathVariable UUID assignmentId, @PathVariable UUID requestId, @PathVariable UUID messageId,
+            Principal principal) {
+
+        VerificationDocumentDto doc =
+                verificationExchangeService.getAttachment(assignmentId, requestId, messageId, principal.getName());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(doc.getContentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(doc.getFileName(), StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(doc.getContent());
     }
 }
