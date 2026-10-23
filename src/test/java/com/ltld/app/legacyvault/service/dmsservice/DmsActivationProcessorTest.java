@@ -17,6 +17,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -64,6 +65,7 @@ class DmsActivationProcessorTest {
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
+    @Mock private UserRepository userRepository;
 
     private DmsActivationProcessor processor;
 
@@ -81,7 +83,7 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService);
+                auditLogService, executorNotificationService, userRepository);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -259,6 +261,72 @@ class DmsActivationProcessorTest {
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         verify(executorNotificationService, never()).send(anyString(), anyString());
         assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "DMS_TRIGGERED_NO_EXECUTOR");
+    }
+
+    // ---------- B6: báo Admin khi không có Executor ----------
+
+    private void noExecutors() {
+        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY))
+                .thenReturn(Optional.empty());
+        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP))
+                .thenReturn(Optional.empty());
+    }
+
+    @Test
+    @DisplayName("B6: không có Executor -> mọi Admin ACTIVE nhận mail kèm Owner và mã DmsConfig")
+    void trigger_noExecutors_mailsEveryActiveAdmin() {
+        noExecutors();
+        when(userRepository.findActiveByRoleCode("ADMIN")).thenReturn(List.of(
+                User.builder().id(UUID.randomUUID()).email("admin1@example.test").build(),
+                User.builder().id(UUID.randomUUID()).email("admin2@example.test").build()));
+
+        processor.trigger(config.getId(), now);
+
+        ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
+        verify(executorNotificationService).send(eq("admin1@example.test"), content.capture());
+        verify(executorNotificationService).send(eq("admin2@example.test"), anyString());
+        assertThat(content.getValue()).contains("Nguyễn Văn A (owner@example.test)", config.getId().toString());
+        // Không tạo Notification EXECUTOR_ACTIVATED cho Admin.
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("B6: gửi mail cho một Admin lỗi -> vẫn gửi Admin còn lại, DMS vẫn TRIGGERED")
+    void trigger_noExecutors_adminMailFailureDoesNotStopOthers() {
+        noExecutors();
+        when(userRepository.findActiveByRoleCode("ADMIN")).thenReturn(List.of(
+                User.builder().id(UUID.randomUUID()).email("down@example.test").build(),
+                User.builder().id(UUID.randomUUID()).email("ok@example.test").build()));
+        doThrow(new RuntimeException("smtp down")).when(executorNotificationService)
+                .send(eq("down@example.test"), anyString());
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        verify(executorNotificationService).send(eq("ok@example.test"), anyString());
+    }
+
+    @Test
+    @DisplayName("B6: chưa có Admin nào / lỗi tải Admin -> không lỗi, không gửi mail")
+    void trigger_noExecutors_noAdminOrLookupFailure_isSilent() {
+        noExecutors();
+        when(userRepository.findActiveByRoleCode("ADMIN"))
+                .thenReturn(List.of())
+                .thenThrow(new RuntimeException("db down"));
+
+        processor.trigger(config.getId(), now);
+        config.setStatus(DmsStatus.ACTIVE);
+        processor.trigger(config.getId(), now);
+
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(userRepository, times(2)).findActiveByRoleCode("ADMIN");
+    }
+
+    @Test
+    @DisplayName("B6: có Executor -> không báo Admin")
+    void trigger_withExecutor_doesNotNotifyAdmins() {
+        processor.trigger(config.getId(), now);
+        verify(userRepository, never()).findActiveByRoleCode(anyString());
     }
 
     // ---------- B3: Q27 hoãn kích hoạt khi Owner chưa nhận được lần nhắc nào ----------
