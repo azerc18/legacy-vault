@@ -13,6 +13,7 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -70,6 +71,7 @@ class OwnerActivityLogIntegrationTest {
     @Autowired private DmsConfigService dmsConfigService;
     @Autowired private AuditLogService auditLogService;
     @Autowired private UserRepository userRepository;
+    @Autowired private RoleRepository roleRepository;
     @Autowired private VaultRepository vaultRepository;
     @Autowired private DmsConfigRepository dmsConfigRepository;
     @Autowired private DmsCheckinRepository dmsCheckinRepository;
@@ -138,6 +140,28 @@ class OwnerActivityLogIntegrationTest {
                 .filteredOn(r -> r.getAction() == AuditAction.DMS_CHECKIN)
                 .singleElement()
                 .satisfies(r -> assertThat(r.getActorName()).isEqualTo("Bạn"));
+    }
+
+    @Test
+    void suspendByAdmin_appearsInOwnerLog_withAdminActorAndDescription() {
+        Fixture a = fixture("s");
+        User admin = user("admin-" + UUID.randomUUID().toString().substring(0, 8));
+        admin.getRoles().add(roleRepository.findByCode("ADMIN").orElseThrow());
+        userRepository.save(admin);
+
+        // O5 qua service thật: ghi DMS_SUSPENDED với entityId = id DmsConfig, detail có reason
+        dmsConfigService.suspendByAdmin(a.ownerId, admin.getId(), "Owner yêu cầu tạm dừng");
+
+        Page<VaultActivityLogResponse> logs = ownerActivityLogService.getOwnerActivityLogs(
+                a.ownerId, null, null, PageRequest.of(0, 50));
+
+        assertThat(logs.getContent())
+                .filteredOn(r -> r.getAction() == AuditAction.DMS_SUSPENDED)
+                .singleElement()
+                .satisfies(r -> {
+                    assertThat(r.getActorName()).isEqualTo("Quản trị viên hệ thống");
+                    assertThat(r.getDescription()).isEqualTo("Quản trị viên tạm dừng Dead Man's Switch.");
+                });
     }
 
     @Test
