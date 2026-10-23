@@ -29,6 +29,7 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
                 <div className="mt-6 flex justify-end gap-3">
                     <button
                         type="button"
+                        autoFocus
                         onClick={onCancel}
                         disabled={busy}
                         className="h-10 px-4 rounded-xl border border-outline-variant font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-50"

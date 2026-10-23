@@ -20,6 +20,7 @@ public class VerificationRequestResponseDto {
     private String executorName;
     private LegalVerificationStatus status;
     private boolean hasDeathCertificate;   // true/false thay vì lộ URL nội bộ
+    // Giữ để FE cũ không vỡ; bỏ khi mọi FE đã dùng `vaults` (tránh giữ hai trường mãi)
     private List<UUID> vaultIds;           // verifier biết sẽ mở khóa vault nào
     private List<VerificationVaultDto> vaults; // cùng danh sách, kèm tên vault
     private String rejectionReason;

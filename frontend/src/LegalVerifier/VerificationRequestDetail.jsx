@@ -16,6 +16,8 @@ import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
 const otpKey = (id) => `lv_sign_otp_${id}`;
+// Thông báo của BE khi mã ký không còn dùng được (khớp InvalidSignCodeException trong sign)
+const OTP_UNUSABLE = /hết lượt thử|Sai quá số lần|hết hạn|chưa được tạo/i;
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
 const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
@@ -35,7 +37,7 @@ const CONFIRM_TEXT = {
     },
     reject: {
         title: 'Reject this request?',
-        message: 'This cannot be undone. The Executor will be notified with your reason.',
+        message: 'This cannot be undone. Your reason will be saved with the request and shown to the Executor on their request page.',
         confirmText: 'Reject',
         danger: true,
     },
@@ -89,15 +91,17 @@ export default function VerificationRequestDetail() {
     }, [cooldown]);
 
     // Chạy 1 hành động; 409 = hồ sơ đã được xử lý ở nơi khác -> tải lại trạng thái mới
-    const run = async (action, fallback) => {
+    const run = async (action, fallback, onFail) => {
         setBusy(true); setError(''); setInfo('');
         try {
             const updated = await action();
             if (updated) setReq(updated);
             return true;
         } catch (e) {
-            setError(getErrorMessage(e, fallback));
+            const message = getErrorMessage(e, fallback);
+            setError(message);
             if (e.response?.status === 409) load();
+            onFail?.(message);
             return false;
         } finally {
             setBusy(false);
@@ -129,7 +133,15 @@ export default function VerificationRequestDetail() {
         if (action === 'approve') await run(() => approveRequest(req.id), 'Could not approve.');
         if (action === 'reject') await run(() => rejectRequest(req.id, rejectReason), 'Could not reject.');
         if (action === 'sign') {
-            const ok = await run(() => signRequest(req.id, code), 'Could not sign.');
+            const ok = await run(() => signRequest(req.id, code), 'Could not sign.', (message) => {
+                // Mã hết hạn / hết lượt thử: bỏ trạng thái "đã gửi mã", quay về nút Send code
+                if (OTP_UNUSABLE.test(message)) {
+                    forgetOtpSent(req.id);
+                    setCodeSent(false);
+                    setCode('');
+                    setCooldown(0);
+                }
+            });
             if (ok) forgetOtpSent(req.id);
         }
         setConfirm(null);
@@ -137,7 +149,6 @@ export default function VerificationRequestDetail() {
 
     const handleCheckDocument = async () => {
         setBusy(true); setChecking(true); setError('');
-        setDocCheck(null);   // kiểm tra lại thì ẩn nút View cho tới khi có kết quả mới
         try { setDocCheck(await verifyDocument(req.id)); }
         catch (e) { setError(getErrorMessage(e, 'Could not check the document.')); }
         finally { setBusy(false); setChecking(false); }
@@ -252,16 +263,14 @@ export default function VerificationRequestDetail() {
                                 >
                                     {checking ? 'Checking...' : 'Check document'}
                                 </button>
-                                {/* Chỉ cho xem file khi đã kiểm tra và kết quả là hợp lệ */}
-                                {docCheck?.valid && (
-                                    <button
-                                        onClick={handleViewDocument}
-                                        disabled={busy || viewing}
-                                        className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
-                                    >
-                                        {viewing ? 'Opening...' : 'View document'}
-                                    </button>
-                                )}
+                                {/* Luôn cho xem tài liệu thật: Check (mock theo đuôi file) chỉ là gợi ý */}
+                                <button
+                                    onClick={handleViewDocument}
+                                    disabled={busy || viewing}
+                                    className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
+                                >
+                                    {viewing ? 'Opening...' : 'View document'}
+                                </button>
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">No death certificate attached.</p>

@@ -24,7 +24,11 @@ export default function VerificationHistory() {
         setError('');
         getHistory({ status: status || undefined, from: from || undefined, to: to || undefined, page, size: PAGE_SIZE })
             .then((data) => { if (!cancelled) setItems(data); })
-            .catch((e) => { if (!cancelled) setError(getErrorMessage(e, 'Could not load history.')); })
+            .catch((e) => {
+                if (cancelled) return;
+                setItems([]);   // lỗi thì không hiện kết quả cũ dưới thông báo lỗi
+                setError(getErrorMessage(e, 'Could not load history.'));
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [status, from, to, page]);

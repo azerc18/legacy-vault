@@ -812,7 +812,7 @@ public class LegalVerificationServiceImplTest {
                 eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
     }
 
-    // B8: nhập sai mã -> báo còn bao nhiêu lần thử
+    // FR-14: nhập sai mã -> báo còn bao nhiêu lần thử
     @Test
     void sign_wrongCode_messageShowsRemainingAttempts() {
         approvedByVerifier();
@@ -832,7 +832,7 @@ public class LegalVerificationServiceImplTest {
                 .hasMessageContaining("Còn 4 lần thử");
     }
 
-    // A3: DTO trả cả tên vault (không chỉ UUID)
+    // FR-12: DTO trả cả tên vault (không chỉ UUID)
     @Test
     void getPendingRequests_includesVaultNames() {
         UUID vaultId = UUID.randomUUID();
@@ -851,7 +851,7 @@ public class LegalVerificationServiceImplTest {
         assertThat(dto.getVaults().get(0).getName()).isEqualTo("Family vault");
     }
 
-    // A2: số liệu Home đếm trong DB, không phụ thuộc phân trang
+    // FR-15: số liệu Home đếm trong DB, không phụ thuộc phân trang
     @Test
     void getSummary_countsEachStatusInDb() {
         when(requestRepository.countPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId)).thenReturn(3L);
