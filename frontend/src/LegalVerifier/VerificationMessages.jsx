@@ -4,11 +4,16 @@ import { getErrorMessage } from '../api/http.js';
 import { formatDate } from './verifierUi.js';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024; // khớp giới hạn 10MB của BE
+const POLL_MS = 30000;                   // hồ sơ còn mở: tự tải tin mới mỗi 30 giây
+
 export default function VerificationMessages({ requestId, status }) {
     const [messages, setMessages] = useState([]);
     const [text, setText] = useState('');
     const [file, setFile] = useState(null);
+    const [fileKey, setFileKey] = useState(0);   // đổi key để xoá ô chọn file
     const [sending, setSending] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState('');
 
     const canSend = status === 'PENDING' || status === 'APPROVED';
@@ -23,6 +28,34 @@ export default function VerificationMessages({ requestId, status }) {
 
     useEffect(() => { load(); }, [load]);
 
+    // Tự làm mới khi hồ sơ còn mở và tab đang hiển thị
+    useEffect(() => {
+        if (!canSend) return;
+        const t = setInterval(() => {
+            if (document.visibilityState === 'visible') load();
+        }, POLL_MS);
+        return () => clearInterval(t);
+    }, [canSend, load]);
+
+    const handleRefresh = async () => {
+        setRefreshing(true);
+        setError('');
+        await load();
+        setRefreshing(false);
+    };
+
+    const handleFileChange = (e) => {
+        const picked = e.target.files?.[0] ?? null;
+        if (picked && picked.size > MAX_FILE_BYTES) {
+            setError('File exceeds the 10MB limit.');
+            setFile(null);
+            setFileKey((k) => k + 1);
+            return;
+        }
+        setError('');
+        setFile(picked);
+    };
+
     const handleSend = async (e) => {
         e.preventDefault();
         if (!text.trim() && !file) return;
@@ -32,7 +65,7 @@ export default function VerificationMessages({ requestId, status }) {
             await sendMessage(requestId, text.trim(), file);
             setText('');
             setFile(null);
-            e.target.reset();
+            setFileKey((k) => k + 1);
             await load();
         } catch (err) {
             setError(getErrorMessage(err, 'Could not send the message.'));
@@ -55,12 +88,26 @@ export default function VerificationMessages({ requestId, status }) {
     };
 
     return (
-        <div className="mt-6 pt-6 border-t border-outline-variant/20">
-            <h3 className="font-bold mb-3">Messages with the Executor</h3>
+        <div>
+            <div className="flex items-center justify-between gap-3 mb-6">
+                <h2 className="font-title-lg text-on-surface font-bold flex items-center gap-3">
+                    <span className="material-symbols-outlined text-secondary">forum</span>
+                    Messages with the Executor
+                </h2>
+                <button
+                    type="button"
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="flex items-center gap-1 text-sm font-semibold text-secondary hover:text-primary disabled:text-outline"
+                >
+                    <span className="material-symbols-outlined text-[18px]">refresh</span>
+                    {refreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
+            </div>
 
-            {error && <p className="text-sm text-error mb-3">{error}</p>}
+            {error && <p role="alert" className="text-sm text-error mb-3">{error}</p>}
 
-            <div className="space-y-3 mb-4 max-h-80 overflow-y-auto">
+            <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
                 {messages.length === 0 && (
                     <p className="text-sm text-on-surface-variant">No messages yet.</p>
                 )}
@@ -96,12 +143,16 @@ export default function VerificationMessages({ requestId, status }) {
                         maxLength={2000}
                         rows={3}
                         placeholder="Write a reply to the Executor..."
+                        aria-label="Reply to the Executor"
                         className="w-full p-3 rounded-xl border border-outline-variant/40 text-sm"
                     />
+                    <div className="text-xs text-outline text-right">{text.length}/2000</div>
                     <input
+                        key={fileKey}
                         type="file"
                         accept=".pdf,.png,.jpg,.jpeg"
-                        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                        onChange={handleFileChange}
+                        aria-label="Attach a file (pdf, png, jpg, max 10MB)"
                         className="text-sm"
                     />
                     <div>

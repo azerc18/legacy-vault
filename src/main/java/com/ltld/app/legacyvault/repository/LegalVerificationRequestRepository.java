@@ -25,6 +25,17 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     List<LegalVerificationRequest> findPendingVisibleTo(@Param("status") LegalVerificationStatus status,
                                                         @Param("verifierId") UUID verifierId);
 
+    // Đếm hồ sơ chờ duyệt (cùng điều kiện loại xung đột lợi ích với findPendingVisibleTo)
+    @Query("""
+        SELECT COUNT(r) FROM LegalVerificationRequest r
+        WHERE r.status = :status AND r.owner.id <> :verifierId AND r.executor.id <> :verifierId
+    """)
+    long countPendingVisibleTo(@Param("status") LegalVerificationStatus status,
+                               @Param("verifierId") UUID verifierId);
+
+    // Đếm hồ sơ verifier đã xử lý theo trạng thái
+    long countByVerifierIdAndStatus(UUID verifierId, LegalVerificationStatus status);
+
     // M2: lịch sử lọc + phân trang ngay trong DB, lấy luôn owner + executor (tránh lazy N+1)
     @Query("""
         SELECT r FROM LegalVerificationRequest r JOIN FETCH r.owner JOIN FETCH r.executor

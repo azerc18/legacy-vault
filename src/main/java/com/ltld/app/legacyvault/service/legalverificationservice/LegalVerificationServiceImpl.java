@@ -5,6 +5,8 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationReque
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationVaultDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.entity.DigitalSignature;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
@@ -307,7 +309,10 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
                     verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
-            throw new InvalidSignCodeException("Mã xác nhận không đúng.");
+            int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
+            throw new InvalidSignCodeException(remaining > 0
+                    ? "Mã xác nhận không đúng. Còn " + remaining + " lần thử."
+                    : "Mã xác nhận không đúng. Đã hết lượt thử, vui lòng yêu cầu mã mới.");
         }
 
         // Xác thực thành công: hủy mã OTP đã dùng
@@ -400,6 +405,18 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 verifierId, statuses, fromTime, toTime, PageRequest.of(safePage, safeSize)));
     }
 
+    // Đếm theo trạng thái ngay trong DB (không phụ thuộc phân trang)
+    @Override
+    @Transactional(readOnly = true)
+    public VerifierSummaryResponseDto getSummary(UUID verifierId) {
+        return VerifierSummaryResponseDto.builder()
+                .pending(requestRepository.countPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
+                .awaitingSignature(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.APPROVED))
+                .signed(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.SIGNED))
+                .rejected(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.REJECTED))
+                .build();
+    }
+
     // Mock FR-13: hợp lệ nếu đường dẫn kết thúc bằng .pdf, .jpg, .jpeg hoặc .png
     private boolean mockVerifyDocument(String documentRef) {
         if (documentRef == null) return false;
@@ -467,11 +484,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // 1 hồ sơ: lấy vault riêng
     private VerificationRequestResponseDto toDto(LegalVerificationRequest r) {
-        List<UUID> vaultIds = requestVaultRepository.findByRequestId(r.getId())
-                .stream()
-                .map(rv -> rv.getVault().getId())
-                .toList();
-        return toDto(r, vaultIds);
+        return toDto(r, requestVaultRepository.findByRequestId(r.getId()).stream()
+                .map(LegalVerificationServiceImpl::toVaultDto)
+                .toList());
     }
 
     // M1: nhiều hồ sơ: lấy vault của tất cả trong 1 query
@@ -480,23 +495,31 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             return List.of();
         }
         List<UUID> ids = requests.stream().map(LegalVerificationRequest::getId).toList();
-        Map<UUID, List<UUID>> vaultIdsByRequest = requestVaultRepository.findByRequestIdIn(ids).stream()
+        Map<UUID, List<VerificationVaultDto>> vaultsByRequest = requestVaultRepository.findByRequestIdIn(ids).stream()
                 .collect(Collectors.groupingBy(
                         rv -> rv.getRequest().getId(),
-                        Collectors.mapping(rv -> rv.getVault().getId(), Collectors.toList())));
+                        Collectors.mapping(LegalVerificationServiceImpl::toVaultDto, Collectors.toList())));
         return requests.stream()
-                .map(r -> toDto(r, vaultIdsByRequest.getOrDefault(r.getId(), List.of())))
+                .map(r -> toDto(r, vaultsByRequest.getOrDefault(r.getId(), List.of())))
                 .toList();
     }
 
-    private VerificationRequestResponseDto toDto(LegalVerificationRequest r, List<UUID> vaultIds) {
+    private static VerificationVaultDto toVaultDto(VerificationRequestVault rv) {
+        return VerificationVaultDto.builder()
+                .id(rv.getVault().getId())
+                .name(rv.getVault().getName())
+                .build();
+    }
+
+    private VerificationRequestResponseDto toDto(LegalVerificationRequest r, List<VerificationVaultDto> vaults) {
         return VerificationRequestResponseDto.builder()
                 .id(r.getId())
                 .ownerName(r.getOwner().getFullName())
                 .executorName(r.getExecutor().getFullName())
                 .status(r.getStatus())
                 .hasDeathCertificate(r.getDeathCertificateFileUrlEncrypted() != null)
-                .vaultIds(vaultIds)
+                .vaultIds(vaults.stream().map(VerificationVaultDto::getId).toList())
+                .vaults(vaults)
                 .rejectionReason(r.getRejectionReason())
                 .decidedAt(r.getDecidedAt())
                 .createdAt(r.getCreatedAt()) // R1: không để mất createdAt

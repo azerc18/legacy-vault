@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getHistory } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate } from './verifierUi.js';
+import VerifierHeader from './VerifierHeader.jsx';
 
 const PAGE_SIZE = 20;
 
 export default function VerificationHistory() {
+    const navigate = useNavigate();
     const [status, setStatus] = useState('');   // '' = tất cả
     const [from, setFrom] = useState('');       // 'YYYY-MM-DD'
     const [to, setTo] = useState('');
@@ -17,12 +19,18 @@ export default function VerificationHistory() {
 
     // Tải lại khi bộ lọc hoặc trang thay đổi
     useEffect(() => {
+        let cancelled = false;   // bỏ kết quả cũ nếu bộ lọc đã đổi trong lúc chờ
         setLoading(true);
         setError('');
         getHistory({ status: status || undefined, from: from || undefined, to: to || undefined, page, size: PAGE_SIZE })
-            .then(setItems)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load history.')))
-            .finally(() => setLoading(false));
+            .then((data) => { if (!cancelled) setItems(data); })
+            .catch((e) => {
+                if (cancelled) return;
+                setItems([]);   // lỗi thì không hiện kết quả cũ dưới thông báo lỗi
+                setError(getErrorMessage(e, 'Could not load history.'));
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
     }, [status, from, to, page]);
 
     // Đổi bộ lọc thì quay về trang đầu
@@ -32,14 +40,7 @@ export default function VerificationHistory() {
 
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased">
-            <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-outline-variant/30">
-                <div className="max-w-[1200px] mx-auto px-5 h-20 flex items-center gap-3">
-                    <Link to="/verifier" className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant">
-                        <span className="material-symbols-outlined">arrow_back</span>
-                    </Link>
-                    <h1 className="font-headline-sm text-primary font-bold tracking-tight">Verification History</h1>
-                </div>
-            </header>
+            <VerifierHeader title="Verification History" backTo="/verifier/home" />
 
             <main className="max-w-[1200px] mx-auto p-5 mt-6">
                 <div className="flex flex-wrap items-end gap-4 mb-6">
@@ -47,7 +48,7 @@ export default function VerificationHistory() {
                         Result
                         <select value={status} onChange={onFilter(setStatus)} className={inputCls}>
                             <option value="">All</option>
-                            <option value="APPROVED">Approved (awaiting signature)</option>
+                            <option value="APPROVED">Awaiting signature</option>
                             <option value="SIGNED">Signed</option>
                             <option value="REJECTED">Rejected</option>
                         </select>
@@ -70,12 +71,12 @@ export default function VerificationHistory() {
                     )}
                 </div>
 
-                {loading && <p>Loading...</p>}
+                {loading && items.length === 0 && <p>Loading...</p>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
                 {!loading && !error && items.length === 0 && <p>No history found.</p>}
 
-                {!loading && items.length > 0 && (
-                    <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-x-auto">
+                {items.length > 0 && (
+                    <div className={`bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-x-auto transition-opacity ${loading ? 'opacity-50' : ''}`}>
                         <table className="w-full text-left">
                             <thead className="bg-surface-container-low text-sm text-on-surface-variant">
                             <tr>
@@ -88,7 +89,11 @@ export default function VerificationHistory() {
                             </thead>
                             <tbody>
                             {items.map((h) => (
-                                <tr key={h.id} className="border-t border-outline-variant/20 hover:bg-surface-container-low">
+                                <tr
+                                    key={h.id}
+                                    onClick={() => navigate(`/verifier/request/${h.id}`)}
+                                    className="border-t border-outline-variant/20 hover:bg-surface-container-low cursor-pointer"
+                                >
                                     <td className="p-4 whitespace-nowrap">{formatDate(h.decidedAt, true)}</td>
                                     <td className="p-4 font-bold">
                                         <Link to={`/verifier/request/${h.id}`} className="hover:text-primary">{h.ownerName}</Link>

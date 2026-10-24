@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.controller.LegalVerificationController;
 import com.ltld.app.legacyvault.controller.VerifierMessageController;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
@@ -189,5 +190,37 @@ class VerifierMessageControllerSecurityTest {
                         .param("content", "a".repeat(2001)).with(validVerifier()))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(verifierMessageService);
+    }
+
+    // ---------- S5: GET /summary (số liệu Home, FR-15) ----------
+
+    private static final String SUMMARY_URL = "/api/verifier/requests/summary";
+
+    @Test
+    void summary_noToken_returns401() throws Exception {
+        mockMvc.perform(get(SUMMARY_URL)).andExpect(status().isUnauthorized());
+        verifyNoInteractions(legalVerificationService);
+    }
+
+    @Test
+    void summary_executorToken_returns403_andServiceNotCalled() throws Exception {
+        mockMvc.perform(get(SUMMARY_URL).with(token(UUID.randomUUID(), "ROLE_EXECUTOR")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(legalVerificationService);
+    }
+
+    @Test
+    void summary_validVerifier_returns200WithCounts() throws Exception {
+        when(legalVerificationService.getSummary(eq(verifierId)))
+                .thenReturn(VerifierSummaryResponseDto.builder()
+                        .pending(3).awaitingSignature(2).signed(150).rejected(7).build());
+
+        mockMvc.perform(get(SUMMARY_URL).with(validVerifier()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.pending").value(3))
+                .andExpect(jsonPath("$.data.awaitingSignature").value(2))
+                .andExpect(jsonPath("$.data.signed").value(150))
+                .andExpect(jsonPath("$.data.rejected").value(7));
     }
 }

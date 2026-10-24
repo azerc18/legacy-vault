@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationReque
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
@@ -809,5 +810,60 @@ public class LegalVerificationServiceImplTest {
         assertThat(dto.getFileName()).endsWith(".pdf");
         verify(auditLogService).log(eq(AuditAction.LEGAL_DOCUMENT_VIEWED), eq(AuditResult.SUCCESS),
                 eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
+    }
+
+    // FR-14: nhập sai mã -> báo còn bao nhiêu lần thử
+    @Test
+    void sign_wrongCode_messageShowsRemainingAttempts() {
+        approvedByVerifier();
+        handoverStillValid();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        SignVerificationRequestDto badDto = new SignVerificationRequestDto();
+        badDto.setMethod(SignatureMethod.MOCK_OTP);
+        badDto.setCode("111111");
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "111111", "hashedOtp")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
+                .isInstanceOf(InvalidSignCodeException.class)
+                .hasMessageContaining("Còn 4 lần thử");
+    }
+
+    // FR-12: DTO trả cả tên vault (không chỉ UUID)
+    @Test
+    void getPendingRequests_includesVaultNames() {
+        UUID vaultId = UUID.randomUUID();
+        VerificationRequestVault link = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(Vault.builder().id(vaultId).name("Family vault").build()).build();
+
+        when(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
+                .thenReturn(List.of(pendingRequest));
+        when(requestVaultRepository.findByRequestIdIn(anyCollection())).thenReturn(List.of(link));
+
+        VerificationRequestResponseDto dto = service.getPendingRequests(verifierId).get(0);
+
+        assertThat(dto.getVaultIds()).containsExactly(vaultId);
+        assertThat(dto.getVaults()).hasSize(1);
+        assertThat(dto.getVaults().get(0).getId()).isEqualTo(vaultId);
+        assertThat(dto.getVaults().get(0).getName()).isEqualTo("Family vault");
+    }
+
+    // FR-15: số liệu Home đếm trong DB, không phụ thuộc phân trang
+    @Test
+    void getSummary_countsEachStatusInDb() {
+        when(requestRepository.countPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId)).thenReturn(3L);
+        when(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.APPROVED)).thenReturn(2L);
+        when(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.SIGNED)).thenReturn(150L);
+        when(requestRepository.countByVerifierIdAndStatus(verifierId, LegalVerificationStatus.REJECTED)).thenReturn(7L);
+
+        VerifierSummaryResponseDto summary = service.getSummary(verifierId);
+
+        assertThat(summary.getPending()).isEqualTo(3L);
+        assertThat(summary.getAwaitingSignature()).isEqualTo(2L);
+        assertThat(summary.getSigned()).isEqualTo(150L);
+        assertThat(summary.getRejected()).isEqualTo(7L);
     }
 }
