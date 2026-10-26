@@ -45,22 +45,6 @@ public class LegalVerificationRequest {
     @Column(name = "rejection_reason_code", length = 40)
     private RejectionReason rejectionReasonCode;
 
-    // T-3: verifier đã View / Check giấy chứng tử (bắt buộc View → Check → Approve)
-    @Column(name = "document_viewed_by")
-    private UUID documentViewedBy;
-
-    @Column(name = "document_viewed_at")
-    private LocalDateTime documentViewedAt;
-
-    @Column(name = "document_checked_by")
-    private UUID documentCheckedBy;
-
-    @Column(name = "document_checked_at")
-    private LocalDateTime documentCheckedAt;
-
-    @Column(name = "document_valid")
-    private Boolean documentValid;
-
     @Column(name = "notes", length = 1000)
     private String notes;
 

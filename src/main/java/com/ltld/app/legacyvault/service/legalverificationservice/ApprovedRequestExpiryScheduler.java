@@ -6,8 +6,10 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -22,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * B-02: hồ sơ APPROVED nhưng quá APPROVED_EXPIRY_DAYS ngày mà chưa ký thì trả về PENDING
+ * FR-12: hồ sơ APPROVED nhưng quá app.verifier.approved-expiry-days ngày (mặc định 7) mà chưa ký thì trả về PENDING
  * (bỏ verifier, xóa OTP ký) để verifier khác nhận. Tránh hồ sơ bị kẹt khi verifier đã duyệt bỏ đi.
  * Mặc định BẬT; tắt bằng app.verifier.approved-expiry.enabled=false.
  */
@@ -31,22 +33,27 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "app.verifier.approved-expiry.enabled", havingValue = "true", matchIfMissing = true)
 public class ApprovedRequestExpiryScheduler {
 
-    static final int APPROVED_EXPIRY_DAYS = 7;
     static final int BATCH_SIZE = 50;
     private static final String ENTITY = "LegalVerificationRequest";
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
+    private final VerificationReviewProgressRepository progressRepository;
     private final AuditLogService auditLogService;
+    private final int expiryDays;
     private final TransactionTemplate requiresNewTx;
 
     public ApprovedRequestExpiryScheduler(LegalVerificationRequestRepository requestRepository,
                                           DigitalSignatureRepository signatureRepository,
+                                          VerificationReviewProgressRepository progressRepository,
                                           AuditLogService auditLogService,
-                                          PlatformTransactionManager transactionManager) {
+                                          PlatformTransactionManager transactionManager,
+                                          @Value("${app.verifier.approved-expiry-days:7}") int expiryDays) {
         this.requestRepository = requestRepository;
         this.signatureRepository = signatureRepository;
+        this.progressRepository = progressRepository;
         this.auditLogService = auditLogService;
+        this.expiryDays = expiryDays;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -59,7 +66,7 @@ public class ApprovedRequestExpiryScheduler {
     }
 
     public void reopenExpired(LocalDateTime now) {
-        LocalDateTime cutoff = now.minusDays(APPROVED_EXPIRY_DAYS);
+        LocalDateTime cutoff = now.minusDays(expiryDays);
         List<UUID> ids = requestRepository.findExpiredUnsignedIds(
                 LegalVerificationStatus.APPROVED, cutoff, PageRequest.of(0, BATCH_SIZE));
         for (UUID id : ids) {
@@ -68,10 +75,10 @@ public class ApprovedRequestExpiryScheduler {
                 if (Boolean.TRUE.equals(reopened)) {
                     auditLogService.log(AuditAction.LEGAL_REQUEST_REOPENED, AuditResult.SUCCESS,
                             null, null, ENTITY, id.toString(),
-                            "approved over " + APPROVED_EXPIRY_DAYS + " days without signature");
+                            "approved over " + expiryDays + " days without signature");
                 }
             } catch (RuntimeException e) {
-                log.error("B-02: could not reopen request {}: {}", id, e.getMessage());
+                log.error("FR-12: could not reopen request {}: {}", id, e.getMessage());
             }
         }
     }
@@ -92,12 +99,8 @@ public class ApprovedRequestExpiryScheduler {
         r.setSignOtpExpiresAt(null);
         r.setSignOtpSentAt(null);
         r.setSignAttempts(0);
-        // T-3: verifier mới phải View → Check lại từ đầu
-        r.setDocumentViewedBy(null);
-        r.setDocumentViewedAt(null);
-        r.setDocumentCheckedBy(null);
-        r.setDocumentCheckedAt(null);
-        r.setDocumentValid(null);
+        // FR-13: verifier mới phải View → Check lại: xóa tiến độ của mọi verifier
+        progressRepository.deleteByRequestId(r.getId());
         requestRepository.save(r);
         return true;
     }

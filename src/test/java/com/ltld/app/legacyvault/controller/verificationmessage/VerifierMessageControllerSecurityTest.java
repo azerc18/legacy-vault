@@ -225,7 +225,7 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(jsonPath("$.data.rejected").value(7));
     }
 
-    // ---------- T-4: GET /rejection-reasons ----------
+    // ---------- FR-12: GET /rejection-reasons ----------
 
     private static final String REASONS_URL = "/api/verifier/requests/rejection-reasons";
 
@@ -250,7 +250,7 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(jsonPath("$.data[5].code").value("OTHER"));
     }
 
-    // ---------- T-4: validate lý do từ chối ----------
+    // ---------- FR-12: validate lý do từ chối ----------
 
     @Test
     void reject_otherWithoutNote_returns400() throws Exception {
@@ -274,7 +274,7 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(status().isOk());
     }
 
-    // ---------- T-3: check tài liệu là POST ----------
+    // ---------- FR-13: check tài liệu là POST ----------
 
     @Test
     void verifyDocument_getIsNoLongerAllowed() throws Exception {
@@ -282,7 +282,7 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(status().is4xxClientError());
     }
 
-    // ---------- D7: sub sai định dạng -> 401, không phải 500 ----------
+    // ---------- FR-12: sub sai định dạng -> 401, không phải 500 ----------
 
     private static RequestPostProcessor badSubjectVerifier() {
         return jwt().jwt(j -> j.subject("khong-phai-uuid"))

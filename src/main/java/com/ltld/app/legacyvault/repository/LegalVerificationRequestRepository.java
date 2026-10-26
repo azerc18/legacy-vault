@@ -51,7 +51,7 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
                                                @Param("toTime") LocalDateTime toTime,
                                                Pageable pageable);
 
-    // B-02: id hồ sơ đã APPROVED nhưng chưa ký và quá hạn (decidedAt < cutoff)
+    // FR-12: id hồ sơ đã APPROVED nhưng chưa ký và quá hạn (decidedAt < cutoff)
     @Query("""
         SELECT r.id FROM LegalVerificationRequest r
         WHERE r.status = :status AND r.decidedAt < :cutoff

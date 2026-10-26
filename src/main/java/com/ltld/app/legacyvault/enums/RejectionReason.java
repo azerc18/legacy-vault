@@ -1,6 +1,6 @@
 package com.ltld.app.legacyvault.enums;
 
-/** T-4: lý do từ chối hồ sơ xác minh (Verifier chọn trong dropdown). */
+/** FR-12: lý do từ chối hồ sơ xác minh (Verifier chọn trong dropdown). */
 public enum RejectionReason {
     DOCUMENT_UNREADABLE("Tài liệu mờ, không đọc được"),
     DOCUMENT_INVALID("Tài liệu không phải giấy chứng tử hợp lệ"),

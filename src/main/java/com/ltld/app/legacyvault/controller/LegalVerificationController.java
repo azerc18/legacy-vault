@@ -77,14 +77,14 @@ public class LegalVerificationController {
         return ResponseEntity.ok(ApiResponse.success(service.getById(id, verifierId(jwt))));
     }
 
-    // T-4: danh sách lý do từ chối cho dropdown ở FE
+    // FR-12: danh sách lý do từ chối cho dropdown ở FE
     @GetMapping("/rejection-reasons")
     public ResponseEntity<ApiResponse<List<RejectionReasonDto>>> getRejectionReasons() {
         return ResponseEntity.ok(ApiResponse.success(Arrays.stream(RejectionReason.values())
                 .map(r -> new RejectionReasonDto(r.name(), r.getLabel())).toList()));
     }
 
-    // UC13 + T-3: kiểm tra tài liệu (POST vì ghi kết quả kiểm tra; 404 nếu xung đột lợi ích, 409 nếu chưa View)
+    // UC13 + FR-13: kiểm tra tài liệu (POST vì ghi kết quả kiểm tra; 404 nếu xung đột lợi ích, 409 nếu chưa View)
     @PostMapping("/{id}/document/verify")
     public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(
             @PathVariable UUID id,
@@ -146,7 +146,7 @@ public class LegalVerificationController {
     }
 
     // userId nằm ở claim "sub" của token
-    // D7: sub trong token sai định dạng -> 401 (không để lỗi 500)
+    // FR-12: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {
         try {
             return UUID.fromString(jwt.getSubject());

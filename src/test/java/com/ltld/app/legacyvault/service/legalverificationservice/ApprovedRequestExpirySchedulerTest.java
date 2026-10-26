@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,8 +38,11 @@ class ApprovedRequestExpirySchedulerTest {
 
     @Mock private LegalVerificationRequestRepository requestRepository;
     @Mock private DigitalSignatureRepository signatureRepository;
+    @Mock private VerificationReviewProgressRepository progressRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
+
+    private static final int EXPIRY_DAYS = 7;
 
     private ApprovedRequestExpiryScheduler scheduler;
 
@@ -49,7 +53,7 @@ class ApprovedRequestExpirySchedulerTest {
     void setUp() {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         scheduler = new ApprovedRequestExpiryScheduler(requestRepository, signatureRepository,
-                auditLogService, transactionManager);
+                progressRepository, auditLogService, transactionManager, EXPIRY_DAYS);
     }
 
     private LegalVerificationRequest approved(LocalDateTime decidedAt) {
@@ -58,13 +62,13 @@ class ApprovedRequestExpirySchedulerTest {
                 .verifier(User.builder().id(UUID.randomUUID()).build())
                 .decidedAt(decidedAt)
                 .signOtpHash("hash").signAttempts(3)
-                .documentViewedBy(UUID.randomUUID()).documentCheckedBy(UUID.randomUUID()).documentValid(true)
+
                 .build();
     }
 
     private void foundExpired() {
         when(requestRepository.findExpiredUnsignedIds(eq(LegalVerificationStatus.APPROVED),
-                eq(now.minusDays(ApprovedRequestExpiryScheduler.APPROVED_EXPIRY_DAYS)), any(Pageable.class)))
+                eq(now.minusDays(EXPIRY_DAYS)), any(Pageable.class)))
                 .thenReturn(List.of(id));
     }
 
@@ -82,10 +86,8 @@ class ApprovedRequestExpirySchedulerTest {
         assertThat(r.getDecidedAt()).isNull();
         assertThat(r.getSignOtpHash()).isNull();
         assertThat(r.getSignAttempts()).isZero();
-        // T-3: verifier mới phải View → Check lại
-        assertThat(r.getDocumentViewedBy()).isNull();
-        assertThat(r.getDocumentCheckedBy()).isNull();
-        assertThat(r.getDocumentValid()).isNull();
+        // FR-13: tiến độ View/Check của mọi verifier bị xóa
+        verify(progressRepository).deleteByRequestId(id);
         verify(requestRepository).save(r);
         verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REOPENED), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), eq("LegalVerificationRequest"), eq(id.toString()), anyString());
@@ -111,6 +113,7 @@ class ApprovedRequestExpirySchedulerTest {
 
         assertThat(r.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         verify(requestRepository, never()).save(any());
+        verify(progressRepository, never()).deleteByRequestId(any());
         verify(auditLogService, never()).log(any(), any(), any(), any(), anyString(), anyString(), any());
     }
 
@@ -125,5 +128,52 @@ class ApprovedRequestExpirySchedulerTest {
 
         assertThat(r.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
         verify(requestRepository, never()).save(any());
+    }
+
+    // Hồ sơ chưa quá hạn (decidedAt mới hơn cutoff) thì bỏ qua dù repository trả về id
+    @Test
+    void reopenExpired_notYetExpired_skips() {
+        LegalVerificationRequest r = approved(now.minusDays(3));
+        foundExpired();
+        when(requestRepository.findByIdForUpdate(id)).thenReturn(Optional.of(r));
+
+        scheduler.reopenExpired(now);
+
+        assertThat(r.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
+        verify(requestRepository, never()).save(any());
+    }
+
+    // Một hồ sơ lỗi không chặn các hồ sơ sau
+    @Test
+    void reopenExpired_oneFails_othersStillProcessed() {
+        UUID id2 = UUID.randomUUID();
+        LegalVerificationRequest r2 = LegalVerificationRequest.builder().id(id2)
+                .status(LegalVerificationStatus.APPROVED)
+                .verifier(User.builder().id(UUID.randomUUID()).build())
+                .decidedAt(now.minusDays(9)).build();
+        when(requestRepository.findExpiredUnsignedIds(eq(LegalVerificationStatus.APPROVED),
+                eq(now.minusDays(EXPIRY_DAYS)), any(Pageable.class))).thenReturn(List.of(id, id2));
+        when(requestRepository.findByIdForUpdate(id)).thenThrow(new IllegalStateException("db down"));
+        when(requestRepository.findByIdForUpdate(id2)).thenReturn(Optional.of(r2));
+        when(signatureRepository.existsByRequestId(id2)).thenReturn(false);
+
+        scheduler.reopenExpired(now);
+
+        assertThat(r2.getStatus()).isEqualTo(LegalVerificationStatus.PENDING);
+        verify(requestRepository).save(r2);
+    }
+
+    // Số ngày đọc từ cấu hình: đặt 1 ngày thì mốc cắt là now - 1 ngày
+    @Test
+    void reopenExpired_usesConfiguredDays() {
+        ApprovedRequestExpiryScheduler shortLived = new ApprovedRequestExpiryScheduler(requestRepository,
+                signatureRepository, progressRepository, auditLogService, transactionManager, 1);
+        when(requestRepository.findExpiredUnsignedIds(eq(LegalVerificationStatus.APPROVED),
+                eq(now.minusDays(1)), any(Pageable.class))).thenReturn(List.of());
+
+        shortLived.reopenExpired(now);
+
+        verify(requestRepository).findExpiredUnsignedIds(eq(LegalVerificationStatus.APPROVED),
+                eq(now.minusDays(1)), any(Pageable.class));
     }
 }

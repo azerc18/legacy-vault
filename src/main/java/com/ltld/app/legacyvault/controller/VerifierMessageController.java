@@ -64,7 +64,7 @@ public class VerifierMessageController {
                 .body(doc.getContent());
     }
 
-    // D7: sub trong token sai định dạng -> 401 (không để lỗi 500)
+    // FR-12: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {
         try {
             return UUID.fromString(jwt.getSubject());

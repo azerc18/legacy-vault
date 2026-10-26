@@ -59,6 +59,7 @@ export default function VerificationRequestDetail() {
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
     const [rejectReasons, setRejectReasons] = useState([]);   // [{ code, label }] từ BE
+    const [reasonsError, setReasonsError] = useState(false);
     const [rejectChoice, setRejectChoice] = useState('');   // '' | code lý do (OTHER = phải nhập ghi chú)
     const [rejectNote, setRejectNote] = useState('');
     const [docCheck, setDocCheck] = useState(null);   // { valid, message }
@@ -75,10 +76,12 @@ export default function VerificationRequestDetail() {
 
     useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
 
-    // T-4: lý do từ chối lấy từ BE
-    useEffect(() => {
-        getRejectionReasons().then(setRejectReasons).catch(() => setRejectReasons([]));
+    // FR-12: lý do từ chối lấy từ BE; lỗi thì báo và cho thử lại
+    const loadReasons = useCallback(() => {
+        setReasonsError(false);
+        getRejectionReasons().then(setRejectReasons).catch(() => setReasonsError(true));
     }, []);
+    useEffect(() => { loadReasons(); }, [loadReasons]);
 
     // Khôi phục trạng thái "đã gửi mã" nếu vừa tải lại trang khi đang chờ ký
     useEffect(() => {
@@ -170,7 +173,7 @@ export default function VerificationRequestDetail() {
             const res = await getDocumentBlob(req.id);
             if (tab) {
                 showBlobInTab(tab, res.data);
-                load(); // T-3: BE vừa ghi nhận đã xem -> mở khóa bước Check / Reject
+                load(); // FR-13: BE vừa ghi nhận đã xem -> mở khóa bước Check / Reject
             } else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
         } catch (e) {
             if (tab) tab.close();
@@ -201,13 +204,59 @@ export default function VerificationRequestDetail() {
     }
 
     const dialog = confirm ? CONFIRM_TEXT[confirm] : null;
-    // T-3: bắt buộc View → Check (hợp lệ) → Approve; Reject chỉ cần đã View
+    // FR-13: bắt buộc View → Check (hợp lệ) → Approve; Reject chỉ cần đã View
     const isPending = req.status === 'PENDING';
     const canApprove = isPending && req.documentViewed && req.documentChecked && req.documentValid === true;
     const checkResult = docCheck ?? (req.documentChecked
         ? { valid: req.documentValid === true, message: '' } : null);
     // BE mới trả vaults (id + tên); dự phòng về vaultIds nếu thiếu
     const vaultList = req.vaults ?? (req.vaultIds ?? []).map((id) => ({ id, name: null }));
+
+    // Form từ chối: dùng cho hồ sơ PENDING và cho hồ sơ APPROVED của chính verifier đã duyệt (FR-12)
+    const rejectBlock = (
+        <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-2">
+            <label htmlFor="reject-reason" className="text-sm text-on-surface-variant">Rejection reason</label>
+            <select
+                id="reject-reason"
+                value={rejectChoice}
+                onChange={(e) => setRejectChoice(e.target.value)}
+                className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+            >
+                <option value="">Select a reason...</option>
+                {rejectReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+            </select>
+            {reasonsError && (
+                <div role="alert" className="text-sm text-error flex items-center gap-2">
+                    Could not load the rejection reasons.
+                    <button type="button" onClick={loadReasons} className="font-semibold underline">Retry</button>
+                </div>
+            )}
+
+            {rejectChoice === REJECT_REASON_OTHER && (
+                <>
+                    <textarea
+                        rows={3}
+                        maxLength={500}
+                        placeholder="Enter a note for this reason..."
+                        value={rejectNote}
+                        onChange={(e) => setRejectNote(e.target.value)}
+                        aria-label="Rejection note"
+                        className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+                    />
+                    <span className="text-xs text-outline text-right">{rejectNote.length}/500</span>
+                </>
+            )}
+
+            <button
+                onClick={askReject}
+                disabled={busy || (isPending && !req.documentViewed)}
+                title={isPending && !req.documentViewed ? 'View the document first' : undefined}
+                className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
+            >
+                Reject request
+            </button>
+        </div>
+    );
 
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased">
@@ -330,42 +379,7 @@ export default function VerificationRequestDetail() {
                                     Approve request
                                 </button>
 
-                                <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-2">
-                                    <label htmlFor="reject-reason" className="text-sm text-on-surface-variant">Rejection reason</label>
-                                    <select
-                                        id="reject-reason"
-                                        value={rejectChoice}
-                                        onChange={(e) => setRejectChoice(e.target.value)}
-                                        className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
-                                    >
-                                        <option value="">Select a reason...</option>
-                                        {rejectReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
-                                    </select>
-
-                                    {rejectChoice === REJECT_REASON_OTHER && (
-                                        <>
-                                            <textarea
-                                                rows={3}
-                                                maxLength={500}
-                                                placeholder="Enter a note for this reason..."
-                                                value={rejectNote}
-                                                onChange={(e) => setRejectNote(e.target.value)}
-                                                aria-label="Rejection note"
-                                                className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
-                                            />
-                                            <span className="text-xs text-outline text-right">{rejectNote.length}/500</span>
-                                        </>
-                                    )}
-
-                                    <button
-                                        onClick={askReject}
-                                        disabled={busy || !req.documentViewed}
-                                        title={req.documentViewed ? undefined : 'View the document first'}
-                                        className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
-                                    >
-                                        Reject request
-                                    </button>
-                                </div>
+                                {rejectBlock}
                             </div>
                         )}
 
@@ -414,6 +428,9 @@ export default function VerificationRequestDetail() {
                                         </button>
                                     </form>
                                 )}
+
+                                {/* Chỉ verifier đã duyệt mới xem được hồ sơ APPROVED, nên được phép từ chối trước khi ký */}
+                                {rejectBlock}
                             </div>
                         )}
 

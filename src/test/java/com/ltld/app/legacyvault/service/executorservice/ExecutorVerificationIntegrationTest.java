@@ -115,6 +115,9 @@ class ExecutorVerificationIntegrationTest {
         jdbcTemplate.update("DELETE rv FROM verification_request_vaults rv "
                 + "JOIN legal_verification_requests r ON rv.request_id = r.id "
                 + "WHERE r.owner_id = UUID_TO_BIN(?)", owner.getId().toString());
+        jdbcTemplate.update("DELETE p FROM verification_review_progress p "
+                + "JOIN legal_verification_requests r ON p.request_id = r.id "
+                + "WHERE r.owner_id = UUID_TO_BIN(?)", owner.getId().toString());
         jdbcTemplate.update("DELETE FROM legal_verification_requests WHERE owner_id = UUID_TO_BIN(?)", owner.getId().toString());
         executorAssignmentRepository.deleteAll(executorAssignmentRepository.findAllByOwnerId(owner.getId()));
         vaultRepository.deleteAll(vaultRepository.findAll().stream()
@@ -144,7 +147,7 @@ class ExecutorVerificationIntegrationTest {
         LegalVerificationRequest stored = legalVerificationRequestRepository.findById(res.getId()).orElseThrow();
         assertThat(stored.getDeathCertificateFileUrlEncrypted()).endsWith(".pdf");
 
-        // T-3: phải View trước khi Check
+        // FR-13: phải View trước khi Check
         legalVerificationService.getDocument(res.getId(), verifier.getId());
         DocumentVerificationResponseDto verification =
                 legalVerificationService.verifyDocument(res.getId(), verifier.getId());

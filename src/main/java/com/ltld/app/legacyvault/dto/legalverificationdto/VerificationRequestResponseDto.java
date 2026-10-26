@@ -26,7 +26,7 @@ public class VerificationRequestResponseDto {
     private String rejectionReason;
     private LocalDateTime decidedAt;
     private LocalDateTime createdAt;
-    // T-3: tiến độ View → Check của chính verifier đang xem (FE bật/tắt nút Approve)
+    // FR-13: tiến độ View → Check của chính verifier đang xem (FE bật/tắt nút Approve)
     private boolean documentViewed;
     private boolean documentChecked;
     private Boolean documentValid;         // null nếu verifier này chưa Check
