@@ -21,6 +21,7 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Query("""
         SELECT r FROM LegalVerificationRequest r JOIN FETCH r.owner o JOIN FETCH r.executor e
         WHERE r.status = :status AND o.id <> :verifierId AND e.id <> :verifierId
+        ORDER BY r.createdAt ASC
     """)
     List<LegalVerificationRequest> findPendingVisibleTo(@Param("status") LegalVerificationStatus status,
                                                         @Param("verifierId") UUID verifierId);

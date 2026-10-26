@@ -8,12 +8,14 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequest
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import java.nio.charset.StandardCharsets;
@@ -144,7 +146,12 @@ public class LegalVerificationController {
     }
 
     // userId nằm ở claim "sub" của token
+    // D7: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+        }
     }
 }

@@ -281,4 +281,26 @@ class VerifierMessageControllerSecurityTest {
         mockMvc.perform(get("/api/verifier/requests/{id}/document/verify", requestId).with(validVerifier()))
                 .andExpect(status().is4xxClientError());
     }
+
+    // ---------- D7: sub sai định dạng -> 401, không phải 500 ----------
+
+    private static RequestPostProcessor badSubjectVerifier() {
+        return jwt().jwt(j -> j.subject("khong-phai-uuid"))
+                .authorities(new SimpleGrantedAuthority("ROLE_LEGAL_VERIFIER"),
+                        new SimpleGrantedAuthority("LEGAL_REVIEW"));
+    }
+
+    @Test
+    void summary_badSubject_returns401() throws Exception {
+        mockMvc.perform(get(SUMMARY_URL).with(badSubjectVerifier()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(legalVerificationService);
+    }
+
+    @Test
+    void messages_badSubject_returns401() throws Exception {
+        mockMvc.perform(get(MESSAGES_URL, requestId).with(badSubjectVerifier()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(verifierMessageService);
+    }
 }

@@ -68,13 +68,13 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
         String content = normalize(body == null ? null : body.getContent());
         boolean hasFile = file != null && !file.isEmpty();
         if (content == null && !hasFile) {
-            throw new InvalidVerificationDocumentException("Message content or attachment is required.");
+            throw new InvalidVerificationDocumentException("Vui lòng nhập nội dung hoặc đính kèm tệp.");
         }
 
         // n2: kiểm quyền trước, người không có quyền không làm server tốn công đọc/mã hóa file
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         if (!OPEN_STATUSES.contains(request.getStatus())) {
-            throw new VerificationRequestClosedException("This verification request is closed.");
+            throw new VerificationRequestClosedException("Hồ sơ xác minh này đã đóng.");
         }
 
         byte[] encrypted = null;
@@ -83,7 +83,7 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
         }
 
         User verifier = userRepository.findById(verifierId)
-                .orElseThrow(() -> new IllegalStateException("Verifier not found."));
+                .orElseThrow(() -> new IllegalStateException("Không tìm thấy Legal Verifier."));
 
         String storedPath = null;
         if (hasFile) {
@@ -92,7 +92,7 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
             } catch (RuntimeException e) {
                 throw e; // giữ nguyên kiểu, để handler map đúng mã lỗi
             } catch (Exception e) {
-                throw new IllegalStateException("Failed to store verification attachment", e);
+                throw new IllegalStateException("Không thể lưu tệp đính kèm. Vui lòng thử lại sau.", e);
             }
             registerCleanupOnRollback(storedPath);
         }
@@ -126,7 +126,7 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
 
         VerificationExchangeMessage message = messageRepository.findByIdAndRequestId(messageId, requestId)
                 .filter(m -> m.getAttachmentPath() != null)
-                .orElseThrow(() -> new VerificationRequestNotFoundException("Attachment not found."));
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy tệp đính kèm."));
 
         byte[] plain;
         try {
@@ -170,7 +170,7 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
         try {
             return cryptoService.encryptBytes(plain);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to send verification message", e);
+            throw new IllegalStateException("Không thể gửi tin nhắn. Vui lòng thử lại sau.", e);
         }
     }
 
