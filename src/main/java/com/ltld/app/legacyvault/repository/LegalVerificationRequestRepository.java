@@ -50,6 +50,17 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
                                                @Param("toTime") LocalDateTime toTime,
                                                Pageable pageable);
 
+    // B-02: id hồ sơ đã APPROVED nhưng chưa ký và quá hạn (decidedAt < cutoff)
+    @Query("""
+        SELECT r.id FROM LegalVerificationRequest r
+        WHERE r.status = :status AND r.decidedAt < :cutoff
+          AND NOT EXISTS (SELECT 1 FROM DigitalSignature s WHERE s.request = r)
+        ORDER BY r.decidedAt ASC
+    """)
+    List<UUID> findExpiredUnsignedIds(@Param("status") LegalVerificationStatus status,
+                                      @Param("cutoff") LocalDateTime cutoff,
+                                      Pageable pageable);
+
     // Khóa bi quan khi ký: tránh 2 request ký song song → lỗi 500
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM LegalVerificationRequest r WHERE r.id = :id")

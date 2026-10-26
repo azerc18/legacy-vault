@@ -81,6 +81,7 @@ public class AuditDescriptionBuilder {
             case ASSET_DELETED -> "Xóa tài sản số.";
             case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Tải xuống tài liệu thất bại." : "Tải xuống tài liệu.";
             case LEGAL_VERIFICATION_REQUESTED -> "Gửi yêu cầu xác minh pháp lý.";
+            case LEGAL_REQUEST_REOPENED -> "Hồ sơ xác minh quá hạn ký, được đưa về hàng chờ duyệt.";
             // FR-16: detail chứa email người nhận, không được hiển thị
             case BENEFICIARY_NOTIFIED -> "Đã gửi thông báo bàn giao cho người thụ hưởng.";
             case BENEFICIARY_NOTIFY_FAILED -> "Gửi thông báo cho người thụ hưởng thất bại.";

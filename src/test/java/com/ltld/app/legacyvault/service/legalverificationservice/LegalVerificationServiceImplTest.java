@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
 import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
@@ -140,7 +141,7 @@ public class LegalVerificationServiceImplTest {
         dto.setReason("Giấy chứng tử không hợp lệ");
 
         User verifierUser = User.builder().id(verifierId).build();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -150,11 +151,46 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
         assertThat(pendingRequest.getRejectionReason()).isEqualTo("Giấy chứng tử không hợp lệ");
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
+        // B-04: phát event để gửi mail cho Executor
+        verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
+                requestId, LegalVerificationStatus.REJECTED, "Giấy chứng tử không hợp lệ"));
+    }
+
+    // B-02: verifier đã duyệt được từ chối hồ sơ APPROVED chưa ký
+    @Test
+    void reject_approvedBySameVerifier_rejectsAndClearsSignOtp() {
+        approvedByVerifier();
+        pendingRequest.setSignOtpHash("hash");
+        pendingRequest.setSignAttempts(2);
+        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
+        dto.setReason("Phát hiện nghi vấn");
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
+        when(requestRepository.save(any(LegalVerificationRequest.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reject(requestId, verifierId, dto);
+
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
+        assertThat(pendingRequest.getSignOtpHash()).isNull();
+        assertThat(pendingRequest.getSignAttempts()).isZero();
+    }
+
+    // B-02: verifier khác không được từ chối hồ sơ đã APPROVED
+    @Test
+    void reject_approvedByAnotherVerifier_throwsNotAssignedVerifier() {
+        approvedByVerifier();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.reject(requestId, UUID.randomUUID(), new RejectVerificationRequestDto()))
+                .isInstanceOf(NotAssignedVerifierException.class);
+
+        verify(requestRepository, never()).save(any());
     }
 
     @Test
     void reject_requestNotFound_throwsNotFoundException() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.empty());
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId, new RejectVerificationRequestDto()))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
@@ -163,9 +199,9 @@ public class LegalVerificationServiceImplTest {
     }
 
     @Test
-    void reject_alreadyApproved_throwsAlreadyReviewedException() {
-        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+    void reject_alreadySigned_throwsAlreadyReviewedException() {
+        pendingRequest.setStatus(LegalVerificationStatus.SIGNED);
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId, new RejectVerificationRequestDto()))
                 .isInstanceOf(RequestAlreadyReviewedException.class);
@@ -175,7 +211,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void reject_verifierIsExecutor_throwsConflictOfInterest() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
         dto.setReason("test");
 
@@ -190,12 +226,17 @@ public class LegalVerificationServiceImplTest {
     @Test
     void approve_success_setsApprovedWithoutSigningOrUnlocking() {
         User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
+        handoverStillValid();
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         service.approve(requestId, verifierId);
+
+        // B-04: phát event để gửi mail cho Executor
+        verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
+                requestId, LegalVerificationStatus.APPROVED, null));
 
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
@@ -204,6 +245,19 @@ public class LegalVerificationServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_APPROVED), eq(AuditResult.SUCCESS),
                 eq(verifierId), eq("verifier@test.com"),
                 eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
+    }
+
+    // D4: DMS chưa TRIGGERED hoặc Executor không còn ACTIVE thì không được duyệt
+    @Test
+    void approve_handoverNoLongerValid_throwsConflictAndDoesNotSave() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.approve(requestId, verifierId))
+                .isInstanceOf(VaultStateConflictException.class);
+
+        verify(requestRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
