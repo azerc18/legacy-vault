@@ -1865,4 +1865,32 @@ public class BeneficiaryServiceImplTest {
         verify(notificationRepository, never()).save(any());
     }
 
+    @Test
+    void initializeClaim_reuseWindowIsTenMinutes_notFullTtl() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        BeneficiaryClaim existingClaim = BeneficiaryClaim.builder()
+                .id(UUID.randomUUID())
+                .vault(unlockedVault)
+                .status(ClaimStatus.PENDING)
+                .claimDeadlineAt(LocalDateTime.now().plusDays(5))
+                .build();
+        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(existingClaim));
+        // Không có phiên nào trong cửa sổ 10 phút → phải tạo phiên mới
+        when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(verificationRepository.save(any(IdentityVerification.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        LocalDateTime before = LocalDateTime.now();
+        beneficiaryService.initializeClaim(request, currentUserId);
+
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(verificationRepository)
+                .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
+                        any(), any(), any(), any(), cutoff.capture());
+        // Mốc cắt phải là ~10 phút trước (không phải 15 phút)
+        assertThat(cutoff.getValue()).isBetween(
+                before.minusMinutes(10).minusSeconds(2), LocalDateTime.now().minusMinutes(10).plusSeconds(2));
+        verify(verificationRepository).save(any(IdentityVerification.class));
+    }
 }

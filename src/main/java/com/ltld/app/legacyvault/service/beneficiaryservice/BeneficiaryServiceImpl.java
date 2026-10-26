@@ -50,6 +50,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -75,6 +77,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
     private static final int OTP_TTL_MINUTES = 5;
+    // B-05: chỉ dùng lại phiên PENDING khi còn đủ thời gian cho một OTP trọn vẹn
+    private static final int SESSION_REUSE_WINDOW_MINUTES = VERIFICATION_TTL_MINUTES - OTP_TTL_MINUTES;
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
     // FR-17 3b: khóa tạm; hết hạn sau LOCK_HOURS (cùng cửa sổ 24 giờ với bộ đếm lượt thử)
@@ -232,12 +236,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
         }
 
-        // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
+        // 4. Chống spam: chỉ dùng lại phiên PENDING còn đủ thời gian cho một OTP trọn vẹn.
+        //    Phiên cũ hơn mốc này không dùng lại (sendIdentityOtp sẽ từ chối), nên tạo phiên mới.
+        //    Phiên cũ vẫn là PENDING để lượt thử sai của nó còn được cộng vào giới hạn 5 lần / 24h.
+        LocalDateTime reusableAfter = LocalDateTime.now().minusMinutes(SESSION_REUSE_WINDOW_MINUTES);
         IdentityVerification verification = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                         vault.getId(), currentUserId, request.getVerificationMethod(),
-                        VerificationStatus.PENDING,
-                        LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES))
+                        VerificationStatus.PENDING, reusableAfter)
                 .orElseGet(() -> verificationRepository.save(
                         IdentityVerification.builder()
                                 .beneficiary(beneficiary)
@@ -295,8 +301,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
         verificationRepository.save(verification);
 
-        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log
-        emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
+        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log.
+        // Gửi sau commit để không gửi OTP cho một bản ghi chưa được lưu (TA3).
+        String recipient = vault.getBeneficiary().getEmail();
+        runAfterCommit(() -> {
+            try {
+                emailSender.sendEmail(recipient, otp);
+            } catch (Exception e) {
+                // Không log OTP. Người dùng có thể bấm gửi lại sau OTP_RESEND_SECONDS.
+                log.error("Gửi OTP danh tính thất bại, vaultId={}", vault.getId(), e);
+            }
+        });
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
                 vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
     }
@@ -767,5 +782,19 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpCode(null);
         verification.setOtpSentAt(null);
         verification.setOtpExpiresAt(null);
+    }
+
+    // Chạy sau khi transaction commit; không có transaction (unit test) thì chạy ngay
+    private void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 }
