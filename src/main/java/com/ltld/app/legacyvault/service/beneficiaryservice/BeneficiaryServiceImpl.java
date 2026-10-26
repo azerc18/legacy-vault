@@ -42,6 +42,7 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.AfterCommit;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
@@ -50,8 +51,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -77,7 +76,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
     private static final int OTP_TTL_MINUTES = 5;
-    // B-05: chỉ dùng lại phiên PENDING khi còn đủ thời gian cho một OTP trọn vẹn
+    // FR-17: only reuse a PENDING session that still has room for a full OTP
     private static final int SESSION_REUSE_WINDOW_MINUTES = VERIFICATION_TTL_MINUTES - OTP_TTL_MINUTES;
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
@@ -302,14 +301,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verificationRepository.save(verification);
 
         // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log.
-        // Gửi sau commit để không gửi OTP cho một bản ghi chưa được lưu (TA3).
+        // FR-17: send after commit so no code goes out for a rolled-back transaction.
+        UUID vaultId = vault.getId();
         String recipient = vault.getBeneficiary().getEmail();
-        runAfterCommit(() -> {
+        AfterCommit.run(() -> {
             try {
                 emailSender.sendEmail(recipient, otp);
             } catch (Exception e) {
-                // Không log OTP. Người dùng có thể bấm gửi lại sau OTP_RESEND_SECONDS.
-                log.error("Gửi OTP danh tính thất bại, vaultId={}", vault.getId(), e);
+                // Never log the OTP. The user can resend after OTP_RESEND_SECONDS.
+                log.error("FR-17: identity OTP mail failed, vaultId={}", vaultId, e);
+                auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.FAILURE, currentUserId,
+                        recipient, "Vault", vaultId.toString(), "mail delivery failed");
             }
         });
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
@@ -782,19 +784,5 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpCode(null);
         verification.setOtpSentAt(null);
         verification.setOtpExpiresAt(null);
-    }
-
-    // Chạy sau khi transaction commit; không có transaction (unit test) thì chạy ngay
-    private void runAfterCommit(Runnable action) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
-            });
-        } else {
-            action.run();
-        }
     }
 }

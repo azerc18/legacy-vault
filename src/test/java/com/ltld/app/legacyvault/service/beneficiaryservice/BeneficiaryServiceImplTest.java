@@ -60,6 +60,8 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -69,10 +71,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.contains;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.never;
@@ -709,6 +713,41 @@ public class BeneficiaryServiceImplTest {
         assertThat(saved.getOtpSentAt()).isNotNull();
         assertThat(saved.getOtpExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(4));
         verify(emailSender).sendEmail("beneficiary@example.com", "123456");
+    }
+
+    @Test
+    void sendIdentityOtp_mailFailure_doesNotPropagate_andAuditsFailure() {
+        currentBeneficiary.setEmail("beneficiary@example.com");
+        stubAccessibleVault();
+        stubPendingSession(pendingSession(VerificationMethod.OTP));
+        when(otpGenerator.generate()).thenReturn("123456");
+        doThrow(new RuntimeException("smtp down")).when(emailSender).sendEmail(any(), any());
+
+        assertThatCode(() -> beneficiaryService.sendIdentityOtp(request, currentUserId))
+                .doesNotThrowAnyException();
+
+        verify(auditLogService).log(eq(AuditAction.IDENTITY_OTP_SENT), eq(AuditResult.FAILURE),
+                eq(currentUserId), any(), eq("Vault"), any(), any());
+    }
+
+    @Test
+    void sendIdentityOtp_insideTransaction_mailSentOnlyAfterCommit() {
+        currentBeneficiary.setEmail("beneficiary@example.com");
+        stubAccessibleVault();
+        stubPendingSession(pendingSession(VerificationMethod.OTP));
+        when(otpGenerator.generate()).thenReturn("123456");
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            beneficiaryService.sendIdentityOtp(request, currentUserId);
+            verify(emailSender, never()).sendEmail(any(), any());
+
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+            verify(emailSender).sendEmail("beneficiary@example.com", "123456");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

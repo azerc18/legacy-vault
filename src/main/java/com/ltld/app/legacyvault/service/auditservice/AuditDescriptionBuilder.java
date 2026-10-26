@@ -86,7 +86,9 @@ public class AuditDescriptionBuilder {
             case BENEFICIARY_NOTIFY_FAILED -> "Gửi thông báo cho người thụ hưởng thất bại.";
             case BENEFICIARY_NOTIFY_GAVE_UP -> "Ngừng gửi thông báo cho người thụ hưởng sau nhiều lần thất bại.";
             case BENEFICIARY_PENDING_NOTIFIED -> "Đã gửi lời mời đăng ký tới người thụ hưởng (chưa có tài khoản).";
-            case IDENTITY_OTP_SENT -> "Gửi mã OTP xác minh danh tính người thụ hưởng.";
+            case IDENTITY_OTP_SENT -> isFailure(log)
+                    ? "Gửi mã OTP xác minh danh tính người thụ hưởng thất bại."
+                    : "Gửi mã OTP xác minh danh tính người thụ hưởng.";
             case IDENTITY_VERIFIED -> "Người thụ hưởng xác minh danh tính thành công.";
             case IDENTITY_VERIFY_FAILED -> "Người thụ hưởng xác minh danh tính thất bại.";
             case IDENTITY_LOCKED -> "Tạm khóa xác minh danh tính do nhập sai quá số lần cho phép.";
