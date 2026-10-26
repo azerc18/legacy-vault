@@ -1,13 +1,25 @@
 package com.ltld.app.legacyvault.dto.legalverificationdto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.ltld.app.legacyvault.enums.RejectionReason;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class RejectVerificationRequestDto {
 
-    @NotBlank(message = "Vui lòng nhập lý do từ chối")
-    @Size(max = 1000, message = "Lý do tối đa 1000 ký tự")
-    private String reason;
+    @NotNull(message = "Vui lòng chọn lý do từ chối")
+    private RejectionReason reason;
+
+    @Size(max = 500, message = "Ghi chú tối đa 500 ký tự")
+    private String note;
+
+    // Chọn "Lý do khác" thì bắt buộc nhập ghi chú
+    @JsonIgnore
+    @AssertTrue(message = "Vui lòng nhập ghi chú khi chọn lý do khác")
+    public boolean isNoteProvidedWhenOther() {
+        return reason != RejectionReason.OTHER || (note != null && !note.isBlank());
+    }
 }

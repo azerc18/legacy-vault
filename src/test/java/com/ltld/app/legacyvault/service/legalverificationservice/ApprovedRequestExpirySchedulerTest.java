@@ -58,6 +58,7 @@ class ApprovedRequestExpirySchedulerTest {
                 .verifier(User.builder().id(UUID.randomUUID()).build())
                 .decidedAt(decidedAt)
                 .signOtpHash("hash").signAttempts(3)
+                .documentViewedBy(UUID.randomUUID()).documentCheckedBy(UUID.randomUUID()).documentValid(true)
                 .build();
     }
 
@@ -81,6 +82,10 @@ class ApprovedRequestExpirySchedulerTest {
         assertThat(r.getDecidedAt()).isNull();
         assertThat(r.getSignOtpHash()).isNull();
         assertThat(r.getSignAttempts()).isZero();
+        // T-3: verifier mới phải View → Check lại
+        assertThat(r.getDocumentViewedBy()).isNull();
+        assertThat(r.getDocumentCheckedBy()).isNull();
+        assertThat(r.getDocumentValid()).isNull();
         verify(requestRepository).save(r);
         verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REOPENED), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), eq("LegalVerificationRequest"), eq(id.toString()), anyString());

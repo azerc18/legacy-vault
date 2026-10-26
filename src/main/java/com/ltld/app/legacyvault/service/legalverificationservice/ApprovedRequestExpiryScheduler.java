@@ -92,6 +92,12 @@ public class ApprovedRequestExpiryScheduler {
         r.setSignOtpExpiresAt(null);
         r.setSignOtpSentAt(null);
         r.setSignAttempts(0);
+        // T-3: verifier mới phải View → Check lại từ đầu
+        r.setDocumentViewedBy(null);
+        r.setDocumentViewedAt(null);
+        r.setDocumentCheckedBy(null);
+        r.setDocumentCheckedAt(null);
+        r.setDocumentValid(null);
         requestRepository.save(r);
         return true;
     }

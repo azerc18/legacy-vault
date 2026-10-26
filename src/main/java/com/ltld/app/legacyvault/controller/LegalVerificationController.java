@@ -2,6 +2,8 @@ package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.RejectionReasonDto;
+import com.ltld.app.legacyvault.enums.RejectionReason;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,8 +75,15 @@ public class LegalVerificationController {
         return ResponseEntity.ok(ApiResponse.success(service.getById(id, verifierId(jwt))));
     }
 
-    // UC13: xác thực tài liệu (mock) (trả 404 nếu xung đột lợi ích)
-    @GetMapping("/{id}/document/verify")
+    // T-4: danh sách lý do từ chối cho dropdown ở FE
+    @GetMapping("/rejection-reasons")
+    public ResponseEntity<ApiResponse<List<RejectionReasonDto>>> getRejectionReasons() {
+        return ResponseEntity.ok(ApiResponse.success(Arrays.stream(RejectionReason.values())
+                .map(r -> new RejectionReasonDto(r.name(), r.getLabel())).toList()));
+    }
+
+    // UC13 + T-3: kiểm tra tài liệu (POST vì ghi kết quả kiểm tra; 404 nếu xung đột lợi ích, 409 nếu chưa View)
+    @PostMapping("/{id}/document/verify")
     public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {

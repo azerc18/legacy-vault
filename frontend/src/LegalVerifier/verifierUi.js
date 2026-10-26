@@ -14,15 +14,8 @@ export const STATUS_CLASS = {
     REJECTED: 'bg-error-container text-on-error-container',
 };
 
-// Lý do từ chối có sẵn (chọn trong dropdown). OTHER = tự nhập.
-export const REJECT_REASON_OTHER = '__other__';
-export const REJECT_REASONS = [
-    'Death certificate is unclear or unreadable',
-    'Death certificate appears invalid or forged',
-    'Information does not match the vault owner',
-    'Missing required documents',
-    'Executor identity could not be confirmed',
-];
+// Danh sách lý do từ chối lấy từ BE (GET /rejection-reasons). OTHER = phải nhập ghi chú.
+export const REJECT_REASON_OTHER = 'OTHER';
 
 // BE trả LocalDateTime "2026-10-16T10:30:00"
 export function formatDate(value, withTime = false) {

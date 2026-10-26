@@ -144,6 +144,8 @@ class ExecutorVerificationIntegrationTest {
         LegalVerificationRequest stored = legalVerificationRequestRepository.findById(res.getId()).orElseThrow();
         assertThat(stored.getDeathCertificateFileUrlEncrypted()).endsWith(".pdf");
 
+        // T-3: phải View trước khi Check
+        legalVerificationService.getDocument(res.getId(), verifier.getId());
         DocumentVerificationResponseDto verification =
                 legalVerificationService.verifyDocument(res.getId(), verifier.getId());
         assertThat(verification.isValid()).isTrue();

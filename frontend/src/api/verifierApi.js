@@ -21,16 +21,20 @@ export async function getRequests() {
 // UC12: chi tiết (404 nếu không tồn tại hoặc xung đột lợi ích)
 export const getRequestById = (id) => http.get(`${BASE}/${id}`).then(unwrap);
 
-// UC13: kiểm tra giấy chứng tử (mock) -> { requestId, valid, message }
-export const verifyDocument = (id) => http.get(`${BASE}/${id}/document/verify`).then(unwrap);
+// UC13 + T-3: kiểm tra giấy chứng tử (POST, phải đã View trước, nếu không BE trả 409) -> { requestId, valid, message }
+export const verifyDocument = (id) => http.post(`${BASE}/${id}/document/verify`).then(unwrap);
 
 // D1: tải giấy chứng tử (trả về file, nên cần responseType blob)
 export const getDocumentBlob = (id) =>
     http.get(`${BASE}/${id}/document`, { responseType: 'blob' });
 
-// UC12: duyệt / từ chối (lý do bắt buộc, tối đa 1000 ký tự)
+// T-4: danh sách lý do từ chối cho dropdown -> [{ code, label }]
+export const getRejectionReasons = () => http.get(`${BASE}/rejection-reasons`).then(unwrap);
+
+// UC12: duyệt / từ chối. reason = code của lý do; note bắt buộc khi reason = OTHER (tối đa 500 ký tự)
 export const approveRequest = (id) => http.post(`${BASE}/${id}/approve`).then(unwrap);
-export const rejectRequest = (id, reason) => http.post(`${BASE}/${id}/reject`, { reason }).then(unwrap);
+export const rejectRequest = (id, reason, note) =>
+    http.post(`${BASE}/${id}/reject`, { reason, note: note || null }).then(unwrap);
 
 // UC14 bước 1: gửi mã ký 6 số qua email (hết hạn 5 phút, gửi lại sau 60s)
 export const sendSignOtp = (id) => http.post(`${BASE}/${id}/sign/otp`);
