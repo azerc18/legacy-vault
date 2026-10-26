@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
+import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
 import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
@@ -166,6 +167,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
+        assertHandoverStillValid(request); // FR-14: DMS còn TRIGGERED và Executor còn ACTIVE mới được duyệt
 
         User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
         request.setStatus(LegalVerificationStatus.APPROVED);
@@ -176,22 +178,30 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         auditLogService.log(AuditAction.LEGAL_REQUEST_APPROVED, AuditResult.SUCCESS,
                 verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), null);
+        eventPublisher.publishEvent(new VerificationRequestDecidedEvent(
+                requestId, LegalVerificationStatus.APPROVED, null)); // FR-12
 
         return toDto(request);
     }
 
-    // UC12: từ chối hồ sơ
+    // UC12: từ chối hồ sơ. FR-12: hồ sơ APPROVED chưa ký vẫn được từ chối, nhưng chỉ bởi verifier đã duyệt
     @Override
     @Transactional
     public VerificationRequestResponseDto reject(UUID requestId, UUID verifierId,
                                                  RejectVerificationRequestDto dto) {
-        LegalVerificationRequest request = findRequestOrThrow(requestId);
-        assertPending(request);
+        LegalVerificationRequest request = requestRepository.findByIdForUpdate(requestId)
+                .orElseThrow(() -> new VerificationRequestNotFoundException(
+                        "Không tìm thấy hồ sơ: " + requestId));
+        assertPendingOrApprovedUnsigned(request, verifierId);
         assertNoConflictOfInterest(request, verifierId);
 
         User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
         request.setStatus(LegalVerificationStatus.REJECTED);
         request.setVerifier(verifier);
+        request.setSignOtpHash(null);
+        request.setSignOtpExpiresAt(null);
+        request.setSignOtpSentAt(null);
+        request.setSignAttempts(0);
         request.setRejectionReason(dto.getReason());
         request.setDecidedAt(LocalDateTime.now());
         requestRepository.save(request);
@@ -199,6 +209,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         auditLogService.log(AuditAction.LEGAL_REQUEST_REJECTED, AuditResult.SUCCESS,
                 verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), "reason=" + dto.getReason());
+        eventPublisher.publishEvent(new VerificationRequestDecidedEvent(
+                requestId, LegalVerificationStatus.REJECTED, dto.getReason())); // FR-12
 
         return toDto(request);
     }
@@ -435,6 +447,21 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getStatus() != LegalVerificationStatus.PENDING) {
             throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
         }
+    }
+
+    // FR-12: PENDING thì ai cũng từ chối được; APPROVED (chưa ký) chỉ verifier đã duyệt mới được từ chối
+    private void assertPendingOrApprovedUnsigned(LegalVerificationRequest request, UUID verifierId) {
+        if (request.getStatus() == LegalVerificationStatus.PENDING) {
+            return;
+        }
+        if (request.getStatus() == LegalVerificationStatus.APPROVED) {
+            User approver = request.getVerifier();
+            if (approver == null || !approver.getId().equals(verifierId)) {
+                throw new NotAssignedVerifierException("Hồ sơ này đã được Verifier khác duyệt");
+            }
+            return;
+        }
+        throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
     }
 
     // D3: kiểm tra lại ngay trước khi mở khóa (phòng dữ liệu bị chèn tay hoặc đổi sau khi duyệt)
