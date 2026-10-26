@@ -167,7 +167,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
-        assertHandoverStillValid(request); // D4: DMS còn TRIGGERED và Executor còn ACTIVE mới được duyệt
+        assertHandoverStillValid(request); // FR-14: DMS còn TRIGGERED và Executor còn ACTIVE mới được duyệt
 
         User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
         request.setStatus(LegalVerificationStatus.APPROVED);
@@ -179,12 +179,12 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), null);
         eventPublisher.publishEvent(new VerificationRequestDecidedEvent(
-                requestId, LegalVerificationStatus.APPROVED, null)); // B-04
+                requestId, LegalVerificationStatus.APPROVED, null)); // FR-12
 
         return toDto(request);
     }
 
-    // UC12: từ chối hồ sơ. B-02: hồ sơ APPROVED chưa ký vẫn được từ chối, nhưng chỉ bởi verifier đã duyệt
+    // UC12: từ chối hồ sơ. FR-12: hồ sơ APPROVED chưa ký vẫn được từ chối, nhưng chỉ bởi verifier đã duyệt
     @Override
     @Transactional
     public VerificationRequestResponseDto reject(UUID requestId, UUID verifierId,
@@ -210,7 +210,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 verifierId, verifier.getEmail(),
                 "LegalVerificationRequest", requestId.toString(), "reason=" + dto.getReason());
         eventPublisher.publishEvent(new VerificationRequestDecidedEvent(
-                requestId, LegalVerificationStatus.REJECTED, dto.getReason())); // B-04
+                requestId, LegalVerificationStatus.REJECTED, dto.getReason())); // FR-12
 
         return toDto(request);
     }
@@ -449,7 +449,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         }
     }
 
-    // B-02: PENDING thì ai cũng từ chối được; APPROVED (chưa ký) chỉ verifier đã duyệt mới được từ chối
+    // FR-12: PENDING thì ai cũng từ chối được; APPROVED (chưa ký) chỉ verifier đã duyệt mới được từ chối
     private void assertPendingOrApprovedUnsigned(LegalVerificationRequest request, UUID verifierId) {
         if (request.getStatus() == LegalVerificationStatus.PENDING) {
             return;

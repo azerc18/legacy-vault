@@ -151,12 +151,12 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
         assertThat(pendingRequest.getRejectionReason()).isEqualTo("Giấy chứng tử không hợp lệ");
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
-        // B-04: phát event để gửi mail cho Executor
+        // FR-12: phát event để gửi mail cho Executor
         verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
                 requestId, LegalVerificationStatus.REJECTED, "Giấy chứng tử không hợp lệ"));
     }
 
-    // B-02: verifier đã duyệt được từ chối hồ sơ APPROVED chưa ký
+    // FR-12: verifier đã duyệt được từ chối hồ sơ APPROVED chưa ký
     @Test
     void reject_approvedBySameVerifier_rejectsAndClearsSignOtp() {
         approvedByVerifier();
@@ -174,9 +174,11 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
         assertThat(pendingRequest.getSignOtpHash()).isNull();
         assertThat(pendingRequest.getSignAttempts()).isZero();
+        verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
+                requestId, LegalVerificationStatus.REJECTED, "Phát hiện nghi vấn"));
     }
 
-    // B-02: verifier khác không được từ chối hồ sơ đã APPROVED
+    // FR-12: verifier khác không được từ chối hồ sơ đã APPROVED
     @Test
     void reject_approvedByAnotherVerifier_throwsNotAssignedVerifier() {
         approvedByVerifier();
@@ -186,6 +188,7 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(NotAssignedVerifierException.class);
 
         verify(requestRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -234,7 +237,7 @@ public class LegalVerificationServiceImplTest {
 
         service.approve(requestId, verifierId);
 
-        // B-04: phát event để gửi mail cho Executor
+        // FR-12: phát event để gửi mail cho Executor
         verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
                 requestId, LegalVerificationStatus.APPROVED, null));
 
@@ -247,7 +250,7 @@ public class LegalVerificationServiceImplTest {
                 eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
     }
 
-    // D4: DMS chưa TRIGGERED hoặc Executor không còn ACTIVE thì không được duyệt
+    // FR-14: DMS chưa TRIGGERED hoặc Executor không còn ACTIVE thì không được duyệt
     @Test
     void approve_handoverNoLongerValid_throwsConflictAndDoesNotSave() {
         when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
