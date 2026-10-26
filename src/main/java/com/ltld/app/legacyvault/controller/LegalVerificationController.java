@@ -2,16 +2,20 @@ package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.RejectionReasonDto;
+import com.ltld.app.legacyvault.enums.RejectionReason;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.service.legalverificationservice.LegalVerificationService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import java.nio.charset.StandardCharsets;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,8 +77,15 @@ public class LegalVerificationController {
         return ResponseEntity.ok(ApiResponse.success(service.getById(id, verifierId(jwt))));
     }
 
-    // UC13: xác thực tài liệu (mock) (trả 404 nếu xung đột lợi ích)
-    @GetMapping("/{id}/document/verify")
+    // FR-12: danh sách lý do từ chối cho dropdown ở FE
+    @GetMapping("/rejection-reasons")
+    public ResponseEntity<ApiResponse<List<RejectionReasonDto>>> getRejectionReasons() {
+        return ResponseEntity.ok(ApiResponse.success(Arrays.stream(RejectionReason.values())
+                .map(r -> new RejectionReasonDto(r.name(), r.getLabel())).toList()));
+    }
+
+    // UC13 + FR-13: kiểm tra tài liệu (POST vì ghi kết quả kiểm tra; 404 nếu xung đột lợi ích, 409 nếu chưa View)
+    @PostMapping("/{id}/document/verify")
     public ResponseEntity<ApiResponse<DocumentVerificationResponseDto>> verifyDocument(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -134,7 +146,12 @@ public class LegalVerificationController {
     }
 
     // userId nằm ở claim "sub" của token
+    // FR-12: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+        }
     }
 }

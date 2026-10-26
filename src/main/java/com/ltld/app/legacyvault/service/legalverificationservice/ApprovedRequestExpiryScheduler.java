@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,17 +38,20 @@ public class ApprovedRequestExpiryScheduler {
 
     private final LegalVerificationRequestRepository requestRepository;
     private final DigitalSignatureRepository signatureRepository;
+    private final VerificationReviewProgressRepository progressRepository;
     private final AuditLogService auditLogService;
     private final int expiryDays;
     private final TransactionTemplate requiresNewTx;
 
     public ApprovedRequestExpiryScheduler(LegalVerificationRequestRepository requestRepository,
                                           DigitalSignatureRepository signatureRepository,
+                                          VerificationReviewProgressRepository progressRepository,
                                           AuditLogService auditLogService,
                                           PlatformTransactionManager transactionManager,
                                           @Value("${app.verifier.approved-expiry-days:7}") int expiryDays) {
         this.requestRepository = requestRepository;
         this.signatureRepository = signatureRepository;
+        this.progressRepository = progressRepository;
         this.auditLogService = auditLogService;
         this.expiryDays = expiryDays;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
@@ -95,6 +99,8 @@ public class ApprovedRequestExpiryScheduler {
         r.setSignOtpExpiresAt(null);
         r.setSignOtpSentAt(null);
         r.setSignAttempts(0);
+        // FR-13: verifier mới phải View → Check lại: xóa tiến độ của mọi verifier
+        progressRepository.deleteByRequestId(r.getId());
         requestRepository.save(r);
         return true;
     }

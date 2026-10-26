@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
     getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
-    getDocumentBlob,
+    getDocumentBlob, getRejectionReasons,
 } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import {
-    STATUS_LABEL, STATUS_CLASS, formatDate, shortId, REJECT_REASONS, REJECT_REASON_OTHER,
+    STATUS_LABEL, STATUS_CLASS, formatDate, shortId, REJECT_REASON_OTHER,
 } from './verifierUi.js';
 import VerificationMessages from './VerificationMessages.jsx';
 import VerifierHeader from './VerifierHeader.jsx';
@@ -58,8 +58,10 @@ export default function VerificationRequestDetail() {
     const [checking, setChecking] = useState(false);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
-    const [rejectChoice, setRejectChoice] = useState('');   // '' | một lý do có sẵn | REJECT_REASON_OTHER
-    const [rejectOther, setRejectOther] = useState('');
+    const [rejectReasons, setRejectReasons] = useState([]);   // [{ code, label }] từ BE
+    const [reasonsError, setReasonsError] = useState(false);
+    const [rejectChoice, setRejectChoice] = useState('');   // '' | code lý do (OTHER = phải nhập ghi chú)
+    const [rejectNote, setRejectNote] = useState('');
     const [docCheck, setDocCheck] = useState(null);   // { valid, message }
     const [codeSent, setCodeSent] = useState(false);
     const [code, setCode] = useState('');
@@ -73,6 +75,13 @@ export default function VerificationRequestDetail() {
     }, [requestId]);
 
     useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
+
+    // FR-12: lý do từ chối lấy từ BE; lỗi thì báo và cho thử lại
+    const loadReasons = useCallback(() => {
+        setReasonsError(false);
+        getRejectionReasons().then(setRejectReasons).catch(() => setReasonsError(true));
+    }, []);
+    useEffect(() => { loadReasons(); }, [loadReasons]);
 
     // Khôi phục trạng thái "đã gửi mã" nếu vừa tải lại trang khi đang chờ ký
     useEffect(() => {
@@ -108,15 +117,14 @@ export default function VerificationRequestDetail() {
         }
     };
 
-    // Lý do từ chối cuối cùng: lý do có sẵn hoặc nội dung tự nhập
-    const rejectReason = rejectChoice === REJECT_REASON_OTHER ? rejectOther.trim() : rejectChoice;
+    const rejectNoteText = rejectNote.trim();
 
     const askApprove = () => { setError(''); setConfirm('approve'); };
 
     const askReject = () => {
         if (!rejectChoice) return setError('Please select a rejection reason.');
-        if (!rejectReason) return setError('Please enter a rejection reason.');
-        if (rejectReason.length > 1000) return setError('Reason must be at most 1000 characters.');
+        if (rejectChoice === REJECT_REASON_OTHER && !rejectNoteText) return setError('Please enter a note for the "other" reason.');
+        if (rejectNoteText.length > 500) return setError('Note must be at most 500 characters.');
         setError('');
         setConfirm('reject');
     };
@@ -131,7 +139,7 @@ export default function VerificationRequestDetail() {
     const doConfirmed = async () => {
         const action = confirm;
         if (action === 'approve') await run(() => approveRequest(req.id), 'Could not approve.');
-        if (action === 'reject') await run(() => rejectRequest(req.id, rejectReason), 'Could not reject.');
+        if (action === 'reject') await run(() => rejectRequest(req.id, rejectChoice, rejectNoteText), 'Could not reject.');
         if (action === 'sign') {
             const ok = await run(() => signRequest(req.id, code), 'Could not sign.', (message) => {
                 // Mã hết hạn / hết lượt thử: bỏ trạng thái "đã gửi mã", quay về nút Send code
@@ -149,7 +157,7 @@ export default function VerificationRequestDetail() {
 
     const handleCheckDocument = async () => {
         setBusy(true); setChecking(true); setError('');
-        try { setDocCheck(await verifyDocument(req.id)); }
+        try { setDocCheck(await verifyDocument(req.id)); await load(); }
         catch (e) { setError(getErrorMessage(e, 'Could not check the document.')); }
         finally { setBusy(false); setChecking(false); }
     };
@@ -163,8 +171,10 @@ export default function VerificationRequestDetail() {
         const tab = window.open('', '_blank');
         try {
             const res = await getDocumentBlob(req.id);
-            if (tab) showBlobInTab(tab, res.data);
-            else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
+            if (tab) {
+                showBlobInTab(tab, res.data);
+                load(); // FR-13: BE vừa ghi nhận đã xem -> mở khóa bước Check / Reject
+            } else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
         } catch (e) {
             if (tab) tab.close();
             setError(await getBlobErrorMessage(e, `Could not open the document (HTTP ${e.response?.status ?? 'no response'}).`));
@@ -194,8 +204,59 @@ export default function VerificationRequestDetail() {
     }
 
     const dialog = confirm ? CONFIRM_TEXT[confirm] : null;
+    // FR-13: bắt buộc View → Check (hợp lệ) → Approve; Reject chỉ cần đã View
+    const isPending = req.status === 'PENDING';
+    const canApprove = isPending && req.documentViewed && req.documentChecked && req.documentValid === true;
+    const checkResult = docCheck ?? (req.documentChecked
+        ? { valid: req.documentValid === true, message: '' } : null);
     // BE mới trả vaults (id + tên); dự phòng về vaultIds nếu thiếu
     const vaultList = req.vaults ?? (req.vaultIds ?? []).map((id) => ({ id, name: null }));
+
+    // Form từ chối: dùng cho hồ sơ PENDING và cho hồ sơ APPROVED của chính verifier đã duyệt (FR-12)
+    const rejectBlock = (
+        <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-2">
+            <label htmlFor="reject-reason" className="text-sm text-on-surface-variant">Rejection reason</label>
+            <select
+                id="reject-reason"
+                value={rejectChoice}
+                onChange={(e) => setRejectChoice(e.target.value)}
+                className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+            >
+                <option value="">Select a reason...</option>
+                {rejectReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+            </select>
+            {reasonsError && (
+                <div role="alert" className="text-sm text-error flex items-center gap-2">
+                    Could not load the rejection reasons.
+                    <button type="button" onClick={loadReasons} className="font-semibold underline">Retry</button>
+                </div>
+            )}
+
+            {rejectChoice === REJECT_REASON_OTHER && (
+                <>
+                    <textarea
+                        rows={3}
+                        maxLength={500}
+                        placeholder="Enter a note for this reason..."
+                        value={rejectNote}
+                        onChange={(e) => setRejectNote(e.target.value)}
+                        aria-label="Rejection note"
+                        className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
+                    />
+                    <span className="text-xs text-outline text-right">{rejectNote.length}/500</span>
+                </>
+            )}
+
+            <button
+                onClick={askReject}
+                disabled={busy || (isPending && !req.documentViewed)}
+                title={isPending && !req.documentViewed ? 'View the document first' : undefined}
+                className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
+            >
+                Reject request
+            </button>
+        </div>
+    );
 
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased">
@@ -256,14 +317,17 @@ export default function VerificationRequestDetail() {
                                     <span className="material-symbols-outlined text-success">check_circle</span>
                                     Document submitted by the Executor
                                 </span>
-                                <button
-                                    onClick={handleCheckDocument}
-                                    disabled={busy}
-                                    className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
-                                >
-                                    {checking ? 'Checking...' : 'Check document'}
-                                </button>
-                                {/* Luôn cho xem tài liệu thật: Check (mock theo đuôi file) chỉ là gợi ý */}
+                                {isPending && (
+                                    <button
+                                        onClick={handleCheckDocument}
+                                        disabled={busy || !req.documentViewed}
+                                        title={req.documentViewed ? undefined : 'View the document first'}
+                                        className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
+                                    >
+                                        {checking ? 'Checking...' : 'Check document'}
+                                    </button>
+                                )}
+                                {/* Bước 1: xem tài liệu thật (BE ghi nhận), sau đó mới Check / Reject / Approve */}
                                 <button
                                     onClick={handleViewDocument}
                                     disabled={busy || viewing}
@@ -275,10 +339,15 @@ export default function VerificationRequestDetail() {
                         ) : (
                             <p className="text-on-surface-variant">No death certificate attached.</p>
                         )}
-                        {docCheck && (
-                            <div className={`mt-4 p-3 rounded-lg text-sm ${docCheck.valid ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
-                                <b>{docCheck.valid ? 'Valid' : 'Invalid'}</b>{docCheck.message ? ` — ${docCheck.message}` : ''}
+                        {checkResult && (
+                            <div className={`mt-4 p-3 rounded-lg text-sm ${checkResult.valid ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
+                                <b>{checkResult.valid ? 'Valid' : 'Invalid'}</b>{checkResult.message ? ` — ${checkResult.message}` : ''}
                             </div>
+                        )}
+                        {isPending && !canApprove && (
+                            <p className="mt-3 text-sm text-on-surface-variant">
+                                Steps: 1) View document, 2) Check document, 3) Approve. Rejecting only needs step 1.
+                            </p>
                         )}
                     </section>
 
@@ -304,48 +373,13 @@ export default function VerificationRequestDetail() {
                             <div className="space-y-4">
                                 <button
                                     onClick={askApprove}
-                                    disabled={busy}
+                                    disabled={busy || !canApprove}
                                     className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
                                 >
                                     Approve request
                                 </button>
 
-                                <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-2">
-                                    <label htmlFor="reject-reason" className="text-sm text-on-surface-variant">Rejection reason</label>
-                                    <select
-                                        id="reject-reason"
-                                        value={rejectChoice}
-                                        onChange={(e) => setRejectChoice(e.target.value)}
-                                        className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
-                                    >
-                                        <option value="">Select a reason...</option>
-                                        {REJECT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                                        <option value={REJECT_REASON_OTHER}>Other (enter your own)</option>
-                                    </select>
-
-                                    {rejectChoice === REJECT_REASON_OTHER && (
-                                        <>
-                                            <textarea
-                                                rows={3}
-                                                maxLength={1000}
-                                                placeholder="Enter reason here..."
-                                                value={rejectOther}
-                                                onChange={(e) => setRejectOther(e.target.value)}
-                                                aria-label="Other rejection reason"
-                                                className="w-full px-4 py-2 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
-                                            />
-                                            <span className="text-xs text-outline text-right">{rejectOther.length}/1000</span>
-                                        </>
-                                    )}
-
-                                    <button
-                                        onClick={askReject}
-                                        disabled={busy}
-                                        className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
-                                    >
-                                        Reject request
-                                    </button>
-                                </div>
+                                {rejectBlock}
                             </div>
                         )}
 
@@ -394,6 +428,9 @@ export default function VerificationRequestDetail() {
                                         </button>
                                     </form>
                                 )}
+
+                                {/* Chỉ verifier đã duyệt mới xem được hồ sơ APPROVED, nên được phép từ chối trước khi ký */}
+                                {rejectBlock}
                             </div>
                         )}
 

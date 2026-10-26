@@ -32,6 +32,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -222,5 +223,84 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(jsonPath("$.data.awaitingSignature").value(2))
                 .andExpect(jsonPath("$.data.signed").value(150))
                 .andExpect(jsonPath("$.data.rejected").value(7));
+    }
+
+    // ---------- FR-12: GET /rejection-reasons ----------
+
+    private static final String REASONS_URL = "/api/verifier/requests/rejection-reasons";
+
+    @Test
+    void rejectionReasons_noToken_returns401() throws Exception {
+        mockMvc.perform(get(REASONS_URL)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void rejectionReasons_executorToken_returns403() throws Exception {
+        mockMvc.perform(get(REASONS_URL).with(token(UUID.randomUUID(), "ROLE_EXECUTOR")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectionReasons_validVerifier_returnsAllCodesWithLabels() throws Exception {
+        mockMvc.perform(get(REASONS_URL).with(validVerifier()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(6))
+                .andExpect(jsonPath("$.data[0].code").value("DOCUMENT_UNREADABLE"))
+                .andExpect(jsonPath("$.data[0].label").value("Tài liệu mờ, không đọc được"))
+                .andExpect(jsonPath("$.data[5].code").value("OTHER"));
+    }
+
+    // ---------- FR-12: validate lý do từ chối ----------
+
+    @Test
+    void reject_otherWithoutNote_returns400() throws Exception {
+        mockMvc.perform(post("/api/verifier/requests/{id}/reject", requestId).with(validVerifier())
+                        .contentType("application/json").content("{\"reason\":\"OTHER\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(legalVerificationService);
+    }
+
+    @Test
+    void reject_missingReason_returns400() throws Exception {
+        mockMvc.perform(post("/api/verifier/requests/{id}/reject", requestId).with(validVerifier())
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reject_otherWithNote_returns200() throws Exception {
+        mockMvc.perform(post("/api/verifier/requests/{id}/reject", requestId).with(validVerifier())
+                        .contentType("application/json").content("{\"reason\":\"OTHER\",\"note\":\"ly do\"}"))
+                .andExpect(status().isOk());
+    }
+
+    // ---------- FR-13: check tài liệu là POST ----------
+
+    @Test
+    void verifyDocument_getIsNoLongerAllowed() throws Exception {
+        mockMvc.perform(get("/api/verifier/requests/{id}/document/verify", requestId).with(validVerifier()))
+                .andExpect(status().is4xxClientError());
+    }
+
+    // ---------- FR-12: sub sai định dạng -> 401, không phải 500 ----------
+
+    private static RequestPostProcessor badSubjectVerifier() {
+        return jwt().jwt(j -> j.subject("khong-phai-uuid"))
+                .authorities(new SimpleGrantedAuthority("ROLE_LEGAL_VERIFIER"),
+                        new SimpleGrantedAuthority("LEGAL_REVIEW"));
+    }
+
+    @Test
+    void summary_badSubject_returns401() throws Exception {
+        mockMvc.perform(get(SUMMARY_URL).with(badSubjectVerifier()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(legalVerificationService);
+    }
+
+    @Test
+    void messages_badSubject_returns401() throws Exception {
+        mockMvc.perform(get(MESSAGES_URL, requestId).with(badSubjectVerifier()))
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(verifierMessageService);
     }
 }

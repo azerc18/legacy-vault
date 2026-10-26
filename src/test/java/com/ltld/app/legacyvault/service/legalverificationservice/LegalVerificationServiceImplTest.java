@@ -11,11 +11,13 @@ import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
+import com.ltld.app.legacyvault.entity.VerificationReviewProgress;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.enums.RejectionReason;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
@@ -28,12 +30,14 @@ import com.ltld.app.legacyvault.exception.RequestNotApprovedException;
 import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.exception.VerificationStepRequiredException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
@@ -47,6 +51,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
@@ -110,6 +115,12 @@ public class LegalVerificationServiceImplTest {
     @Mock
     private VerifierAccessGuard verifierAccessGuard;
 
+    @Mock
+    private VerificationReviewProgressRepository progressRepository;
+
+    @Mock
+    private ReviewProgressRecorder progressRecorder;
+
     @InjectMocks
     private LegalVerificationServiceImpl service;
 
@@ -133,12 +144,47 @@ public class LegalVerificationServiceImplTest {
                 .build();
     }
 
+    private VerificationReviewProgress progressOf(UUID verifier, boolean viewed, boolean checked, Boolean valid) {
+        return VerificationReviewProgress.builder()
+                .request(pendingRequest).verifierId(verifier)
+                .viewedAt(viewed ? LocalDateTime.now() : null)
+                .checkedAt(checked ? LocalDateTime.now() : null)
+                .documentValid(valid)
+                .build();
+    }
+
+    // FR-13: tiến độ của verifier hiện tại (bắt buộc dùng trong test, strict stubs)
+    private VerificationReviewProgress viewed() {
+        VerificationReviewProgress p = progressOf(verifierId, true, false, null);
+        when(progressRepository.findByRequestIdAndVerifierId(requestId, verifierId)).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    private VerificationReviewProgress viewedAndChecked() {
+        VerificationReviewProgress p = progressOf(verifierId, true, true, true);
+        when(progressRepository.findByRequestIdAndVerifierId(requestId, verifierId)).thenReturn(Optional.of(p));
+        return p;
+    }
+
+    // Tiến độ của verifier KHÁC: có thể không được đọc tới trong test
+    private void otherVerifierHasFullProgress(UUID other) {
+        lenient().when(progressRepository.findByRequestIdAndVerifierId(requestId, other))
+                .thenReturn(Optional.of(progressOf(other, true, true, true)));
+    }
+
+    private RejectVerificationRequestDto rejectDto(RejectionReason reason, String note) {
+        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
+        dto.setReason(reason);
+        dto.setNote(note);
+        return dto;
+    }
+
     // ---------- reject ----------
 
     @Test
     void reject_success_setsStatusRejectedAndSavesReason() {
-        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
-        dto.setReason("Giấy chứng tử không hợp lệ");
+        RejectVerificationRequestDto dto = rejectDto(RejectionReason.DOCUMENT_INVALID, null);
+        viewed();
 
         User verifierUser = User.builder().id(verifierId).build();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
@@ -149,11 +195,56 @@ public class LegalVerificationServiceImplTest {
         service.reject(requestId, verifierId, dto);
 
         assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
-        assertThat(pendingRequest.getRejectionReason()).isEqualTo("Giấy chứng tử không hợp lệ");
+        assertThat(pendingRequest.getRejectionReasonCode()).isEqualTo(RejectionReason.DOCUMENT_INVALID);
+        assertThat(pendingRequest.getRejectionReason()).isEqualTo(RejectionReason.DOCUMENT_INVALID.getLabel());
         assertThat(pendingRequest.getDecidedAt()).isNotNull();
+        // FR-12: audit chỉ ghi mã lý do
+        verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REJECTED), eq(AuditResult.SUCCESS),
+                eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()),
+                eq("reason=DOCUMENT_INVALID"));
         // FR-12: phát event để gửi mail cho Executor
         verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
-                requestId, LegalVerificationStatus.REJECTED, "Giấy chứng tử không hợp lệ"));
+                requestId, LegalVerificationStatus.REJECTED, RejectionReason.DOCUMENT_INVALID.getLabel()));
+    }
+
+    // FR-12: chọn "Lý do khác" kèm ghi chú -> cột text lưu "label: note", audit không ghi note
+    @Test
+    void reject_otherWithNote_savesLabelAndNote_auditHasNoNote() {
+        viewed();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
+        when(requestRepository.save(any(LegalVerificationRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reject(requestId, verifierId, rejectDto(RejectionReason.OTHER, "  Ảnh bị cắt góc  "));
+
+        assertThat(pendingRequest.getRejectionReasonCode()).isEqualTo(RejectionReason.OTHER);
+        assertThat(pendingRequest.getRejectionReason()).isEqualTo("Lý do khác: Ảnh bị cắt góc");
+        verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REJECTED), eq(AuditResult.SUCCESS),
+                eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()),
+                eq("reason=OTHER"));
+    }
+
+    // FR-13: từ chối hồ sơ PENDING khi chưa xem tài liệu -> 409
+    @Test
+    void reject_pendingNotViewed_throwsStepRequired() {
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.reject(requestId, verifierId,
+                rejectDto(RejectionReason.DOCUMENT_INVALID, null)))
+                .isInstanceOf(VerificationStepRequiredException.class);
+
+        verify(requestRepository, never()).save(any());
+    }
+
+    // FR-13: người khác đã xem thì không tính cho verifier này
+    @Test
+    void reject_pendingViewedByAnotherVerifier_throwsStepRequired() {
+        otherVerifierHasFullProgress(UUID.randomUUID());
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.reject(requestId, verifierId,
+                rejectDto(RejectionReason.DOCUMENT_INVALID, null)))
+                .isInstanceOf(VerificationStepRequiredException.class);
     }
 
     // FR-12: verifier đã duyệt được từ chối hồ sơ APPROVED chưa ký
@@ -162,8 +253,7 @@ public class LegalVerificationServiceImplTest {
         approvedByVerifier();
         pendingRequest.setSignOtpHash("hash");
         pendingRequest.setSignAttempts(2);
-        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
-        dto.setReason("Phát hiện nghi vấn");
+        RejectVerificationRequestDto dto = rejectDto(RejectionReason.SUSPECTED_FORGERY, null);
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
         when(requestRepository.save(any(LegalVerificationRequest.class)))
@@ -175,7 +265,7 @@ public class LegalVerificationServiceImplTest {
         assertThat(pendingRequest.getSignOtpHash()).isNull();
         assertThat(pendingRequest.getSignAttempts()).isZero();
         verify(eventPublisher).publishEvent(new VerificationRequestDecidedEvent(
-                requestId, LegalVerificationStatus.REJECTED, "Phát hiện nghi vấn"));
+                requestId, LegalVerificationStatus.REJECTED, RejectionReason.SUSPECTED_FORGERY.getLabel()));
     }
 
     // FR-12: verifier khác không được từ chối hồ sơ đã APPROVED
@@ -215,8 +305,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void reject_verifierIsExecutor_throwsConflictOfInterest() {
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
-        RejectVerificationRequestDto dto = new RejectVerificationRequestDto();
-        dto.setReason("test");
+        RejectVerificationRequestDto dto = rejectDto(RejectionReason.OTHER, "test");
 
         assertThatThrownBy(() -> service.reject(requestId, pendingRequest.getExecutor().getId(), dto))
                 .isInstanceOf(ConflictOfInterestException.class);
@@ -229,8 +318,9 @@ public class LegalVerificationServiceImplTest {
     @Test
     void approve_success_setsApprovedWithoutSigningOrUnlocking() {
         User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
+        viewedAndChecked();
         handoverStillValid();
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
         when(requestRepository.save(any(LegalVerificationRequest.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -253,7 +343,8 @@ public class LegalVerificationServiceImplTest {
     // FR-14: DMS chưa TRIGGERED hoặc Executor không còn ACTIVE thì không được duyệt
     @Test
     void approve_handoverNoLongerValid_throwsConflictAndDoesNotSave() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        viewedAndChecked();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.approve(requestId, verifierId))
@@ -263,10 +354,65 @@ public class LegalVerificationServiceImplTest {
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    // FR-13: thiếu bước nào thì 409, không lưu gì
+    @Test
+    void approve_notViewed_throwsStepRequired() {
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.approve(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verify(requestRepository, never()).save(any());
+    }
+
+    @Test
+    void approve_viewedButNotChecked_throwsStepRequired() {
+        viewed();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.approve(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verify(requestRepository, never()).save(any());
+    }
+
+    @Test
+    void approve_checkedInvalid_throwsStepRequired() {
+        viewedAndChecked().setDocumentValid(false);
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.approve(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verify(requestRepository, never()).save(any());
+    }
+
+    @Test
+    void approve_viewedAndCheckedByAnotherVerifier_throwsStepRequired() {
+        otherVerifierHasFullProgress(UUID.randomUUID());
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.approve(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+    }
+
+    // FR-13: B cũng đã View/Check thì A vẫn Approve được (tiến độ không đè lên nhau)
+    @Test
+    void approve_anotherVerifierAlsoProgressed_stillApprovesForMe() {
+        viewedAndChecked();
+        otherVerifierHasFullProgress(UUID.randomUUID());
+        User verifierUser = User.builder().id(verifierId).email("verifier@test.com").build();
+        handoverStillValid();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(verifierUser);
+        when(requestRepository.save(any(LegalVerificationRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approve(requestId, verifierId);
+
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
+    }
+
     @Test
     void approve_alreadyRejected_throwsAlreadyReviewedException() {
         pendingRequest.setStatus(LegalVerificationStatus.REJECTED);
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.approve(requestId, verifierId))
                 .isInstanceOf(RequestAlreadyReviewedException.class);
@@ -276,7 +422,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void approve_verifierIsOwner_throwsConflictOfInterest() {
-        when(requestRepository.findById(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.approve(requestId, ownerId))
                 .isInstanceOf(ConflictOfInterestException.class);
@@ -654,29 +800,63 @@ public class LegalVerificationServiceImplTest {
         when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
     }
 
+    private void documentContains(byte[] plain) throws Exception {
+        byte[] cipher = "cipher".getBytes();
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+    }
+
     @Test
-    void verifyDocument_supportedFormat_returnsValid() {
+    void verifyDocument_realPdfContent_returnsValidAndSavesResult() throws Exception {
+        VerificationReviewProgress progress = viewed();
         guardAllowsReading();
+        documentContains("%PDF-1.4 noi dung".getBytes());
 
         DocumentVerificationResponseDto result = service.verifyDocument(requestId, verifierId);
 
         assertThat(result.isValid()).isTrue();
+        assertThat(progress.getCheckedAt()).isNotNull();
+        assertThat(progress.getDocumentValid()).isTrue();
+        verify(progressRepository).save(progress);
     }
 
+    // FR-13: kiểm tra theo nội dung, tên file .pdf nhưng nội dung không phải PDF/ảnh -> không hợp lệ
     @Test
-    void verifyDocument_unsupportedFormat_returnsInvalid() {
-        pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.exe");
+    void verifyDocument_fakeExtensionButTextContent_returnsInvalid() throws Exception {
+        VerificationReviewProgress progress = viewed();
         guardAllowsReading();
+        documentContains("day chi la van ban".getBytes());
 
         assertThat(service.verifyDocument(requestId, verifierId).isValid()).isFalse();
+        assertThat(progress.getDocumentValid()).isFalse();
     }
 
     @Test
-    void verifyDocument_jpegFormat_returnsValid() {
-        pendingRequest.setDeathCertificateFileUrlEncrypted("enc://test.jpeg");
+    void verifyDocument_notViewed_throwsStepRequiredAndReadsNothing() throws Exception {
         guardAllowsReading();
 
-        assertThat(service.verifyDocument(requestId, verifierId).isValid()).isTrue();
+        assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verify(fileStorageService, never()).readFile(any());
+        verify(progressRepository, never()).save(any());
+    }
+
+    @Test
+    void verifyDocument_viewedByAnotherVerifier_throwsStepRequired() {
+        otherVerifierHasFullProgress(UUID.randomUUID());
+        guardAllowsReading();
+
+        assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+    }
+
+    @Test
+    void verifyDocument_notPending_throwsAlreadyReviewed() {
+        approvedByVerifier();
+        guardAllowsReading();
+
+        assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
+                .isInstanceOf(RequestAlreadyReviewedException.class);
     }
 
     @Test
@@ -686,6 +866,25 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    // FR-13: DTO cho FE chỉ tính tiến độ của chính verifier đang xem
+    @Test
+    void getById_progressIsPerVerifier() {
+        viewedAndChecked();
+        UUID other = UUID.randomUUID();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(verifierAccessGuard.requireReadable(requestId, other)).thenReturn(pendingRequest);
+
+        VerificationRequestResponseDto mine = service.getById(requestId, verifierId);
+        VerificationRequestResponseDto theirs = service.getById(requestId, other);
+
+        assertThat(mine.isDocumentViewed()).isTrue();
+        assertThat(mine.isDocumentChecked()).isTrue();
+        assertThat(mine.getDocumentValid()).isTrue();
+        assertThat(theirs.isDocumentViewed()).isFalse();
+        assertThat(theirs.isDocumentChecked()).isFalse();
+        assertThat(theirs.getDocumentValid()).isNull();
     }
 
     @Test
@@ -865,8 +1064,53 @@ public class LegalVerificationServiceImplTest {
         assertThat(dto.getContent()).isEqualTo(plain);
         assertThat(dto.getContentType()).isEqualTo("application/pdf");
         assertThat(dto.getFileName()).endsWith(".pdf");
+        // FR-13: ghi nhận verifier đã xem (dòng riêng của verifier này)
+        verify(progressRecorder).recordViewed(requestId, verifierId);
         verify(auditLogService).log(eq(AuditAction.LEGAL_DOCUMENT_VIEWED), eq(AuditResult.SUCCESS),
                 eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
+    }
+
+    // FR-13: đã có dòng tiến độ của mình thì không tạo lại, và không đụng tiến độ người khác
+    @Test
+    void getDocument_alreadyViewed_doesNotRecordAgain() throws Exception {
+        viewedAndChecked();
+        byte[] cipher = "c".getBytes();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn("%PDF-1.4".getBytes());
+
+        service.getDocument(requestId, verifierId);
+
+        verify(progressRecorder, never()).recordViewed(any(), any());
+    }
+
+    // FR-13: hai request song song cùng tạo dòng -> bên thua (unique) không bị lỗi
+    @Test
+    void getDocument_parallelCreateConflict_stillReturnsDocument() throws Exception {
+        byte[] cipher = "c".getBytes();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn("%PDF-1.4".getBytes());
+        doThrow(new DataIntegrityViolationException("duplicate")).when(progressRecorder)
+                .recordViewed(requestId, verifierId);
+
+        VerificationDocumentDto dto = service.getDocument(requestId, verifierId);
+
+        assertThat(dto.getContentType()).isEqualTo("application/pdf");
+    }
+
+    // FR-13: xem lại hồ sơ đã APPROVED không ghi tiến độ
+    @Test
+    void getDocument_approved_doesNotRecordProgress() throws Exception {
+        approvedByVerifier();
+        byte[] cipher = "c".getBytes();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn("%PDF-1.4".getBytes());
+
+        service.getDocument(requestId, verifierId);
+
+        verify(progressRecorder, never()).recordViewed(any(), any());
     }
 
     // FR-14: nhập sai mã -> báo còn bao nhiêu lần thử

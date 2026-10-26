@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,7 @@ class ApprovedRequestExpirySchedulerTest {
 
     @Mock private LegalVerificationRequestRepository requestRepository;
     @Mock private DigitalSignatureRepository signatureRepository;
+    @Mock private VerificationReviewProgressRepository progressRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
 
@@ -51,7 +53,7 @@ class ApprovedRequestExpirySchedulerTest {
     void setUp() {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         scheduler = new ApprovedRequestExpiryScheduler(requestRepository, signatureRepository,
-                auditLogService, transactionManager, EXPIRY_DAYS);
+                progressRepository, auditLogService, transactionManager, EXPIRY_DAYS);
     }
 
     private LegalVerificationRequest approved(LocalDateTime decidedAt) {
@@ -60,6 +62,7 @@ class ApprovedRequestExpirySchedulerTest {
                 .verifier(User.builder().id(UUID.randomUUID()).build())
                 .decidedAt(decidedAt)
                 .signOtpHash("hash").signAttempts(3)
+
                 .build();
     }
 
@@ -83,6 +86,8 @@ class ApprovedRequestExpirySchedulerTest {
         assertThat(r.getDecidedAt()).isNull();
         assertThat(r.getSignOtpHash()).isNull();
         assertThat(r.getSignAttempts()).isZero();
+        // FR-13: tiến độ View/Check của mọi verifier bị xóa
+        verify(progressRepository).deleteByRequestId(id);
         verify(requestRepository).save(r);
         verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REOPENED), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), eq("LegalVerificationRequest"), eq(id.toString()), anyString());
@@ -108,6 +113,7 @@ class ApprovedRequestExpirySchedulerTest {
 
         assertThat(r.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
         verify(requestRepository, never()).save(any());
+        verify(progressRepository, never()).deleteByRequestId(any());
         verify(auditLogService, never()).log(any(), any(), any(), any(), anyString(), anyString(), any());
     }
 
@@ -161,7 +167,7 @@ class ApprovedRequestExpirySchedulerTest {
     @Test
     void reopenExpired_usesConfiguredDays() {
         ApprovedRequestExpiryScheduler shortLived = new ApprovedRequestExpiryScheduler(requestRepository,
-                signatureRepository, auditLogService, transactionManager, 1);
+                signatureRepository, progressRepository, auditLogService, transactionManager, 1);
         when(requestRepository.findExpiredUnsignedIds(eq(LegalVerificationStatus.APPROVED),
                 eq(now.minusDays(1)), any(Pageable.class))).thenReturn(List.of());
 

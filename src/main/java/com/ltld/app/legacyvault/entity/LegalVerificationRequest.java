@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.entity;
 
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
+import com.ltld.app.legacyvault.enums.RejectionReason;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -39,6 +40,10 @@ public class LegalVerificationRequest {
 
     @Column(name = "rejection_reason", columnDefinition = "TEXT")
     private String rejectionReason;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rejection_reason_code", length = 40)
+    private RejectionReason rejectionReasonCode;
 
     @Column(name = "notes", length = 1000)
     private String notes;

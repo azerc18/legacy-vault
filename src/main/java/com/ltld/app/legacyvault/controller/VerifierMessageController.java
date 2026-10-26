@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
 import com.ltld.app.legacyvault.dto.executordto.VerificationMessageResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.service.legalverificationservice.VerifierMessageService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
@@ -36,7 +37,7 @@ public class VerifierMessageController {
     public ResponseEntity<ApiResponse<List<VerificationMessageResponse>>> history(
             @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Verification messages retrieved", service.history(id, verifierId(jwt))));
+                "Đã lấy danh sách trao đổi", service.history(id, verifierId(jwt))));
     }
 
     @PostMapping(value = "/{id}/messages", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -46,7 +47,7 @@ public class VerifierMessageController {
             @Valid @ModelAttribute SendVerificationMessageRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                "Verification message sent", service.send(id, verifierId(jwt), file, request)));
+                "Đã gửi tin nhắn", service.send(id, verifierId(jwt), file, request)));
     }
 
     @GetMapping("/{id}/messages/{messageId}/attachment")
@@ -63,7 +64,12 @@ public class VerifierMessageController {
                 .body(doc.getContent());
     }
 
+    // FR-12: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {
-        return UUID.fromString(jwt.getSubject());
+        try {
+            return UUID.fromString(jwt.getSubject());
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+        }
     }
 }
