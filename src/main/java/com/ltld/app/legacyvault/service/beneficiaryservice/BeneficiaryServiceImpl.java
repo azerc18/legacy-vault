@@ -42,6 +42,7 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.AfterCommit;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
@@ -75,6 +76,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
     private static final int OTP_TTL_MINUTES = 5;
+    // FR-17: only reuse a PENDING session that still has room for a full OTP
+    private static final int SESSION_REUSE_WINDOW_MINUTES = VERIFICATION_TTL_MINUTES - OTP_TTL_MINUTES;
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
     // FR-17 3b: khóa tạm; hết hạn sau LOCK_HOURS (cùng cửa sổ 24 giờ với bộ đếm lượt thử)
@@ -232,12 +235,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
         }
 
-        // 4. Chống spam: Tìm phiên PENDING còn hiệu lực
+        // 4. Chống spam: chỉ dùng lại phiên PENDING còn đủ thời gian cho một OTP trọn vẹn.
+        //    Phiên cũ hơn mốc này không dùng lại (sendIdentityOtp sẽ từ chối), nên tạo phiên mới.
+        //    Phiên cũ vẫn là PENDING để lượt thử sai của nó còn được cộng vào giới hạn 5 lần / 24h.
+        LocalDateTime reusableAfter = LocalDateTime.now().minusMinutes(SESSION_REUSE_WINDOW_MINUTES);
         IdentityVerification verification = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                         vault.getId(), currentUserId, request.getVerificationMethod(),
-                        VerificationStatus.PENDING,
-                        LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES))
+                        VerificationStatus.PENDING, reusableAfter)
                 .orElseGet(() -> verificationRepository.save(
                         IdentityVerification.builder()
                                 .beneficiary(beneficiary)
@@ -295,8 +300,20 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
         verificationRepository.save(verification);
 
-        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log
-        emailSender.sendEmail(vault.getBeneficiary().getEmail(), otp);
+        // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log.
+        // FR-17: send after commit so no code goes out for a rolled-back transaction.
+        UUID vaultId = vault.getId();
+        String recipient = vault.getBeneficiary().getEmail();
+        AfterCommit.run(() -> {
+            try {
+                emailSender.sendEmail(recipient, otp);
+            } catch (Exception e) {
+                // Never log the OTP. The user can resend after OTP_RESEND_SECONDS.
+                log.error("FR-17: identity OTP mail failed, vaultId={}", vaultId, e);
+                auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.FAILURE, currentUserId,
+                        recipient, "Vault", vaultId.toString(), "mail delivery failed");
+            }
+        });
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
                 vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
     }
