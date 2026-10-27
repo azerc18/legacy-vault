@@ -128,7 +128,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         assertPending(request);
         VerificationReviewProgress progress = progressOf(requestId, verifierId);
         if (progress == null || progress.getViewedAt() == null) {
-            throw new VerificationStepRequiredException("Vui lòng xem tài liệu trước khi kiểm tra.");
+            throw new VerificationStepRequiredException("Please view the document before checking it.");
         }
 
         byte[] plain = readDecryptedDocument(request, requestId);
@@ -142,8 +142,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .requestId(requestId)
                 .valid(valid)
                 .message(valid
-                        ? "Tài liệu hợp lệ"
-                        : "Tài liệu không hợp lệ (nội dung không phải PDF, JPG hoặc PNG)")
+                        ? "The document is valid"
+                        : "The document is invalid (content is not PDF, JPG or PNG)")
                 .build();
     }
 
@@ -153,7 +153,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                     fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
         } catch (Exception e) {
             log.error("Death certificate read/decrypt failed for request {}", requestId, e);
-            throw new IllegalStateException("Không thể đọc tài liệu. Vui lòng thử lại sau.");
+            throw new IllegalStateException("Could not read the document. Please try again later.");
         }
     }
 
@@ -174,7 +174,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             auditLogService.log(AuditAction.LEGAL_DOCUMENT_VIEWED, AuditResult.FAILURE,
                     verifierId, email, "LegalVerificationRequest", requestId.toString(),
                     "Read or decrypt failed");
-            throw new IllegalStateException("Không thể đọc tài liệu. Vui lòng thử lại sau.");
+            throw new IllegalStateException("Could not read the document. Please try again later.");
         }
 
         // FR-13: ghi nhận verifier đã xem (chỉ hồ sơ PENDING), không đụng tiến độ của verifier khác
@@ -239,7 +239,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getStatus() == LegalVerificationStatus.PENDING) {
             VerificationReviewProgress progress = progressOf(requestId, verifierId);
             if (progress == null || progress.getViewedAt() == null) {
-                throw new VerificationStepRequiredException("Vui lòng xem tài liệu trước khi từ chối.");
+                throw new VerificationStepRequiredException("Please view the document before rejecting.");
             }
         }
         RejectionReason reasonCode = dto.getReason();
@@ -274,20 +274,20 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestOrThrow(requestId);
 
         if (request.getStatus() != LegalVerificationStatus.APPROVED) {
-            throw new RequestNotApprovedException("Hồ sơ phải được phê duyệt trước khi yêu cầu mã ký.");
+            throw new RequestNotApprovedException("The request must be approved before requesting a signing code.");
         }
         if (request.getVerifier() == null || !verifierId.equals(request.getVerifier().getId())) {
-            throw new NotAssignedVerifierException("Chỉ Legal Verifier đã phê duyệt hồ sơ mới được yêu cầu mã ký.");
+            throw new NotAssignedVerifierException("Only the Legal Verifier who approved the request can request a signing code.");
         }
         if (signatureRepository.existsByRequestId(requestId)) {
-            throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó.");
+            throw new RequestAlreadyReviewedException("This request has already been signed.");
         }
 
         // D3 (n1): không gửi mã ký cho hồ sơ không thể ký, cũng không tốn lượt cooldown 60 giây
         assertHandoverStillValid(request);
 
         User verifier = userRepository.findById(verifierId)
-                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy thông tin verifier."));
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Verifier not found."));
 
         String otp = otpGenerator.generate();
         LocalDateTime now = LocalDateTime.now();
@@ -326,25 +326,25 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                                                SignVerificationRequestDto dto) {
         // N4: Chỉ chấp nhận method MOCK_OTP
         if (dto.getMethod() != SignatureMethod.MOCK_OTP) {
-            throw new InvalidSignCodeException("Phương thức ký hiện tại chỉ hỗ trợ MOCK_OTP.");
+            throw new InvalidSignCodeException("The only supported signing method is MOCK_OTP.");
         }
 
         // PESSIMISTIC_WRITE: khóa row, tránh 2 request ký song song gây lỗi 500
         LegalVerificationRequest request = requestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException(
-                        "Không tìm thấy hồ sơ: " + requestId));
+                        "Request not found: " + requestId));
 
         if (request.getStatus() != LegalVerificationStatus.APPROVED) {
-            throw new RequestNotApprovedException("Hồ sơ phải được phê duyệt trước khi ký");
+            throw new RequestNotApprovedException("The request must be approved before signing");
         }
         // Chỉ verifier đã phê duyệt mới được ký (FR-14 bước 1)
         if (request.getVerifier() == null
                 || !verifierId.equals(request.getVerifier().getId())) {
             throw new NotAssignedVerifierException(
-                    "Chỉ Legal Verifier đã phê duyệt hồ sơ mới được ký.");
+                    "Only the Legal Verifier who approved the request can sign it.");
         }
         if (signatureRepository.existsByRequestId(requestId)) {
-            throw new RequestAlreadyReviewedException("Hồ sơ này đã được ký trước đó");
+            throw new RequestAlreadyReviewedException("This request has already been signed");
         }
 
         // D3 (n1): kiểm tra DMS và Executor trước khi xác thực OTP,
@@ -355,7 +355,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getSignOtpHash() == null
                 || request.getSignOtpExpiresAt() == null
                 || LocalDateTime.now().isAfter(request.getSignOtpExpiresAt())) {
-            throw new InvalidSignCodeException("Mã xác nhận đã hết hạn hoặc chưa được tạo. Vui lòng yêu cầu mã mới.");
+            throw new InvalidSignCodeException("The confirmation code has expired or was not generated. Please request a new code.");
         }
 
         request.setSignAttempts(request.getSignAttempts() + 1);
@@ -365,7 +365,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
                     verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
-            throw new InvalidSignCodeException("Sai quá số lần cho phép. Vui lòng yêu cầu mã mới.");
+            throw new InvalidSignCodeException("Too many attempts. Please request a new code.");
         }
 
         if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
@@ -375,8 +375,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                     "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
             int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
             throw new InvalidSignCodeException(remaining > 0
-                    ? "Mã xác nhận không đúng. Còn " + remaining + " lần thử."
-                    : "Mã xác nhận không đúng. Đã hết lượt thử, vui lòng yêu cầu mã mới.");
+                    ? "Incorrect confirmation code. Attempts left: " + remaining + "."
+                    : "Incorrect confirmation code. No attempts left; please request a new code.");
         }
 
         // Xác thực thành công: hủy mã OTP đã dùng
@@ -386,7 +386,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         List<VerificationRequestVault> links =
                 requestVaultRepository.findByRequestIdFetchVault(requestId);
         if (links.isEmpty()) {
-            throw new VaultStateConflictException("Hồ sơ không gắn với Vault nào.");
+            throw new VaultStateConflictException("The request is not linked to any vault.");
         }
         List<Vault> invalid = links.stream()
                 .map(VerificationRequestVault::getVault)
@@ -396,7 +396,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .toList();
         if (!invalid.isEmpty()) {
             throw new VaultStateConflictException(
-                    "Có Vault không ở trạng thái cho phép mở khóa: "
+                    "Some vaults are not in a state that allows unlocking: "
                             + invalid.stream().map(v -> String.valueOf(v.getId())).toList());
         }
 
@@ -453,7 +453,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             LocalDate from, LocalDate to, int page, int size) {
 
         if (from != null && to != null && from.isAfter(to)) {
-            throw new InvalidDateRangeException("'from' phải trước hoặc bằng 'to'.");
+            throw new InvalidDateRangeException("'from' must be before or equal to 'to'.");
         }
 
         LocalDateTime fromTime = from == null ? HISTORY_MIN_TIME : from.atStartOfDay();
@@ -485,26 +485,26 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private LegalVerificationRequest findRequestOrThrow(UUID requestId) {
         return requestRepository.findById(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException(
-                        "Không tìm thấy hồ sơ: " + requestId));
+                        "Request not found: " + requestId));
     }
 
     private LegalVerificationRequest findRequestForUpdateOrThrow(UUID requestId) {
         return requestRepository.findByIdForUpdate(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException(
-                        "Không tìm thấy hồ sơ: " + requestId));
+                        "Request not found: " + requestId));
     }
 
     // FR-13: chính verifier này phải đã View và Check, và kết quả Check là hợp lệ
     private void assertViewedCheckedAndValid(LegalVerificationRequest request, UUID verifierId) {
         VerificationReviewProgress progress = progressOf(request.getId(), verifierId);
         if (progress == null || progress.getViewedAt() == null) {
-            throw new VerificationStepRequiredException("Vui lòng xem tài liệu trước khi phê duyệt.");
+            throw new VerificationStepRequiredException("Please view the document before approving.");
         }
         if (progress.getCheckedAt() == null) {
-            throw new VerificationStepRequiredException("Vui lòng kiểm tra tài liệu trước khi phê duyệt.");
+            throw new VerificationStepRequiredException("Please check the document before approving.");
         }
         if (!Boolean.TRUE.equals(progress.getDocumentValid())) {
-            throw new VerificationStepRequiredException("Tài liệu không hợp lệ, không thể phê duyệt.");
+            throw new VerificationStepRequiredException("The document is invalid and cannot be approved.");
         }
     }
 
@@ -527,7 +527,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     private void assertPending(LegalVerificationRequest request) {
         if (request.getStatus() != LegalVerificationStatus.PENDING) {
-            throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
+            throw new RequestAlreadyReviewedException("This request has already been processed");
         }
     }
 
@@ -539,11 +539,11 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getStatus() == LegalVerificationStatus.APPROVED) {
             User approver = request.getVerifier();
             if (approver == null || !approver.getId().equals(verifierId)) {
-                throw new NotAssignedVerifierException("Hồ sơ này đã được Verifier khác duyệt");
+                throw new NotAssignedVerifierException("This request has been reviewed by another verifier");
             }
             return;
         }
-        throw new RequestAlreadyReviewedException("Hồ sơ này đã được xử lý trước đó");
+        throw new RequestAlreadyReviewedException("This request has already been processed");
     }
 
     // D3: kiểm tra lại ngay trước khi mở khóa (phòng dữ liệu bị chèn tay hoặc đổi sau khi duyệt)
@@ -554,13 +554,13 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .map(c -> c.getStatus() == DmsStatus.TRIGGERED)
                 .orElse(false);
         if (!dmsTriggered) {
-            throw new VaultStateConflictException("Dead Man's Switch của Owner chưa được kích hoạt.");
+            throw new VaultStateConflictException("The owner's Dead Man's Switch has not been triggered.");
         }
 
         boolean executorActive = executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatus(
                 ownerId, request.getExecutor().getId(), ExecutorStatus.ACTIVE);
         if (!executorActive) {
-            throw new VaultStateConflictException("Executor của hồ sơ không còn quyền hoạt động với Owner này.");
+            throw new VaultStateConflictException("The executor of this request is no longer active for this owner.");
         }
     }
 
@@ -568,7 +568,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
         if (VerifierAccessGuard.isConflict(request, verifierId)) {
             throw new ConflictOfInterestException(
-                    "Bạn không được xử lý hồ sơ có liên quan đến chính mình.");
+                    "You cannot process a request that involves yourself.");
         }
     }
 

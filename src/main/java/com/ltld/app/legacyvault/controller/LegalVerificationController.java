@@ -113,7 +113,7 @@ public class LegalVerificationController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Đã phê duyệt hồ sơ", service.approve(id, verifierId(jwt))));
+                "Request approved", service.approve(id, verifierId(jwt))));
     }
 
     // UC12: từ chối
@@ -123,7 +123,7 @@ public class LegalVerificationController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody RejectVerificationRequestDto dto) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Đã từ chối", service.reject(id, verifierId(jwt), dto)));
+                "Request rejected", service.reject(id, verifierId(jwt), dto)));
     }
 
     // UC14: gửi OTP ký xác nhận mở khóa Vault qua email verifier
@@ -132,7 +132,7 @@ public class LegalVerificationController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         service.sendSignOtp(id, verifierId(jwt));
-        return ResponseEntity.ok(ApiResponse.success("Mã xác nhận đã được gửi đến email của bạn."));
+        return ResponseEntity.ok(ApiResponse.success("A confirmation code has been sent to your email."));
     }
 
     // UC14: ký xác nhận, mở khóa Vault
@@ -142,7 +142,7 @@ public class LegalVerificationController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody SignVerificationRequestDto dto) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Đã ký và mở khóa Vault", service.sign(id, verifierId(jwt), dto)));
+                "Signed and unlocked the vault", service.sign(id, verifierId(jwt), dto)));
     }
 
     // userId nằm ở claim "sub" của token
@@ -151,7 +151,7 @@ public class LegalVerificationController {
         try {
             return UUID.fromString(jwt.getSubject());
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new BusinessException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException("Invalid session.", HttpStatus.UNAUTHORIZED);
         }
     }
 }

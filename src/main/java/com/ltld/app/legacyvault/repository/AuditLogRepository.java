@@ -4,8 +4,11 @@ import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;
+import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.UUID;
 
 public interface AuditLogRepository extends Repository<AuditLog, UUID> {
@@ -62,4 +65,50 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
         @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
         Pageable pageable
     );
+
+    @Query(value = """
+    SELECT a FROM AuditLog a LEFT JOIN FETCH a.actor act
+    WHERE (:action IS NULL OR a.action = :action)
+      AND (:actorEmail IS NULL OR lower(act.email) LIKE :actorEmail)
+      AND (:ip IS NULL OR a.ipAddress = :ip)
+      AND a.createdAt >= :from AND a.createdAt <= :to
+    ORDER BY a.createdAt DESC, a.id DESC
+    """,
+            countQuery = """
+    SELECT COUNT(a) FROM AuditLog a LEFT JOIN a.actor act
+    WHERE (:action IS NULL OR a.action = :action)
+      AND (:actorEmail IS NULL OR lower(act.email) LIKE :actorEmail)
+      AND (:ip IS NULL OR a.ipAddress = :ip)
+      AND a.createdAt >= :from AND a.createdAt <= :to
+    """)
+    Page<AuditLog> searchForAdmin(@Param("action") AuditAction action, @Param("actorEmail") String actorEmail,
+                                  @Param("ip") String ip, @Param("from") Instant from, @Param("to") Instant to,
+                                  Pageable pageable);
+
+    java.util.List<AuditLog> findByActionInAndCreatedAtAfter(
+            java.util.Collection<AuditAction> actions, java.time.Instant after);
+
+    // Cảnh báo bất thường: đếm theo IP trong cửa sổ thời gian
+    interface IpCount { String getIp(); Long getTotal(); }
+
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT a.ipAddress AS ip, COUNT(a) AS total FROM AuditLog a " +
+                    "WHERE a.action = :action AND a.createdAt >= :since AND a.ipAddress IS NOT NULL " +
+                    "GROUP BY a.ipAddress HAVING COUNT(a) >= :threshold")
+    java.util.List<IpCount> countByIpSince(
+            @org.springframework.data.repository.query.Param("action") AuditAction action,
+            @org.springframework.data.repository.query.Param("since") java.time.Instant since,
+            @org.springframework.data.repository.query.Param("threshold") long threshold);
+
+    // Cảnh báo bất thường: đếm theo người làm trong cửa sổ thời gian
+    interface ActorCount { UUID getActorId(); Long getTotal(); }
+
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT a.actor.id AS actorId, COUNT(a) AS total FROM AuditLog a " +
+                    "WHERE a.action IN :actions AND a.createdAt >= :since AND a.actor IS NOT NULL " +
+                    "GROUP BY a.actor.id HAVING COUNT(a) >= :threshold")
+    java.util.List<ActorCount> countByActorSince(
+            @org.springframework.data.repository.query.Param("actions") java.util.Collection<AuditAction> actions,
+            @org.springframework.data.repository.query.Param("since") java.time.Instant since,
+            @org.springframework.data.repository.query.Param("threshold") long threshold);
 }

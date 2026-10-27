@@ -46,7 +46,7 @@ public class DigitalAssetController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         List<DigitalAssetResponse> list = digitalAssetService.listAssets(ownerId, vaultId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tài sản thành công", list));
+        return ResponseEntity.ok(ApiResponse.success("Assets retrieved successfully", list));
     }
 
     // FR-27: Chi tiết 1 tài sản (kèm secret đã giải mã)
@@ -59,7 +59,7 @@ public class DigitalAssetController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         DigitalAssetDetailResponse detail = digitalAssetService.getAsset(ownerId, vaultId, assetId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết tài sản thành công", detail));
+        return ResponseEntity.ok(ApiResponse.success("Asset details retrieved successfully", detail));
     }
 
     // FR-27: Thêm tài sản mới
@@ -73,7 +73,7 @@ public class DigitalAssetController {
         UUID ownerId = UUID.fromString(principal.getName());
         DigitalAssetResponse response = digitalAssetService.addAsset(ownerId, vaultId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Thêm tài sản thành công", response));
+                .body(ApiResponse.success("Asset added successfully", response));
     }
 
     // FR-27: Cập nhật tài sản
@@ -87,7 +87,7 @@ public class DigitalAssetController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         DigitalAssetResponse response = digitalAssetService.updateAsset(ownerId, vaultId, assetId, request);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật tài sản thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Asset updated successfully", response));
     }
 
     // FR-27: Xóa cứng tài sản
@@ -100,6 +100,6 @@ public class DigitalAssetController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         digitalAssetService.deleteAsset(ownerId, vaultId, assetId);
-        return ResponseEntity.ok(ApiResponse.success("Xóa tài sản thành công"));
+        return ResponseEntity.ok(ApiResponse.success("Asset deleted successfully"));
     }
 }

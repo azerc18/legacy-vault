@@ -30,10 +30,10 @@ public class CryptoServiceImpl implements CryptoService {
         try {
             raw = Base64.getDecoder().decode(base64Key.trim());
         } catch (IllegalArgumentException e) {
-            throw new IllegalStateException("app.security.crypto.master-key phải là chuỗi Base64", e);
+            throw new IllegalStateException("app.security.crypto.master-key must be a Base64 string", e);
         }
         if (raw.length != 32) {
-            throw new IllegalStateException("Master key phải đúng 32 byte (AES-256), hiện là " + raw.length);
+            throw new IllegalStateException("The master key must be exactly 32 bytes (AES-256), current length: " + raw.length);
         }
         this.key = new SecretKeySpec(raw, "AES");
     }
@@ -69,7 +69,7 @@ public class CryptoServiceImpl implements CryptoService {
     public byte[] decryptBytes(byte[] data) throws Exception {
         if (data == null) return null;
         if (data.length < HEADER_LEN + TAG_BITS / 8 || data[0] != VERSION) {
-            throw new GeneralSecurityException("Bản mã không đúng định dạng hoặc phiên bản");
+            throw new GeneralSecurityException("Invalid ciphertext format or version");
         }
         Cipher cipher = Cipher.getInstance(TRANSFORMATION);
         cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_BITS, data, 1, IV_LEN));

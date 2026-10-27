@@ -26,16 +26,16 @@ public class EmailSender {
     @Async
     public void sendEmail(String email, String otp) {
         send(email,
-                "Mã xác thực OTP - LegacyVault",
-                "Mã OTP của bạn là: " + otp);
+                "OTP verification code - LegacyVault",
+                "Your OTP code is: " + otp);
     }
 
     @Async
     public void sendPasswordResetEmail(String email, String otp) {
         send(email,
-                "Đặt lại mật khẩu - LegacyVault",
-                "Mã đặt lại mật khẩu của bạn là: " + otp
-                        + "\nNếu bạn không yêu cầu, hãy bỏ qua email này và cân nhắc đổi mật khẩu.");
+                "Reset your password - LegacyVault",
+                "Your password reset code is: " + otp
+                        + "\nIf you did not request this, ignore this email and consider changing your password.");
     }
 
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
@@ -43,20 +43,20 @@ public class EmailSender {
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
         String link = registerLink();
         sendWithoutOtpFooter(email,
-                "Lời mời trở thành người thụ hưởng - LegacyVault",
-                ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
-                        + "\nVui lòng đăng ký tài khoản (hoặc hoàn tất xác minh email nếu đã đăng ký) bằng chính địa chỉ email này"
-                        + " để được liên kết với Vault."
-                        + (link != null ? "\nĐăng ký tại: " + link : ""));
+                "Invitation to become a beneficiary - LegacyVault",
+                ownerName + " has named you the beneficiary of vault \"" + vaultName + "\" on LegacyVault."
+                        + "\nPlease register an account (or finish verifying your email if you have already registered) using this email address"
+                        + " so you can be linked to the vault."
+                        + (link != null ? "\nRegister at: " + link : ""));
     }
 
     // FR-02: thông báo cho người thụ hưởng đã có tài khoản
     @Async
     public void sendBeneficiaryAssignedNotice(String email, String ownerName, String vaultName) {
         sendWithoutOtpFooter(email,
-                "Bạn được chỉ định là người thụ hưởng - LegacyVault",
-                ownerName + " đã chỉ định bạn là người thụ hưởng của Vault \"" + vaultName + "\" trên LegacyVault."
-                        + "\nBạn sẽ nhận được thông báo khi Vault được mở khóa để bàn giao.");
+                "You have been named a beneficiary - LegacyVault",
+                ownerName + " has named you the beneficiary of vault \"" + vaultName + "\" on LegacyVault."
+                        + "\nYou will be notified when the vault is unlocked for handover.");
     }
 
     // FR-02 (bước 7): xác nhận cho Owner
@@ -64,10 +64,10 @@ public class EmailSender {
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
                                                       String beneficiaryEmail, boolean pendingRegistration) {
         sendWithoutOtpFooter(ownerEmail,
-                "Xác nhận chỉ định người thụ hưởng - LegacyVault",
-                "Bạn đã chỉ định " + beneficiaryEmail + " là người thụ hưởng của Vault \"" + vaultName + "\"."
+                "Beneficiary assignment confirmed - LegacyVault",
+                "You have named " + beneficiaryEmail + " as the beneficiary of vault \"" + vaultName + "\"."
                         + (pendingRegistration
-                        ? "\nNgười này chưa có tài khoản đã xác minh; hệ thống đã gửi lời mời đăng ký."
+                        ? "\nThis person does not have a verified account yet; a sign-up invitation has been sent."
                         : ""));
     }
 
@@ -90,41 +90,41 @@ public class EmailSender {
         String deadline = formatDeadline(claimDeadlineAt);
 
         StringBuilder body = new StringBuilder()
-                .append("Xin chào ").append(fullName == null ? "" : fullName).append(",\n\n")
-                .append("Hồ sơ \"").append(vaultName).append("\" của ").append(ownerName)
-                .append(" đã được mở khóa và bàn giao cho bạn trên LegacyVault.\n\n");
+                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
+                .append("The vault \"").append(vaultName).append("\" of ").append(ownerName)
+                .append(" has been unlocked and handed over to you on LegacyVault.\n\n");
 
         if (!accountActive) {
-            body.append("Tài khoản của bạn chưa được kích hoạt. ")
-                    .append("Vui lòng hoàn tất đăng ký và xác minh email trước, sau đó đăng nhập để nhận tài sản.\n");
+            body.append("Your account has not been activated yet. ")
+                    .append("Please complete registration and verify your email first, then sign in to claim the assets.\n");
             String registerLink = registerLink();
             if (registerLink != null) {
-                body.append("Đăng ký tại: ").append(registerLink).append("\n");
+                body.append("Register at: ").append(registerLink).append("\n");
             }
             body.append("\n");
         }
 
         String link = vaultLink(vaultId);
         if (link != null) {
-            body.append("Truy cập hồ sơ: ").append(link).append("\n\n");
+            body.append("Open the vault: ").append(link).append("\n\n");
         }
 
-        body.append("Cách nhận tài sản:\n")
-                .append("1. Đăng nhập LegacyVault bằng tài khoản Beneficiary.\n")
-                .append("2. Chọn hồ sơ được bàn giao và xác thực danh tính (mã OTP qua email hoặc eKYC).\n")
-                .append("3. Xem hoặc tải xuống tài sản, sau đó xác nhận đã nhận bàn giao.\n\n")
-                .append("Hạn nhận tài sản: ").append(deadline).append(" (GMT+7).\n")
-                .append("Sau thời hạn này, hồ sơ sẽ bị khóa lưu trữ và bạn không thể truy cập nội dung tài sản.\n\n")
-                .append("Vui lòng không chia sẻ email này với bất kỳ ai.");
+        body.append("How to claim the assets:\n")
+                .append("1. Sign in to LegacyVault with your beneficiary account.\n")
+                .append("2. Open the handed-over vault and verify your identity (email OTP or eKYC).\n")
+                .append("3. View or download the assets, then confirm you have received the handover.\n\n")
+                .append("Claim deadline: ").append(deadline).append(" (GMT+7).\n")
+                .append("After this deadline the vault will be archived and you will no longer be able to access the asset contents.\n\n")
+                .append("Please do not share this email with anyone.");
 
-        sendWithoutOtpFooter(email, "Tài sản số được bàn giao cho bạn - LegacyVault", body.toString());
+        sendWithoutOtpFooter(email, "Digital assets handed over to you - LegacyVault", body.toString());
     }
 
     public void sendVerificationRequestNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
-                "Hồ sơ xác minh mới - LegacyVault",
-                "Có hồ sơ xác minh mới cần xử lý. Mã hồ sơ: " + requestId
-                        + "\nVui lòng đăng nhập để xem chi tiết.");
+                "New verification request - LegacyVault",
+                "A new verification request needs review. Request ID: " + requestId
+                        + "\nPlease sign in to view the details.");
     }
 
     private String frontendBase() {
@@ -152,40 +152,40 @@ public class EmailSender {
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
         sendWithoutOtpFooter(email,
-                "Nhắc check-in Dead Man's Switch (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
-                "Bạn chưa check-in Dead Man's Switch trên LegacyVault."
-                        + "\nHạn check-in: " + formatDeadline(checkinDueAt) + " (giờ Việt Nam)"
-                        + "\nNếu bạn không phản hồi, hệ thống sẽ kích hoạt quy trình bàn giao vào lúc "
-                        + formatDeadline(triggerAt) + " (giờ Việt Nam) và gửi thông báo cho Digital Executor của bạn."
-                        + "\n\nĐể check-in, hãy đăng nhập LegacyVault và chọn \"Check-in\" trong mục Cài đặt Dead Man's Switch."
-                        + "\nĐây là lần nhắc thứ " + reminderNumber + " trên tổng số " + reminderCount + " lần.");
+                "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
+                "You have not checked in to your Dead Man's Switch on LegacyVault."
+                        + "\nCheck-in deadline: " + formatDeadline(checkinDueAt) + " (Vietnam time)"
+                        + "\nIf you do not respond, the system will start the handover process at "
+                        + formatDeadline(triggerAt) + " (Vietnam time) and notify your Digital Executor."
+                        + "\n\nTo check in, sign in to LegacyVault and choose \"Check-in\" in the Dead Man's Switch settings."
+                        + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
     }
 
     public void sendVerificationMessageNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
-                "Tin nhắn mới trong hồ sơ xác minh - LegacyVault",
-                "Có tin nhắn hoặc tệp bổ sung mới trong hồ sơ xác minh. Mã hồ sơ: " + requestId
-                        + "\nVui lòng đăng nhập để xem chi tiết.");
+                "New message in a verification request - LegacyVault",
+                "There is a new message or supporting file in a verification request. Request ID: " + requestId
+                        + "\nPlease sign in to view the details.");
     }
 
     // FR-06: method đồng bộ; bản thân listener AFTER_COMMIT đã chạy @Async, lỗi do listener bắt và log.
     // Không nêu tên Executor còn lại của Owner.
     public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
-        String role = type == ExecutorType.PRIMARY ? "Executor chính (PRIMARY)" : "Executor dự phòng (BACKUP)";
+        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
         sendWithoutOtpFooter(to,
-                "Bạn được chỉ định làm Digital Executor - LegacyVault",
-                ownerLabel(ownerName, ownerEmail) + " đã chỉ định bạn làm " + role + " trên LegacyVault."
-                        + "\nBạn chưa cần làm gì lúc này. Khi Dead Man's Switch của " + ownerDisplayName(ownerName, ownerEmail)
-                        + " được kích hoạt, hệ thống sẽ gửi thông báo để bạn đăng nhập và xác nhận tiếp nhận quy trình bàn giao."
-                        + "\nNếu bạn không biết người này, hãy liên hệ bộ phận hỗ trợ LegacyVault.");
+                "You have been assigned as a Digital Executor - LegacyVault",
+                ownerLabel(ownerName, ownerEmail) + " has assigned you as " + role + " on LegacyVault."
+                        + "\nYou do not need to do anything now. When the Dead Man's Switch of " + ownerDisplayName(ownerName, ownerEmail)
+                        + " is triggered, the system will notify you to sign in and accept the handover process."
+                        + "\nIf you do not know this person, please contact LegacyVault support.");
     }
 
     public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
-        String role = type == ExecutorType.PRIMARY ? "Executor chính (PRIMARY)" : "Executor dự phòng (BACKUP)";
+        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
         sendWithoutOtpFooter(to,
-                "Quyền Digital Executor của bạn đã bị thu hồi - LegacyVault",
-                ownerLabel(ownerName, ownerEmail) + " đã thu hồi vai trò " + role + " của bạn trên LegacyVault."
-                        + "\nTừ thời điểm này bạn không còn quyền thực hiện quy trình bàn giao cho "
+                "Your Digital Executor role has been revoked - LegacyVault",
+                ownerLabel(ownerName, ownerEmail) + " has revoked your " + role + " role on LegacyVault."
+                        + "\nFrom now on you can no longer carry out the handover process for "
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 
@@ -204,8 +204,8 @@ public class EmailSender {
         message.setTo(to);
         message.setSubject(subject);
         message.setText(body
-                + "\nMã có hiệu lực trong " + (OTP_EXPIRE_SECONDS / 60) + " phút."
-                + "\nVui lòng không chia sẻ mã này với bất kỳ ai.");
+                + "\nThe code is valid for " + (OTP_EXPIRE_SECONDS / 60) + " minutes."
+                + "\nPlease do not share this code with anyone.");
         javaMailSender.send(message);
     }
 

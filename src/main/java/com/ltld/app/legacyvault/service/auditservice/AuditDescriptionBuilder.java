@@ -28,8 +28,8 @@ public class AuditDescriptionBuilder {
     }
 
     String maskActorName(User actor, UUID vaultOwnerId) {
-        if (actor == null) return "Hệ thống";
-        if (actor.getId().equals(vaultOwnerId)) return "Bạn";
+        if (actor == null) return "System";
+        if (actor.getId().equals(vaultOwnerId)) return "You";
 
         boolean isAdmin = false;
         boolean isExecutor = false;
@@ -39,9 +39,9 @@ public class AuditDescriptionBuilder {
                 if ("EXECUTOR".equals(role.getCode())) isExecutor = true;
             }
         }
-        if (isAdmin) return "Quản trị viên hệ thống";
-        if (isExecutor) return "Người thi hành: " + actor.getFullName();
-        return "Người dùng khác";
+        if (isAdmin) return "System administrator";
+        if (isExecutor) return "Executor: " + actor.getFullName();
+        return "Another user";
     }
 
     String maskIpAddress(User actor, UUID vaultOwnerId, String ipAddress) {
@@ -58,59 +58,59 @@ public class AuditDescriptionBuilder {
             detail = (String) log.getMetadata().get("detail");
         }
         return switch (log.getAction()) {
-            case VAULT_CREATED -> "Khởi tạo két sắt mới.";
-            case VAULT_UPDATED -> "Cập nhật thông tin két sắt.";
-            case VAULT_DELETED -> "Xóa két sắt thành công.";
-            case VAULT_DELETE_DENIED -> "Từ chối xóa két sắt: " + (detail != null ? detail : "");
-            case DOCUMENT_UPLOADED -> "Tải lên tài liệu mới thành công.";
-            case DOCUMENT_DELETED -> "Xóa tài liệu thành công.";
-            case ADMIN_VAULT_VIEWED -> "Quản trị viên xem chi tiết két sắt.";
+            case VAULT_CREATED -> "Created a new vault.";
+            case VAULT_UPDATED -> "Updated vault details.";
+            case VAULT_DELETED -> "Deleted the vault.";
+            case VAULT_DELETE_DENIED -> "Vault deletion denied: " + (detail != null ? detail : "");
+            case DOCUMENT_UPLOADED -> "Uploaded a new document.";
+            case DOCUMENT_DELETED -> "Deleted a document.";
+            case ADMIN_VAULT_VIEWED -> "An administrator viewed the vault details.";
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
-            case BENEFICIARY_ASSIGNED -> "Chỉ định người thụ hưởng cho két sắt.";
-            case BENEFICIARY_REPLACED -> "Thay đổi người thụ hưởng của két sắt.";
-            case BENEFICIARY_ASSIGN_DENIED -> "Từ chối chỉ định người thụ hưởng.";
-            case BENEFICIARY_LINKED -> "Người thụ hưởng đã liên kết tài khoản với két sắt.";
-            case VAULT_UNLOCK -> "Két sắt được mở khóa sau khi xác minh pháp lý.";
-            case VAULT_ARCHIVED -> "Két sắt được lưu trữ do hết hạn nhận bàn giao.";
-            case CLAIM_COMPLETED -> "Người thụ hưởng đã hoàn tất nhận bàn giao.";
-            case ASSET_VIEWED -> "Xem chi tiết tài sản số.";
-            case ASSET_DOWNLOADED -> "Tải xuống tài sản số.";
+            case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
+            case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";
+            case BENEFICIARY_ASSIGN_DENIED -> "Beneficiary assignment denied.";
+            case BENEFICIARY_LINKED -> "The beneficiary linked their account to the vault.";
+            case VAULT_UNLOCK -> "The vault was unlocked after legal verification.";
+            case VAULT_ARCHIVED -> "The vault was archived because the claim period expired.";
+            case CLAIM_COMPLETED -> "The beneficiary completed the handover.";
+            case ASSET_VIEWED -> "Viewed digital asset details.";
+            case ASSET_DOWNLOADED -> "Downloaded a digital asset.";
             // FR-27: Owner quản lý tài sản số; không nối detail
-            case ASSET_CREATED -> "Thêm tài sản số mới.";
-            case ASSET_UPDATED -> "Cập nhật tài sản số.";
-            case ASSET_DELETED -> "Xóa tài sản số.";
-            case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Tải xuống tài liệu thất bại." : "Tải xuống tài liệu.";
-            case LEGAL_VERIFICATION_REQUESTED -> "Gửi yêu cầu xác minh pháp lý.";
-            case LEGAL_REQUEST_REOPENED -> "Hồ sơ xác minh quá hạn ký, được đưa về hàng chờ duyệt.";
+            case ASSET_CREATED -> "Added a new digital asset.";
+            case ASSET_UPDATED -> "Updated a digital asset.";
+            case ASSET_DELETED -> "Deleted a digital asset.";
+            case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Document download failed." : "Downloaded a document.";
+            case LEGAL_VERIFICATION_REQUESTED -> "Submitted a legal verification request.";
+            case LEGAL_REQUEST_REOPENED -> "The verification request missed its signing deadline and was returned to the review queue.";
             // FR-16: detail chứa email người nhận, không được hiển thị
-            case BENEFICIARY_NOTIFIED -> "Đã gửi thông báo bàn giao cho người thụ hưởng.";
-            case BENEFICIARY_NOTIFY_FAILED -> "Gửi thông báo cho người thụ hưởng thất bại.";
-            case BENEFICIARY_NOTIFY_GAVE_UP -> "Ngừng gửi thông báo cho người thụ hưởng sau nhiều lần thất bại.";
-            case BENEFICIARY_PENDING_NOTIFIED -> "Đã gửi lời mời đăng ký tới người thụ hưởng (chưa có tài khoản).";
+            case BENEFICIARY_NOTIFIED -> "Sent the handover notice to the beneficiary.";
+            case BENEFICIARY_NOTIFY_FAILED -> "Failed to notify the beneficiary.";
+            case BENEFICIARY_NOTIFY_GAVE_UP -> "Stopped notifying the beneficiary after repeated failures.";
+            case BENEFICIARY_PENDING_NOTIFIED -> "Sent a sign-up invitation to the beneficiary (no account yet).";
             case IDENTITY_OTP_SENT -> isFailure(log)
-                    ? "Gửi mã OTP xác minh danh tính người thụ hưởng thất bại."
-                    : "Gửi mã OTP xác minh danh tính người thụ hưởng.";
-            case IDENTITY_VERIFIED -> "Người thụ hưởng xác minh danh tính thành công.";
-            case IDENTITY_VERIFY_FAILED -> "Người thụ hưởng xác minh danh tính thất bại.";
-            case IDENTITY_LOCKED -> "Tạm khóa xác minh danh tính do nhập sai quá số lần cho phép.";
+                    ? "Failed to send the beneficiary identity verification OTP."
+                    : "Sent the beneficiary identity verification OTP.";
+            case IDENTITY_VERIFIED -> "The beneficiary verified their identity.";
+            case IDENTITY_VERIFY_FAILED -> "The beneficiary failed identity verification.";
+            case IDENTITY_LOCKED -> "Identity verification locked after too many failed attempts.";
             // FR-03 / FR-06 / FR-07: nhật ký cấp Owner; detail chứa ownerId và id nội bộ nên không nối
-            case DMS_CONFIGURED -> "Lưu cấu hình Dead Man's Switch.";
-            case DMS_CHECKIN -> "Check-in xác nhận vẫn còn hoạt động.";
-            case DMS_TRIGGERED -> "Dead Man's Switch được kích hoạt do quá hạn check-in.";
-            case DMS_TRIGGER_DEFERRED -> "Hoãn kích hoạt Dead Man's Switch 24 giờ do chủ hồ sơ chưa nhận được lần nhắc nào.";
-            case DMS_TRIGGERED_NO_EXECUTOR ->"Dead Man's Switch được kích hoạt nhưng không có người thi hành khả dụng.";
+            case DMS_CONFIGURED -> "Saved the Dead Man's Switch configuration.";
+            case DMS_CHECKIN -> "Checked in to confirm still active.";
+            case DMS_TRIGGERED -> "The Dead Man's Switch was triggered because the check-in deadline passed.";
+            case DMS_TRIGGER_DEFERRED -> "Dead Man's Switch activation postponed 24 hours because the owner has not received any reminder.";
+            case DMS_TRIGGERED_NO_EXECUTOR ->"The Dead Man's Switch was triggered but no executor is available.";
             // O5: detail chứa reason do Admin nhập nên không nối
-            case DMS_SUSPENDED -> "Quản trị viên tạm dừng Dead Man's Switch.";
-            case DMS_RESUMED -> "Quản trị viên mở lại Dead Man's Switch, bắt đầu chu kỳ check-in mới.";
-            case EXECUTOR_ASSIGNED -> "Chỉ định người thi hành.";
-            case EXECUTOR_REPLACED -> "Thay đổi người thi hành.";
+            case DMS_SUSPENDED -> "An administrator suspended the Dead Man's Switch.";
+            case DMS_RESUMED -> "An administrator resumed the Dead Man's Switch and started a new check-in cycle.";
+            case EXECUTOR_ASSIGNED -> "Assigned an executor.";
+            case EXECUTOR_REPLACED -> "Changed the executor.";
             // Owner thu hồi luôn ghi actor = Owner; BR-03 (FR-07 tự thu hồi Primary) ghi actor = null
             case EXECUTOR_REVOKE -> log.getActor() == null
-                    ? "Hệ thống tự động thu hồi người thi hành chính do không xác nhận đúng hạn."
-                    : "Thu hồi người thi hành.";
-            case EXECUTOR_ACTIVATED -> "Kích hoạt người thi hành sau khi Dead Man's Switch được kích hoạt.";
-            case EXECUTOR_ACKNOWLEDGED -> "Người thi hành đã xác nhận nhận thông báo kích hoạt.";
-            default -> "Thực hiện hành động: " + log.getAction();
+                    ? "The system automatically revoked the primary executor for not acknowledging in time."
+                    : "Revoked the executor.";
+            case EXECUTOR_ACTIVATED -> "Activated the executor after the Dead Man's Switch was triggered.";
+            case EXECUTOR_ACKNOWLEDGED -> "The executor acknowledged the activation notice.";
+            default -> "Performed action: " + log.getAction();
         };
     }
 

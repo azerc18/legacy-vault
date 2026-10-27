@@ -62,7 +62,7 @@ public class DocumentController {
             @PathVariable UUID vaultId) {
         UUID ownerId = UUID.fromString(principal.getName());
         List<DocumentResponse> documents = documentService.getDocumentsByVault(vaultId, ownerId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tài liệu thành công", documents));
+        return ResponseEntity.ok(ApiResponse.success("Documents retrieved successfully", documents));
     }
 
     // FR-04: Owner tải xuống và giải mã tài liệu (trả 404 nếu không phải chủ sở hữu)
@@ -93,6 +93,6 @@ public class DocumentController {
             @PathVariable UUID documentId) throws Exception {
         UUID ownerId = UUID.fromString(principal.getName());
         documentService.deleteDocument(documentId, ownerId);
-        return ResponseEntity.ok(ApiResponse.success("Xóa tài liệu thành công"));
+        return ResponseEntity.ok(ApiResponse.success("Document deleted successfully"));
     }
 }

@@ -29,11 +29,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AdminUserServiceImpl implements AdminUserService{
-    private static final Set<String> MANAGEABLE_ROLES = Set.of("LEGAL_VERIFIER", "ADMIN");
+    private static final Set<String> UNMANAGEABLE_ROLES = Set.of("OWNER", "BENEFICIARY", "EXECUTOR");
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final AuditLogService auditLogService;
+
 
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -43,12 +44,12 @@ public class AdminUserServiceImpl implements AdminUserService{
         String code = normalizeRole(roleCode);
         User user = lockUser(userId);
         if (user.getStatus() != UserStatus.ACTIVE) {
-            throw new AdminException("Chỉ gán role cho tài khoản đang ACTIVE", HttpStatus.CONFLICT);
+            throw new AdminException("Roles can only be granted to ACTIVE accounts", HttpStatus.CONFLICT);
         }
         boolean has = user.getRoles().stream().anyMatch(r -> code.equals(r.getCode()));
         if (!has) {
             Role role = roleRepository.findByCode(code)
-                    .orElseThrow(() -> new IllegalStateException("Role not found: " + code));
+                    .orElseThrow(() -> new AdminException("Role not found: " + code, HttpStatus.NOT_FOUND));
             user.getRoles().add(role);
             afterRbacChange(adminId, user, "GRANT " + code);
         }
@@ -60,7 +61,7 @@ public class AdminUserServiceImpl implements AdminUserService{
     public AdminUserResponse revokeRole(UUID adminId, UUID userId, String roleCode) {
         String code = normalizeRole(roleCode);
         if ("ADMIN".equals(code) && adminId.equals(userId)) {
-            throw new AdminException("Không thể tự gỡ quyền ADMIN của chính mình", HttpStatus.CONFLICT);
+            throw new AdminException("You cannot remove your own ADMIN role", HttpStatus.CONFLICT);
         }
         User user = lockUser(userId);
         if (user.getRoles().removeIf(r -> code.equals(r.getCode()))) {
@@ -77,13 +78,14 @@ public class AdminUserServiceImpl implements AdminUserService{
 
     private User lockUser(UUID userId) {
         return userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() -> new AdminException("Không tìm thấy người dùng", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new AdminException("User not found", HttpStatus.NOT_FOUND));
     }
 
     private static String normalizeRole(String roleCode) {
         String code = roleCode == null ? "" : roleCode.trim().toUpperCase(Locale.ROOT);
-        if (!MANAGEABLE_ROLES.contains(code)) {
-            throw new AdminException("Chỉ quản lý được role LEGAL_VERIFIER và ADMIN", HttpStatus.BAD_REQUEST);
+        if (code.isEmpty() || UNMANAGEABLE_ROLES.contains(code)) {
+            throw new AdminException("OWNER, BENEFICIARY and EXECUTOR roles cannot be granted or revoked manually",
+                    HttpStatus.BAD_REQUEST);
         }
         return code;
     }

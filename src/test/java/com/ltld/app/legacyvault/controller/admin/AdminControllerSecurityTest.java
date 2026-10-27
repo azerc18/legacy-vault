@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
+import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
@@ -35,12 +36,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AdminController.class)
 @Import(SecurityConfig.class)
+
 class AdminControllerSecurityTest {
 
     private static final UUID ADMIN_ID = UUID.randomUUID();
     private static final UUID USER_ID = UUID.randomUUID();
 
     @Autowired private MockMvc mockMvc;
+    @MockitoBean private AdminRoleService adminRoleService;
     @MockitoBean private AdminUserService adminUserService;
     @MockitoBean private DmsConfigService dmsConfigService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
@@ -114,7 +117,7 @@ class AdminControllerSecurityTest {
     @Test
     void revokeRole_selfAdmin_returns409() throws Exception {
         when(adminUserService.revokeRole(any(), any(), any()))
-                .thenThrow(new AdminException("Không thể tự gỡ quyền ADMIN của chính mình", HttpStatus.CONFLICT));
+                .thenThrow(new AdminException("You cannot remove your own ADMIN role", HttpStatus.CONFLICT));
 
         mockMvc.perform(delete("/api/admin/users/{id}/roles/{code}", ADMIN_ID, "ADMIN").with(admin()))
                 .andExpect(status().isConflict());
@@ -246,7 +249,7 @@ class AdminControllerSecurityTest {
     @Test
     void suspendDms_noConfig_returns404() throws Exception {
         when(dmsConfigService.suspendByAdmin(any(), any(), any()))
-                .thenThrow(new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+                .thenThrow(new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(put("/api/admin/dms/{ownerId}/suspend", USER_ID).with(admin()))
                 .andExpect(status().isNotFound());

@@ -259,7 +259,7 @@ class DmsConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
                 .isInstanceOf(DmsException.class)
-                .hasMessage("Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.")
+                .hasMessage("The Dead Man's Switch has been suspended by an administrator. Please contact an admin.")
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
         assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
@@ -285,7 +285,7 @@ class DmsConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
                 .isInstanceOf(DmsException.class)
-                .hasMessageContaining("yêu cầu khác")
+                .hasMessageContaining("another request")
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
         verifyNoInteractions(auditLogService);
     }
@@ -454,7 +454,7 @@ class DmsConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.checkIn(ownerId))
                 .isInstanceOf(DmsException.class)
-                .hasMessage("Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.")
+                .hasMessage("The Dead Man's Switch has been suspended by an administrator. Please contact an admin.")
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
         verifyNothingWritten();
     }

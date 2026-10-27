@@ -30,8 +30,8 @@ public class OwnerActivityLogServiceImpl implements OwnerActivityLogService {
         // Khoảng ngày giống nhật ký Vault: mặc định 30 ngày, tối đa 1 năm
         Instant to = endDate != null ? endDate : Instant.now();
         Instant from = startDate != null ? startDate : to.minus(30, ChronoUnit.DAYS);
-        if (from.isAfter(to)) throw new DmsException("Ngày bắt đầu phải trước ngày kết thúc.", HttpStatus.BAD_REQUEST);
-        if (Duration.between(from, to).toDays() > 365) throw new DmsException("Khoảng thời gian tối đa 1 năm.", HttpStatus.BAD_REQUEST);
+        if (from.isAfter(to)) throw new DmsException("Start date must be before end date.", HttpStatus.BAD_REQUEST);
+        if (Duration.between(from, to).toDays() > 365) throw new DmsException("The date range must be at most 1 year.", HttpStatus.BAD_REQUEST);
 
         // Lọc theo entity (DmsConfig / mọi ExecutorAssignment của Owner, kể cả REVOKED); Owner chưa có gì -> trang rỗng
         Page<AuditLog> logs = auditLogRepository.findOwnerActivity(ownerId,

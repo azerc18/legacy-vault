@@ -132,14 +132,14 @@ class OwnerActivityLogIntegrationTest {
                 .filteredOn(r -> r.getAction() == AuditAction.EXECUTOR_REVOKE)
                 .singleElement()
                 .satisfies(r -> {
-                    assertThat(r.getActorName()).isEqualTo("Hệ thống");
+                    assertThat(r.getActorName()).isEqualTo("System");
                     assertThat(r.getDescription()).isEqualTo(
-                            "Hệ thống tự động thu hồi người thi hành chính do không xác nhận đúng hạn.");
+                            "The system automatically revoked the primary executor for not acknowledging in time.");
                 });
         assertThat(logsA.getContent())
                 .filteredOn(r -> r.getAction() == AuditAction.DMS_CHECKIN)
                 .singleElement()
-                .satisfies(r -> assertThat(r.getActorName()).isEqualTo("Bạn"));
+                .satisfies(r -> assertThat(r.getActorName()).isEqualTo("You"));
     }
 
     @Test
@@ -159,8 +159,8 @@ class OwnerActivityLogIntegrationTest {
                 .filteredOn(r -> r.getAction() == AuditAction.DMS_SUSPENDED)
                 .singleElement()
                 .satisfies(r -> {
-                    assertThat(r.getActorName()).isEqualTo("Quản trị viên hệ thống");
-                    assertThat(r.getDescription()).isEqualTo("Quản trị viên tạm dừng Dead Man's Switch.");
+                    assertThat(r.getActorName()).isEqualTo("System administrator");
+                    assertThat(r.getDescription()).isEqualTo("An administrator suspended the Dead Man's Switch.");
                 });
     }
 

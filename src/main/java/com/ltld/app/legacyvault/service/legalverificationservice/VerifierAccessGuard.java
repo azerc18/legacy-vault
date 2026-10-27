@@ -24,16 +24,16 @@ public class VerifierAccessGuard {
      */
     public LegalVerificationRequest requireReadable(UUID requestId, UUID verifierId) {
         LegalVerificationRequest request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + requestId));
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Request not found: " + requestId));
 
         if (isConflict(request, verifierId)) {
-            throw new VerificationRequestNotFoundException("Không tìm thấy hồ sơ: " + requestId);
+            throw new VerificationRequestNotFoundException("Request not found: " + requestId);
         }
 
         if (request.getStatus() != LegalVerificationStatus.PENDING
                 && (request.getVerifier() == null || !verifierId.equals(request.getVerifier().getId()))) {
             throw new NotAssignedVerifierException(
-                    "Chỉ Legal Verifier đã xử lý hồ sơ mới được truy cập hồ sơ này.");
+                    "Only the Legal Verifier who handled this request can access it.");
         }
         return request;
     }

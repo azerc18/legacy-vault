@@ -78,7 +78,7 @@ public class VaultController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         AssignBeneficiaryResponse response = vaultService.assignBeneficiary(ownerId, vaultId, request);
-        return ResponseEntity.ok(ApiResponse.success("Chỉ định người thụ hưởng thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary assigned successfully", response));
     }
 
     // FR-27: Owner xem danh sách Vault của mình
@@ -87,7 +87,7 @@ public class VaultController {
     public ResponseEntity<ApiResponse<List<VaultResponse>>> getMyVaults(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
         List<VaultResponse> list = vaultService.getMyVaults(ownerId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault thành công", list));
+        return ResponseEntity.ok(ApiResponse.success("Vaults retrieved successfully", list));
     }
 
     // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu)
@@ -98,7 +98,7 @@ public class VaultController {
             @PathVariable UUID vaultId) {
         UUID ownerId = UUID.fromString(principal.getName());
         VaultDetailResponse response = vaultService.getVaultDetail(vaultId, ownerId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết Vault thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Vault details retrieved successfully", response));
     }
 
     // FR-27: Owner cập nhật tên/mô tả Vault (bị chặn khi DMS triggered hoặc có verification đang mở)
@@ -110,7 +110,7 @@ public class VaultController {
             @Valid @RequestBody UpdateVaultRequest request) {
         UUID ownerId = UUID.fromString(principal.getName());
         VaultResponse response = vaultService.updateVault(vaultId, ownerId, request);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật Vault thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Vault updated successfully", response));
     }
 
     // FR-20/Admin: Admin xem toàn bộ Vault, lọc theo trạng thái, phân trang
@@ -120,7 +120,7 @@ public class VaultController {
             @RequestParam(required = false) VaultStatus status,
             @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<VaultResponse> page = vaultService.getAllVaultsForAdmin(status, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Vault thành công", page));
+        return ResponseEntity.ok(ApiResponse.success("Vaults retrieved successfully", page));
     }
 
     // FR-20/Admin: Admin xem chi tiết một Vault bất kỳ
@@ -131,6 +131,6 @@ public class VaultController {
             @PathVariable UUID vaultId) {
         UUID adminId = UUID.fromString(principal.getName());
         AdminVaultDetailResponse response = vaultService.getAdminVaultDetail(vaultId, adminId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết Vault thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Vault details retrieved successfully", response));
     }
 }
