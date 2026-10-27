@@ -108,7 +108,7 @@ class UserProfileServiceImplTest {
         UserProfileException ex = assertThrows(UserProfileException.class, () -> service.getMe(userId));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
-        assertEquals("Không tìm thấy tài khoản", ex.getMessage());
+        assertEquals("Account not found", ex.getMessage());
     }
 
     // ---------- updateMe ----------
@@ -199,7 +199,7 @@ class UserProfileServiceImplTest {
                 () -> service.changePassword(userId, changeRequest("wrong", "new-pass")));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Mật khẩu hiện tại không đúng", ex.getMessage());
+        assertEquals("Current password is incorrect", ex.getMessage());
         assertEquals(OLD_HASH, u.getPasswordHash());
         verify(auditLogService).failure(AuditAction.PASSWORD_CHANGE_FAILED, userId, "owner@example.com",
                 "wrong current password");
@@ -218,7 +218,7 @@ class UserProfileServiceImplTest {
                 () -> service.changePassword(userId, changeRequest("same-pass", "same-pass")));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Mật khẩu mới phải khác mật khẩu hiện tại", ex.getMessage());
+        assertEquals("The new password must be different from the current password", ex.getMessage());
         verify(userRepository, never()).save(any());
         verify(tokenService, never()).revokeAllUserTokens(any(), any());
         verify(auditLogService, never()).success(any(), any(), any());

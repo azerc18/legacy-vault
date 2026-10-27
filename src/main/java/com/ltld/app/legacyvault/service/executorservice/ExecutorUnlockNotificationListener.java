@@ -30,9 +30,9 @@ public class ExecutorUnlockNotificationListener {
 
     // Tham số: Owner, danh sách tên Vault
     private static final String MSG_UNLOCKED =
-            "Hồ sơ xác minh của %s đã được Legal Verifier ký duyệt. Các Vault sau đã được mở khóa: %s.%n"
-                    + "Hệ thống sẽ thông báo cho người thụ hưởng. Vui lòng đăng nhập LegacyVault để theo dõi "
-                    + "quá trình bàn giao.";
+            "The verification request for %s has been signed by a Legal Verifier. The following vaults have been unlocked: %s.%n"
+                    + "The system will notify the beneficiaries. Please sign in to LegacyVault to follow "
+                    + "the handover process.";
 
     private final LegalVerificationRequestRepository requestRepository;
     private final VaultRepository vaultRepository;

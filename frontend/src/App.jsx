@@ -29,6 +29,7 @@ import ProfilePage from './Profile/ProfilePage.jsx';
 import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
+import AssistantWidget from './Assistant/AssistantWidget.jsx';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -91,6 +92,7 @@ function App() {
 
                 <Route path="*" element={<NotFound />} />
             </Routes>
+            <AssistantWidget />
         </BrowserRouter>
     );
 }

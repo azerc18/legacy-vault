@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleTooLarge(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error("Tệp vượt quá dung lượng cho phép (10MB)."));
+                .body(ApiResponse.error("File exceeds the allowed size (10MB)."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
@@ -95,7 +95,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
         log.warn("DataIntegrityViolation: {}", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("Dữ liệu đã thay đổi hoặc bị trùng. Vui lòng tải lại."));
+                .body(ApiResponse.error("The data has changed or is duplicated. Please reload."));
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)
@@ -114,12 +114,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Tham số '" + e.getName() + "' không đúng định dạng"));
+                .body(ApiResponse.error("Parameter '" + e.getName() + "' has an invalid format"));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException e) {
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Thiếu tham số bắt buộc '" + e.getParameterName() + "'"))
+                .body(ApiResponse.error("Missing required parameter '" + e.getParameterName() + "'"))
                 ;}
 }

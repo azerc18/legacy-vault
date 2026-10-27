@@ -37,8 +37,8 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
 
     // FR-05: nhật ký cấp Owner — sự kiện DMS / Executor (vaultId = null) của DmsConfig và mọi ExecutorAssignment
     // (kể cả REVOKED) thuộc Owner. Subquery rỗng => trang rỗng, không sinh "IN ()".
-    // Y3: thêm VAULT_DELETED do chính Owner xóa (có vaultId; Vault đã xóa cứng nên lọc theo actor, không join Vault).
-    // Y2: bỏ các action trong hiddenActions; điều kiện phải có ở CẢ countQuery để totalElements không đếm chúng.
+    // FR-05: thêm VAULT_DELETED do chính Owner xóa (có vaultId; Vault đã xóa cứng nên lọc theo actor, không join Vault).
+    // FR-05: bỏ các action trong hiddenActions; điều kiện phải có ở CẢ countQuery để totalElements không đếm chúng.
     @org.springframework.data.jpa.repository.Query(
         value = "SELECT a FROM AuditLog a " +
                 "LEFT JOIN FETCH a.actor " +

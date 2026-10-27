@@ -148,7 +148,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
             plain = cryptoService.decryptBytes(fileStorageService.readFile(message.getAttachmentPath()));
         } catch (Exception e) {
             log.error("Attachment read/decrypt failed for message {}", messageId, e);
-            throw new IllegalStateException("Không thể đọc tệp đính kèm. Vui lòng thử lại sau.");
+            throw new IllegalStateException("Could not read the attachment. Please try again later.");
         }
 
         User executor = assignment.getExecutorUser();

@@ -77,7 +77,7 @@ class OwnerActivityLogServiceImplTest {
         ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
         verify(auditLogRepository).findOwnerActivity(eq(ownerId), any(), any(), any(),
                 fromCaptor.capture(), toCaptor.capture(), eq(pageable));
-        // Y2 (T-1): không truyền from -> xem toàn bộ lịch sử
+        // FR-05: không truyền from -> xem toàn bộ lịch sử
         assertThat(fromCaptor.getValue()).isEqualTo(Instant.EPOCH);
         assertThat(toCaptor.getValue()).isAfterOrEqualTo(before);
     }
@@ -100,7 +100,7 @@ class OwnerActivityLogServiceImplTest {
         Instant to = Instant.now();
         Instant from = to.minus(400, ChronoUnit.DAYS);
 
-        // Y2 (T-1): bỏ giới hạn 1 năm
+        // FR-05: bỏ giới hạn 1 năm
         assertThatCode(() -> ownerActivityLogService.getOwnerActivityLogs(ownerId, from, to, pageable))
                 .doesNotThrowAnyException();
         verify(auditLogRepository).findOwnerActivity(eq(ownerId), any(), any(), any(), eq(from), eq(to), eq(pageable));
@@ -157,10 +157,10 @@ class OwnerActivityLogServiceImplTest {
         assertThat(result.getTotalElements()).isEqualTo(12);
         assertThat(result.getPageable()).isEqualTo(pageable);
         assertThat(result.getContent()).extracting(VaultActivityLogResponse::getActorName)
-                .containsExactly("Bạn", "Hệ thống");
+                .containsExactly("You", "System");
         assertThat(result.getContent()).extracting(VaultActivityLogResponse::getDescription)
-                .containsExactly("Check-in xác nhận vẫn còn hoạt động.",
-                        "Dead Man's Switch được kích hoạt do quá hạn check-in.");
+                .containsExactly("Checked in to confirm still active.",
+                        "The Dead Man's Switch was triggered because the check-in deadline passed.");
         assertThat(result.getContent().get(0).getIpAddress()).isEqualTo("192.168.1.100");
     }
 }

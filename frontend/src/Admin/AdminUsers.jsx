@@ -147,7 +147,13 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
             </td>
             <td className="p-4">
                 <div className="flex flex-wrap gap-1">
-                    {roles.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+                    {roles.length === 0 && <span className="text-xs text-outline">—</span>}
+                    {roles.map((r) => (
+                        <span key={r}
+                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container whitespace-nowrap">
+                {labelOf(r)}
+            </span>
+                    ))}
                 </div>
             </td>
             <td className="p-4 whitespace-nowrap">{formatDate(u.lastLoginAt, true)}</td>

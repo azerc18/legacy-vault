@@ -1,23 +1,25 @@
 package com.ltld.app.legacyvault.dto.userdto;
 
+import com.ltld.app.legacyvault.utility.PasswordPolicy;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class ChangePasswordRequest {
-    @NotBlank(message = "Vui lòng nhập mật khẩu hiện tại")
+    @NotBlank(message = "Please enter your current password")
     private String currentPassword;
 
-    @NotBlank(message = "Vui lòng nhập mật khẩu mới")
-    @Size(min = 6, max = 72, message = "Mật khẩu mới phải từ 6 đến 72 ký tự")
+    @NotBlank(message = "Please enter a new password")
+    @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
     private String newPassword;
 
-    @NotBlank(message = "Vui lòng xác nhận mật khẩu mới")
+    @NotBlank(message = "Please confirm your new password")
     private String passwordConfirm;
 
-    @AssertTrue(message = "Mật khẩu xác nhận không khớp")
+    @AssertTrue(message = "Password confirmation does not match")
     public boolean isPasswordMatching() {
         if (newPassword == null || passwordConfirm == null) return true;
         return newPassword.equals(passwordConfirm);

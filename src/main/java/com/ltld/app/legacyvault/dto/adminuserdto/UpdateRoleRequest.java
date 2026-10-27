@@ -9,13 +9,13 @@ import java.util.List;
 
 @Data
 public class UpdateRoleRequest {
-    @NotBlank(message = "Tên role là bắt buộc")
-    @Size(max = 100, message = "Tên role tối đa 100 ký tự")
+    @NotBlank(message = "Role name is required")
+    @Size(max = 100, message = "Role name must be at most 100 characters")
     private String name;
 
-    @Size(max = 255, message = "Mô tả tối đa 255 ký tự")
+    @Size(max = 255, message = "Description must be at most 255 characters")
     private String description;
 
-    @NotEmpty(message = "Role phải có ít nhất 1 quyền")
+    @NotEmpty(message = "A role must have at least one authority")
     private List<String> authorities;
 }

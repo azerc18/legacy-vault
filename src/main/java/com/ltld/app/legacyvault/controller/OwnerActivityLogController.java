@@ -38,15 +38,15 @@ public class OwnerActivityLogController {
 
         // Khoảng ngày (mặc định từ đầu đến hiện tại, không giới hạn độ dài) do service kiểm
         if (page < 0) {
-            throw new DmsException("Số trang không hợp lệ (phải >= 0).", HttpStatus.BAD_REQUEST);
+            throw new DmsException("Invalid page number (must be >= 0).", HttpStatus.BAD_REQUEST);
         }
         if (size < 1 || size > 100) {
-            throw new DmsException("Kích thước trang phải từ 1 đến 100.", HttpStatus.BAD_REQUEST);
+            throw new DmsException("Page size must be between 1 and 100.", HttpStatus.BAD_REQUEST);
         }
 
         Page<VaultActivityLogResponse> response = ownerActivityLogService.getOwnerActivityLogs(
                 ownerId, startDate, endDate, PageRequest.of(page, size));
 
-        return ResponseEntity.ok(ApiResponse.success("Lấy nhật ký hoạt động thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Activity logs retrieved successfully", response));
     }
 }

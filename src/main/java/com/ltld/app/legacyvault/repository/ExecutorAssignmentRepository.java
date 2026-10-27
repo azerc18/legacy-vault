@@ -18,7 +18,7 @@ import java.util.UUID;
 public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssignment, UUID> {
     List<ExecutorAssignment> findAllByOwnerId(UUID ownerId);
 
-    // B-01a: khóa FOR UPDATE mọi dòng Executor của Owner, để bật DMS và thu hồi Executor cuối cùng không write-skew.
+    // FR-03/FR-06: khóa FOR UPDATE mọi dòng Executor của Owner, để bật DMS và thu hồi Executor cuối cùng không write-skew.
     // Không join fetch: FOR UPDATE chỉ khóa executor_assignments (qua uk owner_id + executor_type).
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from ExecutorAssignment a where a.owner.id = :ownerId")

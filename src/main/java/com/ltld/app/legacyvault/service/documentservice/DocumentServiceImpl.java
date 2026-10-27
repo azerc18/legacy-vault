@@ -183,7 +183,7 @@ public class DocumentServiceImpl implements DocumentService {
             legalDocumentRepository.delete(doc);
             legalDocumentRepository.flush();
         } catch (DataIntegrityViolationException e) {
-            throw new VaultException("Tài liệu đang được dùng trong hồ sơ xác minh, không thể xóa.", HttpStatus.CONFLICT);
+            throw new VaultException("The document is used in a verification request and cannot be deleted.", HttpStatus.CONFLICT);
         }
 
         // M2a & M2b: Xóa file vật lý SAU KHI transaction commit thành công

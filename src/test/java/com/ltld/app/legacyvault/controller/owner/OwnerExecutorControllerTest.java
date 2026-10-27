@@ -128,7 +128,7 @@ class OwnerExecutorControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + email + "\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.email").value("Email tối đa 255 ký tự"));
+                .andExpect(jsonPath("$.data.email").value("Email must be at most 255 characters"));
         verify(executorManagementService, never()).assignExecutor(any(), any(), any());
     }
 

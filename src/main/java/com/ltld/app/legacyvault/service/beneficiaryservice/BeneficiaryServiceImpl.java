@@ -69,7 +69,7 @@ import java.util.stream.Collectors;
 public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     private static final int VERIFICATION_TTL_MINUTES = 15;
-    private static final String NOT_FOUND_MSG = "Không tìm thấy yêu cầu nhận tài sản.";
+    private static final String NOT_FOUND_MSG = "Claim request not found.";
     // Trùng với BeneficiaryNotificationListener.ENTITY_VAULT
     private static final String REF_VAULT = "Vault";
     private static final int CLAIM_TIMEOUT_DAYS = 60;
@@ -84,15 +84,15 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final int LOCK_HOURS = 24;
     private static final int VIEW_SESSION_MINUTES = 30;
 
-    private static final String ALREADY_CLAIMED_MSG = "Tài sản này đã được nhận.";
-    private static final String CLAIM_ENDED_MSG = "Thời hạn yêu cầu nhận tài sản đã kết thúc.";
-    private static final String NOT_READY_MSG = "Tài sản chưa sẵn sàng để nhận.";
-    private static final String NO_SESSION_MSG = "Chưa có phiên xác thực. Vui lòng khởi tạo yêu cầu nhận tài sản trước.";
-    private static final String LOCKED_MSG = "Truy cập đã bị tạm khóa do xác thực sai nhiều lần. Vui lòng thử lại sau 24 giờ hoặc liên hệ Admin để được hỗ trợ.";
+    private static final String ALREADY_CLAIMED_MSG = "These assets have already been claimed.";
+    private static final String CLAIM_ENDED_MSG = "The claim period has ended.";
+    private static final String NOT_READY_MSG = "The assets are not ready to be claimed yet.";
+    private static final String NO_SESSION_MSG = "No verification session. Please start a claim request first.";
+    private static final String LOCKED_MSG = "Access is temporarily locked after too many failed verification attempts. Please try again in 24 hours or contact an admin for help.";
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
-    private static final String CONFIRM_REQUIRED_MSG = "Cần xác nhận lần cuối để đóng hồ sơ nhận bàn giao.";
+    private static final String CONFIRM_REQUIRED_MSG = "Final confirmation is required to close the handover case.";
     // Dùng chung cho tên tệp và Content-Type; khớp các loại FR-04 cho phép (PDF, DOC/DOCX, JPG/PNG)
     private static final Map<String, String> DOCUMENT_TYPES = Map.of(
             "pdf", "application/pdf",
@@ -177,7 +177,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // Thông báo của người khác trả 404 để không lộ sự tồn tại
         Notification notification = notificationRepository
                 .findByIdAndRecipientIdAndChannel(notificationId, currentUserId, NotificationChannel.IN_APP)
-                .orElseThrow(() -> new BeneficiaryException("Không tìm thấy thông báo.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BeneficiaryException("Notification not found.", HttpStatus.NOT_FOUND));
         if (notification.getStatus() != NotificationStatus.READ) {
             notification.setStatus(NotificationStatus.READ);
             notificationRepository.save(notification);
@@ -201,13 +201,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // 2. Kiểm tra trạng thái Vault
         if (vault.getStatus() == VaultStatus.CLAIMED) {
-            throw new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT);
+            throw new BeneficiaryException("These assets have already been claimed.", HttpStatus.CONFLICT);
         }
         if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
-            throw new BeneficiaryException("Thời hạn yêu cầu nhận tài sản đã kết thúc.", HttpStatus.GONE);
+            throw new BeneficiaryException("The claim period has ended.", HttpStatus.GONE);
         }
         if (vault.getStatus() != VaultStatus.UNLOCKED) {
-            throw new BeneficiaryException("Tài sản chưa sẵn sàng để nhận.", HttpStatus.BAD_REQUEST);
+            throw new BeneficiaryException("The assets are not ready to be claimed yet.", HttpStatus.BAD_REQUEST);
         }
 
         // 3. Khởi tạo hoặc lấy BeneficiaryClaim hiện tại
@@ -215,7 +215,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         if (claim != null) {
             if (claim.getStatus() == ClaimStatus.CLAIMED) {
-                throw new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT);
+                throw new BeneficiaryException("These assets have already been claimed.", HttpStatus.CONFLICT);
             }
         } else {
             claim = BeneficiaryClaim.builder()
@@ -228,11 +228,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         if (claim.getStatus() == ClaimStatus.EXPIRED || LocalDateTime.now().isAfter(claim.getClaimDeadlineAt())) {
-            throw new BeneficiaryException("Thời hạn yêu cầu nhận tài sản đã kết thúc.", HttpStatus.GONE);
+            throw new BeneficiaryException("The claim period has ended.", HttpStatus.GONE);
         }
 
         if (request.getVerificationMethod() == VerificationMethod.EKYC_MOCK && !mockKycVerifier.isEnabled()) {
-            throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
+            throw new BeneficiaryException("The eKYC method is not supported yet.", HttpStatus.BAD_REQUEST);
         }
 
         // 4. Chống spam: chỉ dùng lại phiên PENDING còn đủ thời gian cho một OTP trọn vẹn.
@@ -271,7 +271,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
 
         if (request.getVerificationMethod() != VerificationMethod.OTP) {
-            throw new BeneficiaryException("Phương thức xác thực này không dùng OTP.", HttpStatus.BAD_REQUEST);
+            throw new BeneficiaryException("This verification method does not use OTP.", HttpStatus.BAD_REQUEST);
         }
 
         IdentityVerification verification =
@@ -283,14 +283,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         LocalDateTime sessionEnd = verification.getCreatedAt().plusMinutes(VERIFICATION_TTL_MINUTES);
         if (now.plusMinutes(OTP_TTL_MINUTES).isAfter(sessionEnd)) {
             throw new BeneficiaryException(
-                    "Phiên xác thực sắp hết hạn. Vui lòng khởi tạo lại yêu cầu nhận tài sản.", HttpStatus.BAD_REQUEST);
+                    "The verification session is about to expire. Please start the claim request again.", HttpStatus.BAD_REQUEST);
         }
 
         // Chặn gửi lại quá nhanh, dựa vào thời điểm gửi lần trước được lưu tường minh
         if (verification.getOtpSentAt() != null
                 && now.isBefore(verification.getOtpSentAt().plusSeconds(OTP_RESEND_SECONDS))) {
             throw new BeneficiaryException(
-                    "Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.", HttpStatus.TOO_MANY_REQUESTS);
+                    "Please wait a moment before requesting another OTP.", HttpStatus.TOO_MANY_REQUESTS);
         }
 
         // Gửi lại KHÔNG reset attemptCount, tránh lách giới hạn số lần thử
@@ -333,22 +333,22 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // 1. Kiểm tra đầu vào. Các lỗi này không tính vào số lần thử.
         if (isOtp) {
             if (request.getOtp() == null) {
-                throw new BeneficiaryException("OTP không được để trống.", HttpStatus.BAD_REQUEST);
+                throw new BeneficiaryException("OTP is required.", HttpStatus.BAD_REQUEST);
             }
             if (verification.getOtpCode() == null || verification.getOtpExpiresAt() == null) {
                 throw new BeneficiaryException(
-                        "Chưa có OTP. Vui lòng yêu cầu gửi OTP trước.", HttpStatus.BAD_REQUEST);
+                        "No OTP yet. Please request an OTP first.", HttpStatus.BAD_REQUEST);
             }
             if (now.isAfter(verification.getOtpExpiresAt())) {
                 throw new BeneficiaryException(
-                        "OTP đã hết hạn. Vui lòng yêu cầu gửi lại OTP.", HttpStatus.BAD_REQUEST);
+                        "The OTP has expired. Please request a new one.", HttpStatus.BAD_REQUEST);
             }
         } else {
             if (!mockKycVerifier.isEnabled()) {
-                throw new BeneficiaryException("Phương thức eKYC hiện chưa được hỗ trợ.", HttpStatus.BAD_REQUEST);
+                throw new BeneficiaryException("The eKYC method is not supported yet.", HttpStatus.BAD_REQUEST);
             }
             if (request.getKycIdNumber() == null) {
-                throw new BeneficiaryException("Số CCCD không được để trống.", HttpStatus.BAD_REQUEST);
+                throw new BeneficiaryException("ID number is required.", HttpStatus.BAD_REQUEST);
             }
         }
 
@@ -386,7 +386,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
             }
             throw new BeneficiaryException(
-                    "Xác thực không thành công. Bạn còn " + (MAX_VERIFY_ATTEMPTS - totalAttempts) + " lần thử.",
+                    "Verification failed. Attempts left: " + (MAX_VERIFY_ATTEMPTS - totalAttempts) + ".",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -495,7 +495,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // Bắt buộc thuộc đúng vault, không thì 404 để không lộ tài liệu của vault khác
         LegalDocument document = legalDocumentRepository.findByIdAndVaultId(documentId, vault.getId())
-                .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài liệu.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BeneficiaryException("Document not found.", HttpStatus.NOT_FOUND));
 
         byte[] plain;
         try {
@@ -508,7 +508,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     vault.getBeneficiary().getEmail(), vault.getId(),
                     "LegalDocument", document.getId().toString(), "Read or decrypt failed");
             throw new BeneficiaryException(
-                    "Không thể giải mã tài liệu. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
+                    "Could not decrypt the document. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         String fileName = toSafeDocumentFileName(document.getFileName());
@@ -574,13 +574,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         long totalAssets = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
         if (totalAssets > 0 && unviewed.size() == totalAssets) {
             throw new BeneficiaryException(
-                    "Bạn cần xem hoặc tải xuống ít nhất một tài sản trước khi đóng hồ sơ.", HttpStatus.BAD_REQUEST);
+                    "You must view or download at least one asset before closing the case.", HttpStatus.BAD_REQUEST);
         }
         // Cho đóng khi còn tài sản chưa xem, nhưng bắt buộc xác nhận rõ ràng.
         if (!unviewed.isEmpty() && !Boolean.TRUE.equals(request.getAcknowledgeUnviewed())) {
-            throw new BeneficiaryException("Còn " + unviewed.size()
-                    + " tài sản chưa xem. Sau khi đóng hồ sơ bạn sẽ không xem được nữa. "
-                    + "Nếu vẫn muốn đóng, hãy gửi acknowledgeUnviewed = true.", HttpStatus.CONFLICT);
+            throw new BeneficiaryException("Unviewed assets: " + unviewed.size()
+                    + ". After closing the case you will no longer be able to view them. "
+                    + "If you still want to close it, send acknowledgeUnviewed = true.", HttpStatus.CONFLICT);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -623,7 +623,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         DigitalAsset asset = digitalAssetRepository
                 .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
-                .orElseThrow(() -> new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BeneficiaryException("Asset not found.", HttpStatus.NOT_FOUND));
 
         DecryptedAsset decrypted;
         try {
@@ -635,7 +635,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             // Không log dữ liệu đã giải mã, chỉ log id tài sản
             log.error("Decrypt failed for asset {}", asset.getId(), e);
             throw new BeneficiaryException(
-                    "Không thể giải mã tài sản. Vui lòng thử lại sau.", HttpStatus.INTERNAL_SERVER_ERROR);
+                    "Could not decrypt the asset. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         // Chỉ ghi nhận khi giải mã thành công (điều kiện đóng hồ sơ ở FR-19)
@@ -651,17 +651,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private String buildDownloadContent(DecryptedAsset decrypted) {
         DigitalAsset asset = decrypted.asset();
         String notes = decrypted.notes() == null || decrypted.notes().isBlank()
-                ? "(không có)" : decrypted.notes();
+                ? "(none)" : decrypted.notes();
 
-        return "LegacyVault - Thông tin tài sản thừa kế\n"
+        return "LegacyVault - Inherited asset information\n"
                 + "========================================\n"
-                + "Tên tài sản: " + asset.getAssetName() + "\n"
-                + "Loại tài sản: " + asset.getAssetType() + "\n"
-                + "Thông tin truy cập: " + decrypted.secret() + "\n"
-                + "Ghi chú: " + notes + "\n"
-                + "Xuất lúc: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
+                + "Asset name: " + asset.getAssetName() + "\n"
+                + "Asset type: " + asset.getAssetType() + "\n"
+                + "Access information: " + decrypted.secret() + "\n"
+                + "Note: " + notes + "\n"
+                + "Exported at: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
                 + "\n"
-                + "Vui lòng lưu giữ thông tin này an toàn và xóa tệp sau khi đã lưu.\n";
+                + "Please keep this information safe and delete the file after saving it.\n";
     }
 
     // Tên tài sản do người dùng nhập nên phải làm sạch trước khi đặt tên tệp (chống header injection, ký tự cấm)
@@ -770,7 +770,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
         if (!valid) {
             throw new BeneficiaryException(
-                    "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN);
+                    "Identity verification is required before viewing assets.", HttpStatus.FORBIDDEN);
         }
     }
 

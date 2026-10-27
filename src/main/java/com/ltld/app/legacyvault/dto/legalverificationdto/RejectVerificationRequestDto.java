@@ -10,15 +10,15 @@ import lombok.Data;
 @Data
 public class RejectVerificationRequestDto {
 
-    @NotNull(message = "Vui lòng chọn lý do từ chối")
+    @NotNull(message = "Please select a rejection reason")
     private RejectionReason reason;
 
-    @Size(max = 500, message = "Ghi chú tối đa 500 ký tự")
+    @Size(max = 500, message = "Note must be at most 500 characters")
     private String note;
 
     // Chọn "Lý do khác" thì bắt buộc nhập ghi chú
     @JsonIgnore
-    @AssertTrue(message = "Vui lòng nhập ghi chú khi chọn lý do khác")
+    @AssertTrue(message = "Please enter a note when choosing another reason")
     public boolean isNoteProvidedWhenOther() {
         return reason != RejectionReason.OTHER || (note != null && !note.isBlank());
     }

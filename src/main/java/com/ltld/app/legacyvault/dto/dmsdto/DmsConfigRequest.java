@@ -8,18 +8,18 @@ import lombok.Data;
 // FR-03: Owner cấu hình Dead Man's Switch. Kênh thông báo chưa cho chọn (mặc định EMAIL).
 @Data
 public class DmsConfigRequest {
-    @NotNull(message = "Chu kỳ check-in không được để trống")
-    @Min(value = 1, message = "Chu kỳ check-in phải từ 1 ngày trở lên")
-    @Max(value = 365, message = "Chu kỳ check-in tối đa 365 ngày")
+    @NotNull(message = "Check-in interval is required")
+    @Min(value = 1, message = "Check-in interval must be at least 1 day")
+    @Max(value = 365, message = "Check-in interval must be at most 365 days")
     private Integer checkinIntervalDays;
 
-    @NotNull(message = "Thời gian chờ không được để trống")
-    @Min(value = 1, message = "Thời gian chờ phải từ 1 ngày trở lên")
-    @Max(value = 90, message = "Thời gian chờ tối đa 90 ngày")
+    @NotNull(message = "Grace period is required")
+    @Min(value = 1, message = "Grace period must be at least 1 day")
+    @Max(value = 90, message = "Grace period must be at most 90 days")
     private Integer gracePeriodDays;
 
-    @NotNull(message = "Số lần nhắc không được để trống")
-    @Min(value = 1, message = "Số lần nhắc phải từ 1 trở lên")
-    @Max(value = 10, message = "Số lần nhắc tối đa 10")
+    @NotNull(message = "Reminder count is required")
+    @Min(value = 1, message = "Reminder count must be at least 1")
+    @Max(value = 10, message = "Reminder count must be at most 10")
     private Integer reminderCount;
 }

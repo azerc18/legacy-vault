@@ -3,6 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
+import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
+import { isPasswordValid } from '../Common/passwordPolicy.js';
 
 export default function Register() {
     const [formData, setFormData] = useState({
@@ -34,10 +36,7 @@ export default function Register() {
             return;
         }
 
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
-            return;
-        }
+        if (!isPasswordValid(password)) { setError('Password does not meet the requirements.'); return; }
 
         if (password !== passwordConfirm) {
             setError('Passwords do not match.');
@@ -107,11 +106,12 @@ export default function Register() {
                         <input
                             type="password"
                             name="password"
-                            placeholder="At least 6 characters"
+                            placeholder="At least 8 characters"
                             value={formData.password}
                             onChange={handleChange}
                             className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                         />
+                        <PasswordStrengthMeter password={formData.password} />
                     </div>
 
                     <div className="flex flex-col gap-1.5">

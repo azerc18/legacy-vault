@@ -55,7 +55,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     public DigitalAssetDetailResponse getAsset(UUID ownerId, UUID vaultId, UUID assetId) throws Exception {
         Vault vault = loadOwnedVault(vaultId, ownerId);
         if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
-            throw new VaultException("Nội dung két đã bị xóa theo chính sách lưu trữ.", HttpStatus.GONE);
+            throw new VaultException("The vault contents were deleted under the retention policy.", HttpStatus.GONE);
         }
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
@@ -68,7 +68,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                     : null;
         } catch (Exception ex) {
             log.error("Failed to decrypt digital asset {}: {}", assetId, ex.getMessage());
-            throw new VaultException("Không thể giải mã nội dung tài sản số", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new VaultException("Could not decrypt the digital asset content", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
@@ -98,7 +98,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         vaultModificationGuard.ensureModifiable(vault);
 
         if (request.getSecret() == null || request.getSecret().isBlank()) {
-            throw new VaultException("Secret không được để trống khi thêm tài sản mới", HttpStatus.BAD_REQUEST);
+            throw new VaultException("Secret is required when adding a new asset", HttpStatus.BAD_REQUEST);
         }
 
         DigitalAsset asset = DigitalAsset.builder()

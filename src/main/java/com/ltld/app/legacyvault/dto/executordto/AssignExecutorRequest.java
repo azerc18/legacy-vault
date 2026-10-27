@@ -7,9 +7,9 @@ import lombok.Data;
 
 @Data
 public class AssignExecutorRequest {
-    @Email(message = "Email không đúng định dạng")
-    @NotBlank(message = "Email Executor là bắt buộc")
-    @Size(max = 255, message = "Email tối đa 255 ký tự")
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Executor email is required")
+    @Size(max = 255, message = "Email must be at most 255 characters")
     private String email;
 
     // FR-06: vị trí đã có Executor khác thì Owner phải xác nhận thay thế

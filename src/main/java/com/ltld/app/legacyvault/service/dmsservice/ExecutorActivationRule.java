@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * B-01a: Executor nào sẽ được kích hoạt nếu DMS trigger lúc này.
+ * FR-03: Executor nào sẽ được kích hoạt nếu DMS trigger lúc này.
  *
  * <p>Sao y cách {@code DmsActivationProcessor.trigger} chọn người: Primary chưa REVOKED, nếu không có thì
  * Backup đang INACTIVE. Trigger chưa dùng helper này (file đang được sửa ở nhánh khác); khi đổi một bên

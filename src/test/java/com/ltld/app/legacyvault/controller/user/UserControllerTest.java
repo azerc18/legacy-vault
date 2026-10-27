@@ -80,12 +80,12 @@ class UserControllerTest {
     @Test
     void getMe_userNotFound_returns404() throws Exception {
         when(userProfileService.getMe(userId))
-                .thenThrow(new UserProfileException("Không tìm thấy tài khoản", HttpStatus.NOT_FOUND));
+                .thenThrow(new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get(BASE).principal(principal))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Không tìm thấy tài khoản"));
+                .andExpect(jsonPath("$.message").value("Account not found"));
     }
 
     // ---------- PUT /api/users/me ----------
@@ -99,7 +99,7 @@ class UserControllerTest {
                         .content("{\"fullName\":\"Tran Thi B\",\"phoneNumber\":\"0912345678\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Cập nhật hồ sơ thành công"))
+                .andExpect(jsonPath("$.message").value("Profile updated successfully"))
                 .andExpect(jsonPath("$.data.fullName").value("Tran Thi B"));
 
         verify(userProfileService).updateMe(eq(userId), argThat(r ->
@@ -134,7 +134,7 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"fullName\":\"A\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.fullName").value("Họ tên phải từ 2 đến 100 ký tự"));
+                .andExpect(jsonPath("$.data.fullName").value("Full name must be 2-100 characters"));
     }
 
     @Test
@@ -143,7 +143,7 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"fullName\":\"Tran Thi B\",\"phoneNumber\":\"abc123\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.phoneNumber").value("Số điện thoại không hợp lệ"));
+                .andExpect(jsonPath("$.data.phoneNumber").value("Invalid phone number"));
 
         verify(userProfileService, never()).updateMe(any(), any());
     }
@@ -154,22 +154,22 @@ class UserControllerTest {
     void changePassword_valid_returns200WithReloginMessage() throws Exception {
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"new-pass\"}"))
+                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Đổi mật khẩu thành công. Vui lòng đăng nhập lại."));
+                .andExpect(jsonPath("$.message").value("Password changed successfully. Please sign in again."));
 
         verify(userProfileService).changePassword(eq(userId), argThat(r ->
-                "old-pass".equals(r.getCurrentPassword()) && "new-pass".equals(r.getNewPassword())));
+                "old-pass".equals(r.getCurrentPassword()) && "New-Pass1".equals(r.getNewPassword())));
     }
 
     @Test
     void changePassword_confirmMismatch_returns400AndSkipsService() throws Exception {
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"other-pass\"}"))
+                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"other-pass\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.passwordMatching").value("Mật khẩu xác nhận không khớp"));
+                .andExpect(jsonPath("$.data.passwordMatching").value("Password confirmation does not match"));
 
         verify(userProfileService, never()).changePassword(any(), any());
     }
@@ -198,14 +198,14 @@ class UserControllerTest {
 
     @Test
     void changePassword_wrongCurrent_returns400WithServiceMessage() throws Exception {
-        doThrow(new UserProfileException("Mật khẩu hiện tại không đúng", HttpStatus.BAD_REQUEST))
+        doThrow(new UserProfileException("Current password is incorrect", HttpStatus.BAD_REQUEST))
                 .when(userProfileService).changePassword(eq(userId), any());
 
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"new-pass\"}"))
+                        .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Mật khẩu hiện tại không đúng"));
+                .andExpect(jsonPath("$.message").value("Current password is incorrect"));
     }
 }

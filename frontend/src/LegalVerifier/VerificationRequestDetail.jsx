@@ -17,7 +17,7 @@ const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS c
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
 const otpKey = (id) => `lv_sign_otp_${id}`;
 // Thông báo của BE khi mã ký không còn dùng được (khớp InvalidSignCodeException trong sign)
-const OTP_UNUSABLE = /hết lượt thử|Sai quá số lần|hết hạn|chưa được tạo/i;
+const OTP_UNUSABLE = /no attempts left|too many attempts|has expired|was not generated/i;
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
 const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
@@ -312,42 +312,75 @@ export default function VerificationRequestDetail() {
                             Death certificate
                         </h2>
                         {req.hasDeathCertificate ? (
-                            <div className="flex flex-wrap items-center gap-4">
-                                <span className="flex items-center gap-2 font-semibold">
+                            <div className="space-y-5">
+                                <p className="flex items-center gap-2 font-semibold">
                                     <span className="material-symbols-outlined text-success">check_circle</span>
                                     Document submitted by the Executor
-                                </span>
+                                </p>
                                 {isPending && (
+                                    <div className="flex flex-wrap gap-3">
+                                        {/* Bước 1: xem tài liệu thật (BE ghi nhận), sau đó mới Check / Reject / Approve */}
+                                        <button
+                                            onClick={handleViewDocument}
+                                            disabled={busy || viewing}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                            {viewing ? 'Opening...' : 'View document'}
+                                        </button>
+                                        <button
+                                            onClick={handleCheckDocument}
+                                            disabled={busy || !req.documentViewed}
+                                            title={req.documentViewed ? undefined : 'View the document first'}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">fact_check</span>
+                                            {checking ? 'Checking...' : 'Check document'}
+                                        </button>
+                                    </div>
+                                )}
+                                {!isPending && (
                                     <button
-                                        onClick={handleCheckDocument}
-                                        disabled={busy || !req.documentViewed}
-                                        title={req.documentViewed ? undefined : 'View the document first'}
-                                        className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
+                                        onClick={handleViewDocument}
+                                        disabled={busy || viewing}
+                                        className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
                                     >
-                                        {checking ? 'Checking...' : 'Check document'}
+                                        <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                        {viewing ? 'Opening...' : 'View document'}
                                     </button>
                                 )}
-                                {/* Bước 1: xem tài liệu thật (BE ghi nhận), sau đó mới Check / Reject / Approve */}
-                                <button
-                                    onClick={handleViewDocument}
-                                    disabled={busy || viewing}
-                                    className="h-10 px-4 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50"
-                                >
-                                    {viewing ? 'Opening...' : 'View document'}
-                                </button>
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">No death certificate attached.</p>
                         )}
                         {checkResult && (
-                            <div className={`mt-4 p-3 rounded-lg text-sm ${checkResult.valid ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
+                            <div className={`mt-5 p-3 rounded-lg text-sm ${checkResult.valid ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
                                 <b>{checkResult.valid ? 'Valid' : 'Invalid'}</b>{checkResult.message ? ` — ${checkResult.message}` : ''}
                             </div>
                         )}
-                        {isPending && !canApprove && (
-                            <p className="mt-3 text-sm text-on-surface-variant">
-                                Steps: 1) View document, 2) Check document, 3) Approve. Rejecting only needs step 1.
-                            </p>
+                        {isPending && req.hasDeathCertificate && (
+                            <div className="mt-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant/40">
+                                <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold">
+                                    {[
+                                        { n: 1, label: 'View', done: !!req.documentViewed },
+                                        { n: 2, label: 'Check', done: !!req.documentChecked && req.documentValid !== false },
+                                        { n: 3, label: 'Approve', done: false },
+                                    ].map((st, i) => (
+                                        <React.Fragment key={st.n}>
+                                            {i > 0 && <span className="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>}
+                                            <li className={`flex items-center gap-2 ${st.done ? 'text-success' : 'text-on-surface-variant'}`}>
+                                                {st.done ? (
+                                                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                                                ) : (
+                                                    <span className="w-5 h-5 rounded-full border border-outline-variant text-xs flex items-center justify-center">{st.n}</span>
+                                                )}
+                                                {st.label}
+                                            </li>
+                                        </React.Fragment>
+                                    ))}
+                                </ol>
+                                <p className="mt-2 text-xs text-on-surface-variant">Rejecting only needs step 1 (View).</p>
+                            </div>
                         )}
                     </section>
 

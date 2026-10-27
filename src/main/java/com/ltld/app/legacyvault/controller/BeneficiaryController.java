@@ -79,7 +79,7 @@ public class BeneficiaryController {
     public ResponseEntity<ApiResponse<Void>> markNotificationRead(
             Principal principal, @PathVariable UUID notificationId) {
         beneficiaryService.markNotificationRead(notificationId, currentUserId(principal));
-        return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu đã đọc."));
+        return ResponseEntity.ok(ApiResponse.success("Marked as read."));
     }
 
     // FR-17: Gửi OTP xác thực danh tính qua email
@@ -89,7 +89,7 @@ public class BeneficiaryController {
             @Valid @RequestBody BeneficiaryClaimRequest request) {
 
         beneficiaryService.sendIdentityOtp(request, currentUserId(principal));
-        return ResponseEntity.ok(ApiResponse.success("OTP đã được gửi đến email của bạn."));
+        return ResponseEntity.ok(ApiResponse.success("An OTP has been sent to your email."));
     }
 
     // FR-17: Xác thực danh tính bằng OTP hoặc mock eKYC
@@ -99,7 +99,7 @@ public class BeneficiaryController {
             @Valid @RequestBody VerifyIdentityRequest request) {
 
         VerifyIdentityResponse response = beneficiaryService.verifyIdentity(request, currentUserId(principal));
-        return ResponseEntity.ok(ApiResponse.success("Xác thực danh tính thành công.", response));
+        return ResponseEntity.ok(ApiResponse.success("Identity verified successfully.", response));
     }
 
     // FR-17: Danh sách tài sản trong Vault (sau khi xác thực)
@@ -168,7 +168,7 @@ public class BeneficiaryController {
             @Valid @RequestBody CloseVaultRequest request) {
 
         CloseVaultResponse response = beneficiaryService.closeVault(vaultId, request, currentUserId(principal));
-        return ResponseEntity.ok(ApiResponse.success("Đã đóng hồ sơ nhận bàn giao.", response));
+        return ResponseEntity.ok(ApiResponse.success("Handover case closed.", response));
     }
 
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController
@@ -176,7 +176,7 @@ public class BeneficiaryController {
         try {
             return UUID.fromString(principal.getName());
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new BeneficiaryException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+            throw new BeneficiaryException("Invalid session.", HttpStatus.UNAUTHORIZED);
         }
     }
 

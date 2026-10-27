@@ -37,7 +37,7 @@ public class AdminMonitoringController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy audit log thành công",
+        return ResponseEntity.ok(ApiResponse.success("Audit logs retrieved successfully",
                 adminAuditLogService.search(action, actorEmail, ip, from, to, page, size)));
     }
 
@@ -51,7 +51,7 @@ public class AdminMonitoringController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.success("Lấy cảnh báo thành công",
+        return ResponseEntity.ok(ApiResponse.success("Alerts retrieved successfully",
                 securityAlertService.list(status, page, size)));
     }
 
@@ -64,7 +64,7 @@ public class AdminMonitoringController {
     public ResponseEntity<ApiResponse<SecurityAlertResponse>> acknowledgeAlert(
             Principal principal, @PathVariable UUID alertId) {
         UUID adminId = UUID.fromString(principal.getName());
-        return ResponseEntity.ok(ApiResponse.success("Đã xác nhận cảnh báo",
+        return ResponseEntity.ok(ApiResponse.success("Alert acknowledged",
                 securityAlertService.acknowledge(adminId, alertId)));
     }
 }

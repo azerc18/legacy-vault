@@ -15,7 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutorAccessGuard {
 
-    static final String NOT_ACTIVE_MESSAGE = "Chưa đến thời điểm thực hiện quyền";
+    static final String NOT_ACTIVE_MESSAGE = "Access is not available yet";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 

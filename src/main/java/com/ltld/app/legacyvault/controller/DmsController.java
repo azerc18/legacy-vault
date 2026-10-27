@@ -26,7 +26,7 @@ public class DmsController {
     @GetMapping
     public ResponseEntity<ApiResponse<DmsConfigResponse>> getConfig(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
-        return ResponseEntity.ok(ApiResponse.success("Lấy cấu hình Dead Man's Switch thành công",
+        return ResponseEntity.ok(ApiResponse.success("Dead Man's Switch configuration retrieved successfully",
                 dmsConfigService.getConfig(ownerId)));
     }
 
@@ -38,12 +38,12 @@ public class DmsController {
         UUID ownerId = UUID.fromString(principal.getName());
         DmsConfigService.UpsertResult result = dmsConfigService.upsertConfig(ownerId, request);
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
-                .body(ApiResponse.success("Lưu cấu hình Dead Man's Switch thành công", result.config()));
+                .body(ApiResponse.success("Dead Man's Switch configuration saved successfully", result.config()));
     }
 
     @PostMapping("/check-in")
     public ResponseEntity<ApiResponse<DmsConfigResponse>> checkIn(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
-        return ResponseEntity.ok(ApiResponse.success("Check-in thành công", dmsConfigService.checkIn(ownerId)));
+        return ResponseEntity.ok(ApiResponse.success("Checked in successfully", dmsConfigService.checkIn(ownerId)));
     }
 }

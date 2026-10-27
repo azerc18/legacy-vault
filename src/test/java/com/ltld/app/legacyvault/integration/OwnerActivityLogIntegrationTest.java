@@ -137,22 +137,22 @@ class OwnerActivityLogIntegrationTest {
         assertThat(logsA.getContent()).extracting(VaultActivityLogResponse::getCreatedAt)
                 .isSortedAccordingTo(Comparator.reverseOrder());
 
-        // Owner tự làm -> "Bạn"; BR-03 tự thu hồi (actor null) -> "Hệ thống"
+        // Owner tự làm -> "You"; BR-03 tự thu hồi (actor null) -> "System"
         assertThat(logsA.getContent())
                 .filteredOn(r -> r.getAction() == AuditAction.EXECUTOR_REVOKE)
                 .singleElement()
                 .satisfies(r -> {
-                    assertThat(r.getActorName()).isEqualTo("Hệ thống");
+                    assertThat(r.getActorName()).isEqualTo("System");
                     assertThat(r.getDescription()).isEqualTo(
-                            "Hệ thống tự động thu hồi người thi hành chính do không xác nhận đúng hạn.");
+                            "The system automatically revoked the primary executor for not acknowledging in time.");
                 });
         assertThat(logsA.getContent())
                 .filteredOn(r -> r.getAction() == AuditAction.DMS_CHECKIN)
                 .singleElement()
-                .satisfies(r -> assertThat(r.getActorName()).isEqualTo("Bạn"));
+                .satisfies(r -> assertThat(r.getActorName()).isEqualTo("You"));
     }
 
-    // Y2: thay test cũ suspendByAdmin_appearsInOwnerLog_... (DMS_SUSPENDED nay bị ẩn khỏi nhật ký Owner)
+    // FR-05: thay test cũ suspendByAdmin_appearsInOwnerLog_... (DMS_SUSPENDED nay bị ẩn khỏi nhật ký Owner)
     @Test
     void adminOnlyActions_hiddenFromOwnerLog_andNotCounted() {
         Fixture a = fixture("s");
@@ -185,7 +185,7 @@ class OwnerActivityLogIntegrationTest {
                 .isEqualTo(a.ownerLogIds().size());
     }
 
-    // Y3: Owner thấy VAULT_DELETED do chính mình xóa; không thấy của Owner khác hay của người khác (Admin)
+    // FR-05: Owner thấy VAULT_DELETED do chính mình xóa; không thấy của Owner khác hay của người khác (Admin)
     @Test
     void ownVaultDeleted_appearsInOwnerLog_otherOwnersAndAdminDoNot() throws Exception {
         Fixture a = fixture("d");
@@ -220,8 +220,8 @@ class OwnerActivityLogIntegrationTest {
                 .singleElement()
                 .satisfies(r -> {
                     assertThat(r.getId()).isEqualTo(deletedByA);
-                    assertThat(r.getActorName()).isEqualTo("Bạn");
-                    assertThat(r.getDescription()).isEqualTo("Xóa két sắt thành công.");
+                    assertThat(r.getActorName()).isEqualTo("You");
+                    assertThat(r.getDescription()).isEqualTo("Deleted the vault.");
                 });
         assertThat(logsA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
         assertThat(firstOfOneA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
@@ -231,7 +231,7 @@ class OwnerActivityLogIntegrationTest {
                 .doesNotContain(deletedByA, deletedByAdmin);
     }
 
-    // Y2 (T-1): không truyền from -> log cũ hơn 30 ngày (và hơn 1 năm) vẫn được trả về
+    // FR-05: không truyền from -> log cũ hơn 30 ngày (và hơn 1 năm) vẫn được trả về
     @Test
     void noFromDate_returnsLogsOlderThan30Days() {
         Fixture a = fixture("o");
@@ -296,7 +296,7 @@ class OwnerActivityLogIntegrationTest {
         Vault vault = vaultRepository.save(Vault.builder().owner(owner).name("Vault " + tag).build());
         String ownerDetail = "ownerId=" + owner.getId();
 
-        // B-01a: phải có Primary trước khi bật DMS. Lưu qua repository nên không sinh audit.
+        // FR-03: phải có Primary trước khi bật DMS. Lưu qua repository nên không sinh audit.
         ExecutorAssignment primary = assignment(owner, user("primary-" + tag), ExecutorType.PRIMARY, ExecutorStatus.INACTIVE);
         ExecutorAssignment revokedBackup = assignment(owner, user("backup-" + tag), ExecutorType.BACKUP, ExecutorStatus.REVOKED);
 

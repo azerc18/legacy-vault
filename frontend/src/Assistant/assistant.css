@@ -1,0 +1,42 @@
+.chibi { width: 96px; height: 112px; overflow: visible; cursor: pointer; }
+.chibi * { transform-box: fill-box; }
+
+.chibi-body   { animation: chibi-bob 3s ease-in-out infinite; }
+.chibi-eyes   { transform-origin: center; animation: chibi-blink 4s infinite; }
+.chibi-arm-r  { transform-origin: 20% 5%; }
+@keyframes chibi-wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-110deg); } }
+.chibi-antenna{ transform-origin: center; animation: chibi-glow 2s ease-in-out infinite; }
+
+.chibi--wave  .chibi-arm-r { animation: chibi-wave .5s ease-in-out 4; }
+.chibi--jump  .chibi-body  { animation: chibi-jump .5s ease-out 1; }
+.chibi--talk  .chibi-mouth { transform-origin: center; animation: chibi-talk .25s ease-in-out infinite alternate; }
+
+@keyframes chibi-bob   { 50% { transform: translateY(-3px); } }
+@keyframes chibi-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
+@keyframes chibi-wave  { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-150deg); } }
+@keyframes chibi-jump  { 40% { transform: translateY(-16px); } }
+@keyframes chibi-talk  { to { transform: scaleY(.4); } }
+@keyframes chibi-glow  { 50% { transform: scale(1.25); } }
+
+.chibi-bubble { animation: bubble-in .25s ease-out; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px) scale(.95); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .chibi *, .chibi-bubble, .typing-dot { animation: none !important; }
+}
+
+.typing-dot {
+    width: 6px; height: 6px; border-radius: 9999px;
+    background: currentColor; opacity: .4;
+    animation: typing-bounce 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: .15s; }
+.typing-dot:nth-child(3) { animation-delay: .3s; }
+@keyframes typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: .4; }
+    30%           { transform: translateY(-4px); opacity: 1; }
+}
+.chibi-mini { width: 32px; height: 32px; flex-shrink: 0; overflow: visible; }
+.chibi-mini * { transform-box: fill-box; }
+.chibi-mini .chibi-body { animation: none; }   /* avatar nhỏ không nhún, vẫn chớp mắt */
+

@@ -39,10 +39,10 @@ public class VaultActivityLogController {
 
         // Khoảng ngày (mặc định 30 ngày, tối đa 1 năm) do service kiểm
         if (page < 0) {
-            throw new VaultException("Số trang không hợp lệ (phải >= 0).", HttpStatus.BAD_REQUEST);
+            throw new VaultException("Invalid page number (must be >= 0).", HttpStatus.BAD_REQUEST);
         }
         if (size < 1 || size > 100) {
-            throw new VaultException("Kích thước trang phải từ 1 đến 100.", HttpStatus.BAD_REQUEST);
+            throw new VaultException("Page size must be between 1 and 100.", HttpStatus.BAD_REQUEST);
         }
 
         Pageable pageable = PageRequest.of(page, size);

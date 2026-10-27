@@ -38,10 +38,10 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
         Instant end = to != null ? to : Instant.now();
         Instant start = from != null ? from : end.minus(DEFAULT_RANGE_DAYS, ChronoUnit.DAYS);
         if (start.isAfter(end)) {
-            throw new AdminException("Ngày bắt đầu phải trước ngày kết thúc", HttpStatus.BAD_REQUEST);
+            throw new AdminException("Start date must be before end date", HttpStatus.BAD_REQUEST);
         }
         if (Duration.between(start, end).toDays() > MAX_RANGE_DAYS) {
-            throw new AdminException("Khoảng thời gian tối đa 365 ngày", HttpStatus.BAD_REQUEST);
+            throw new AdminException("The date range must be at most 365 days", HttpStatus.BAD_REQUEST);
         }
 
         String emailPattern = isBlank(actorEmail) ? null : "%" + actorEmail.trim().toLowerCase(Locale.ROOT) + "%";
@@ -63,7 +63,7 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
         try {
             return AuditAction.valueOf(action.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new AdminException("Action không hợp lệ: " + action, HttpStatus.BAD_REQUEST);
+            throw new AdminException("Invalid action: " + action, HttpStatus.BAD_REQUEST);
         }
     }
 

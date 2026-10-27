@@ -59,10 +59,10 @@ class EmailSenderDmsReminderTest {
         String text = message.getText();
         assertThat(message.getTo()).containsExactly("owner@example.com");
         assertThat(message.getSubject()).contains("(1/3)");
-        assertThat(text).contains("Hạn check-in: 01/11/2026 09:00 (giờ Việt Nam)");
-        assertThat(text).contains("vào lúc 08/11/2026 09:00 (giờ Việt Nam)");
+        assertThat(text).contains("Check-in deadline: 01/11/2026 09:00 (Vietnam time)");
+        assertThat(text).contains("handover process at 08/11/2026 09:00 (Vietnam time)");
         assertThat(text).doesNotContain("02:00");
-        assertThat(text).doesNotContain("Mã có hiệu lực");
+        assertThat(text).doesNotContain("The code is valid for");
     }
 
     @Test

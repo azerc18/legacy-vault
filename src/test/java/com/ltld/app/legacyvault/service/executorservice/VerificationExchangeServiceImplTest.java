@@ -227,7 +227,7 @@ class VerificationExchangeServiceImplTest {
     void guardRejection_stopsEverything() throws Exception {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
                 .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         assertThrows(ExecutorAssignmentNotFoundException.class, () -> send(null, "text"));
         assertThrows(ExecutorNotActiveException.class, () -> send(null, "text"));
@@ -457,7 +457,7 @@ class VerificationExchangeServiceImplTest {
     @DisplayName("Attachment with a guard rejection (wrong user / not active) reads nothing")
     void attachment_guardRejection_readsNothing() {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         assertThrows(ExecutorNotActiveException.class,
                 () -> service.getAttachment(assignmentId, requestId, UUID.randomUUID(), LOGIN));
