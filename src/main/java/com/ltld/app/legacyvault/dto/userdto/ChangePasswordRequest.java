@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.dto.userdto;
 
+import com.ltld.app.legacyvault.utility.PasswordPolicy;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -11,7 +13,7 @@ public class ChangePasswordRequest {
     private String currentPassword;
 
     @NotBlank(message = "Please enter a new password")
-    @Size(min = 6, max = 72, message = "New password must be 6-72 characters")
+    @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
     private String newPassword;
 
     @NotBlank(message = "Please confirm your new password")

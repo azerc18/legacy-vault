@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.dto.forgotpassworddto;
 
+import com.ltld.app.legacyvault.utility.PasswordPolicy;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -18,7 +19,7 @@ public class ResetPasswordRequest {
     private String otp;
 
     @NotBlank(message = "This field is required")
-    @Size(min = 6, max = 72, message = "Password must be 6-72 characters.")
+    @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
     private String newPassword;
 
     @NotBlank(message = "This field is required.")

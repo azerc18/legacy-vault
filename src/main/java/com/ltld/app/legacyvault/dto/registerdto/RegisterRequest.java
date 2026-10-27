@@ -1,9 +1,7 @@
 package com.ltld.app.legacyvault.dto.registerdto;
 
-import jakarta.validation.constraints.AssertTrue;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import com.ltld.app.legacyvault.utility.PasswordPolicy;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 
 @Data
@@ -17,7 +15,7 @@ public class RegisterRequest {
     private String fullName;
 
     @NotBlank(message = "This field is required")
-    @Size(min = 6, max = 72, message = "Password must be 6-72 characters.")
+    @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
     private String password;
 
     @NotBlank(message = "This field is required.")

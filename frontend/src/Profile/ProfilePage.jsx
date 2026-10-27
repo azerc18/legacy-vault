@@ -6,6 +6,8 @@ import UserAvatar from '../Common/UserAvatar.jsx';
 import { getErrorMessage } from '../api/http.js';
 import { logout, updateStoredUser } from '../auth/auth.js';
 import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import PasswordStrengthMeter from "../Common/PasswordStrengthMeter.jsx";
+import {isPasswordValid} from "../Common/passwordPolicy.js";
 
 const ROLE_LABEL = {
     OWNER: 'Vault Owner',
@@ -246,7 +248,7 @@ function ChangePasswordForm() {
         e.preventDefault();
         setError('');
         if (!current || !next || !confirm) return setError('Please fill in all password fields.');
-        if (next.length < 6 || next.length > 72) return setError('New password must be 6–72 characters.');
+        if (!isPasswordValid(next)) return setError('New password does not meet the requirements.');
         if (next !== confirm) return setError('Password confirmation does not match.');
         if (next === current) return setError('New password must be different from the current one.');
 
@@ -271,8 +273,9 @@ function ChangePasswordForm() {
                     <PasswordInput value={current} onChange={setCurrent} autoComplete="current-password" />
                 </Field>
                 <div className="grid sm:grid-cols-2 gap-4">
-                    <Field label="New password" hint="6–72 characters">
+                    <Field label="New password" hint="8–72 characters">
                         <PasswordInput value={next} onChange={setNext} autoComplete="new-password" />
+                        <PasswordStrengthMeter password={next} />
                     </Field>
                     <Field label="Confirm new password">
                         <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />

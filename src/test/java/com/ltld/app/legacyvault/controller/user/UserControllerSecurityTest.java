@@ -37,7 +37,7 @@ class UserControllerSecurityTest {
     private static final String BASE = "/api/users/me";
     private static final String UPDATE_BODY = "{\"fullName\":\"Nguyen Van A\",\"phoneNumber\":\"0901234567\"}";
     private static final String CHANGE_BODY =
-            "{\"currentPassword\":\"old-pass\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"new-pass\"}";
+            "{\"currentPassword\":\"old-pass\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}";
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private UserProfileService userProfileService;
