@@ -28,15 +28,19 @@ async function saveBlob(url, fallbackName) {
 
 export const ownerApi = {
     /* ---------- Vault (FR-01, FR-27) ---------- */
-    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt }]
-    listVaults: () => http.get('/vaults').then((r) => unwrap(r) ?? []),
+    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt, beneficiaryEmail, totalAssets, totalDocuments, modifiable, lockReason }]
+    listVaults: () => http.get('/vaults').then((r) => {
+        const d = unwrap(r);
+        return Array.isArray(d) ? d : (d?.content ?? []);
+    }),
 
     // -> VaultDetailResponse { id, name, description, status, ownerEmail, beneficiaryId, beneficiaryEmail,
-    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
+    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets, modifiable, lockReason }
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
-    // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
-    createVault: ({ name, description, assets }) => http.post('/vaults', { name, description, assets }).then(unwrap),
+    // name ≤100 (bắt buộc), description ≤500, assets ≤50, primaryExecutorEmail, backupExecutorEmail
+    createVault: ({ name, description, assets, primaryExecutorEmail, backupExecutorEmail }) =>
+        http.post('/vaults', { name, description, assets, primaryExecutorEmail, backupExecutorEmail }).then(unwrap),
 
     // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
     updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
@@ -59,6 +63,9 @@ export const ownerApi = {
     // -> { vaultId, beneficiaryEmail, beneficiaryName, pendingRegistration, replaced }
     assignBeneficiary: (vaultId, email, confirmReplace = false) =>
         http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap),
+
+    // V8: gỡ người thụ hưởng hoặc hủy lời mời
+    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`),
 
     // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER

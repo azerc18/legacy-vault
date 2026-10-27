@@ -45,4 +45,31 @@ public class VaultModificationGuard {
                     HttpStatus.CONFLICT);
         }
     }
+
+    /**
+     * V7: Kiểm tra lý do khóa không ném exception để trả về cho FE
+     */
+    public java.util.Optional<String> lockReason(Vault vault) {
+        if (vault.getStatus() != VaultStatus.ACTIVE) {
+            return java.util.Optional.of("Cannot modify vault that is not in active state");
+        }
+        try {
+            dmsConfigService.assertHandoverNotStarted(vault.getOwner().getId());
+        } catch (Exception ex) {
+            return java.util.Optional.of("Handover process has started");
+        }
+        boolean hasOpenVerification = !verificationRequestVaultRepository
+                .findVaultIdsWithOpenRequest(
+                        List.of(vault.getId()),
+                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED))
+                .isEmpty();
+        if (hasOpenVerification) {
+            return java.util.Optional.of("A verification request is pending or approved");
+        }
+        return java.util.Optional.empty();
+    }
+
+    public boolean isModifiable(Vault vault) {
+        return lockReason(vault).isEmpty();
+    }
 }
