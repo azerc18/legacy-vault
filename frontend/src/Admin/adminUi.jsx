@@ -1,14 +1,17 @@
 // Layout + hộp thoại dùng chung cho các trang Admin
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Link, Navigate, NavLink, useNavigate} from 'react-router-dom';
 import {getUser, logout} from '../auth/auth.js';
 import {Icon, btnPrimary, btnOutline, btnDanger} from '../Owner/ownerUi.jsx';
 import UserAvatar from '../Common/UserAvatar.jsx';
+import {adminApi} from '../api/adminApi.js';
 
 const NAV = [
     {to: '/admin/users', label: 'Users', icon: 'group'},
     {to: '/admin/roles', label: 'Roles', icon: 'shield_person'},
     {to: '/admin/vaults', label: 'Vaults', icon: 'inventory_2'},
+    {to: '/admin/audit-logs', label: 'Audit log', icon: 'history'},
+    {to: '/admin/alerts', label: 'Alerts', icon: 'notifications_active', badge: true},
 ];
 
 export const isAdmin = (user) => (user?.roles || []).includes('ADMIN');
@@ -16,6 +19,12 @@ export const isAdmin = (user) => (user?.roles || []).includes('ADMIN');
 export function AdminLayout({title, subtitle, children}) {
     const navigate = useNavigate();
     const user = getUser();
+
+    const [openAlerts, setOpenAlerts] = useState(0);
+    useEffect(() => {
+        if (!isAdmin(user)) return;
+        adminApi.countOpenAlerts().then((r) => setOpenAlerts(r?.open ?? 0)).catch(() => {});
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!user) return <Navigate to="/login" replace/>;
     if (!isAdmin(user)) return <Navigate to="/home" replace/>;
@@ -65,6 +74,11 @@ export function AdminLayout({title, subtitle, children}) {
                                 }`}
                         >
                             <Icon name={n.icon} className="text-[18px]"/> {n.label}
+                            {n.badge && openAlerts > 0 && (
+                                <span className="ml-1 min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
+                                    {openAlerts}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
                 </nav>
