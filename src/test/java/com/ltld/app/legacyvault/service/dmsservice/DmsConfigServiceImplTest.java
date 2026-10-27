@@ -4,15 +4,19 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
+import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -21,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -34,6 +39,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,6 +64,7 @@ class DmsConfigServiceImplTest {
 
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private DmsCheckinRepository dmsCheckinRepository;
+    @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private VaultRepository vaultRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService auditLogService;
@@ -88,6 +96,25 @@ class DmsConfigServiceImplTest {
             return c;
         });
         when(dmsCheckinRepository.saveAndFlush(any(DmsCheckin.class))).thenAnswer(inv -> inv.getArgument(0));
+        // B-01a: mặc định Owner đã có Primary, để bật DMS / mở lại DMS được phép.
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE));
+    }
+
+    /** Stub các dòng Executor của Owner cho cả lần đọc có khóa (upsert/resume) lẫn đọc thường (getConfig...). */
+    private void executors(ExecutorAssignment... assignments) {
+        when(executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId)).thenReturn(List.of(assignments));
+        when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of(assignments));
+    }
+
+    private ExecutorAssignment executor(ExecutorType type, ExecutorStatus status) {
+        return ExecutorAssignment.builder()
+                .id(UUID.randomUUID())
+                .owner(owner)
+                .executorUser(User.builder().id(UUID.randomUUID()).email(type + "@example.test").build())
+                .executorType(type)
+                .status(status)
+                .version(0L)
+                .build();
     }
 
     private static DmsConfigRequest request(int intervalDays, int gracePeriodDays, int reminderCount) {
@@ -115,6 +142,8 @@ class DmsConfigServiceImplTest {
                 .version(3L)
                 .build();
         when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.of(config));
+        // upsertConfig đọc bằng khóa (B-01a).
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(config));
         return config;
     }
 
@@ -273,6 +302,72 @@ class DmsConfigServiceImplTest {
         verifyNoInteractions(auditLogService);
     }
 
+    // ---------- B-01a: phải có Executor chính trước khi bật DMS ----------
+
+    @Test
+    @DisplayName("B-01a: tạo mới khi Owner chưa có Executor nào -> 409, không lưu, không audit")
+    void upsert_create_withoutPrimary_returns409() {
+        executors();
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.NO_PRIMARY_EXECUTOR_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("B-01a: lưu lại cấu hình khi Primary đã bị thu hồi -> 409, giữ nguyên lịch cũ")
+    void upsert_existing_withoutPrimary_returns409() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.REVOKED));
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(60, 10, 2)))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.NO_PRIMARY_EXECUTOR_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getCheckinIntervalDays()).isEqualTo(30);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("B-01a: chỉ có Backup (Primary chưa chỉ định) -> 409, đúng chữ tài liệu: cần Executor chính")
+    void upsert_onlyBackup_returns409() {
+        executors(executor(ExecutorType.BACKUP, ExecutorStatus.INACTIVE));
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.NO_PRIMARY_EXECUTOR_MESSAGE);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("B-01a: Primary REVOKED dù Backup còn -> 409")
+    void upsert_primaryRevokedWithBackup_returns409() {
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.REVOKED),
+                executor(ExecutorType.BACKUP, ExecutorStatus.INACTIVE));
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.NO_PRIMARY_EXECUTOR_MESSAGE);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("B-01a: có Primary -> lưu được, hasUsableExecutor=true; khóa DmsConfig rồi mới khóa Executor, rồi mới ghi")
+    void upsert_withPrimary_locksDmsConfigThenExecutors() {
+        DmsConfigService.UpsertResult result = service.upsertConfig(ownerId, request(30, 7, 3));
+
+        assertThat(result.config().isHasUsableExecutor()).isTrue();
+        InOrder order = inOrder(dmsConfigRepository, executorAssignmentRepository);
+        order.verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        order.verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        order.verify(dmsConfigRepository).saveAndFlush(any(DmsConfig.class));
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+    }
+
     // ---------- checkIn ----------
 
     @Test
@@ -391,6 +486,30 @@ class DmsConfigServiceImplTest {
         assertThat(response.getNextReminderAt()).isEqualTo(existing.getNextReminderAt());
         assertThat(response.getRemindersSent()).isEqualTo(2);
         verifyNothingWritten();
+    }
+
+    // Cột trống = chưa có dòng cho vị trí đó. Cùng quy tắc chọn người với DmsActivationProcessor.trigger.
+    @ParameterizedTest(name = "Primary={0}, Backup={1} -> hasUsableExecutor={2}")
+    @CsvSource({
+            "INACTIVE, , true",
+            "ACTIVE, , true",
+            "INACTIVE, INACTIVE, true",
+            "REVOKED, INACTIVE, true",
+            "REVOKED, ACTIVE, false",
+            "REVOKED, REVOKED, false",
+            ", INACTIVE, true",
+            ", ACTIVE, false",
+            ", , false"
+    })
+    @DisplayName("B-01a: hasUsableExecutor tính như trigger chọn người (Primary chưa REVOKED, nếu không thì Backup INACTIVE)")
+    void getConfig_hasUsableExecutor(ExecutorStatus primary, ExecutorStatus backup, boolean expected) {
+        existingConfig(DmsStatus.ACTIVE);
+        List<ExecutorAssignment> rows = new ArrayList<>();
+        if (primary != null) rows.add(executor(ExecutorType.PRIMARY, primary));
+        if (backup != null) rows.add(executor(ExecutorType.BACKUP, backup));
+        executors(rows.toArray(ExecutorAssignment[]::new));
+
+        assertThat(service.getConfig(ownerId).isHasUsableExecutor()).isEqualTo(expected);
     }
 
     // ---------- assertHandoverNotStarted (O1) ----------
@@ -572,6 +691,36 @@ class DmsConfigServiceImplTest {
                 .isInstanceOf(DmsException.class)
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
         verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("B-01a (O5): mở lại khi Owner đã thu hồi Primary lúc DMS tạm dừng -> 409, vẫn SUSPENDED, không ghi")
+    void resumeByAdmin_withoutPrimary_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.SUSPENDED);
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.REVOKED),
+                executor(ExecutorType.BACKUP, ExecutorStatus.INACTIVE));
+
+        assertThatThrownBy(() -> service.resumeByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.RESUME_NO_PRIMARY_EXECUTOR_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
+        verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("B-01a (O5): mở lại có Primary -> khóa DmsConfig rồi mới khóa Executor, hasUsableExecutor=true")
+    void resumeByAdmin_withPrimary_locksDmsConfigThenExecutors() {
+        lockedConfig(DmsStatus.SUSPENDED);
+
+        DmsConfigResponse response = service.resumeByAdmin(ownerId, adminId);
+
+        assertThat(response.isHasUsableExecutor()).isTrue();
+        InOrder order = inOrder(dmsConfigRepository, executorAssignmentRepository);
+        order.verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        order.verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        order.verify(dmsConfigRepository).saveAndFlush(any(DmsConfig.class));
     }
 
     private DmsConfig lockedConfig(DmsStatus status) {

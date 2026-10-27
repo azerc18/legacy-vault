@@ -28,4 +28,7 @@ public class DmsConfigResponse {
     private LocalDateTime nextReminderAt;
     private Integer remindersSent;
     private LocalDateTime triggeredAt;
+    // B-01a: trigger lúc này có kích hoạt được Executor nào không (ExecutorActivationRule, cùng quy tắc với FR-07).
+    // Sau khi TRIGGERED và leo thang BR-03 (Primary REVOKED, Backup ACTIVE) giá trị là false; chỉ có ý nghĩa khi chưa TRIGGERED.
+    private boolean hasUsableExecutor;
 }

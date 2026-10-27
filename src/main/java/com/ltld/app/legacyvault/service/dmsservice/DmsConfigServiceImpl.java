@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
+import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -13,6 +14,7 @@ import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -20,10 +22,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,9 +42,13 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String SUSPEND_TRIGGERED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể tạm dừng.";
     static final String ALREADY_SUSPENDED_MESSAGE = "Dead Man's Switch đã ở trạng thái tạm dừng.";
     static final String NOT_SUSPENDED_MESSAGE = "Dead Man's Switch không ở trạng thái tạm dừng.";
+    static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Cần chỉ định Executor chính trước khi bật Dead Man's Switch.";
+    static final String RESUME_NO_PRIMARY_EXECUTOR_MESSAGE =
+            "Owner chưa có Executor chính, không thể mở lại Dead Man's Switch.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final VaultRepository vaultRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
@@ -52,10 +60,13 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         return toResponse(findConfig(ownerId));
     }
 
+    // B-01a: READ_COMMITTED như FR-06. Với REPEATABLE READ, findByOwnerIdForUpdate trên dòng chưa có sẽ khóa gap
+    // của uk_dms_config_owner; hai lần tạo đồng thời giữ gap của nhau rồi chờ nhau ở INSERT / khóa Executor (deadlock).
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UpsertResult upsertConfig(UUID ownerId, DmsConfigRequest request) {
-        DmsConfig existing = dmsConfigRepository.findByOwnerId(ownerId).orElse(null);
+        // Khóa DmsConfig (nếu đã có) TRƯỚC ExecutorAssignment, cùng thứ tự với FR-06/FR-07.
+        DmsConfig existing = dmsConfigRepository.findByOwnerIdForUpdate(ownerId).orElse(null);
         // SRS: DMS đã kích hoạt thì quy trình bàn giao không thể bị Owner hủy hay cấu hình lại.
         if (existing != null && existing.getStatus() == DmsStatus.TRIGGERED) {
             throw new DmsException("Dead Man's Switch đã được kích hoạt, không thể thay đổi cấu hình.",
@@ -70,6 +81,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             throw new DmsException("Cần tạo ít nhất một Vault trước khi cấu hình Dead Man's Switch.",
                     HttpStatus.CONFLICT);
         }
+        // B-01a: áp dụng cả khi tạo mới lẫn khi lưu lại cấu hình.
+        List<ExecutorAssignment> executors = lockExecutorsWithPrimary(ownerId, NO_PRIMARY_EXECUTOR_MESSAGE);
 
         User owner = existing != null ? existing.getOwner() : userRepository.findById(ownerId)
                 .orElseThrow(() -> new DmsException("Không tìm thấy Owner.", HttpStatus.NOT_FOUND));
@@ -106,7 +119,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 + ", checkinIntervalDays=" + config.getCheckinIntervalDays()
                 + ", gracePeriodDays=" + config.getGracePeriodDays()
                 + ", reminderCount=" + config.getReminderCount());
-        return new UpsertResult(toResponse(config), created);
+        return new UpsertResult(toResponse(config, executors), created);
     }
 
     @Override
@@ -172,14 +185,18 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         return toResponse(config);
     }
 
+    // READ_COMMITTED: cùng lý do với upsertConfig.
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DmsConfigResponse resumeByAdmin(UUID ownerId, UUID adminId) {
         DmsConfig config = findConfigForUpdate(ownerId);
         if (config.getStatus() != DmsStatus.SUSPENDED) {
             throw new DmsException(NOT_SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
         }
         assertScheduleComplete(config);
+        // B-01a: mở lại = bật lại DMS, cùng quy tắc với upsertConfig. Owner có thể đã thu hồi Executor
+        // trong lúc DMS bị tạm dừng (FR-06 cho phép), nên phải kiểm lại ở đây.
+        List<ExecutorAssignment> executors = lockExecutorsWithPrimary(ownerId, RESUME_NO_PRIMARY_EXECUTOR_MESSAGE);
 
         // Chu kỳ mới từ lúc mở lại: hạn cũ có thể đã qua trong thời gian tạm dừng, không được trigger ngay.
         config.setStatus(DmsStatus.ACTIVE);
@@ -187,7 +204,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         config = dmsConfigRepository.saveAndFlush(config);
 
         auditByAdmin(AuditAction.DMS_RESUMED, adminId, config, "nextCheckinDueAt=" + config.getNextCheckinDueAt());
-        return toResponse(config);
+        return toResponse(config, executors);
     }
 
     private DmsConfig findConfig(UUID ownerId) {
@@ -199,6 +216,20 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     private DmsConfig findConfigForUpdate(UUID ownerId) {
         return dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
                 .orElseThrow(() -> new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+    }
+
+    /**
+     * B-01a: khóa FOR UPDATE các dòng Executor của Owner rồi mới kiểm có Primary chưa REVOKED; không có -> 409.
+     * FR-06 revokeExecutor khóa cùng các dòng này rồi mới đọc trạng thái DMS, nên "bật DMS lần đầu" (chưa có dòng
+     * DmsConfig để khóa chung) và "thu hồi Executor cuối cùng" chạy lần lượt, không cùng commit được.
+     * Gọi SAU khi đã khóa DmsConfig (thứ tự DmsConfig -> User -> ExecutorAssignment).
+     */
+    private List<ExecutorAssignment> lockExecutorsWithPrimary(UUID ownerId, String message) {
+        List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
+        if (executors.stream().noneMatch(ExecutorActivationRule::isUsablePrimary)) {
+            throw new DmsException(message, HttpStatus.CONFLICT);
+        }
+        return executors;
     }
 
     // Dòng tạo trước FR-03 chưa có thời gian chờ: không tính được lịch, yêu cầu lưu lại cấu hình.
@@ -237,6 +268,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     private DmsConfigResponse toResponse(DmsConfig config) {
+        return toResponse(config, executorAssignmentRepository.findAllByOwnerId(config.getOwner().getId()));
+    }
+
+    private DmsConfigResponse toResponse(DmsConfig config, List<ExecutorAssignment> executors) {
         LocalDateTime checkinDueAt = config.getLastCheckinAt() != null && config.getCheckinIntervalDays() != null
                 ? config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays())
                 : null;
@@ -252,6 +287,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
                 .triggeredAt(config.getTriggeredAt())
+                .hasUsableExecutor(ExecutorActivationRule.pickActivationTarget(executors).isPresent())
                 .build();
     }
 }

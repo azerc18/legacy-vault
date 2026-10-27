@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.executorservice;
 
 import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
+import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -34,6 +35,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -50,6 +52,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class ExecutorManagementServiceImpl implements ExecutorManagementService {
+
+    static final String LAST_EXECUTOR_MESSAGE =
+            "Không thể thu hồi Executor cuối cùng khi DMS đang bật. Hãy chỉ định người thay thế hoặc tắt DMS.";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
@@ -153,11 +158,12 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         return toResponse(saved);
     }
 
-    // READ_COMMITTED: cùng lý do với assignExecutor.
+    // READ_COMMITTED: cùng lý do với assignExecutor; thêm nữa, B-01a đọc lại DmsConfig sau khi khóa Executor
+    // phải thấy dòng mà upsertConfig vừa commit.
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ExecutorAssignmentResponse revokeExecutor(UUID ownerId, ExecutorType type) {
-        ensureDmsNotTriggered(ownerId);
+        Optional<DmsConfig> lockedDms = ensureDmsNotTriggered(ownerId);
         User owner = loadOwner(ownerId);
 
         ExecutorAssignment assignment = executorAssignmentRepository
@@ -166,11 +172,13 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .orElseThrow(() -> new ExecutorManagementException(
                         "Không có Executor " + type + " nào để thu hồi.", HttpStatus.NOT_FOUND));
 
-        assignment.setStatus(ExecutorStatus.REVOKED);
-        assignment.setRevokedAt(LocalDateTime.now());
         User executor = assignment.getExecutorUser();
         // Không đọc executor.getRoles() trước dòng này (xem comment ở assignExecutor).
         lockUsersInOrder(executor.getId());
+        ensureNotLastExecutorWhileDmsActive(ownerId, assignment, lockedDms);
+
+        assignment.setStatus(ExecutorStatus.REVOKED);
+        assignment.setRevokedAt(LocalDateTime.now());
         executorRoleManager.revokeIfUnused(executor, assignment.getId());
 
         ExecutorAssignment saved = saveAndFlush(assignment, type);
@@ -208,15 +216,43 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
      * </ul>
      * Phải gọi ĐẦU TIÊN trong transaction: khóa DmsConfig trước, ExecutorAssignment sau, cùng thứ tự với
      * trigger của FR-07, để hai bên không khóa chéo nhau (deadlock). Chưa có DmsConfig thì không có gì để chặn.
+     *
+     * @return DmsConfig đã khóa, hoặc rỗng nếu Owner chưa có DmsConfig.
      */
-    private void ensureDmsNotTriggered(UUID ownerId) {
-        dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
-                .filter(c -> c.getStatus() == DmsStatus.TRIGGERED)
-                .ifPresent(c -> {
-                    throw new ExecutorManagementException(
-                            "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi Executor.",
-                            HttpStatus.CONFLICT);
-                });
+    private Optional<DmsConfig> ensureDmsNotTriggered(UUID ownerId) {
+        Optional<DmsConfig> config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId);
+        if (config.filter(c -> c.getStatus() == DmsStatus.TRIGGERED).isPresent()) {
+            throw new ExecutorManagementException(
+                    "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi Executor.",
+                    HttpStatus.CONFLICT);
+        }
+        return config;
+    }
+
+    /**
+     * B-01a: DMS đang ACTIVE thì không được thu hồi Executor cuối cùng chưa REVOKED (thu hồi Primary khi còn
+     * Backup vẫn được). Chưa có DMS hoặc DMS SUSPENDED thì cho phép; Admin mở lại DMS sẽ kiểm lại Primary.
+     *
+     * <p>Khóa FOR UPDATE các dòng Executor của Owner (sau khóa User, giữ thứ tự DmsConfig -> User -> ExecutorAssignment)
+     * rồi mới đọc trạng thái DMS. Lúc ensureDmsNotTriggered chưa có DmsConfig thì không có khóa chung với
+     * upsertConfig bật DMS lần đầu; upsertConfig cũng khóa các dòng này trước khi kiểm Primary, nên:
+     * <ul>
+     *   <li>upsert khóa trước: lệnh khóa ở đây chờ upsert commit, rồi đọc lại (READ_COMMITTED) thấy DMS ACTIVE -> 409;</li>
+     *   <li>ở đây khóa trước: upsert chờ, sau đó thấy Primary đã REVOKED -> 409.</li>
+     * </ul>
+     * Đọc lại bằng đọc thường, không khóa DmsConfig sau ExecutorAssignment: khóa ngược thứ tự sẽ deadlock với trigger FR-07.
+     */
+    private void ensureNotLastExecutorWhileDmsActive(UUID ownerId, ExecutorAssignment target,
+                                                     Optional<DmsConfig> lockedDms) {
+        List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
+        boolean dmsActive = lockedDms.or(() -> dmsConfigRepository.findByOwnerId(ownerId))
+                .filter(c -> c.getStatus() == DmsStatus.ACTIVE)
+                .isPresent();
+        boolean othersLeft = executors.stream()
+                .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED);
+        if (dmsActive && !othersLeft) {
+            throw new ExecutorManagementException(LAST_EXECUTOR_MESSAGE, HttpStatus.CONFLICT);
+        }
     }
 
     private User loadOwner(UUID ownerId) {
