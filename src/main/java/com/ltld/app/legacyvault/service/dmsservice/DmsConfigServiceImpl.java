@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 @Service
 @RequiredArgsConstructor
@@ -43,8 +44,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String ALREADY_SUSPENDED_MESSAGE = "Dead Man's Switch đã ở trạng thái tạm dừng.";
     static final String NOT_SUSPENDED_MESSAGE = "Dead Man's Switch không ở trạng thái tạm dừng.";
     static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Cần chỉ định Executor chính trước khi bật Dead Man's Switch.";
-    static final String RESUME_NO_PRIMARY_EXECUTOR_MESSAGE =
-            "Owner chưa có Executor chính, không thể mở lại Dead Man's Switch.";
+    static final String NO_ACTIVATION_TARGET_MESSAGE = "Không còn Executor nào có thể nhận bàn giao. "
+            + "Hãy chỉ định Executor trước khi lưu cấu hình Dead Man's Switch.";
+    static final String RESUME_NO_ACTIVATION_TARGET_MESSAGE =
+            "Owner không còn Executor nào có thể nhận bàn giao, không thể mở lại Dead Man's Switch.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -60,7 +63,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         return toResponse(findConfig(ownerId));
     }
 
-    // B-01a: READ_COMMITTED như FR-06. Với REPEATABLE READ, findByOwnerIdForUpdate trên dòng chưa có sẽ khóa gap
+    // FR-03: READ_COMMITTED như FR-06. Với REPEATABLE READ, findByOwnerIdForUpdate trên dòng chưa có sẽ khóa gap
     // của uk_dms_config_owner; hai lần tạo đồng thời giữ gap của nhau rồi chờ nhau ở INSERT / khóa Executor (deadlock).
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -81,8 +84,13 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             throw new DmsException("Cần tạo ít nhất một Vault trước khi cấu hình Dead Man's Switch.",
                     HttpStatus.CONFLICT);
         }
-        // B-01a: áp dụng cả khi tạo mới lẫn khi lưu lại cấu hình.
-        List<ExecutorAssignment> executors = lockExecutorsWithPrimary(ownerId, NO_PRIMARY_EXECUTOR_MESSAGE);
+        // FR-03: bật lần đầu phải có Executor chính chưa REVOKED; lưu lại cấu hình chỉ cần trigger còn chọn được
+        // người (cùng quy tắc với FR-07), để Owner đã thu hồi Primary nhưng còn Backup vẫn lưu được.
+        List<ExecutorAssignment> executors = existing == null
+                ? lockExecutors(ownerId, list -> list.stream().anyMatch(ExecutorActivationRule::isUsablePrimary),
+                        NO_PRIMARY_EXECUTOR_MESSAGE)
+                : lockExecutors(ownerId, list -> ExecutorActivationRule.pickActivationTarget(list).isPresent(),
+                        NO_ACTIVATION_TARGET_MESSAGE);
 
         User owner = existing != null ? existing.getOwner() : userRepository.findById(ownerId)
                 .orElseThrow(() -> new DmsException("Không tìm thấy Owner.", HttpStatus.NOT_FOUND));
@@ -194,9 +202,11 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             throw new DmsException(NOT_SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
         }
         assertScheduleComplete(config);
-        // B-01a: mở lại = bật lại DMS, cùng quy tắc với upsertConfig. Owner có thể đã thu hồi Executor
-        // trong lúc DMS bị tạm dừng (FR-06 cho phép), nên phải kiểm lại ở đây.
-        List<ExecutorAssignment> executors = lockExecutorsWithPrimary(ownerId, RESUME_NO_PRIMARY_EXECUTOR_MESSAGE);
+        // FR-03: mở lại = bật lại DMS đã có cấu hình, cùng quy tắc với lưu lại cấu hình: trigger phải còn chọn được
+        // người. Owner có thể đã thu hồi Executor trong lúc DMS bị tạm dừng (FR-06 cho phép), nên phải kiểm lại ở đây.
+        List<ExecutorAssignment> executors = lockExecutors(ownerId,
+                list -> ExecutorActivationRule.pickActivationTarget(list).isPresent(),
+                RESUME_NO_ACTIVATION_TARGET_MESSAGE);
 
         // Chu kỳ mới từ lúc mở lại: hạn cũ có thể đã qua trong thời gian tạm dừng, không được trigger ngay.
         config.setStatus(DmsStatus.ACTIVE);
@@ -219,14 +229,15 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     /**
-     * B-01a: khóa FOR UPDATE các dòng Executor của Owner rồi mới kiểm có Primary chưa REVOKED; không có -> 409.
+     * FR-03: khóa FOR UPDATE các dòng Executor của Owner rồi mới kiểm {@code usable}; không đạt -> 409 {@code message}.
      * FR-06 revokeExecutor khóa cùng các dòng này rồi mới đọc trạng thái DMS, nên "bật DMS lần đầu" (chưa có dòng
      * DmsConfig để khóa chung) và "thu hồi Executor cuối cùng" chạy lần lượt, không cùng commit được.
      * Gọi SAU khi đã khóa DmsConfig (thứ tự DmsConfig -> User -> ExecutorAssignment).
      */
-    private List<ExecutorAssignment> lockExecutorsWithPrimary(UUID ownerId, String message) {
+    private List<ExecutorAssignment> lockExecutors(UUID ownerId, Predicate<List<ExecutorAssignment>> usable,
+                                                   String message) {
         List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
-        if (executors.stream().noneMatch(ExecutorActivationRule::isUsablePrimary)) {
+        if (!usable.test(executors)) {
             throw new DmsException(message, HttpStatus.CONFLICT);
         }
         return executors;
@@ -287,7 +298,9 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
                 .triggeredAt(config.getTriggeredAt())
-                .hasUsableExecutor(ExecutorActivationRule.pickActivationTarget(executors).isPresent())
+                .hasUsableExecutor(config.getStatus() == DmsStatus.TRIGGERED
+                        ? null
+                        : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
                 .build();
     }
 }

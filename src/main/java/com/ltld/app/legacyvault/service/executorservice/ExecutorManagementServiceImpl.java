@@ -158,7 +158,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         return toResponse(saved);
     }
 
-    // READ_COMMITTED: cùng lý do với assignExecutor; thêm nữa, B-01a đọc lại DmsConfig sau khi khóa Executor
+    // READ_COMMITTED: cùng lý do với assignExecutor; thêm nữa, FR-06 đọc lại DmsConfig sau khi khóa Executor
     // phải thấy dòng mà upsertConfig vừa commit.
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -230,8 +230,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     }
 
     /**
-     * B-01a: DMS đang ACTIVE thì không được thu hồi Executor cuối cùng chưa REVOKED (thu hồi Primary khi còn
-     * Backup vẫn được). Chưa có DMS hoặc DMS SUSPENDED thì cho phép; Admin mở lại DMS sẽ kiểm lại Primary.
+     * FR-06: DMS đang ACTIVE thì không được thu hồi Executor cuối cùng chưa REVOKED (thu hồi Primary khi còn
+     * Backup vẫn được). Chưa có DMS hoặc DMS SUSPENDED thì cho phép; Admin mở lại DMS sẽ kiểm lại còn Executor
+     * nhận bàn giao được.
      *
      * <p>Khóa FOR UPDATE các dòng Executor của Owner (sau khóa User, giữ thứ tự DmsConfig -> User -> ExecutorAssignment)
      * rồi mới đọc trạng thái DMS. Lúc ensureDmsNotTriggered chưa có DmsConfig thì không có khóa chung với

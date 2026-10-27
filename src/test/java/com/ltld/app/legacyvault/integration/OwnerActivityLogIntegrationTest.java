@@ -208,7 +208,7 @@ class OwnerActivityLogIntegrationTest {
         Vault vault = vaultRepository.save(Vault.builder().owner(owner).name("Vault " + tag).build());
         String ownerDetail = "ownerId=" + owner.getId();
 
-        // B-01a: phải có Primary trước khi bật DMS. Lưu qua repository nên không sinh audit.
+        // FR-03: phải có Primary trước khi bật DMS. Lưu qua repository nên không sinh audit.
         ExecutorAssignment primary = assignment(owner, user("primary-" + tag), ExecutorType.PRIMARY, ExecutorStatus.INACTIVE);
         ExecutorAssignment revokedBackup = assignment(owner, user("backup-" + tag), ExecutorType.BACKUP, ExecutorStatus.REVOKED);
 

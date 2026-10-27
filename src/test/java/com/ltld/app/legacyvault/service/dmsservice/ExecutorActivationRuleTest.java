@@ -16,7 +16,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * B-01a: các tổ hợp dưới đây PHẢI khớp với cách DmsActivationProcessor.trigger chọn người khi DMS kích hoạt:
+ * FR-03: các tổ hợp dưới đây PHẢI khớp với cách DmsActivationProcessor.trigger chọn người khi DMS kích hoạt:
  * Primary có status != REVOKED, nếu không có thì Backup có status == INACTIVE, nếu không có nữa thì không ai
  * (DMS_TRIGGERED_NO_EXECUTOR). Trigger chưa dùng ExecutorActivationRule; khi chuyển trigger sang dùng helper
  * (PR riêng) thì bảng này là hợp đồng để đối chiếu, và đổi một bên phải đổi cả bên kia.

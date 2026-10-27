@@ -104,7 +104,7 @@ class ExecutorManagementIntegrationTest {
     // Mail đã gửi chạy trên thread @Async: chờ tối đa MAIL_WAIT_MS; kiểm "không gửi" chờ NO_MAIL_WAIT_MS.
     private static final long MAIL_WAIT_MS = 5_000;
     private static final long NO_MAIL_WAIT_MS = 300;
-    // B-01a: thời gian giữ transaction mở sau khi ghi, trong test race bật DMS vs thu hồi Executor.
+    // FR-03/FR-06: thời gian giữ transaction mở sau khi ghi, trong test race bật DMS vs thu hồi Executor.
     private static final long RACE_WINDOW_MS = 30;
 
     // Mốc T0 = lúc quét kích hoạt; cắt về giây để so sánh với DATETIME của MySQL không lệch.
@@ -114,7 +114,7 @@ class ExecutorManagementIntegrationTest {
     private EmailSender emailSender;                                   // mail FR-06
     @MockitoBean
     private ExecutorNotificationService executorNotificationService;   // mail kích hoạt FR-07
-    // B-01a: spy gọi hàm thật; chỉ test race B-01a thêm độ trễ để giữ transaction mở (Spring reset spy sau mỗi test).
+    // FR-03/FR-06: spy gọi hàm thật; chỉ test race bật DMS vs thu hồi Executor thêm độ trễ để giữ transaction mở (Spring reset spy sau mỗi test).
     @MockitoSpyBean
     private AuditLogService auditLogService;
 
@@ -158,7 +158,7 @@ class ExecutorManagementIntegrationTest {
         for (UUID ownerId : ownerIds) {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
                     "%ownerId=" + ownerId + "%");
-            // DmsConfig do upsertConfig tạo (B-01a) không nằm sẵn trong configIds.
+            // DmsConfig do upsertConfig tạo (FR-03) không nằm sẵn trong configIds.
             dmsConfigRepository.findByOwnerId(ownerId)
                     .filter(c -> !configIds.contains(c.getId()))
                     .ifPresent(c -> configIds.add(c.getId()));
@@ -260,7 +260,7 @@ class ExecutorManagementIntegrationTest {
 
     @Test
     void revokeThenReassign_reusesSameRowAndClearsTimestamps_auditInOrder() {
-        // Không tạo DMS: B-01a cấm thu hồi Executor cuối cùng khi DMS ACTIVE; test này chỉ kiểm việc dùng lại dòng.
+        // Không tạo DMS: FR-06 cấm thu hồi Executor cuối cùng khi DMS ACTIVE; test này chỉ kiểm việc dùng lại dòng.
         Owner o = owner(null);
         User c = user("c");
         User d = user("d");
@@ -569,7 +569,7 @@ class ExecutorManagementIntegrationTest {
         verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
     }
 
-    // ---------- 8. B-01a Race: bật DMS lần đầu vs thu hồi Executor cuối cùng ----------
+    // ---------- 8. FR-03/FR-06 Race: bật DMS lần đầu vs thu hồi Executor cuối cùng ----------
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.MINUTES)

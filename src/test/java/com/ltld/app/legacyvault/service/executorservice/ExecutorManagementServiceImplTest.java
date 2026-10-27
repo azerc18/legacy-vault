@@ -442,7 +442,7 @@ class ExecutorManagementServiceImplTest {
         verifyNoInteractions(auditLogService, eventPublisher);
     }
 
-    // ---------- B-01a: không thu hồi Executor cuối cùng khi DMS ACTIVE ----------
+    // ---------- FR-06: không thu hồi Executor cuối cùng khi DMS ACTIVE ----------
 
     @Test
     @DisplayName("B-01a: DMS ACTIVE, thu hồi Executor cuối cùng -> 409, giữ nguyên assignment và role, không audit, không mail")
@@ -511,7 +511,7 @@ class ExecutorManagementServiceImplTest {
     }
 
     @Test
-    @DisplayName("B-01a: DMS SUSPENDED -> thu hồi Executor cuối cùng được phép (Admin mở lại sẽ bị chặn vì thiếu Primary)")
+    @DisplayName("B-01a: DMS SUSPENDED -> thu hồi Executor cuối cùng được phép (Admin mở lại sẽ bị chặn nếu không còn Executor nhận bàn giao)")
     void revoke_lastExecutor_dmsSuspended_allowed() {
         ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
         lockedExecutors(current);
