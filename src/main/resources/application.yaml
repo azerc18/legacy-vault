@@ -51,4 +51,9 @@ app:
   security:
     crypto:
       master-key: ${CRYPTO_MASTER_KEY}
+  ai:
+    provider: ${AI_PROVIDER:mock}
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-3.6-flash}
 
