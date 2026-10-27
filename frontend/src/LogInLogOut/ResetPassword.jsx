@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
+import PasswordStrengthMeter from "../Common/PasswordStrengthMeter.jsx";
+import {isPasswordValid} from "../Common/passwordPolicy.js";
 
 const RESEND_SECONDS = 60;
 
@@ -51,8 +53,8 @@ export default function ResetPassword() {
             setError('The code must be exactly 6 digits.');
             return;
         }
-        if (password.length < 6) {
-            setError('Password must be at least 6 characters.');
+        if (!isPasswordValid(password)) {
+            setError('Password does not meet the requirements.');
             return;
         }
         if (password !== passwordConfirm) {
@@ -163,11 +165,12 @@ export default function ResetPassword() {
                                 <label className="font-label-sm text-on-surface-variant font-semibold">New password</label>
                                 <input
                                     type="password"
-                                    placeholder="At least 6 characters"
+                                    placeholder="At least 8 characters"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className={inputClass}
                                 />
+                                <PasswordStrengthMeter password={password} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">

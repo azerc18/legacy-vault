@@ -91,8 +91,8 @@ public class AuthControllerTest {
         RegisterRequest request = new RegisterRequest();
         request.setEmail(EMAIL);
         request.setFullName("Nguyen Van A");
-        request.setPassword("Password123");
-        request.setPasswordConfirm("Password123");
+        request.setPassword("Password@123");
+        request.setPasswordConfirm("Password@123");
         return request;
     }
 
@@ -112,7 +112,7 @@ public class AuthControllerTest {
     private LoginRequest validLoginRequest() {
         LoginRequest request = new LoginRequest();
         request.setEmail(EMAIL);
-        request.setPassword("Password123");
+        request.setPassword("Password@123");
         return request;
     }
 
@@ -433,7 +433,7 @@ public class AuthControllerTest {
     // ---------- POST /api/auth/reset-password ----------
     @Test
     void resetPassword_valid_returnsOk() throws Exception {
-        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "NewPass123"))
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass@123", "NewPass@123"))
                 .andExpect(status().isOk());
 
         verify(authService).resetPassword(any(ResetPasswordRequest.class));
@@ -441,7 +441,7 @@ public class AuthControllerTest {
 
     @Test
     void resetPassword_passwordMismatch_returnsBadRequest() throws Exception {
-        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "Other123"))
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass@123", "Other123"))
                 .andExpect(status().isBadRequest());
 
         verify(authService, never()).resetPassword(any());
@@ -449,7 +449,7 @@ public class AuthControllerTest {
 
     @Test
     void resetPassword_otpNotSixDigits_returnsBadRequest() throws Exception {
-        postJson(RESET_PASSWORD_URL, resetBody("12ab", "NewPass123", "NewPass123"))
+        postJson(RESET_PASSWORD_URL, resetBody("12ab", "NewPass@123", "NewPass@123"))
                 .andExpect(status().isBadRequest());
 
         verify(authService, never()).resetPassword(any());
@@ -468,7 +468,7 @@ public class AuthControllerTest {
         doThrow(new InvalidOtpException("Wrong OTP for user"))
                 .when(authService).resetPassword(any(ResetPasswordRequest.class));
 
-        postJson(RESET_PASSWORD_URL, resetBody("000000", "NewPass123", "NewPass123"))
+        postJson(RESET_PASSWORD_URL, resetBody("000000", "NewPass@123", "NewPass@123"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Wrong OTP for user"));
     }
@@ -478,7 +478,7 @@ public class AuthControllerTest {
         doThrow(new ObjectOptimisticLockingFailureException(VerificationToken.class, UUID.randomUUID()))
                 .when(authService).resetPassword(any(ResetPasswordRequest.class));
 
-        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass123", "NewPass123"))
+        postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass@123", "NewPass@123"))
                 .andExpect(status().isConflict());
     }
 }

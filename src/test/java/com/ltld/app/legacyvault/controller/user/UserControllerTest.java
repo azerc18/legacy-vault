@@ -154,20 +154,20 @@ class UserControllerTest {
     void changePassword_valid_returns200WithReloginMessage() throws Exception {
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"new-pass\"}"))
+                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Password changed successfully. Please sign in again."));
 
         verify(userProfileService).changePassword(eq(userId), argThat(r ->
-                "old-pass".equals(r.getCurrentPassword()) && "new-pass".equals(r.getNewPassword())));
+                "old-pass".equals(r.getCurrentPassword()) && "New-Pass1".equals(r.getNewPassword())));
     }
 
     @Test
     void changePassword_confirmMismatch_returns400AndSkipsService() throws Exception {
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"other-pass\"}"))
+                        .content("{\"currentPassword\":\"old-pass\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"other-pass\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.passwordMatching").value("Password confirmation does not match"));
 
@@ -203,7 +203,7 @@ class UserControllerTest {
 
         mockMvc.perform(post(CHANGE_PW).principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"new-pass\",\"passwordConfirm\":\"new-pass\"}"))
+                        .content("{\"currentPassword\":\"wrong\",\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Current password is incorrect"));
