@@ -96,7 +96,7 @@ public class DataInitializer {
         ));
 
         mapping.forEach((roleCode, authCodes) -> {
-            Role role = roleRepository.findByCode(roleCode).orElseThrow(
+            Role role = roleRepository.findWithAuthoritiesByCode(roleCode).orElseThrow(
                     () -> new IllegalStateException("Role not found: " + roleCode));
             if (!role.getAuthorities().isEmpty()) {
                 return;
