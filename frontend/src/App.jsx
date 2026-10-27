@@ -26,6 +26,7 @@ import AdminVaults from './Admin/AdminVaults.jsx';
 import RequireRole from './Common/RequireRole.jsx';
 import NotFound from './Common/NotFound.jsx';
 import ProfilePage from './Profile/ProfilePage.jsx';
+import AdminRoles from './Admin/AdminRoles.jsx';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -77,6 +78,8 @@ function App() {
                 <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
                 <Route path="/admin/users" element={guard(ADMIN, <AdminUsers />)} />
                 <Route path="/admin/vaults" element={guard(ADMIN, <AdminVaults />)} />
+
+                <Route path="/admin/roles" element={guard(ADMIN, <AdminRoles />)} />
 
                 <Route path="/home" element={guard(null, <UserHome />)} />
                 <Route path="/me" element={guard(null, <ProfilePage />)} />

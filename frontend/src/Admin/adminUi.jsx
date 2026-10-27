@@ -7,6 +7,7 @@ import UserAvatar from '../Common/UserAvatar.jsx';
 
 const NAV = [
     {to: '/admin/users', label: 'Users', icon: 'group'},
+    {to: '/admin/roles', label: 'Roles', icon: 'shield_person'},
     {to: '/admin/vaults', label: 'Vaults', icon: 'inventory_2'},
 ];
 

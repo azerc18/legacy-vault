@@ -16,6 +16,18 @@ export const adminApi = {
         return http.get('/admin/users', { params }).then(unwrap);
     },
 
+    /* ---------- Role & quyền ---------- */
+    // -> [{ code, description }]
+    listAuthorities: () => http.get('/admin/authorities').then(unwrap),
+    // -> [{ id, code, name, description, system, authorities[] }]
+    listRoles: () => http.get('/admin/roles').then(unwrap),
+    // body: { code, name, description, authorities[] }; 409 nếu trùng code, 400 nếu quyền không tồn tại
+    createRole: (body) => http.post('/admin/roles', body).then(unwrap),
+    // body: { name, description, authorities[] }; role ADMIN phải giữ ADMIN_MANAGE (409)
+    updateRole: (code, body) => http.put(`/admin/roles/${encodeURIComponent(code)}`, body).then(unwrap),
+    // 409 nếu là role hệ thống hoặc còn user đang giữ role
+    deleteRole: (code) => http.delete(`/admin/roles/${encodeURIComponent(code)}`).then(unwrap),
+
     // Chỉ chuyển ACTIVE <-> LOCKED, không tự đổi chính mình, user PENDING (chưa xác thực email) bị chặn
     updateStatus: (userId, status, reason) =>
         http.patch(`/admin/users/${userId}/status`, { status, reason: reason || null }).then(unwrap),
