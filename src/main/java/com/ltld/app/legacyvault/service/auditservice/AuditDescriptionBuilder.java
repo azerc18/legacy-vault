@@ -4,8 +4,12 @@ import com.ltld.app.legacyvault.dto.auditdto.VaultActivityLogResponse;
 import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -14,6 +18,10 @@ import java.util.UUID;
  */
 @Component
 public class AuditDescriptionBuilder {
+
+    // Y2: hành động chỉ Admin cần thấy, ẩn khỏi nhật ký Owner (dùng lại cho nhật ký Admin). Không sửa được.
+    public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
+            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED));
 
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
     public VaultActivityLogResponse toResponse(AuditLog log, UUID ownerId) {

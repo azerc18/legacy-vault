@@ -12,9 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 @Service
@@ -27,16 +25,16 @@ public class OwnerActivityLogServiceImpl implements OwnerActivityLogService {
     @Override
     @Transactional(readOnly = true)
     public Page<VaultActivityLogResponse> getOwnerActivityLogs(UUID ownerId, Instant startDate, Instant endDate, Pageable pageable) {
-        // Khoảng ngày giống nhật ký Vault: mặc định 30 ngày, tối đa 1 năm
+        // Y2 (T-1): không truyền from thì xem từ đầu (EPOCH), không giới hạn độ dài khoảng ngày
         Instant to = endDate != null ? endDate : Instant.now();
-        Instant from = startDate != null ? startDate : to.minus(30, ChronoUnit.DAYS);
+        Instant from = startDate != null ? startDate : Instant.EPOCH;
         if (from.isAfter(to)) throw new DmsException("Ngày bắt đầu phải trước ngày kết thúc.", HttpStatus.BAD_REQUEST);
-        if (Duration.between(from, to).toDays() > 365) throw new DmsException("Khoảng thời gian tối đa 1 năm.", HttpStatus.BAD_REQUEST);
 
-        // Lọc theo entity (DmsConfig / mọi ExecutorAssignment của Owner, kể cả REVOKED); Owner chưa có gì -> trang rỗng
+        // Lọc theo entity (DmsConfig / mọi ExecutorAssignment của Owner, kể cả REVOKED) và VAULT_DELETED do Owner xóa;
+        // bỏ các action chỉ Admin cần thấy. Owner chưa có gì -> trang rỗng
         Page<AuditLog> logs = auditLogRepository.findOwnerActivity(ownerId,
                 DmsActivationProcessor.ENTITY_DMS_CONFIG, DmsActivationProcessor.ENTITY_EXECUTOR_ASSIGNMENT,
-                from, to, pageable);
+                AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS, from, to, pageable);
 
         return logs.map(log -> descriptionBuilder.toResponse(log, ownerId));
     }
