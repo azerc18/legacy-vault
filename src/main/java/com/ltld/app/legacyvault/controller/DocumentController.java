@@ -51,7 +51,8 @@ public class DocumentController {
                 .uploadedAt(document.getUploadedAt())
                 .build();
                 
-        return ResponseEntity.ok(ApiResponse.success("Document uploaded and encrypted securely", response));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.success("Document uploaded and encrypted securely", response));
     }
 
     // FR-04: Owner xem danh sách tài liệu pháp lý của một Vault
