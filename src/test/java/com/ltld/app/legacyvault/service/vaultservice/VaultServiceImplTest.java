@@ -78,6 +78,8 @@ class VaultServiceImplTest {
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock
+    private com.ltld.app.legacyvault.service.executorservice.ExecutorManagementService executorManagementService;
+    @Mock
     private VaultModificationGuard vaultModificationGuard;
     @Mock
     private DmsConfigService dmsConfigService;
@@ -115,6 +117,11 @@ class VaultServiceImplTest {
         savedVault.setStatus(VaultStatus.ACTIVE);
         savedVault.setOwner(mockOwner);
 
+        com.ltld.app.legacyvault.entity.ExecutorAssignment primary = new com.ltld.app.legacyvault.entity.ExecutorAssignment();
+        primary.setStatus(com.ltld.app.legacyvault.enums.ExecutorStatus.ACTIVE);
+        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
+                .thenReturn(Optional.of(primary));
+
         // Kịch bản giả lập (Khi code gọi hàm A thì trả về B)
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
         when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
@@ -132,6 +139,45 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).save(any(Vault.class));
         verify(digitalAssetRepository, times(1)).save(any(DigitalAsset.class));
         verify(cryptoService, times(1)).encrypt("my-password");
+    }
+
+    @Test
+    @DisplayName("createVault (V1): Vault đầu tiên chưa có Primary Executor mà không gửi email -> 400 Bad Request")
+    void createVault_withoutExistingPrimary_missingEmail_throwsBadRequest() {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("First Vault");
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
+                .thenReturn(Optional.empty());
+
+        VaultException ex = assertThrows(VaultException.class, () -> vaultService.createVault(ownerId, request));
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals("Vault đầu tiên cần chỉ định Executor chính.", ex.getMessage());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createVault (V1): Vault đầu tiên có email Primary -> gọi assignExecutor và lưu Vault thành công")
+    void createVault_withoutExistingPrimary_withEmail_assignsPrimary() throws Exception {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("First Vault");
+        request.setPrimaryExecutorEmail("exec@example.com");
+
+        Vault savedVault = new Vault();
+        savedVault.setId(UUID.randomUUID());
+        savedVault.setName("First Vault");
+        savedVault.setStatus(VaultStatus.ACTIVE);
+        savedVault.setOwner(mockOwner);
+
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
+                .thenReturn(Optional.empty());
+        when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
+
+        Vault result = vaultService.createVault(ownerId, request);
+        assertNotNull(result);
+        verify(executorManagementService).assignExecutor(eq(ownerId), eq(com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY), any());
+        verify(vaultRepository).save(any());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)
@@ -164,7 +210,7 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).delete(vault);
     }
 
-    // Kịch bản 3: Cố tình xóa Vault của người khác -> Phải văng lỗi (Business Rule)
+    // Kịch bản 3: Cố tình xóa Vault của người khác -> Chặn 404 Not Found (V4)
     @Test
     void deleteVault_NotOwner_ThrowsException() {
         UUID vaultId = UUID.randomUUID();
@@ -179,13 +225,14 @@ class VaultServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Bắt lỗi phải là VaultException
-        Exception exception = assertThrows(VaultException.class, () -> {
+        // Bắt lỗi phải là VaultException mã 404
+        VaultException exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 
-        // Nội dung lỗi phải chuẩn xác
-        assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
+        // Nội dung lỗi phải là Vault not found chống dò ID (V4)
+        assertEquals("Vault not found", exception.getMessage());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
@@ -403,12 +450,12 @@ class VaultServiceImplTest {
     }
 
     @Test
-    void assignBeneficiary_notOwner_returns403AndAudits() {
+    void assignBeneficiary_notOwner_returns404AndAudits() {
         Vault vault = activeVault();
         when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
         UUID otherUserId = UUID.randomUUID();
 
-        assertVaultError(HttpStatus.FORBIDDEN,
+        assertVaultError(HttpStatus.NOT_FOUND,
                 () -> vaultService.assignBeneficiary(otherUserId, vault.getId(), assignRequest("ben@example.com", null)));
 
         verify(vaultRepository, never()).save(any());
@@ -626,7 +673,7 @@ class VaultServiceImplTest {
     @DisplayName("getMyVaults: Lấy danh sách két của Owner thành công")
     void getMyVaults_Success() {
         Vault vault = activeVault();
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of(vault));
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -634,18 +681,46 @@ class VaultServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("My Vault", result.get(0).getName());
         assertEquals(ownerId, result.get(0).getOwnerId());
-        verify(vaultRepository).findByOwnerIdOrderByCreatedAtDesc(ownerId);
+        verify(vaultRepository).findByOwnerIdWithBeneficiary(ownerId);
     }
 
     @Test
     @DisplayName("getMyVaults: Trả về danh sách rỗng khi Owner chưa có két")
     void getMyVaults_EmptyList() {
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of());
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (V8): Gỡ người thụ hưởng thành công")
+    void removeBeneficiary_Success() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
+        UUID vId = vault.getId();
+        when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vId);
+
+        assertNull(vault.getBeneficiary());
+        assertNull(vault.getBeneficiaryEmail());
+        verify(vaultRepository).saveAndFlush(vault);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@example.com"), eq(vId), eq("Vault"), eq(vId.toString()), any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (V8/V4): Không phải chủ két -> 404 Not Found")
+    void removeBeneficiary_NotOwner_ThrowsNotFound() {
+        Vault vault = activeVault();
+        UUID otherId = UUID.randomUUID();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        assertVaultError(HttpStatus.NOT_FOUND, () -> vaultService.removeBeneficiary(otherId, vault.getId()));
+        verify(vaultRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -716,7 +791,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vaultRepository.saveAndFlush(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
         VaultResponse response = vaultService.updateVault(vId, ownerId, request);
@@ -724,7 +799,7 @@ class VaultServiceImplTest {
         assertEquals("Tên két mới", response.getName());
         assertEquals("Mô tả mới", response.getDescription());
         verify(vaultModificationGuard).ensureModifiable(vault);
-        verify(vaultRepository).save(vault);
+        verify(vaultRepository).saveAndFlush(vault);
         verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId),
                 eq("Vault"), eq(vId.toString()), any());
