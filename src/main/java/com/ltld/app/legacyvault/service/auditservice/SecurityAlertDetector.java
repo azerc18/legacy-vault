@@ -86,7 +86,7 @@ public class SecurityAlertDetector {
         List<AuditLogRepository.IpCount> rows = auditLogRepository.countByIpSince(
                 AuditAction.LOGIN_FAILED, now.minus(loginFailureWindow), loginFailuresPerIp);
         for (AuditLogRepository.IpCount row : rows) {
-            String msg = String.format("%d lần đăng nhập thất bại từ IP %s trong %d phút gần nhất.",
+            String msg = String.format("%d failed sign-in attempts from IP %s in the last %d minutes.",
                     row.getTotal(), row.getIp(), loginFailureWindow.toMinutes());
             upsertOpen(SecurityAlertRule.LOGIN_FAILURES_FROM_IP, row.getIp(), msg, row.getTotal(), now, created);
         }
@@ -98,7 +98,7 @@ public class SecurityAlertDetector {
         for (AuditLogRepository.ActorCount row : rows) {
             String who = userRepository.findById(row.getActorId()).map(User::getEmail)
                     .orElse(row.getActorId().toString());
-            String msg = String.format("%s đã tải %d tài sản/tài liệu trong %d phút gần nhất.",
+            String msg = String.format("%s downloaded %d assets/documents in the last %d minutes.",
                     who, row.getTotal(), downloadWindow.toMinutes());
             upsertOpen(SecurityAlertRule.MASS_DOWNLOAD, row.getActorId().toString(), msg, row.getTotal(), now, created);
         }
@@ -143,19 +143,19 @@ public class SecurityAlertDetector {
     }
 
     private String eventMessage(SecurityAlertRule rule, AuditLog log) {
-        String ip = log.getIpAddress() != null ? log.getIpAddress() : "không rõ";
+        String ip = log.getIpAddress() != null ? log.getIpAddress() : "unknown";
         String actor = log.getActor() != null ? log.getActor().getEmail() : meta(log, "email");
         return switch (rule) {
             case ACCOUNT_LOCKED -> String.format(
-                    "Tài khoản %s bị khoá tạm sau nhiều lần sai mật khẩu (IP %s).", orUnknown(actor), ip);
+                    "Account %s was temporarily locked after repeated wrong passwords (IP %s).", orUnknown(actor), ip);
             case REFRESH_TOKEN_REUSE -> String.format(
-                    "Refresh token cũ của %s bị dùng lại (IP %s): có thể token đã bị đánh cắp, mọi phiên đã bị thu hồi.",
+                    "An old refresh token of %s was reused (IP %s): the token may have been stolen; all sessions were revoked.",
                     orUnknown(actor), ip);
             case ADMIN_ROLE_GRANTED -> {
                 UUID targetId = log.getEntityId();
-                String target = targetId == null ? "không rõ"
+                String target = targetId == null ? "unknown"
                         : userRepository.findById(targetId).map(User::getEmail).orElse(targetId.toString());
-                yield String.format("%s đã cấp quyền ADMIN cho %s.", orUnknown(actor), target);
+                yield String.format("%s granted the ADMIN role to %s.", orUnknown(actor), target);
             }
             default -> rule.name();
         };
@@ -165,7 +165,7 @@ public class SecurityAlertDetector {
     private void notifyAdminsAfterCommit(List<SecurityAlert> created) {
         List<String> messages = created.stream()
                 .filter(a -> a.getSeverity() == SecurityAlertSeverity.HIGH)
-                .map(a -> "[LegacyVault] Cảnh báo bảo mật " + a.getRule() + ": " + a.getMessage())
+                .map(a -> "[LegacyVault] Security alert " + a.getRule() + ": " + a.getMessage())
                 .toList();
         if (messages.isEmpty()) return;
 
@@ -196,7 +196,7 @@ public class SecurityAlertDetector {
     }
 
     private static String orUnknown(String s) {
-        return s == null ? "không rõ" : s;
+        return s == null ? "unknown" : s;
     }
 
     private static String truncate(String s) {

@@ -111,12 +111,12 @@ class ExecutorHandoverControllerSecurityTest {
         UUID assignmentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         when(executorHandoverService.getHandoverProgress(eq(assignmentId), eq(userId.toString())))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         mockMvc.perform(get(PROGRESS_URL, assignmentId).with(token(userId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Chưa đến thời điểm thực hiện quyền"));
+                .andExpect(jsonPath("$.message").value("Access is not available yet"));
     }
 
     @Test

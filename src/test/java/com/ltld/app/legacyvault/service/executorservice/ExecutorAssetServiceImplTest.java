@@ -137,7 +137,7 @@ class ExecutorAssetServiceImplTest {
     @DisplayName("Guard rejects with 403 -> no vault or asset query is made")
     void getAssignedVaults_guardNotActive_propagatesAndSkipsQueries() {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         assertThrows(ExecutorNotActiveException.class,
                 () -> executorAssetService.getAssignedVaults(assignmentId, LOGIN));

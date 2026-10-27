@@ -511,7 +511,7 @@ class BeneficiaryNotificationListenerTest {
 
         verify(emailSender).sendVaultUnlockedNotification("an@example.com", null, "Bình", "Hồ sơ A", deadline, false, vaultId);
         verify(claimRepository, never()).save(any());
-        verify(executorNotificationService).send(eq("ex1@example.com"), contains("Hồ sơ \"Hồ sơ A\""));
+        verify(executorNotificationService).send(eq("ex1@example.com"), contains("vault \"Hồ sơ A\""));
         verify(executorNotificationService, never()).send(eq("ex2@example.com"), anyString());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),

@@ -13,24 +13,24 @@ import lombok.Data;
 @Data
 public class DigitalAssetRequest {
 
-    @NotNull(message = "Loại tài sản không được để trống")
+    @NotNull(message = "Asset type is required")
     private AssetType assetType;
 
-    @NotBlank(message = "Tên tài sản không được để trống")
-    @Size(max = 200, message = "Tên tài sản tối đa 200 ký tự")
+    @NotBlank(message = "Asset name is required")
+    @Size(max = 200, message = "Asset name must be at most 200 characters")
     private String assetName;
 
     /**
      * Secret dạng plain-text (password, private key, seed phrase…).
      * Bắt buộc khi tạo mới; khi cập nhật có thể bỏ qua (null = giữ nguyên).
      */
-    @Size(max = 5000, message = "Secret tối đa 5000 ký tự")
+    @Size(max = 5000, message = "Secret must be at most 5000 characters")
     private String secret;
 
     /**
      * Ghi chú bổ sung (hướng dẫn truy cập, mã PIN phụ...).
      * Khi cập nhật: null = giữ nguyên, chuỗi rỗng ("") = xóa ghi chú cũ, có giá trị = mã hóa giá trị mới.
      */
-    @Size(max = 2000, message = "Ghi chú tối đa 2000 ký tự")
+    @Size(max = 2000, message = "Note must be at most 2000 characters")
     private String notes;
 }

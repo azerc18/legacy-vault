@@ -273,7 +273,7 @@ class VaultServiceImplTest {
                 eq(vaultId),
                 eq("Vault"),
                 eq(vaultId.toString()),
-                eq("Két không ở trạng thái hoạt động")
+                eq("The vault is not active")
         );
     }
 
@@ -302,7 +302,7 @@ class VaultServiceImplTest {
                 eq(vaultId),
                 eq("Vault"),
                 eq(vaultId.toString()),
-                eq("Quy trình bàn giao đã bắt đầu")
+                eq("The handover process has already started")
         );
     }
 
@@ -457,7 +457,7 @@ class VaultServiceImplTest {
 
         // Q26: Executor của Owner không được đồng thời là người thụ hưởng
         assertEquals(HttpStatus.CONFLICT, ex.getStatus());
-        assertEquals("Người này đang là Digital Executor của bạn, không thể đồng thời là người thụ hưởng.",
+        assertEquals("This person is your Digital Executor and cannot also be your beneficiary.",
                 ex.getMessage());
         assertNull(vault.getBeneficiary());
         assertNull(vault.getBeneficiaryEmail());
@@ -594,7 +594,7 @@ class VaultServiceImplTest {
     @Test
     void assignBeneficiary_dmsTriggered_returns409WithoutTouchingVault() {
         UUID vaultId = UUID.randomUUID();
-        doThrow(new DmsException("Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.",
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
                 HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
 
         DmsException ex = assertThrows(DmsException.class,

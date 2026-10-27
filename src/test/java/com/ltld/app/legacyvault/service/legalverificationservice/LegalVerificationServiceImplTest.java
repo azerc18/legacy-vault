@@ -218,7 +218,7 @@ public class LegalVerificationServiceImplTest {
         service.reject(requestId, verifierId, rejectDto(RejectionReason.OTHER, "  Ảnh bị cắt góc  "));
 
         assertThat(pendingRequest.getRejectionReasonCode()).isEqualTo(RejectionReason.OTHER);
-        assertThat(pendingRequest.getRejectionReason()).isEqualTo("Lý do khác: Ảnh bị cắt góc");
+        assertThat(pendingRequest.getRejectionReason()).isEqualTo("Other reason: Ảnh bị cắt góc");
         verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_REJECTED), eq(AuditResult.SUCCESS),
                 eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()),
                 eq("reason=OTHER"));
@@ -1130,7 +1130,7 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
                 .isInstanceOf(InvalidSignCodeException.class)
-                .hasMessageContaining("Còn 4 lần thử");
+                .hasMessageContaining("Attempts left: 4");
     }
 
     // FR-12: DTO trả cả tên vault (không chỉ UUID)

@@ -47,22 +47,22 @@ class DmsConfigRequestValidationTest {
 
         assertThat(violations).extracting(v -> v.getPropertyPath().toString(), ConstraintViolation::getMessage)
                 .containsExactlyInAnyOrder(
-                        tuple("checkinIntervalDays", "Chu kỳ check-in không được để trống"),
-                        tuple("gracePeriodDays", "Thời gian chờ không được để trống"),
-                        tuple("reminderCount", "Số lần nhắc không được để trống"));
+                        tuple("checkinIntervalDays", "Check-in interval is required"),
+                        tuple("gracePeriodDays", "Grace period is required"),
+                        tuple("reminderCount", "Reminder count is required"));
     }
 
     @ParameterizedTest(name = "{0} = {1}")
     @CsvSource({
-            "checkinIntervalDays, 0, Chu kỳ check-in phải từ 1 ngày trở lên",
-            "checkinIntervalDays, -1, Chu kỳ check-in phải từ 1 ngày trở lên",
-            "checkinIntervalDays, 366, Chu kỳ check-in tối đa 365 ngày",
-            "gracePeriodDays, 0, Thời gian chờ phải từ 1 ngày trở lên",
-            "gracePeriodDays, -7, Thời gian chờ phải từ 1 ngày trở lên",
-            "gracePeriodDays, 91, Thời gian chờ tối đa 90 ngày",
-            "reminderCount, 0, Số lần nhắc phải từ 1 trở lên",
-            "reminderCount, -3, Số lần nhắc phải từ 1 trở lên",
-            "reminderCount, 11, Số lần nhắc tối đa 10"
+            "checkinIntervalDays, 0, Check-in interval must be at least 1 day",
+            "checkinIntervalDays, -1, Check-in interval must be at least 1 day",
+            "checkinIntervalDays, 366, Check-in interval must be at most 365 days",
+            "gracePeriodDays, 0, Grace period must be at least 1 day",
+            "gracePeriodDays, -7, Grace period must be at least 1 day",
+            "gracePeriodDays, 91, Grace period must be at most 90 days",
+            "reminderCount, 0, Reminder count must be at least 1",
+            "reminderCount, -3, Reminder count must be at least 1",
+            "reminderCount, 11, Reminder count must be at most 10"
     })
     @DisplayName("FR-03: giá trị 0, âm hoặc vượt giới hạn -> lỗi đúng field và message")
     void outOfRangeValue_isRejected(String field, int value, String expectedMessage) {

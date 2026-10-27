@@ -125,7 +125,7 @@ public class VaultServiceImpl implements VaultService {
         } catch (DmsException ex) {
             auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
                     ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
-                    "Quy trình bàn giao đã bắt đầu");
+                    "The handover process has already started");
             throw ex;
         }
 
@@ -133,7 +133,7 @@ public class VaultServiceImpl implements VaultService {
         if (vault.getStatus() != VaultStatus.ACTIVE) {
             auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
                     ownerId, ownerEmail, vaultId, "Vault", vaultId.toString(),
-                    "Két không ở trạng thái hoạt động");
+                    "The vault is not active");
             throw new VaultException("Cannot delete vault that is not in active state");
         }
 
@@ -183,32 +183,32 @@ public class VaultServiceImpl implements VaultService {
 
         // Khóa dòng Vault để 2 request gán đồng thời không cùng vượt qua bước xác nhận ghi đè
         Vault vault = vaultRepository.findByIdForUpdate(vaultId)
-                .orElseThrow(() -> new VaultException("Không tìm thấy Vault", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
         User owner = vault.getOwner();
         if (!owner.getId().equals(ownerId)) {
             auditLogService.log(AuditAction.BENEFICIARY_ASSIGN_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
                     "Vault", vaultId.toString(), "not owner");
-            throw new VaultException("Bạn không có quyền thao tác trên Vault này", HttpStatus.FORBIDDEN);
+            throw new VaultException("You do not have permission to act on this vault", HttpStatus.FORBIDDEN);
         }
 
         // Vault đã bước vào quy trình bàn giao thì không được đổi người thụ hưởng (tương tự BR-08)
         if (vault.getStatus() != VaultStatus.ACTIVE) {
             auditLogService.log(AuditAction.BENEFICIARY_ASSIGN_DENIED, AuditResult.FAILURE, ownerId, owner.getEmail(), vaultId,
                     "Vault", vaultId.toString(), "vault status " + vault.getStatus());
-            throw new VaultException("Chỉ có thể chỉ định người thụ hưởng khi Vault đang ở trạng thái ACTIVE",
+            throw new VaultException("A beneficiary can only be assigned while the vault is ACTIVE",
                     HttpStatus.CONFLICT);
         }
 
         String email = request.getEmail().trim().toLowerCase();
         if (email.equals(owner.getEmail())) {
-            throw new VaultException("Không thể tự chỉ định chính mình làm người thụ hưởng", HttpStatus.BAD_REQUEST);
+            throw new VaultException("You cannot assign yourself as the beneficiary", HttpStatus.BAD_REQUEST);
         }
 
         // Q26: Executor (chưa bị thu hồi) của Owner không được đồng thời là người thụ hưởng.
         // Đặt trước bước "gán lại đúng người" để cả trường hợp người thụ hưởng hiện tại vừa trở thành Executor cũng bị chặn.
         if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, email)) {
-            throw new VaultException("Người này đang là Digital Executor của bạn, không thể đồng thời là người thụ hưởng.",
+            throw new VaultException("This person is your Digital Executor and cannot also be your beneficiary.",
                     HttpStatus.CONFLICT);
         }
 
@@ -224,8 +224,8 @@ public class VaultServiceImpl implements VaultService {
         // FR-02 (2a): đã có người thụ hưởng thì phải xác nhận ghi đè
         boolean replacing = currentEmail != null;
         if (replacing && !Boolean.TRUE.equals(request.getConfirmReplace())) {
-            throw new VaultException("Vault đã có người thụ hưởng (" + currentEmail
-                    + "). Gửi lại với confirmReplace=true để thay thế.", HttpStatus.CONFLICT);
+            throw new VaultException("The vault already has a beneficiary (" + currentEmail
+                    + "). Resend with confirmReplace=true to replace them.", HttpStatus.CONFLICT);
         }
 
         // m5: lấy định danh người cũ trước khi ghi đè, để audit không cần ghi email

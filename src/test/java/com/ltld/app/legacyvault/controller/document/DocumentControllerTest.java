@@ -83,6 +83,6 @@ public class DocumentControllerTest {
                         .principal(() -> UUID.randomUUID().toString()))
                 .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Tệp vượt quá dung lượng cho phép (10MB)."));
+                .andExpect(jsonPath("$.message").value("File exceeds the allowed size (10MB)."));
     }
 }

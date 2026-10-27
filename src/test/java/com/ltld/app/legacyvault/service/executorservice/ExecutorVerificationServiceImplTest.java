@@ -345,7 +345,7 @@ class ExecutorVerificationServiceImplTest {
     @DisplayName("Inactive executor -> ExecutorNotActiveException (403)")
     void submit_inactiveExecutor_forbidden() throws Exception {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         CreateDeathVerificationRequest req = new CreateDeathVerificationRequest(List.of(vault1.getId()), null);
         assertThrows(ExecutorNotActiveException.class, () -> service.submit(assignmentId, LOGIN, pdf(), req));

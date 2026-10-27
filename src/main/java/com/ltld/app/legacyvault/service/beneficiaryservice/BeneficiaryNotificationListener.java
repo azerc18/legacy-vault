@@ -63,19 +63,19 @@ public class BeneficiaryNotificationListener {
     static final Duration RETRY_GRACE = Duration.ofMinutes(5);
 
     private static final String ENTITY_VAULT = "Vault";
-    private static final String OWNER_FALLBACK = "chủ hồ sơ";
+    private static final String OWNER_FALLBACK = "the owner";
     // Tham số: tên Vault, tên Owner, hạn nhận
-    private static final String MSG_IN_APP = "Hồ sơ \"%s\" của %s đã được bàn giao cho bạn. Hạn nhận tài sản: %s (GMT+7).";
+    private static final String MSG_IN_APP = "The vault \"%s\" of %s has been handed over to you. Claim deadline: %s (GMT+7).";
 
     // Tham số: tên Vault, tên Owner, email Beneficiary, số lần đã thử, hạn nhận
     private static final String MSG_GAVE_UP =
-            "Hệ thống không gửi được thông báo bàn giao hồ sơ \"%s\" của %s tới người thụ hưởng (%s) sau %d lần thử.%n"
-                    + "Vui lòng liên hệ người thụ hưởng và hướng dẫn họ đăng nhập LegacyVault để nhận tài sản "
-                    + "trước hạn %s (GMT+7).";
+            "The system could not deliver the handover notice for vault \"%s\" of %s to the beneficiary (%s) after %d attempts.%n"
+                    + "Please contact the beneficiary and guide them to sign in to LegacyVault to claim the assets "
+                    + "before %s (GMT+7).";
     // Tham số: tên Vault, tên Owner, hạn nhận
     private static final String MSG_PENDING_REGISTRATION =
-            "Hồ sơ \"%s\" của %s đã được mở khóa nhưng người thụ hưởng chưa có tài khoản đã xác minh.%n"
-                    + "Vui lòng liên hệ để họ đăng ký và xác minh email trước hạn nhận %s (GMT+7).";
+            "The vault \"%s\" of %s has been unlocked, but the beneficiary does not have a verified account yet.%n"
+                    + "Please contact them so they can register and verify their email before the claim deadline %s (GMT+7).";
 
     private final VaultRepository vaultRepository;
     private final BeneficiaryClaimRepository claimRepository;

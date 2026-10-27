@@ -201,7 +201,7 @@ class ExecutorHandoverServiceImplTest {
     @DisplayName("Guard rejects with 403 -> no query is made")
     void guardNotActive_propagatesAndSkipsQuery() {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         assertThrows(ExecutorNotActiveException.class, () -> service.getHandoverProgress(assignmentId, LOGIN));
 

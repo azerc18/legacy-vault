@@ -32,12 +32,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
-    static final String SUSPENDED_MESSAGE = "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ Admin.";
-    static final String HANDOVER_STARTED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.";
-    static final String INCOMPLETE_CONFIG_MESSAGE = "Cấu hình Dead Man's Switch chưa đầy đủ, vui lòng lưu lại cấu hình.";
-    static final String SUSPEND_TRIGGERED_MESSAGE = "Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể tạm dừng.";
-    static final String ALREADY_SUSPENDED_MESSAGE = "Dead Man's Switch đã ở trạng thái tạm dừng.";
-    static final String NOT_SUSPENDED_MESSAGE = "Dead Man's Switch không ở trạng thái tạm dừng.";
+    static final String SUSPENDED_MESSAGE = "The Dead Man's Switch has been suspended by an administrator. Please contact an admin.";
+    static final String HANDOVER_STARTED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be changed.";
+    static final String INCOMPLETE_CONFIG_MESSAGE = "The Dead Man's Switch configuration is incomplete. Please save the configuration again.";
+    static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
+    static final String ALREADY_SUSPENDED_MESSAGE = "The Dead Man's Switch is already suspended.";
+    static final String NOT_SUSPENDED_MESSAGE = "The Dead Man's Switch is not suspended.";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
@@ -58,7 +58,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         DmsConfig existing = dmsConfigRepository.findByOwnerId(ownerId).orElse(null);
         // SRS: DMS đã kích hoạt thì quy trình bàn giao không thể bị Owner hủy hay cấu hình lại.
         if (existing != null && existing.getStatus() == DmsStatus.TRIGGERED) {
-            throw new DmsException("Dead Man's Switch đã được kích hoạt, không thể thay đổi cấu hình.",
+            throw new DmsException("The Dead Man's Switch has been triggered; its configuration cannot be changed.",
                     HttpStatus.CONFLICT);
         }
         // Q28: SUSPENDED do Admin đặt và gỡ; Owner không tự bật lại bằng cách lưu cấu hình.
@@ -67,12 +67,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         }
         // FR-03 precondition: có ít nhất 1 Vault.
         if (!vaultRepository.existsByOwnerId(ownerId)) {
-            throw new DmsException("Cần tạo ít nhất một Vault trước khi cấu hình Dead Man's Switch.",
+            throw new DmsException("Create at least one vault before configuring the Dead Man's Switch.",
                     HttpStatus.CONFLICT);
         }
 
         User owner = existing != null ? existing.getOwner() : userRepository.findById(ownerId)
-                .orElseThrow(() -> new DmsException("Không tìm thấy Owner.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new DmsException("Owner not found.", HttpStatus.NOT_FOUND));
         DmsConfig config = existing != null ? existing : DmsConfig.builder()
                 .owner(owner)
                 .backupActivationWaitDays(DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS)
@@ -95,7 +95,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         } catch (DataIntegrityViolationException e) {
             // Hai yêu cầu tạo đồng thời: yêu cầu thua vi phạm uk_dms_config_owner.
             if (created) {
-                throw new DmsException("Cấu hình Dead Man's Switch vừa được tạo bởi một yêu cầu khác. Vui lòng tải lại.",
+                throw new DmsException("The Dead Man's Switch configuration was just created by another request. Please reload.",
                         HttpStatus.CONFLICT);
             }
             throw e;
@@ -117,9 +117,9 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             // TRIGGERED: SRS không cho Owner hủy quy trình bàn giao đã kích hoạt bằng check-in.
             // SUSPENDED (Q28): chỉ Admin gỡ được.
             throw new DmsException(switch (config.getStatus()) {
-                case TRIGGERED -> "Dead Man's Switch đã được kích hoạt, không thể check-in.";
+                case TRIGGERED -> "The Dead Man's Switch has been triggered; check-in is no longer possible.";
                 case SUSPENDED -> SUSPENDED_MESSAGE;
-                default -> "Dead Man's Switch không ở trạng thái hoạt động.";
+                default -> "The Dead Man's Switch is not active.";
             }, HttpStatus.CONFLICT);
         }
         assertScheduleComplete(config);
@@ -192,13 +192,13 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
     private DmsConfig findConfig(UUID ownerId) {
         return dmsConfigRepository.findByOwnerId(ownerId)
-                .orElseThrow(() -> new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
     }
 
     // Khóa PESSIMISTIC_FORCE_INCREMENT: trigger FR-07 / nhắc check-in đang ghi cùng lúc sẽ lỗi @Version và rollback.
     private DmsConfig findConfigForUpdate(UUID ownerId) {
         return dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
-                .orElseThrow(() -> new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
     }
 
     // Dòng tạo trước FR-03 chưa có thời gian chờ: không tính được lịch, yêu cầu lưu lại cấu hình.

@@ -139,10 +139,10 @@ class OwnerActivityLogServiceImplTest {
         assertThat(result.getTotalElements()).isEqualTo(12);
         assertThat(result.getPageable()).isEqualTo(pageable);
         assertThat(result.getContent()).extracting(VaultActivityLogResponse::getActorName)
-                .containsExactly("Bạn", "Hệ thống");
+                .containsExactly("You", "System");
         assertThat(result.getContent()).extracting(VaultActivityLogResponse::getDescription)
-                .containsExactly("Check-in xác nhận vẫn còn hoạt động.",
-                        "Dead Man's Switch được kích hoạt do quá hạn check-in.");
+                .containsExactly("Checked in to confirm still active.",
+                        "The Dead Man's Switch was triggered because the check-in deadline passed.");
         assertThat(result.getContent().get(0).getIpAddress()).isEqualTo("192.168.1.100");
     }
 }

@@ -156,7 +156,7 @@ class DigitalAssetServiceImplTest {
 
         assertThatThrownBy(() -> assetService.getAsset(ownerId, vaultId, assetId))
                 .isInstanceOf(VaultException.class)
-                .hasMessage("Không thể giải mã nội dung tài sản số")
+                .hasMessage("Could not decrypt the digital asset content")
                 .extracting("status").isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
 
         verifyNoInteractions(auditLogService);

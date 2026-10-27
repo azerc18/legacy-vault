@@ -10,18 +10,18 @@ import java.util.List;
 
 @Data
 public class CreateRoleRequest {
-    @NotBlank(message = "Mã role là bắt buộc")
+    @NotBlank(message = "Role code is required")
     @Pattern(regexp = "^[A-Z][A-Z0-9_]{2,49}$",
-            message = "Mã role gồm 3-50 ký tự IN HOA, số hoặc _, bắt đầu bằng chữ")
+            message = "Role code must be 3-50 characters: UPPERCASE letters, digits or _, starting with a letter")
     private String code;
 
-    @NotBlank(message = "Tên role là bắt buộc")
-    @Size(max = 100, message = "Tên role tối đa 100 ký tự")
+    @NotBlank(message = "Role name is required")
+    @Size(max = 100, message = "Role name must be at most 100 characters")
     private String name;
 
-    @Size(max = 255, message = "Mô tả tối đa 255 ký tự")
+    @Size(max = 255, message = "Description must be at most 255 characters")
     private String description;
 
-    @NotEmpty(message = "Role phải có ít nhất 1 quyền")
+    @NotEmpty(message = "A role must have at least one authority")
     private List<String> authorities;
 }

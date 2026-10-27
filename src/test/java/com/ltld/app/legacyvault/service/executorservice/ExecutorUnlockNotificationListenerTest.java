@@ -74,7 +74,7 @@ class ExecutorUnlockNotificationListenerTest {
                 .contains("Nguyễn Văn A (owner@example.test)")
                 .contains("\"Tài khoản ngân hàng\"")
                 // Q25: Beneficiary có thể chưa đăng ký, nên không được khẳng định đã bàn giao.
-                .doesNotContain("bàn giao cho người thụ hưởng");
+                .doesNotContain("handed over to the beneficiary");
     }
 
     @Test
@@ -105,7 +105,7 @@ class ExecutorUnlockNotificationListenerTest {
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
         verify(executorNotificationService).send(eq("executor@example.test"), content.capture());
-        assertThat(content.getValue()).contains("Hồ sơ xác minh của owner@example.test đã");
+        assertThat(content.getValue()).contains("The verification request for owner@example.test has");
     }
 
     @Test

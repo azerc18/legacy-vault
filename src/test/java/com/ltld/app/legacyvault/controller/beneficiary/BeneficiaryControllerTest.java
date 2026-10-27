@@ -105,7 +105,7 @@ public class BeneficiaryControllerTest {
 
         // Giả lập Service ném lỗi 404 Không tìm thấy (Sai người gọi)
         when(beneficiaryService.initializeClaim(any(), eq(userId)))
-                .thenThrow(new BeneficiaryException("Không tìm thấy yêu cầu nhận tài sản.", HttpStatus.NOT_FOUND));
+                .thenThrow(new BeneficiaryException("Claim request not found.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(post("/api/beneficiaries/claim")
                         .principal(principal)
@@ -113,7 +113,7 @@ public class BeneficiaryControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound()) // Expect mã HTTP 404
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Không tìm thấy yêu cầu nhận tài sản."));
+                .andExpect(jsonPath("$.message").value("Claim request not found."));
     }
 
     @Test
@@ -153,7 +153,7 @@ public class BeneficiaryControllerTest {
                         .content(objectMapper.writeValueAsString(validRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("OTP đã được gửi đến email của bạn."));
+                .andExpect(jsonPath("$.message").value("An OTP has been sent to your email."));
 
         verify(beneficiaryService).sendIdentityOtp(any(), eq(userId));
     }
@@ -174,7 +174,7 @@ public class BeneficiaryControllerTest {
     @Test
     void sendIdentityOtp_resendTooSoon_returns429() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
-        doThrow(new BeneficiaryException("Vui lòng đợi một lúc trước khi yêu cầu gửi lại OTP.",
+        doThrow(new BeneficiaryException("Please wait a moment before requesting another OTP.",
                 HttpStatus.TOO_MANY_REQUESTS))
                 .when(beneficiaryService).sendIdentityOtp(any(), any());
 
@@ -264,14 +264,14 @@ public class BeneficiaryControllerTest {
     void getInheritedAssets_noViewSession_returns403() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.getInheritedAssets(any(), any()))
-                .thenThrow(new BeneficiaryException("Cần xác thực danh tính trước khi xem tài sản.",
+                .thenThrow(new BeneficiaryException("Identity verification is required before viewing assets.",
                         HttpStatus.FORBIDDEN));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets", UUID.randomUUID())
                         .principal(principal))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Cần xác thực danh tính trước khi xem tài sản."));
+                .andExpect(jsonPath("$.message").value("Identity verification is required before viewing assets."));
     }
 
     @Test
@@ -302,7 +302,7 @@ public class BeneficiaryControllerTest {
     void getInheritedAssetDetail_assetNotFound_returns404() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.getInheritedAssetDetail(any(), any(), any()))
-                .thenThrow(new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
+                .thenThrow(new BeneficiaryException("Asset not found.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}",
                         UUID.randomUUID(), UUID.randomUUID())
@@ -399,7 +399,7 @@ public class BeneficiaryControllerTest {
     void downloadInheritedAsset_noViewSession_returns403Json() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadInheritedAsset(any(), any(), any()))
-                .thenThrow(new BeneficiaryException("Cần xác thực danh tính trước khi xem tài sản.",
+                .thenThrow(new BeneficiaryException("Identity verification is required before viewing assets.",
                         HttpStatus.FORBIDDEN));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download",
@@ -413,7 +413,7 @@ public class BeneficiaryControllerTest {
     void downloadInheritedAsset_assetNotFound_returns404Json() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadInheritedAsset(any(), any(), any()))
-                .thenThrow(new BeneficiaryException("Không tìm thấy tài sản.", HttpStatus.NOT_FOUND));
+                .thenThrow(new BeneficiaryException("Asset not found.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/assets/{assetId}/download",
                         UUID.randomUUID(), UUID.randomUUID())
@@ -521,7 +521,7 @@ public class BeneficiaryControllerTest {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.previewClose(any(), any()))
                 .thenThrow(new BeneficiaryException(
-                        "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN));
+                        "Identity verification is required before viewing assets.", HttpStatus.FORBIDDEN));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{vaultId}/close-preview", UUID.randomUUID())
                         .principal(principal))
@@ -533,7 +533,7 @@ public class BeneficiaryControllerTest {
     void closeVault_alreadyClaimed_returns409() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.closeVault(any(), any(), any()))
-                .thenThrow(new BeneficiaryException("Tài sản này đã được nhận.", HttpStatus.CONFLICT));
+                .thenThrow(new BeneficiaryException("These assets have already been claimed.", HttpStatus.CONFLICT));
 
         mockMvc.perform(post("/api/beneficiaries/vaults/{vaultId}/close", UUID.randomUUID())
                         .principal(principal)
@@ -617,7 +617,7 @@ public class BeneficiaryControllerTest {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadVaultDocument(any(), any(), any()))
                 .thenThrow(new BeneficiaryException(
-                        "Cần xác thực danh tính trước khi xem tài sản.", HttpStatus.FORBIDDEN));
+                        "Identity verification is required before viewing assets.", HttpStatus.FORBIDDEN));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
                         UUID.randomUUID(), UUID.randomUUID())
@@ -630,7 +630,7 @@ public class BeneficiaryControllerTest {
     void downloadVaultDocument_notFound_returns404Json() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();
         when(beneficiaryService.downloadVaultDocument(any(), any(), any()))
-                .thenThrow(new BeneficiaryException("Không tìm thấy tài liệu.", HttpStatus.NOT_FOUND));
+                .thenThrow(new BeneficiaryException("Document not found.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/api/beneficiaries/vaults/{v}/documents/{d}/download",
                         UUID.randomUUID(), UUID.randomUUID())

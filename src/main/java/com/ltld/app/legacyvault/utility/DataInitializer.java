@@ -44,13 +44,13 @@ public class DataInitializer {
 
     private void seedAuthorities() {
         Map<String, String> defaultAuthorities = new LinkedHashMap<>();
-        defaultAuthorities.put("VAULT_CREATE", "Tạo vault");
+        defaultAuthorities.put("VAULT_CREATE", "Create vault");
         defaultAuthorities.put("VAULT_READ", "Xem vault");
-        defaultAuthorities.put("VAULT_DELETE", "Xóa vault");
-        defaultAuthorities.put("EXECUTOR_MANAGE", "Quản lý executor");
-        defaultAuthorities.put("LEGAL_REVIEW", "Xét duyệt pháp lý");
-        defaultAuthorities.put("ADMIN_MANAGE", "Quản trị hệ thống");
-        defaultAuthorities.put("ASSET_DOWNLOAD", "Tải xuống tài sản");
+        defaultAuthorities.put("VAULT_DELETE", "Delete vault");
+        defaultAuthorities.put("EXECUTOR_MANAGE", "Manage executors");
+        defaultAuthorities.put("LEGAL_REVIEW", "Legal review");
+        defaultAuthorities.put("ADMIN_MANAGE", "System administration");
+        defaultAuthorities.put("ASSET_DOWNLOAD", "Download assets");
 
         defaultAuthorities.forEach((code, desc) -> {
             if (authorityRepository.findByCode(code).isEmpty()) {

@@ -7,9 +7,9 @@ import lombok.Data;
 
 @Data
 public class AssignBeneficiaryRequest {
-    @Email(message = "Email không đúng định dạng")
-    @NotBlank(message = "Email người thụ hưởng là bắt buộc")
-    @Size(max = 255, message = "Email tối đa 255 ký tự")
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Beneficiary email is required")
+    @Size(max = 255, message = "Email must be at most 255 characters")
     private String email;
 
     // FR-02 (2a): Vault đã có người thụ hưởng thì Owner phải xác nhận ghi đè

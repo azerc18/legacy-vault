@@ -27,8 +27,8 @@ class EmailSenderBeneficiaryTest {
     }
 
     private static void assertNoOtpFooter(SimpleMailMessage message) {
-        assertThat(message.getText()).doesNotContain("Mã có hiệu lực");
-        assertThat(message.getText()).doesNotContain("không chia sẻ mã");
+        assertThat(message.getText()).doesNotContain("The code is valid for");
+        assertThat(message.getText()).doesNotContain("not share this code");
     }
 
     @Test
@@ -39,8 +39,8 @@ class EmailSenderBeneficiaryTest {
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("user@example.com");
         assertThat(message.getText()).contains("123456");
-        assertThat(message.getText()).contains("Mã có hiệu lực trong 5 phút.");
-        assertThat(message.getText()).contains("Vui lòng không chia sẻ mã này");
+        assertThat(message.getText()).contains("The code is valid for 5 minutes.");
+        assertThat(message.getText()).contains("Please do not share this code");
     }
 
     @Test
@@ -51,7 +51,7 @@ class EmailSenderBeneficiaryTest {
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("user@example.com");
         assertThat(message.getText()).contains("654321");
-        assertThat(message.getText()).contains("Vui lòng không chia sẻ mã này");
+        assertThat(message.getText()).contains("Please do not share this code");
     }
 
     @Test
@@ -61,7 +61,7 @@ class EmailSenderBeneficiaryTest {
 
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("ben@example.com");
-        assertThat(message.getSubject()).isEqualTo("Lời mời trở thành người thụ hưởng - LegacyVault");
+        assertThat(message.getSubject()).isEqualTo("Invitation to become a beneficiary - LegacyVault");
         assertThat(message.getText()).contains("Owner").contains("\"My Vault\"");
         assertNoOtpFooter(message);
     }
@@ -73,7 +73,7 @@ class EmailSenderBeneficiaryTest {
 
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("ben@example.com");
-        assertThat(message.getSubject()).isEqualTo("Bạn được chỉ định là người thụ hưởng - LegacyVault");
+        assertThat(message.getSubject()).isEqualTo("You have been named a beneficiary - LegacyVault");
         assertNoOtpFooter(message);
     }
 
@@ -84,8 +84,8 @@ class EmailSenderBeneficiaryTest {
 
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("owner@example.com");
-        assertThat(message.getSubject()).isEqualTo("Xác nhận chỉ định người thụ hưởng - LegacyVault");
-        assertThat(message.getText()).contains("ben@example.com").contains("đã gửi lời mời đăng ký");
+        assertThat(message.getSubject()).isEqualTo("Beneficiary assignment confirmed - LegacyVault");
+        assertThat(message.getText()).contains("ben@example.com").contains("a sign-up invitation has been sent");
         assertNoOtpFooter(message);
     }
 }

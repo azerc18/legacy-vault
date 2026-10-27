@@ -30,7 +30,7 @@ class EmailSenderExecutorNoticeTest {
         assertThat(message.getTo()).containsExactly("exec@example.test");
         assertThat(message.getText())
                 .contains("Owner A", "owner@example.test", "BACKUP", "Dead Man's Switch")
-                .doesNotContain("OTP", "Mã có hiệu lực");
+                .doesNotContain("OTP", "The code is valid for");
     }
 
     @Test
@@ -40,10 +40,10 @@ class EmailSenderExecutorNoticeTest {
 
         SimpleMailMessage message = sentMessage();
         assertThat(message.getTo()).containsExactly("old@example.test");
-        assertThat(message.getSubject()).contains("thu hồi");
+        assertThat(message.getSubject()).contains("revoked");
         assertThat(message.getText())
                 .contains("Owner A", "owner@example.test", "PRIMARY")
-                .doesNotContain("OTP", "Mã có hiệu lực");
+                .doesNotContain("OTP", "The code is valid for");
     }
 
     // T5: Owner không có fullName -> dùng email làm tên hiển thị, không in chữ "null".
@@ -52,7 +52,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorAssignedNotice("exec@example.test", null, "owner@example.test", ExecutorType.PRIMARY);
 
         assertThat(sentMessage().getText())
-                .contains("owner@example.test đã chỉ định bạn", "Dead Man's Switch của owner@example.test")
+                .contains("owner@example.test has assigned you", "Dead Man's Switch of owner@example.test")
                 .doesNotContain("null");
     }
 
@@ -61,7 +61,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorRevokedNotice("old@example.test", "  ", "owner@example.test", ExecutorType.BACKUP);
 
         assertThat(sentMessage().getText())
-                .contains("owner@example.test đã thu hồi", "bàn giao cho owner@example.test.")
+                .contains("owner@example.test has revoked", "handover process for owner@example.test.")
                 .doesNotContain("null", "()");
     }
 
@@ -70,7 +70,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
 
         assertThat(sentMessage().getText())
-                .contains("Owner A (owner@example.test) đã chỉ định bạn", "Dead Man's Switch của Owner A ")
+                .contains("Owner A (owner@example.test) has assigned you", "Dead Man's Switch of Owner A ")
                 .doesNotContain("null");
     }
 
@@ -79,7 +79,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorRevokedNotice("old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP);
 
         assertThat(sentMessage().getText())
-                .contains("Owner A (owner@example.test) đã thu hồi", "bàn giao cho Owner A.")
+                .contains("Owner A (owner@example.test) has revoked", "handover process for Owner A.")
                 .doesNotContain("null");
     }
 

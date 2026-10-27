@@ -65,14 +65,14 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional(noRollbackFor = UserProfileException.class)
     public void changePassword(UUID userId, ChangePasswordRequest request) {
         User user = userRepository.findByIdForUpdate(userId)
-                .orElseThrow(() -> new UserProfileException("Không tìm thấy tài khoản", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             auditLogService.failure(AuditAction.PASSWORD_CHANGE_FAILED, user.getId(), user.getEmail(), "wrong current password");
-            throw new UserProfileException("Mật khẩu hiện tại không đúng", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("Current password is incorrect", HttpStatus.BAD_REQUEST);
         }
         if (passwordEncoder.matches(request.getNewPassword(), user.getPasswordHash())) {
-            throw new UserProfileException("Mật khẩu mới phải khác mật khẩu hiện tại", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("The new password must be different from the current password", HttpStatus.BAD_REQUEST);
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -95,7 +95,7 @@ public class UserProfileServiceImpl implements UserProfileService {
         try {
             newPath = fileStorageService.storeFile(file, bytes);
         } catch (Exception e) {
-            throw new UserProfileException("Không thể lưu ảnh đại diện", HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new UserProfileException("Could not save the avatar", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
         String oldPath = user.getAvatarPath();
@@ -117,13 +117,13 @@ public class UserProfileServiceImpl implements UserProfileService {
     public AvatarFile getAvatar(UUID userId) {
         User user = load(userId);
         if (user.getAvatarPath() == null) {
-            throw new UserProfileException("Chưa có ảnh đại diện", HttpStatus.NOT_FOUND);
+            throw new UserProfileException("No avatar yet", HttpStatus.NOT_FOUND);
         }
         try {
             byte[] content = fileStorageService.readFile(user.getAvatarPath());
             return new AvatarFile(content, UploadedDocumentValidator.detectContentType(content));
         } catch (IOException | SecurityException e) {
-            throw new UserProfileException("Không tìm thấy ảnh đại diện", HttpStatus.NOT_FOUND);
+            throw new UserProfileException("Avatar not found", HttpStatus.NOT_FOUND);
         }
     }
 
@@ -146,19 +146,19 @@ public class UserProfileServiceImpl implements UserProfileService {
     // Chỉ nhận PNG/JPG thật (kiểm tra magic bytes), tối đa 2MB
     private byte[] readAndValidateAvatar(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new UserProfileException("Vui lòng chọn ảnh", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("Please choose an image", HttpStatus.BAD_REQUEST);
         }
         if (file.getSize() > MAX_AVATAR_SIZE) {
-            throw new UserProfileException("Ảnh tối đa 2MB", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("Image must be at most 2MB", HttpStatus.BAD_REQUEST);
         }
         byte[] bytes;
         try {
             bytes = file.getBytes();
         } catch (IOException e) {
-            throw new UserProfileException("Không đọc được file ảnh", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("Could not read the image file", HttpStatus.BAD_REQUEST);
         }
         if (!AVATAR_TYPES.contains(UploadedDocumentValidator.detectContentType(bytes))) {
-            throw new UserProfileException("Chỉ chấp nhận ảnh PNG hoặc JPG", HttpStatus.BAD_REQUEST);
+            throw new UserProfileException("Only PNG or JPG images are accepted", HttpStatus.BAD_REQUEST);
         }
         return bytes;
     }
@@ -180,7 +180,7 @@ public class UserProfileServiceImpl implements UserProfileService {
 
     private User load(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new UserProfileException("Không tìm thấy tài khoản", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
     }
 
     private static UserProfileResponse toResponse(User u) {

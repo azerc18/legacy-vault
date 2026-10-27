@@ -17,7 +17,7 @@ const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS c
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
 const otpKey = (id) => `lv_sign_otp_${id}`;
 // Thông báo của BE khi mã ký không còn dùng được (khớp InvalidSignCodeException trong sign)
-const OTP_UNUSABLE = /hết lượt thử|Sai quá số lần|hết hạn|chưa được tạo/i;
+const OTP_UNUSABLE = /no attempts left|too many attempts|has expired|was not generated/i;
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
 const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
