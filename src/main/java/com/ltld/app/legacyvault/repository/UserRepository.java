@@ -48,4 +48,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                               @Param("roleCode") String roleCode,
                               @Param("status") UserStatus status,
                               Pageable pageable);
+
+    boolean existsByRoles_Code(String roleCode);
 }

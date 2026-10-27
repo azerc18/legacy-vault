@@ -29,11 +29,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class AdminUserServiceImpl implements AdminUserService{
-    private static final Set<String> MANAGEABLE_ROLES = Set.of("LEGAL_VERIFIER", "ADMIN");
+    private static final Set<String> UNMANAGEABLE_ROLES = Set.of("OWNER", "BENEFICIARY", "EXECUTOR");
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final AuditLogService auditLogService;
+
 
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -48,7 +49,7 @@ public class AdminUserServiceImpl implements AdminUserService{
         boolean has = user.getRoles().stream().anyMatch(r -> code.equals(r.getCode()));
         if (!has) {
             Role role = roleRepository.findByCode(code)
-                    .orElseThrow(() -> new IllegalStateException("Role not found: " + code));
+                    .orElseThrow(() -> new AdminException("Không tìm thấy role: " + code, HttpStatus.NOT_FOUND));
             user.getRoles().add(role);
             afterRbacChange(adminId, user, "GRANT " + code);
         }
@@ -82,8 +83,9 @@ public class AdminUserServiceImpl implements AdminUserService{
 
     private static String normalizeRole(String roleCode) {
         String code = roleCode == null ? "" : roleCode.trim().toUpperCase(Locale.ROOT);
-        if (!MANAGEABLE_ROLES.contains(code)) {
-            throw new AdminException("Chỉ quản lý được role LEGAL_VERIFIER và ADMIN", HttpStatus.BAD_REQUEST);
+        if (code.isEmpty() || UNMANAGEABLE_ROLES.contains(code)) {
+            throw new AdminException("Không gán/gỡ thủ công được role OWNER, BENEFICIARY, EXECUTOR",
+                    HttpStatus.BAD_REQUEST);
         }
         return code;
     }

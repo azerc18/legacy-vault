@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
+import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
@@ -35,12 +36,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(AdminController.class)
 @Import(SecurityConfig.class)
+
 class AdminControllerSecurityTest {
 
     private static final UUID ADMIN_ID = UUID.randomUUID();
     private static final UUID USER_ID = UUID.randomUUID();
 
     @Autowired private MockMvc mockMvc;
+    @MockitoBean private AdminRoleService adminRoleService;
     @MockitoBean private AdminUserService adminUserService;
     @MockitoBean private DmsConfigService dmsConfigService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
