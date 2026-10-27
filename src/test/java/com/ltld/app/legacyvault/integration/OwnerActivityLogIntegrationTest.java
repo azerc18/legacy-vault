@@ -208,13 +208,14 @@ class OwnerActivityLogIntegrationTest {
         Vault vault = vaultRepository.save(Vault.builder().owner(owner).name("Vault " + tag).build());
         String ownerDetail = "ownerId=" + owner.getId();
 
+        // FR-03: phải có Primary trước khi bật DMS. Lưu qua repository nên không sinh audit.
+        ExecutorAssignment primary = assignment(owner, user("primary-" + tag), ExecutorType.PRIMARY, ExecutorStatus.INACTIVE);
+        ExecutorAssignment revokedBackup = assignment(owner, user("backup-" + tag), ExecutorType.BACKUP, ExecutorStatus.REVOKED);
+
         // FR-03 qua service thật: ghi DMS_CONFIGURED và DMS_CHECKIN với entityId = id DmsConfig
         dmsConfigService.upsertConfig(owner.getId(), dmsRequest());
         dmsConfigService.checkIn(owner.getId());
         UUID configId = dmsConfigRepository.findByOwnerId(owner.getId()).orElseThrow().getId();
-
-        ExecutorAssignment primary = assignment(owner, user("primary-" + tag), ExecutorType.PRIMARY, ExecutorStatus.INACTIVE);
-        ExecutorAssignment revokedBackup = assignment(owner, user("backup-" + tag), ExecutorType.BACKUP, ExecutorStatus.REVOKED);
 
         // Cùng tham số như ExecutorManagementServiceImpl.audit và DmsActivationProcessor (BR-03, actor null)
         auditLogService.log(AuditAction.EXECUTOR_ASSIGNED, AuditResult.SUCCESS, owner.getId(), owner.getEmail(), null,

@@ -442,6 +442,123 @@ class ExecutorManagementServiceImplTest {
         verifyNoInteractions(auditLogService, eventPublisher);
     }
 
+    // ---------- FR-06: không thu hồi Executor cuối cùng khi DMS ACTIVE ----------
+
+    @Test
+    @DisplayName("B-01a: DMS ACTIVE, thu hồi Executor cuối cùng -> 409, giữ nguyên assignment và role, không audit, không mail")
+    void revoke_lastExecutorWhileDmsActive_conflict() {
+        candidate.getRoles().add(executorRole);
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        assertThatThrownBy(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY))
+                .isInstanceOf(ExecutorManagementException.class)
+                .hasMessage(ExecutorManagementServiceImpl.LAST_EXECUTOR_MESSAGE)
+                .satisfies(e -> assertThat(((ExecutorManagementException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        assertThat(current.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(current.getRevokedAt()).isNull();
+        assertThat(candidate.getRoles()).containsExactly(executorRole);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("B-01a: DMS ACTIVE, thu hồi Backup khi Primary đã REVOKED -> vẫn là Executor cuối cùng chưa REVOKED: 409")
+    void revoke_backupWhenPrimaryRevoked_dmsActive_conflict() {
+        ExecutorAssignment primary = assignment(ExecutorType.PRIMARY,
+                user(UUID.randomUUID(), "p@example.test", UserStatus.ACTIVE), ExecutorStatus.REVOKED);
+        ExecutorAssignment backup = assignment(ExecutorType.BACKUP, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(primary, backup);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        assertStatus(() -> service.revokeExecutor(ownerId, ExecutorType.BACKUP), HttpStatus.CONFLICT);
+
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("B-01a: DMS ACTIVE, thu hồi Primary khi Backup còn -> được phép (đúng chữ tài liệu)")
+    void revoke_primaryWhileBackupLeft_dmsActive_allowed() {
+        ExecutorAssignment primary = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        ExecutorAssignment backup = assignment(ExecutorType.BACKUP,
+                user(UUID.randomUUID(), "b@example.test", UserStatus.ACTIVE), ExecutorStatus.INACTIVE);
+        lockedExecutors(primary, backup);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        ExecutorAssignmentResponse response = service.revokeExecutor(ownerId, ExecutorType.PRIMARY);
+
+        assertThat(response.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(executorAssignmentRepository).saveAndFlush(primary);
+    }
+
+    @Test
+    @DisplayName("B-01a: chưa có DMS -> thu hồi Executor cuối cùng được phép; trạng thái DMS được đọc lại sau khi khóa Executor")
+    void revoke_lastExecutor_withoutDms_allowed() {
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+
+        service.revokeExecutor(ownerId, ExecutorType.PRIMARY);
+
+        assertThat(current.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        InOrder order = inOrder(executorAssignmentRepository, dmsConfigRepository);
+        order.verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        order.verify(dmsConfigRepository).findByOwnerId(ownerId);
+        order.verify(executorAssignmentRepository).saveAndFlush(current);
+    }
+
+    @Test
+    @DisplayName("B-01a: DMS SUSPENDED -> thu hồi Executor cuối cùng được phép (Admin mở lại sẽ bị chặn nếu không còn Executor nhận bàn giao)")
+    void revoke_lastExecutor_dmsSuspended_allowed() {
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId))
+                .thenReturn(Optional.of(dmsConfig(DmsStatus.SUSPENDED)));
+
+        service.revokeExecutor(ownerId, ExecutorType.PRIMARY);
+
+        assertThat(current.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        // DmsConfig đã khóa được thì dùng luôn, không đọc lại.
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+    }
+
+    @Test
+    @DisplayName("B-01a write-skew: lúc khóa chưa có DmsConfig, sau khi khóa Executor đọc lại thấy DMS vừa bật ACTIVE -> 409")
+    void revoke_lastExecutor_dmsEnabledConcurrently_conflict() {
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+        // findByOwnerIdForUpdate: rỗng (setUp); upsertConfig đồng thời commit xong trước khi ta có khóa Executor.
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        assertStatus(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY), HttpStatus.CONFLICT);
+
+        assertThat(current.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("B-01a: thu hồi khóa theo thứ tự DmsConfig -> User -> các dòng Executor của Owner -> ghi")
+    void revoke_locksDmsConfigThenUserThenExecutorRows() {
+        ExecutorAssignment current = assignment(ExecutorType.BACKUP, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+
+        service.revokeExecutor(ownerId, ExecutorType.BACKUP);
+
+        InOrder order = inOrder(dmsConfigRepository, userRepository, executorAssignmentRepository);
+        order.verify(dmsConfigRepository).findByOwnerIdForUpdate(ownerId);
+        order.verify(userRepository).findByIdForUpdate(candidate.getId());
+        order.verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        order.verify(executorAssignmentRepository).saveAndFlush(current);
+    }
+
+    private void lockedExecutors(ExecutorAssignment... assignments) {
+        when(executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId)).thenReturn(List.of(assignments));
+    }
+
     // ---------- FR-06 bước 5: event gửi mail ----------
 
     @Test

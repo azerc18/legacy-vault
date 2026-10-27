@@ -5,24 +5,31 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.IThrowableProxy;
 import ch.qos.logback.core.read.ListAppender;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationServiceImpl;
+import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
+import com.ltld.app.legacyvault.service.dmsservice.ExecutorActivationRule;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +46,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
@@ -65,6 +73,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -95,6 +104,8 @@ class ExecutorManagementIntegrationTest {
     // Mail đã gửi chạy trên thread @Async: chờ tối đa MAIL_WAIT_MS; kiểm "không gửi" chờ NO_MAIL_WAIT_MS.
     private static final long MAIL_WAIT_MS = 5_000;
     private static final long NO_MAIL_WAIT_MS = 300;
+    // FR-03/FR-06: thời gian giữ transaction mở sau khi ghi, trong test race bật DMS vs thu hồi Executor.
+    private static final long RACE_WINDOW_MS = 30;
 
     // Mốc T0 = lúc quét kích hoạt; cắt về giây để so sánh với DATETIME của MySQL không lệch.
     private static final LocalDateTime T0 = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
@@ -103,8 +114,13 @@ class ExecutorManagementIntegrationTest {
     private EmailSender emailSender;                                   // mail FR-06
     @MockitoBean
     private ExecutorNotificationService executorNotificationService;   // mail kích hoạt FR-07
+    // FR-03/FR-06: spy gọi hàm thật; chỉ test race bật DMS vs thu hồi Executor thêm độ trễ để giữ transaction mở (Spring reset spy sau mỗi test).
+    @MockitoSpyBean
+    private AuditLogService auditLogService;
 
     @Autowired private ExecutorManagementService executorManagementService;
+    @Autowired private DmsConfigService dmsConfigService;
+    @Autowired private VaultRepository vaultRepository;
     @Autowired private DmsAutomationService dmsAutomationService;
     @Autowired private UserRepository userRepository;
     @Autowired private DmsConfigRepository dmsConfigRepository;
@@ -142,6 +158,10 @@ class ExecutorManagementIntegrationTest {
         for (UUID ownerId : ownerIds) {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
                     "%ownerId=" + ownerId + "%");
+            // DmsConfig do upsertConfig tạo (FR-03) không nằm sẵn trong configIds.
+            dmsConfigRepository.findByOwnerId(ownerId)
+                    .filter(c -> !configIds.contains(c.getId()))
+                    .ifPresent(c -> configIds.add(c.getId()));
         }
         notificationRepository.deleteAll(notificationRepository.findAll().stream()
                 .filter(n -> userIds.contains(n.getRecipient().getId()))
@@ -153,6 +173,9 @@ class ExecutorManagementIntegrationTest {
             executorAssignmentRepository.deleteAll(executorAssignmentRepository.findAllByOwnerId(ownerId));
         }
         dmsConfigRepository.deleteAllById(configIds);
+        vaultRepository.deleteAll(vaultRepository.findAll().stream()
+                .filter(v -> ownerIds.contains(v.getOwner().getId()))
+                .toList());
         userRepository.deleteAllById(userIds);   // Hibernate xóa luôn dòng user_roles của user
         ownerIds.clear();
         configIds.clear();
@@ -237,7 +260,8 @@ class ExecutorManagementIntegrationTest {
 
     @Test
     void revokeThenReassign_reusesSameRowAndClearsTimestamps_auditInOrder() {
-        Owner o = owner(T0.plusDays(5));
+        // Không tạo DMS: FR-06 cấm thu hồi Executor cuối cùng khi DMS ACTIVE; test này chỉ kiểm việc dùng lại dòng.
+        Owner o = owner(null);
         User c = user("c");
         User d = user("d");
         UUID rowId = assign(o, ExecutorType.PRIMARY, c, false).getAssignmentId();
@@ -545,7 +569,92 @@ class ExecutorManagementIntegrationTest {
         verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
     }
 
+    // ---------- 8. FR-03/FR-06 Race: bật DMS lần đầu vs thu hồi Executor cuối cùng ----------
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void firstDmsEnableRacingLastExecutorRevoke_neverActiveWithoutExecutor_noDeadlock() throws Exception {
+        // Audit được gọi sau khi đã ghi và trước khi commit: trễ ở đây giữ transaction mở, để bên kia chắc chắn kiểm
+        // điều kiện trong lúc bên này chưa commit. Thiếu khóa thì write-skew (cả hai cùng thành công) xảy ra.
+        doAnswer(inv -> {
+            AuditAction action = inv.getArgument(0);
+            if (action == AuditAction.DMS_CONFIGURED || action == AuditAction.EXECUTOR_REVOKE) {
+                Thread.sleep(RACE_WINDOW_MS);
+            }
+            return inv.callRealMethod();
+        }).when(auditLogService).log(any(), any(), any(), any(), any(), any(), any(), any());
+
+        int rounds = 20;
+        int enableWon = 0;
+        int revokeWon = 0;
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < rounds; round++) {
+                Owner o = owner(null);   // chưa có DmsConfig: hai bên không có khóa DmsConfig chung
+                vaultRepository.save(Vault.builder()
+                        .owner(userRepository.findById(o.id).orElseThrow())
+                        .name("Vault " + round)
+                        .build());
+                assign(o, ExecutorType.PRIMARY, user("last" + round), false);
+
+                // Bật DMS tới bước khóa Executor nhanh hơn thu hồi (thu hồi còn khóa DmsConfig, User trước), nên vòng chẵn
+                // cho thu hồi trễ 0–4 ms, vòng lẻ cho bật DMS trễ 0–36 ms, để cả hai thứ tự đều xảy ra.
+                boolean delayRevoke = round % 2 == 0;
+                long headStartNanos = TimeUnit.MILLISECONDS.toNanos(delayRevoke ? round / 2 % 5 : 4L * (round / 2 % 10));
+                List<Throwable> results = runConcurrently(pool, List.of(
+                        () -> {
+                            if (!delayRevoke) spin(headStartNanos);
+                            return dmsConfigService.upsertConfig(o.id, dmsRequest());
+                        },
+                        () -> {
+                            if (delayRevoke) spin(headStartNanos);
+                            return executorManagementService.revokeExecutor(o.id, ExecutorType.PRIMARY);
+                        }));
+                Throwable enableError = results.get(0);
+                Throwable revokeError = results.get(1);
+
+                for (Throwable t : results) {
+                    assertThat(isLockFailure(t)).as("round %d: deadlock / lock wait %s", round, t).isFalse();
+                }
+                DmsConfig config = dmsConfigRepository.findByOwnerId(o.id).orElse(null);
+                boolean activeWithoutExecutor = config != null && config.getStatus() == DmsStatus.ACTIVE
+                        && ExecutorActivationRule.pickActivationTarget(
+                                executorAssignmentRepository.findAllByOwnerId(o.id)).isEmpty();
+                assertThat(activeWithoutExecutor)
+                        .as("round %d: DMS ACTIVE nhưng không có Executor dùng được (enable=%s, revoke=%s)",
+                                round, enableError, revokeError)
+                        .isFalse();
+
+                // Đúng một bên thắng; bên thua là 409 nghiệp vụ, không phải 500.
+                assertThat(results).as("round %d", round).filteredOn(t -> t == null).hasSize(1);
+                if (enableError != null) {
+                    assertThat(enableError).as("round %d enable", round).isInstanceOf(DmsException.class);
+                    assertThat(((DmsException) enableError).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    revokeWon++;
+                } else {
+                    assertThat(revokeError).as("round %d revoke", round).isInstanceOf(ExecutorManagementException.class);
+                    assertThat(((ExecutorManagementException) revokeError).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    enableWon++;
+                }
+
+                deleteSeededData();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        log.info("B-01a race first DMS enable vs last executor revoke: enable won={}, revoke won={} / {} rounds",
+                enableWon, revokeWon, rounds);
+    }
+
     // ---------- helpers ----------
+
+    private static DmsConfigRequest dmsRequest() {
+        DmsConfigRequest request = new DmsConfigRequest();
+        request.setCheckinIntervalDays(30);
+        request.setGracePeriodDays(7);
+        request.setReminderCount(3);
+        return request;
+    }
 
     private record Owner(UUID id, String email, String fullName, UUID configId) {}
 

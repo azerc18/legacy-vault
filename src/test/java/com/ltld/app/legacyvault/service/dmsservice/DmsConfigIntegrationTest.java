@@ -155,7 +155,7 @@ class DmsConfigIntegrationTest {
 
     @Test
     void firstUpsert_activatesDmsAndSchedulesFromNow() {
-        Seed s = seed(true, false);
+        Seed s = seed(true, true);
         LocalDateTime before = LocalDateTime.now();
 
         DmsConfigService.UpsertResult result = dmsConfigService.upsertConfig(s.ownerId, request());
@@ -189,7 +189,7 @@ class DmsConfigIntegrationTest {
 
     @Test
     void reminders_sentOncePerDueTime_thenStop() {
-        Seed s = seed(true, false);
+        Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
         LocalDateTime start = config(s).getLastCheckinAt();
         LocalDateTime due = start.plusDays(INTERVAL_DAYS);
@@ -225,7 +225,7 @@ class DmsConfigIntegrationTest {
 
     @Test
     void reminderMailFails_thenRetriedNextScan_recordsExactlyOneReminder() {
-        Seed s = seed(true, false);
+        Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
         LocalDateTime due = config(s).getLastCheckinAt().plusDays(INTERVAL_DAYS);
         LocalDateTime triggerAt = due.plusDays(GRACE_DAYS);
@@ -438,7 +438,7 @@ class DmsConfigIntegrationTest {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             for (int round = 0; round < rounds; round++) {
-                Seed s = seed(true, false);
+                Seed s = seed(true, true);
                 List<DmsConfigService.UpsertResult> successes = new ArrayList<>();
 
                 List<Throwable> results = runConcurrently(pool, List.of(
@@ -474,7 +474,7 @@ class DmsConfigIntegrationTest {
 
     @Test
     void assertHandoverNotStarted_outsideTransaction_throwsIllegalTransactionState() {
-        Seed s = seed(true, false);
+        Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
 
         // MANDATORY: gọi ngoài transaction thì khóa FOR UPDATE vô nghĩa, phải bị từ chối ngay.
@@ -484,7 +484,7 @@ class DmsConfigIntegrationTest {
 
     @Test
     void assertHandoverNotStarted_insideTransaction_whenTriggered_returns409() {
-        Seed s = seed(true, false);
+        Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
         DmsConfig config = config(s);
         config.setStatus(DmsStatus.TRIGGERED);

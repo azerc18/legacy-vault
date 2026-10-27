@@ -28,4 +28,7 @@ public class DmsConfigResponse {
     private LocalDateTime nextReminderAt;
     private Integer remindersSent;
     private LocalDateTime triggeredAt;
+    // FR-03: trigger lúc này có kích hoạt được Executor nào không (ExecutorActivationRule, cùng quy tắc với FR-07).
+    // null khi DMS đã TRIGGERED: bàn giao đã bắt đầu nên câu hỏi này không còn ý nghĩa.
+    private Boolean hasUsableExecutor;
 }
