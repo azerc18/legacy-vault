@@ -138,19 +138,19 @@ class VaultActivityLogServiceImplTest {
         assertThat(result.getContent()).hasSize(4);
 
         // Owner: actorName = "Bạn", IP nguyên vẹn
-        assertThat(result.getContent().get(0).getActorName()).isEqualTo("Bạn");
+        assertThat(result.getContent().get(0).getActorName()).isEqualTo("You");
         assertThat(result.getContent().get(0).getIpAddress()).isEqualTo("192.168.1.100");
 
         // Admin: actorName = "Quản trị viên hệ thống", IP bị mask
-        assertThat(result.getContent().get(1).getActorName()).isEqualTo("Quản trị viên hệ thống");
+        assertThat(result.getContent().get(1).getActorName()).isEqualTo("System administrator");
         assertThat(result.getContent().get(1).getIpAddress()).isEqualTo("***.***.***.***");
 
         // Executor: actorName = "Người thi hành: Nguyen Van A", IP bị mask
-        assertThat(result.getContent().get(2).getActorName()).isEqualTo("Người thi hành: Nguyen Van A");
+        assertThat(result.getContent().get(2).getActorName()).isEqualTo("Executor: Nguyen Van A");
         assertThat(result.getContent().get(2).getIpAddress()).isEqualTo("***.***.***.***");
 
         // System: actorName = "Hệ thống"
-        assertThat(result.getContent().get(3).getActorName()).isEqualTo("Hệ thống");
+        assertThat(result.getContent().get(3).getActorName()).isEqualTo("System");
         assertThat(result.getContent().get(3).getIpAddress()).isNull();
     }
 
@@ -209,30 +209,30 @@ class VaultActivityLogServiceImplTest {
 
     static Stream<Arguments> newDescriptions() {
         return Stream.of(
-                Arguments.of(AuditAction.BENEFICIARY_ASSIGNED, "Chỉ định người thụ hưởng cho két sắt."),
-                Arguments.of(AuditAction.BENEFICIARY_REPLACED, "Thay đổi người thụ hưởng của két sắt."),
-                Arguments.of(AuditAction.BENEFICIARY_ASSIGN_DENIED, "Từ chối chỉ định người thụ hưởng."),
-                Arguments.of(AuditAction.BENEFICIARY_LINKED, "Người thụ hưởng đã liên kết tài khoản với két sắt."),
-                Arguments.of(AuditAction.VAULT_UNLOCK, "Két sắt được mở khóa sau khi xác minh pháp lý."),
-                Arguments.of(AuditAction.VAULT_ARCHIVED, "Két sắt được lưu trữ do hết hạn nhận bàn giao."),
-                Arguments.of(AuditAction.CLAIM_COMPLETED, "Người thụ hưởng đã hoàn tất nhận bàn giao."),
-                Arguments.of(AuditAction.ASSET_VIEWED, "Xem chi tiết tài sản số."),
-                Arguments.of(AuditAction.ASSET_DOWNLOADED, "Tải xuống tài sản số."),
-                Arguments.of(AuditAction.ASSET_CREATED, "Thêm tài sản số mới."),
-                Arguments.of(AuditAction.ASSET_UPDATED, "Cập nhật tài sản số."),
-                Arguments.of(AuditAction.ASSET_DELETED, "Xóa tài sản số."),
-                Arguments.of(AuditAction.DOCUMENT_DOWNLOADED, "Tải xuống tài liệu."),
-                Arguments.of(AuditAction.LEGAL_VERIFICATION_REQUESTED, "Gửi yêu cầu xác minh pháp lý."),
-                Arguments.of(AuditAction.BENEFICIARY_NOTIFIED, "Đã gửi thông báo bàn giao cho người thụ hưởng."),
-                Arguments.of(AuditAction.BENEFICIARY_NOTIFY_FAILED, "Gửi thông báo cho người thụ hưởng thất bại."),
+                Arguments.of(AuditAction.BENEFICIARY_ASSIGNED, "Assigned a beneficiary to the vault."),
+                Arguments.of(AuditAction.BENEFICIARY_REPLACED, "Changed the vault's beneficiary."),
+                Arguments.of(AuditAction.BENEFICIARY_ASSIGN_DENIED, "Beneficiary assignment denied."),
+                Arguments.of(AuditAction.BENEFICIARY_LINKED, "The beneficiary linked their account to the vault."),
+                Arguments.of(AuditAction.VAULT_UNLOCK, "The vault was unlocked after legal verification."),
+                Arguments.of(AuditAction.VAULT_ARCHIVED, "The vault was archived because the claim period expired."),
+                Arguments.of(AuditAction.CLAIM_COMPLETED, "The beneficiary completed the handover."),
+                Arguments.of(AuditAction.ASSET_VIEWED, "Viewed digital asset details."),
+                Arguments.of(AuditAction.ASSET_DOWNLOADED, "Downloaded a digital asset."),
+                Arguments.of(AuditAction.ASSET_CREATED, "Added a new digital asset."),
+                Arguments.of(AuditAction.ASSET_UPDATED, "Updated a digital asset."),
+                Arguments.of(AuditAction.ASSET_DELETED, "Deleted a digital asset."),
+                Arguments.of(AuditAction.DOCUMENT_DOWNLOADED, "Downloaded a document."),
+                Arguments.of(AuditAction.LEGAL_VERIFICATION_REQUESTED, "Submitted a legal verification request."),
+                Arguments.of(AuditAction.BENEFICIARY_NOTIFIED, "Sent the handover notice to the beneficiary."),
+                Arguments.of(AuditAction.BENEFICIARY_NOTIFY_FAILED, "Failed to notify the beneficiary."),
                 Arguments.of(AuditAction.BENEFICIARY_NOTIFY_GAVE_UP,
-                        "Ngừng gửi thông báo cho người thụ hưởng sau nhiều lần thất bại."),
+                        "Stopped notifying the beneficiary after repeated failures."),
                 Arguments.of(AuditAction.BENEFICIARY_PENDING_NOTIFIED,
-                        "Đã gửi lời mời đăng ký tới người thụ hưởng (chưa có tài khoản)."),
-                Arguments.of(AuditAction.IDENTITY_OTP_SENT, "Gửi mã OTP xác minh danh tính người thụ hưởng."),
-                Arguments.of(AuditAction.IDENTITY_VERIFIED, "Người thụ hưởng xác minh danh tính thành công."),
-                Arguments.of(AuditAction.IDENTITY_VERIFY_FAILED, "Người thụ hưởng xác minh danh tính thất bại."),
-                Arguments.of(AuditAction.IDENTITY_LOCKED, "Tạm khóa xác minh danh tính do nhập sai quá số lần cho phép.")
+                        "Sent a sign-up invitation to the beneficiary (no account yet)."),
+                Arguments.of(AuditAction.IDENTITY_OTP_SENT, "Sent the beneficiary identity verification OTP."),
+                Arguments.of(AuditAction.IDENTITY_VERIFIED, "The beneficiary verified their identity."),
+                Arguments.of(AuditAction.IDENTITY_VERIFY_FAILED, "The beneficiary failed identity verification."),
+                Arguments.of(AuditAction.IDENTITY_LOCKED, "Identity verification locked after too many failed attempts.")
         );
     }
 
@@ -243,7 +243,7 @@ class VaultActivityLogServiceImplTest {
 
         assertThat(description)
                 .isEqualTo(expected)
-                .doesNotStartWith("Thực hiện hành động");
+                .doesNotStartWith("Performed action");
     }
 
     @Test
@@ -255,7 +255,7 @@ class VaultActivityLogServiceImplTest {
                 Map.of("result", "FAILURE", "email", "owner@example.com", "detail", detail));
 
         assertThat(description)
-                .isEqualTo("Từ chối chỉ định người thụ hưởng.")
+                .isEqualTo("Beneficiary assignment denied.")
                 .doesNotContain(detail)
                 .doesNotContain(beneficiaryUserId)
                 .doesNotContain("owner@example.com");
@@ -266,6 +266,6 @@ class VaultActivityLogServiceImplTest {
         String description = describe(AuditAction.DOCUMENT_DOWNLOADED,
                 Map.of("result", "FAILURE", "detail", "Read or decrypt failed"));
 
-        assertThat(description).isEqualTo("Tải xuống tài liệu thất bại.");
+        assertThat(description).isEqualTo("Document download failed.");
     }
 }

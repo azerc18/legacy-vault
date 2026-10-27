@@ -235,7 +235,7 @@ public class BeneficiaryServiceImplTest {
                 beneficiaryService.initializeClaim(request, currentUserId));
 
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
-        assertEquals("Không tìm thấy yêu cầu nhận tài sản.", ex.getMessage());
+        assertEquals("Claim request not found.", ex.getMessage());
     }
 
     @Test
@@ -247,7 +247,7 @@ public class BeneficiaryServiceImplTest {
                 beneficiaryService.initializeClaim(request, currentUserId));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Tài sản chưa sẵn sàng để nhận.", ex.getMessage());
+        assertEquals("The assets are not ready to be claimed yet.", ex.getMessage());
     }
 
     @Test
@@ -822,7 +822,7 @@ public class BeneficiaryServiceImplTest {
                 () -> beneficiaryService.verifyIdentity(
                         verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
 
-        assertThat(ex.getMessage()).contains("còn 4 lần"); // còn 4 lần thử
+        assertThat(ex.getMessage()).contains("Attempts left: 4"); // còn 4 lần thử
         // Bộ đếm tăng trong DB bằng một câu UPDATE, không tính trên RAM
         verify(verificationRepository).incrementAttemptCount(session.getId());
         assertThat(session.getAttemptCount()).isEqualTo(1);
@@ -1087,7 +1087,7 @@ public class BeneficiaryServiceImplTest {
 
         AssetDownloadResponse file = beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId);
 
-        assertThat(new String(file.getContent(), StandardCharsets.UTF_8)).contains("(không có)");
+        assertThat(new String(file.getContent(), StandardCharsets.UTF_8)).contains("(none)");
     }
 
     @Test
@@ -1298,7 +1298,7 @@ public class BeneficiaryServiceImplTest {
         BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
 
-        assertThat(ex.getMessage()).contains("Còn 1 tài sản chưa xem");
+        assertThat(ex.getMessage()).contains("Unviewed assets: 1");
         assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
         verify(claimRepository, never()).markClaimed(any(), any());
@@ -1366,7 +1366,7 @@ public class BeneficiaryServiceImplTest {
         BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
                 () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
 
-        assertThat(ex.getMessage()).contains("ít nhất một tài sản");
+        assertThat(ex.getMessage()).contains("at least one asset");
         verify(claimRepository, never()).markClaimed(any(), any());
         verifyNoInteractions(auditLogService);
     }

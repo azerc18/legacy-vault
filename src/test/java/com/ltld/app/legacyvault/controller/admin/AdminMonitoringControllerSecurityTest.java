@@ -108,7 +108,7 @@ class AdminMonitoringControllerSecurityTest {
     @Test
     void acknowledge_alreadyAcknowledged_returns409() throws Exception {
         when(securityAlertService.acknowledge(any(), any()))
-                .thenThrow(new AdminException("Cảnh báo đã được xác nhận trước đó", HttpStatus.CONFLICT));
+                .thenThrow(new AdminException("The alert has already been acknowledged", HttpStatus.CONFLICT));
 
         mockMvc.perform(patch("/api/admin/security-alerts/{id}/acknowledge", UUID.randomUUID()).with(admin()))
                 .andExpect(status().isConflict());

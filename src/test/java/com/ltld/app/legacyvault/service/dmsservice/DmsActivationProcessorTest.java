@@ -689,7 +689,7 @@ class DmsActivationProcessorTest {
         verify(executorNotificationService).send(eq("primary@example.test"), sent.capture());
         assertThat(sent.getValue())
                 .contains("Nguyễn Văn A (owner@example.test)")
-                .contains("Executor Primary")
+                .contains("Primary executor")
                 .contains(primary.getId().toString());
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(saved.capture());
@@ -704,8 +704,8 @@ class DmsActivationProcessorTest {
         String content = DmsActivationProcessor.activationMessage(owner, backup);
 
         assertThat(content)
-                .contains("Dead Man's Switch của owner@example.test đã được kích hoạt")
-                .contains("Executor Backup")
+                .contains("The Dead Man's Switch of owner@example.test has been triggered")
+                .contains("Backup executor")
                 .contains(backup.getId().toString())
                 .doesNotContain("null");
     }

@@ -164,12 +164,12 @@ class ExecutorAssetControllerSecurityTest {
         UUID assignmentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         when(executorAssetService.getAssignedVaults(eq(assignmentId), eq(userId.toString())))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         mockMvc.perform(get(GET_VAULTS_URL, assignmentId).with(token(userId)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Chưa đến thời điểm thực hiện quyền"));
+                .andExpect(jsonPath("$.message").value("Access is not available yet"));
     }
 
     @Test

@@ -138,7 +138,7 @@ class VerificationExchangeControllerSecurityTest {
     @Test
     void send_inactiveAssignment_returns403() throws Exception {
         when(verificationExchangeService.send(any(), any(), any(), any(), any()))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         mockMvc.perform(multipart(MESSAGES_URL, assignmentId, requestId).param("content", "x").with(token(userId)))
                 .andExpect(status().isForbidden());
@@ -234,7 +234,7 @@ class VerificationExchangeControllerSecurityTest {
     @Test
     void attachment_inactiveAssignment_returns403() throws Exception {
         when(verificationExchangeService.getAttachment(any(), any(), any(), any()))
-                .thenThrow(new ExecutorNotActiveException("Chưa đến thời điểm thực hiện quyền"));
+                .thenThrow(new ExecutorNotActiveException("Access is not available yet"));
 
         mockMvc.perform(get(ATTACHMENT_URL, assignmentId, requestId, messageId).with(token(userId)))
                 .andExpect(status().isForbidden());

@@ -64,7 +64,7 @@ public class AdminRoleServiceImpl implements AdminRoleService {
     public RoleResponse createRole(UUID adminId, CreateRoleRequest req) {
         String code = req.getCode().trim();
         if (roleRepository.findByCode(code).isPresent()) {
-            throw new AdminException("Role đã tồn tại: " + code, HttpStatus.CONFLICT);
+            throw new AdminException("Role already exists: " + code, HttpStatus.CONFLICT);
         }
         Role role = roleRepository.save(Role.builder()
                 .code(code)
@@ -86,7 +86,7 @@ public class AdminRoleServiceImpl implements AdminRoleService {
         // Giữ ADMIN_MANAGE cho role ADMIN, nếu không sẽ không còn ai quản trị được hệ thống.
         if (ADMIN_ROLE.equals(role.getCode())
                 && authorities.stream().noneMatch(a -> ADMIN_MANAGE.equals(a.getCode()))) {
-            throw new AdminException("Role ADMIN phải giữ quyền ADMIN_MANAGE", HttpStatus.CONFLICT);
+            throw new AdminException("The ADMIN role must keep the ADMIN_MANAGE authority", HttpStatus.CONFLICT);
         }
 
         role.setName(req.getName().trim());
@@ -103,10 +103,10 @@ public class AdminRoleServiceImpl implements AdminRoleService {
     public void deleteRole(UUID adminId, String roleCode) {
         Role role = findRole(roleCode);
         if (SYSTEM_ROLES.contains(role.getCode())) {
-            throw new AdminException("Không thể xóa role hệ thống: " + role.getCode(), HttpStatus.CONFLICT);
+            throw new AdminException("Cannot delete a system role: " + role.getCode(), HttpStatus.CONFLICT);
         }
         if (userRepository.existsByRoles_Code(role.getCode())) {
-            throw new AdminException("Role đang được gán cho người dùng, hãy gỡ trước khi xóa",
+            throw new AdminException("The role is assigned to users; remove it from them before deleting",
                     HttpStatus.CONFLICT);
         }
         UUID roleId = role.getId();
@@ -117,7 +117,7 @@ public class AdminRoleServiceImpl implements AdminRoleService {
     private Role findRole(String roleCode) {
         String code = roleCode == null ? "" : roleCode.trim().toUpperCase(Locale.ROOT);
         return roleRepository.findByCode(code)
-                .orElseThrow(() -> new AdminException("Không tìm thấy role: " + code, HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new AdminException("Role not found: " + code, HttpStatus.NOT_FOUND));
     }
 
     private Set<Authority> resolveAuthorities(List<String> codes) {
@@ -127,13 +127,13 @@ public class AdminRoleServiceImpl implements AdminRoleService {
                 .filter(c -> !c.isEmpty())
                 .collect(Collectors.toCollection(TreeSet::new));
         if (wanted.isEmpty()) {
-            throw new AdminException("Role phải có ít nhất 1 quyền", HttpStatus.BAD_REQUEST);
+            throw new AdminException("A role must have at least one authority", HttpStatus.BAD_REQUEST);
         }
 
         List<Authority> found = authorityRepository.findByCodeIn(wanted);
         if (found.size() != wanted.size()) {
             found.forEach(a -> wanted.remove(a.getCode()));
-            throw new AdminException("Quyền không tồn tại: " + String.join(", ", wanted), HttpStatus.BAD_REQUEST);
+            throw new AdminException("Authorities not found: " + String.join(", ", wanted), HttpStatus.BAD_REQUEST);
         }
         return new HashSet<>(found);
     }

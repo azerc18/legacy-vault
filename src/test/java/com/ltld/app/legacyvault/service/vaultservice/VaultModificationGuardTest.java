@@ -70,7 +70,7 @@ class VaultModificationGuardTest {
     @Test
     @DisplayName("DMS của Owner đã TRIGGERED -> dmsConfigService ném CONFLICT 409")
     void ensureModifiable_dmsTriggered_throwsConflict() {
-        doThrow(new DmsException("Dead Man's Switch đã kích hoạt quy trình bàn giao, không thể thay đổi.", HttpStatus.CONFLICT))
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.", HttpStatus.CONFLICT))
                 .when(dmsConfigService).assertHandoverNotStarted(ownerId);
 
         DmsException ex = assertThrows(DmsException.class, () -> guard.ensureModifiable(vault));

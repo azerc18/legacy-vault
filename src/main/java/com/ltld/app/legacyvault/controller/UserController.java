@@ -34,7 +34,7 @@ public class UserController {
     @PutMapping
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateMe(
             Principal principal, @Valid @RequestBody UpdateProfileRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật hồ sơ thành công",
+        return ResponseEntity.ok(ApiResponse.success("Profile updated successfully",
                 userProfileService.updateMe(currentUserId(principal), request)));
     }
 
@@ -42,7 +42,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             Principal principal, @Valid @RequestBody ChangePasswordRequest request) {
         userProfileService.changePassword(currentUserId(principal), request);
-        return ResponseEntity.ok(ApiResponse.success("Đổi mật khẩu thành công. Vui lòng đăng nhập lại."));
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully. Please sign in again."));
     }
 
     // ---------- Avatar ----------
@@ -50,7 +50,7 @@ public class UserController {
     @PutMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateAvatar(
             Principal principal, @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật ảnh đại diện thành công",
+        return ResponseEntity.ok(ApiResponse.success("Avatar updated successfully",
                 userProfileService.updateAvatar(currentUserId(principal), file)));
     }
 
@@ -67,7 +67,7 @@ public class UserController {
 
     @DeleteMapping("/avatar")
     public ResponseEntity<ApiResponse<UserProfileResponse>> deleteAvatar(Principal principal) {
-        return ResponseEntity.ok(ApiResponse.success("Đã xoá ảnh đại diện",
+        return ResponseEntity.ok(ApiResponse.success("Avatar removed",
                 userProfileService.deleteAvatar(currentUserId(principal))));
     }
 

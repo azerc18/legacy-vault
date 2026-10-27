@@ -9,14 +9,14 @@ import java.util.UUID;
 
 @Data
 public class VerifyIdentityRequest {
-    @NotNull(message = "Vault ID không được để trống")
+    @NotNull(message = "Vault ID is required")
     private UUID vaultId;
 
-    @NotNull(message = "Phương thức xác thực không được để trống")
+    @NotNull(message = "Verification method is required")
     private VerificationMethod verificationMethod;
 
     // Bắt buộc khi verificationMethod = OTP (kiểm tra ở service)
-    @Pattern(regexp = "\\d{6}", message = "OTP phải gồm đúng 6 chữ số")
+    @Pattern(regexp = "\\d{6}", message = "OTP must be exactly 6 digits")
     private String otp;
 
     // Bắt buộc khi verificationMethod = EKYC_MOCK (kiểm tra ở service)

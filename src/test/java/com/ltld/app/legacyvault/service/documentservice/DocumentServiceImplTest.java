@@ -344,7 +344,7 @@ class DocumentServiceImplTest {
 
         assertThatThrownBy(() -> documentService.deleteDocument(docId, ownerId))
                 .isInstanceOf(VaultException.class)
-                .hasMessageContaining("Tài liệu đang được dùng trong hồ sơ xác minh, không thể xóa.")
+                .hasMessageContaining("The document is used in a verification request and cannot be deleted.")
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
 
         // Đảm bảo không đăng ký xóa file

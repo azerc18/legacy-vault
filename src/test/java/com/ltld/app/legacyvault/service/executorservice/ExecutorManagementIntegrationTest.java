@@ -488,7 +488,7 @@ class ExecutorManagementIntegrationTest {
                 Throwable loserError = results.stream().filter(t -> t != null).findFirst().orElseThrow();
                 assertThat(loserError).as("round %d loser", round).isInstanceOf(ExecutorManagementException.class);
                 assertThat(((ExecutorManagementException) loserError).getStatus()).isEqualTo(HttpStatus.CONFLICT);
-                if (loserError.getMessage().contains("vừa được cập nhật")) uniqueViolations++;
+                if (loserError.getMessage().contains("was just updated")) uniqueViolations++;
                 else serializedByLock++;
 
                 User winner = results.get(0) == null ? c1 : c2;

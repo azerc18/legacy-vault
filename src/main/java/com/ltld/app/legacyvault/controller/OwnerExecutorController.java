@@ -40,7 +40,7 @@ public class OwnerExecutorController {
     @PreAuthorize("hasAuthority('EXECUTOR_MANAGE')")
     public ResponseEntity<ApiResponse<List<ExecutorAssignmentResponse>>> listExecutors(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách Executor thành công",
+        return ResponseEntity.ok(ApiResponse.success("Executors retrieved successfully",
                 executorManagementService.listExecutors(ownerId)));
     }
 
@@ -55,7 +55,7 @@ public class OwnerExecutorController {
         UUID ownerId = UUID.fromString(principal.getName());
         ExecutorAssignmentResponse response =
                 executorManagementService.assignExecutor(ownerId, parseType(type), request);
-        return ResponseEntity.ok(ApiResponse.success("Cập nhật Executor thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Executor updated successfully", response));
     }
 
     // Thu hồi Executor đang giữ vị trí {type}
@@ -67,7 +67,7 @@ public class OwnerExecutorController {
 
         UUID ownerId = UUID.fromString(principal.getName());
         ExecutorAssignmentResponse response = executorManagementService.revokeExecutor(ownerId, parseType(type));
-        return ResponseEntity.ok(ApiResponse.success("Thu hồi Executor thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Executor revoked successfully", response));
     }
 
     // Tự parse thay vì để Spring convert enum: giá trị sai trả 400 rõ ràng thay vì rơi vào handler 500 chung.
@@ -75,7 +75,7 @@ public class OwnerExecutorController {
         try {
             return ExecutorType.valueOf(type.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new ExecutorManagementException("Loại Executor không hợp lệ (PRIMARY hoặc BACKUP).",
+            throw new ExecutorManagementException("Invalid executor type (PRIMARY or BACKUP).",
                     HttpStatus.BAD_REQUEST);
         }
     }

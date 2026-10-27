@@ -117,7 +117,7 @@ class AdminControllerSecurityTest {
     @Test
     void revokeRole_selfAdmin_returns409() throws Exception {
         when(adminUserService.revokeRole(any(), any(), any()))
-                .thenThrow(new AdminException("Không thể tự gỡ quyền ADMIN của chính mình", HttpStatus.CONFLICT));
+                .thenThrow(new AdminException("You cannot remove your own ADMIN role", HttpStatus.CONFLICT));
 
         mockMvc.perform(delete("/api/admin/users/{id}/roles/{code}", ADMIN_ID, "ADMIN").with(admin()))
                 .andExpect(status().isConflict());
@@ -249,7 +249,7 @@ class AdminControllerSecurityTest {
     @Test
     void suspendDms_noConfig_returns404() throws Exception {
         when(dmsConfigService.suspendByAdmin(any(), any(), any()))
-                .thenThrow(new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+                .thenThrow(new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(put("/api/admin/dms/{ownerId}/suspend", USER_ID).with(admin()))
                 .andExpect(status().isNotFound());

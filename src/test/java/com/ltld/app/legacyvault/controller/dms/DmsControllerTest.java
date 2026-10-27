@@ -74,12 +74,12 @@ public class DmsControllerTest {
     @Test
     void getConfig_notConfigured_returns404() throws Exception {
         when(dmsConfigService.getConfig(ownerId))
-                .thenThrow(new DmsException("Chưa cấu hình Dead Man's Switch.", HttpStatus.NOT_FOUND));
+                .thenThrow(new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
 
         mockMvc.perform(get("/api/dms").principal(principal))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Chưa cấu hình Dead Man's Switch."));
+                .andExpect(jsonPath("$.message").value("The Dead Man's Switch has not been configured."));
     }
 
     @Test
@@ -127,7 +127,7 @@ public class DmsControllerTest {
     @Test
     void upsert_withoutVault_returns409() throws Exception {
         when(dmsConfigService.upsertConfig(eq(ownerId), any())).thenThrow(new DmsException(
-                "Cần tạo ít nhất một Vault trước khi cấu hình Dead Man's Switch.", HttpStatus.CONFLICT));
+                "Create at least one vault before configuring the Dead Man's Switch.", HttpStatus.CONFLICT));
 
         mockMvc.perform(put("/api/dms").principal(principal)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -143,18 +143,18 @@ public class DmsControllerTest {
         mockMvc.perform(post("/api/dms/check-in").principal(principal))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("Check-in thành công"))
+                .andExpect(jsonPath("$.message").value("Checked in successfully"))
                 .andExpect(jsonPath("$.data.remindersSent").value(0));
     }
 
     @Test
     void checkIn_whenTriggered_returns409() throws Exception {
         when(dmsConfigService.checkIn(ownerId)).thenThrow(new DmsException(
-                "Dead Man's Switch đã được kích hoạt, không thể check-in.", HttpStatus.CONFLICT));
+                "The Dead Man's Switch has been triggered; check-in is no longer possible.", HttpStatus.CONFLICT));
 
         mockMvc.perform(post("/api/dms/check-in").principal(principal))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Dead Man's Switch đã được kích hoạt, không thể check-in."));
+                .andExpect(jsonPath("$.message").value("The Dead Man's Switch has been triggered; check-in is no longer possible."));
     }
 
     @Test

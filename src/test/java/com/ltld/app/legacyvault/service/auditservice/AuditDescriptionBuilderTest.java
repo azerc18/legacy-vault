@@ -43,19 +43,19 @@ class AuditDescriptionBuilderTest {
 
     static Stream<Arguments> dmsAndExecutorDescriptions() {
         return Stream.of(
-                Arguments.of(AuditAction.DMS_CONFIGURED, "Lưu cấu hình Dead Man's Switch."),
-                Arguments.of(AuditAction.DMS_CHECKIN, "Check-in xác nhận vẫn còn hoạt động."),
-                Arguments.of(AuditAction.DMS_TRIGGERED, "Dead Man's Switch được kích hoạt do quá hạn check-in."),
+                Arguments.of(AuditAction.DMS_CONFIGURED, "Saved the Dead Man's Switch configuration."),
+                Arguments.of(AuditAction.DMS_CHECKIN, "Checked in to confirm still active."),
+                Arguments.of(AuditAction.DMS_TRIGGERED, "The Dead Man's Switch was triggered because the check-in deadline passed."),
                 Arguments.of(AuditAction.DMS_TRIGGERED_NO_EXECUTOR,
-                        "Dead Man's Switch được kích hoạt nhưng không có người thi hành khả dụng."),
-                Arguments.of(AuditAction.DMS_SUSPENDED, "Quản trị viên tạm dừng Dead Man's Switch."),
+                        "The Dead Man's Switch was triggered but no executor is available."),
+                Arguments.of(AuditAction.DMS_SUSPENDED, "An administrator suspended the Dead Man's Switch."),
                 Arguments.of(AuditAction.DMS_RESUMED,
-                        "Quản trị viên mở lại Dead Man's Switch, bắt đầu chu kỳ check-in mới."),
-                Arguments.of(AuditAction.EXECUTOR_ASSIGNED, "Chỉ định người thi hành."),
-                Arguments.of(AuditAction.EXECUTOR_REPLACED, "Thay đổi người thi hành."),
+                        "An administrator resumed the Dead Man's Switch and started a new check-in cycle."),
+                Arguments.of(AuditAction.EXECUTOR_ASSIGNED, "Assigned an executor."),
+                Arguments.of(AuditAction.EXECUTOR_REPLACED, "Changed the executor."),
                 Arguments.of(AuditAction.EXECUTOR_ACTIVATED,
-                        "Kích hoạt người thi hành sau khi Dead Man's Switch được kích hoạt."),
-                Arguments.of(AuditAction.EXECUTOR_ACKNOWLEDGED, "Người thi hành đã xác nhận nhận thông báo kích hoạt.")
+                        "Activated the executor after the Dead Man's Switch was triggered."),
+                Arguments.of(AuditAction.EXECUTOR_ACKNOWLEDGED, "The executor acknowledged the activation notice.")
         );
     }
 
@@ -66,7 +66,7 @@ class AuditDescriptionBuilderTest {
 
         assertThat(description)
                 .isEqualTo(expected)
-                .doesNotStartWith("Thực hiện hành động");
+                .doesNotStartWith("Performed action");
     }
 
     @Test
@@ -74,7 +74,7 @@ class AuditDescriptionBuilderTest {
         String description = builder.describe(log(AuditAction.EXECUTOR_REVOKE, owner(),
                 Map.of("result", "SUCCESS", "detail", "ownerId=" + ownerId + ", reason=OWNER")));
 
-        assertThat(description).isEqualTo("Thu hồi người thi hành.");
+        assertThat(description).isEqualTo("Revoked the executor.");
     }
 
     @Test
@@ -83,7 +83,7 @@ class AuditDescriptionBuilderTest {
                 Map.of("result", "SUCCESS", "detail", "ownerId=" + ownerId + ", reason=BR03_TIMEOUT")));
 
         assertThat(description)
-                .isEqualTo("Hệ thống tự động thu hồi người thi hành chính do không xác nhận đúng hạn.");
+                .isEqualTo("The system automatically revoked the primary executor for not acknowledging in time.");
     }
 
     @Test
@@ -103,7 +103,7 @@ class AuditDescriptionBuilderTest {
     @Test
     void describe_existingVaultSentence_unchanged() {
         assertThat(builder.describe(log(AuditAction.VAULT_CREATED, owner(), Map.of("result", "SUCCESS"))))
-                .isEqualTo("Khởi tạo két sắt mới.");
+                .isEqualTo("Created a new vault.");
     }
 
     @Test
@@ -120,7 +120,7 @@ class AuditDescriptionBuilderTest {
 
         assertThat(response.getId()).isEqualTo(acknowledged.getId());
         assertThat(response.getAction()).isEqualTo(AuditAction.EXECUTOR_ACKNOWLEDGED);
-        assertThat(response.getActorName()).isEqualTo("Người thi hành: Nguyen Van A");
+        assertThat(response.getActorName()).isEqualTo("Executor: Nguyen Van A");
         assertThat(response.getIpAddress()).isEqualTo("***.***.***.***");
         assertThat(response.getCreatedAt()).isEqualTo(acknowledged.getCreatedAt());
     }
@@ -130,7 +130,7 @@ class AuditDescriptionBuilderTest {
         VaultActivityLogResponse response = builder.toResponse(
                 log(AuditAction.DMS_CHECKIN, owner(), Map.of("result", "SUCCESS")), ownerId);
 
-        assertThat(response.getActorName()).isEqualTo("Bạn");
+        assertThat(response.getActorName()).isEqualTo("You");
         assertThat(response.getIpAddress()).isEqualTo("192.168.1.100");
     }
 }

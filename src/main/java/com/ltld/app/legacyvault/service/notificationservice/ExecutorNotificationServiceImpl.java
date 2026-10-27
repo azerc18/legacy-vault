@@ -16,7 +16,7 @@ public class ExecutorNotificationServiceImpl implements ExecutorNotificationServ
     public void send(String recipientEmail, String content) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(recipientEmail);
-        message.setSubject("Thông báo quy trình bàn giao LegacyVault");
+        message.setSubject("LegacyVault handover process notification");
         message.setText(content);
         javaMailSender.send(message);
     }

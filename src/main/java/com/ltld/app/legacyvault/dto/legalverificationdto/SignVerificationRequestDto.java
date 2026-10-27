@@ -9,10 +9,10 @@ import lombok.Data;
 @Data
 public class SignVerificationRequestDto {
 
-    @NotNull(message = "Vui lòng chọn phương thức ký")
+    @NotNull(message = "Please select a signing method")
     private SignatureMethod method;
 
-    @NotBlank(message = "Vui lòng nhập mã xác nhận")
-    @Pattern(regexp = "\\d{6}", message = "Mã xác nhận phải gồm đúng 6 chữ số")
+    @NotBlank(message = "Please enter the confirmation code")
+    @Pattern(regexp = "\\d{6}", message = "Confirmation code must be exactly 6 digits")
     private String code;
 }

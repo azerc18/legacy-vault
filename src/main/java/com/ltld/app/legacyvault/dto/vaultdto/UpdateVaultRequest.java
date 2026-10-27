@@ -13,10 +13,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UpdateVaultRequest {
 
-    @NotBlank(message = "Tên két không được để trống")
-    @Size(max = 100, message = "Tên két tối đa 100 ký tự")
+    @NotBlank(message = "Vault name is required")
+    @Size(max = 100, message = "Vault name must be at most 100 characters")
     private String name;
 
-    @Size(max = 500, message = "Mô tả tối đa 500 ký tự")
+    @Size(max = 500, message = "Description must be at most 500 characters")
     private String description;
 }

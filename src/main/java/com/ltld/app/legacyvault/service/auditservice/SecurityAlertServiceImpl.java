@@ -43,9 +43,9 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
     @Transactional
     public SecurityAlertResponse acknowledge(UUID adminId, UUID alertId) {
         SecurityAlert alert = alertRepository.findById(alertId)
-                .orElseThrow(() -> new AdminException("Không tìm thấy cảnh báo", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new AdminException("Alert not found", HttpStatus.NOT_FOUND));
         if (alert.getStatus() == SecurityAlertStatus.ACKNOWLEDGED) {
-            throw new AdminException("Cảnh báo đã được xác nhận trước đó", HttpStatus.CONFLICT);
+            throw new AdminException("The alert has already been acknowledged", HttpStatus.CONFLICT);
         }
         alert.setStatus(SecurityAlertStatus.ACKNOWLEDGED);
         alert.setAcknowledgedBy(adminId);
@@ -62,7 +62,7 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
         try {
             return SecurityAlertStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new AdminException("Trạng thái không hợp lệ (OPEN, ACKNOWLEDGED)", HttpStatus.BAD_REQUEST);
+            throw new AdminException("Invalid status (OPEN, ACKNOWLEDGED)", HttpStatus.BAD_REQUEST);
         }
     }
 

@@ -246,7 +246,7 @@ class VerifierMessageControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(6))
                 .andExpect(jsonPath("$.data[0].code").value("DOCUMENT_UNREADABLE"))
-                .andExpect(jsonPath("$.data[0].label").value("Tài liệu mờ, không đọc được"))
+                .andExpect(jsonPath("$.data[0].label").value("The document is blurry or unreadable"))
                 .andExpect(jsonPath("$.data[5].code").value("OTHER"));
     }
 

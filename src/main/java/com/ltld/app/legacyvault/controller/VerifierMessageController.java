@@ -37,7 +37,7 @@ public class VerifierMessageController {
     public ResponseEntity<ApiResponse<List<VerificationMessageResponse>>> history(
             @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Đã lấy danh sách trao đổi", service.history(id, verifierId(jwt))));
+                "Messages retrieved", service.history(id, verifierId(jwt))));
     }
 
     @PostMapping(value = "/{id}/messages", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -47,7 +47,7 @@ public class VerifierMessageController {
             @Valid @ModelAttribute SendVerificationMessageRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                "Đã gửi tin nhắn", service.send(id, verifierId(jwt), file, request)));
+                "Message sent", service.send(id, verifierId(jwt), file, request)));
     }
 
     @GetMapping("/{id}/messages/{messageId}/attachment")
@@ -69,7 +69,7 @@ public class VerifierMessageController {
         try {
             return UUID.fromString(jwt.getSubject());
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new BusinessException("Phiên đăng nhập không hợp lệ.", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException("Invalid session.", HttpStatus.UNAUTHORIZED);
         }
     }
 }

@@ -51,13 +51,13 @@ public class DmsActivationProcessor {
     // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
     // Tham số: Owner (tên + email), loại Executor (Primary/Backup), mã ExecutorAssignment.
     private static final String MSG_EXECUTOR_ACTIVATED =
-            "Dead Man's Switch của %s đã được kích hoạt. Bạn là Executor %s.%n"
-                    + "Vui lòng đăng nhập LegacyVault và xác nhận đã nhận thông báo (mã: %s).";
+            "The Dead Man's Switch of %s has been triggered. You are the %s executor.%n"
+                    + "Please sign in to LegacyVault and acknowledge this notice (code: %s).";
 
     // B6: báo Admin khi DMS kích hoạt mà Owner không có Executor khả dụng. Tham số: Owner, mã DmsConfig.
     private static final String MSG_ADMIN_NO_EXECUTOR =
-            "Dead Man's Switch của %s đã được kích hoạt nhưng không có Executor khả dụng "
-                    + "(chưa chỉ định hoặc đã bị thu hồi). Hồ sơ cần được xử lý thủ công (mã DmsConfig: %s).";
+            "The Dead Man's Switch of %s has been triggered, but no executor is available "
+                    + "(not assigned or revoked). The case must be handled manually (DmsConfig ID: %s).";
     static final String ADMIN_ROLE_CODE = "ADMIN";
 
     // B2: gửi lại thông báo FAILED tối đa MAX_ATTEMPTS lần (tính cả lần gửi đầu), giãn cách theo retryDelay.

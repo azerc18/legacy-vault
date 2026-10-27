@@ -56,7 +56,7 @@ public class JwtConfig {
     private SecretKeySpec hmacKey() {
         byte[] raw = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
         if (raw.length < MIN_SECRET_BYTES) {
-            throw new IllegalStateException("JWT_SECRET phải dài tối thiểu 32 byte (HS256), hiện là " + raw.length);
+            throw new IllegalStateException("JWT_SECRET must be at least 32 bytes (HS256), current length: " + raw.length);
         }
         return new SecretKeySpec(raw, "HmacSHA256");
     }

@@ -59,10 +59,10 @@ class EmailSenderTest {
         SimpleMailMessage message = sentMessage();
         String text = message.getText();
         assertTrue(message.getTo()[0].equals("an@example.com"));
-        assertTrue(text.contains("Hồ sơ \"Hồ sơ A\" của Bình"));
+        assertTrue(text.contains("The vault \"Hồ sơ A\" of Bình"));
         assertTrue(text.contains("31/12/2026 17:30 (GMT+7)"));
-        assertFalse(text.contains("chưa được kích hoạt"));
-        assertFalse(text.contains("Mã có hiệu lực"));
+        assertFalse(text.contains("has not been activated"));
+        assertFalse(text.contains("The code is valid for"));
     }
 
     @Test
@@ -70,7 +70,7 @@ class EmailSenderTest {
         emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
                 LocalDateTime.of(2026, 12, 31, 10, 30), false, VAULT_ID);
 
-        assertTrue(sentMessage().getText().contains("Tài khoản của bạn chưa được kích hoạt"));
+        assertTrue(sentMessage().getText().contains("Your account has not been activated"));
     }
 
     @Test
@@ -87,7 +87,7 @@ class EmailSenderTest {
                 LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
 
         String text = sentMessage().getText();
-        assertTrue(text.contains("Truy cập hồ sơ: http://localhost:3000/beneficiary/vaults/" + VAULT_ID));
+        assertTrue(text.contains("Open the vault: http://localhost:3000/beneficiary/vaults/" + VAULT_ID));
         assertFalse(text.contains("3000//"));
     }
 
@@ -98,6 +98,6 @@ class EmailSenderTest {
         emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
                 LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
 
-        assertFalse(sentMessage().getText().contains("Truy cập hồ sơ"));
+        assertFalse(sentMessage().getText().contains("Open the vault"));
     }
 }
