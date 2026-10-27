@@ -51,4 +51,26 @@ export const adminApi = {
     },
     // -> { id, name, description, status, ownerId, ownerEmail, unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
     getVault: (vaultId) => http.get(`/vaults/admin/${vaultId}`).then(unwrap),
+
+    /* ---------- Audit log & cảnh báo bảo mật ---------- */
+    // from/to là ISO string; mặc định BE lấy 30 ngày gần nhất, tối đa 365 ngày
+    // -> Page { content: [{ id, action, result, actorId, actorEmail, entityType, entityId, vaultId, ipAddress, detail, userAgent, createdAt }], ... }
+    searchAuditLogs: ({ action, actorEmail, ip, from, to, page = 0, size = 50 } = {}) => {
+        const params = { page, size };
+        if (action) params.action = action;
+        if (actorEmail) params.actorEmail = actorEmail;
+        if (ip) params.ip = ip;
+        if (from) params.from = from;
+        if (to) params.to = to;
+        return http.get('/admin/audit-logs', { params }).then(unwrap);
+    },
+    listAuditActions: () => http.get('/admin/audit-logs/actions').then(unwrap),
+
+    // status: OPEN | ACKNOWLEDGED
+    listAlerts: ({ status = 'OPEN', page = 0, size = 20 } = {}) =>
+        http.get('/admin/security-alerts', { params: { status, page, size } }).then(unwrap),
+    // -> { open: number }
+    countOpenAlerts: () => http.get('/admin/security-alerts/count').then(unwrap),
+    // 409 nếu đã được xác nhận
+    acknowledgeAlert: (alertId) => http.patch(`/admin/security-alerts/${alertId}/acknowledge`).then(unwrap),
 };

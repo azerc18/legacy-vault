@@ -27,6 +27,8 @@ import RequireRole from './Common/RequireRole.jsx';
 import NotFound from './Common/NotFound.jsx';
 import ProfilePage from './Profile/ProfilePage.jsx';
 import AdminRoles from './Admin/AdminRoles.jsx';
+import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
+import AdminAlerts from './Admin/AdminAlerts.jsx';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -80,6 +82,9 @@ function App() {
                 <Route path="/admin/vaults" element={guard(ADMIN, <AdminVaults />)} />
 
                 <Route path="/admin/roles" element={guard(ADMIN, <AdminRoles />)} />
+
+                <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
+                <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
 
                 <Route path="/home" element={guard(null, <UserHome />)} />
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
