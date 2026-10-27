@@ -30,6 +30,7 @@ public class AssistantServiceImpl implements AssistantService {
             Never ask for or repeat passwords, OTP codes or asset secrets.
             Reply in the user's language, short, using numbered steps when useful.
             Only describe buttons, pages and steps that appear in the GUIDE. Never invent new ones.
+            Keep answers under 120 words. Do not use headings or tables; use **bold** only for button and page names.
             GUIDE:
             %s
             """;
