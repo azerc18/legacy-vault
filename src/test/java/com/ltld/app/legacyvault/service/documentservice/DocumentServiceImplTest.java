@@ -111,13 +111,33 @@ class DocumentServiceImplTest {
         // Mock userRepository cho trường hợp attacker tra cứu email của chính mình
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Phải văng lỗi VaultException (không còn là RuntimeException chung chung)
+        // Phải văng lỗi VaultException với mã 404 NOT_FOUND chống dò ID
         assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, mockFile))
                 .isInstanceOf(VaultException.class)
-                .hasMessageContaining("Unauthorized");
+                .satisfies(ex -> assertThat(((VaultException) ex).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
 
         // Và đương nhiên file không bao giờ được phép đem đi mã hóa hay lưu
         verify(cryptoService, never()).encryptBytes(any());
+    }
+
+    @Test
+    void downloadDocumentForOwner_VaultArchivedLocked_ThrowsGone() {
+        UUID docId = UUID.randomUUID();
+        mockVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        LegalDocument doc = LegalDocument.builder()
+                .id(docId)
+                .vault(mockVault)
+                .fileName("dichuc_2026.pdf")
+                .fileUrlEncrypted("uploads/encrypted_dichuc.bin")
+                .build();
+
+        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
+
+        assertThatThrownBy(() -> documentService.downloadDocumentForOwner(docId, ownerId))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.GONE);
+
+        verifyNoInteractions(fileStorageService);
     }
 
     @Test
