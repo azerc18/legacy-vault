@@ -132,6 +132,19 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).save(any(Vault.class));
         verify(digitalAssetRepository, times(1)).save(any(DigitalAsset.class));
         verify(cryptoService, times(1)).encrypt("my-password");
+        verify(dmsConfigService).assertHandoverNotStarted(ownerId);
+    }
+
+    @Test
+    @DisplayName("createVault (FR-01): DMS đã bắt đầu bàn giao -> ném DmsException 409")
+    void createVault_dmsTriggered_throwsDmsException() {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("New Vault");
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThrows(DmsException.class, () -> vaultService.createVault(ownerId, request));
+        verify(vaultRepository, never()).save(any());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)
