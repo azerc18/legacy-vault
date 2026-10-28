@@ -28,11 +28,12 @@ async function saveBlob(url, fallbackName) {
 
 export const ownerApi = {
     /* ---------- Vault (FR-01, FR-27) ---------- */
-    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt }]
+    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt,
+    //      beneficiaryEmail, pendingRegistration, totalAssets, totalDocuments, modifiable, lockReason }]
     listVaults: () => http.get('/vaults').then((r) => unwrap(r) ?? []),
 
     // -> VaultDetailResponse { id, name, description, status, ownerEmail, beneficiaryId, beneficiaryEmail,
-    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
+    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets, modifiable, lockReason }
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
     // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
@@ -59,6 +60,9 @@ export const ownerApi = {
     // -> { vaultId, beneficiaryEmail, beneficiaryName, pendingRegistration, replaced }
     assignBeneficiary: (vaultId, email, confirmReplace = false) =>
         http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap),
+
+    // FR-02 (V8): gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký (idempotent)
+    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`),
 
     // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER

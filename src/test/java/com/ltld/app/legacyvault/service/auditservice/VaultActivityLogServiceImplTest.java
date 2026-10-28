@@ -33,6 +33,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -129,11 +130,19 @@ class VaultActivityLogServiceImplTest {
                 .build();
 
         Page<AuditLog> logPage = new PageImpl<>(List.of(ownerLog, adminLog, execLog, systemLog));
-        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), eq(pageable)))
+        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), any(), eq(pageable)))
                 .thenReturn(logPage);
 
         Page<VaultActivityLogResponse> result = vaultActivityLogService.getVaultActivityLogs(
                 vaultId, ownerId, null, null, pageable);
+
+        verify(auditLogRepository).findVaultActivity(
+                eq(vaultId),
+                same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS),
+                any(),
+                any(),
+                eq(pageable)
+        );
 
         assertThat(result.getContent()).hasSize(4);
 
@@ -155,14 +164,14 @@ class VaultActivityLogServiceImplTest {
     }
 
     @Test
-    void getVaultActivityLogs_NotOwner_ThrowsForbidden() {
+    void getVaultActivityLogs_NotOwner_ThrowsNotFound() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         UUID strangerId = UUID.randomUUID();
 
         assertThatThrownBy(() -> vaultActivityLogService.getVaultActivityLogs(
                 vaultId, strangerId, null, null, pageable))
                 .isInstanceOf(VaultException.class)
-                .satisfies(ex -> assertThat(((VaultException) ex).getStatus()).isEqualTo(HttpStatus.FORBIDDEN));
+                .satisfies(ex -> assertThat(((VaultException) ex).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
 
     @Test
@@ -178,15 +187,24 @@ class VaultActivityLogServiceImplTest {
     }
 
     @Test
-    void getVaultActivityLogs_RangeExceedsOneYear_ThrowsBadRequest() {
+    void getVaultActivityLogs_RangeExceedsOneYear_Success() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         Instant to = Instant.now();
         Instant from = to.minus(400, ChronoUnit.DAYS);
+        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), any(), eq(pageable)))
+                .thenReturn(Page.empty());
 
-        assertThatThrownBy(() -> vaultActivityLogService.getVaultActivityLogs(
-                vaultId, ownerId, from, to, pageable))
-                .isInstanceOf(VaultException.class)
-                .satisfies(ex -> assertThat(((VaultException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        Page<VaultActivityLogResponse> result = vaultActivityLogService.getVaultActivityLogs(
+                vaultId, ownerId, from, to, pageable);
+        // n3: kiểm service truyền đúng from/to xuống repository (không bị clamp về 1 năm)
+        verify(auditLogRepository).findVaultActivity(
+                eq(vaultId),
+                same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS),
+                eq(from),
+                eq(to),
+                eq(pageable)
+        );
+        assertThat(result.getTotalElements()).isZero();
     }
 
     // Trả về description của một log duy nhất do owner thực hiện
@@ -200,7 +218,7 @@ class VaultActivityLogServiceImplTest {
                 .metadata(metadata)
                 .createdAt(Instant.now())
                 .build();
-        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), eq(pageable)))
+        when(auditLogRepository.findVaultActivity(eq(vaultId), any(), any(), any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(log)));
 
         return vaultActivityLogService.getVaultActivityLogs(vaultId, ownerId, null, null, pageable)

@@ -52,7 +52,10 @@ export default function OwnerVaults() {
                                 <h3 className="font-title-lg text-title-lg">{v.name}</h3>
                                 <div className="flex items-center gap-2">
                                     {!v.modifiable && (
-                                        <span className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1">
+                                        <span
+                                            title={v.lockReason}
+                                            className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
+                                        >
                                             <Icon name="lock" className="text-[14px]" /> Locked
                                         </span>
                                     )}

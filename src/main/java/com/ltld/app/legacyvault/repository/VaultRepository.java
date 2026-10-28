@@ -35,6 +35,11 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     @Query("SELECT v FROM Vault v LEFT JOIN FETCH v.beneficiary WHERE v.owner.id = :ownerId ORDER BY v.createdAt ASC, v.id ASC")
     List<Vault> findByOwnerIdWithBeneficiary(@Param("ownerId") UUID ownerId);
 
+    // FR-27: danh sách Vault của Owner (mới nhất trước) kèm Beneficiary, tránh N+1
+    @Query("SELECT v FROM Vault v LEFT JOIN FETCH v.beneficiary WHERE v.owner.id = :ownerId "
+            + "ORDER BY v.createdAt DESC, v.id DESC")
+    List<Vault> findByOwnerIdWithBeneficiaryNewestFirst(@Param("ownerId") UUID ownerId);
+
     // FR-16: Vault UNLOCKED có Beneficiary, còn hạn nhận, mà chưa gửi được thông báo
     // (chưa có claim, hoặc claim chưa có notifiedAt, còn lượt thử và đã qua khoảng chờ tối thiểu).
     // unlockedBefore: bỏ qua Vault vừa mở khóa để không đụng với listener đang xử lý sự kiện.

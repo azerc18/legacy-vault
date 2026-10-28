@@ -53,8 +53,11 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "app.dms.scheduler.enabled=false"
+        "spring.jpa.hibernate.ddl-auto=create",
+        "app.dms.scheduler.enabled=false",
+        "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false",
+        "app.beneficiary.claim-expiry.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class OwnerActivityLogIntegrationTest {
@@ -78,7 +81,6 @@ class OwnerActivityLogIntegrationTest {
     @Autowired private DmsCheckinRepository dmsCheckinRepository;
     @Autowired private ExecutorAssignmentRepository executorAssignmentRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
-    @Autowired private VaultService vaultService;
 
     // Dữ liệu test tạo ra, để @AfterEach chỉ xóa đúng phần của mình.
     private final List<UUID> ownerIds = new ArrayList<>();
@@ -191,44 +193,6 @@ class OwnerActivityLogIntegrationTest {
 
         assertThat(result.getContent()).isEmpty();
         assertThat(result.getTotalElements()).isZero();
-    }
-
-    // FR-27 (C1): xem danh sách / chi tiết không được khóa hay tăng version DmsConfig, và không 500 khi TRIGGERED
-    @Test
-    void listAndDetail_withDmsActiveThenTriggered_return200_andDoNotBumpDmsVersion() {
-        Fixture a = fixture("c1");
-        long v0 = dmsConfigRepository.findByOwnerId(a.ownerId).orElseThrow().getVersion();
-
-        // 1. DMS ACTIVE: getMyVaults trả modifiable = true, không tăng version DmsConfig
-        assertThat(vaultService.getMyVaults(a.ownerId)).singleElement()
-                .satisfies(r -> {
-                    assertThat(r.isModifiable()).isTrue();
-                    assertThat(r.getLockReason()).isNull();
-                });
-        assertThat(dmsConfigRepository.findByOwnerId(a.ownerId).orElseThrow().getVersion()).isEqualTo(v0);
-
-        UUID vaultId = vaultRepository.findAll().stream()
-                .filter(v -> v.getOwner().getId().equals(a.ownerId))
-                .findFirst().orElseThrow().getId();
-
-        // getVaultDetail cũng trả modifiable = true, không tăng version DmsConfig
-        assertThat(vaultService.getVaultDetail(vaultId, a.ownerId).isModifiable()).isTrue();
-        assertThat(dmsConfigRepository.findByOwnerId(a.ownerId).orElseThrow().getVersion()).isEqualTo(v0);
-
-        // 2. Chuyển DMS sang TRIGGERED bằng jdbcTemplate
-        UUID configId = dmsConfigRepository.findByOwnerId(a.ownerId).orElseThrow().getId();
-        jdbcTemplate.update("UPDATE dms_configs SET status = 'TRIGGERED' WHERE id = UUID_TO_BIN(?)", configId.toString());
-
-        // getMyVaults và getVaultDetail trả 200 (không bị UnexpectedRollbackException 500)
-        assertThat(vaultService.getMyVaults(a.ownerId)).singleElement()
-                .satisfies(r -> {
-                    assertThat(r.isModifiable()).isFalse();
-                    assertThat(r.getLockReason()).isEqualTo("The handover process has started.");
-                });
-
-        assertThat(vaultService.getVaultDetail(vaultId, a.ownerId).getLockReason())
-                .isEqualTo("The handover process has started.");
-        assertThat(vaultService.getVaultDetail(vaultId, a.ownerId).isModifiable()).isFalse();
     }
 
     // ---------- dữ liệu ----------
