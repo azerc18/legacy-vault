@@ -59,7 +59,7 @@ public class VaultControllerTest {
                         .principal(mockPrincipal)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Vault created successfully"));
     }
@@ -229,5 +229,19 @@ public class VaultControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Vault đã có người thụ hưởng"));
+    }
+    @Test
+    void removeBeneficiary_ReturnsOk() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        Principal mockPrincipal = () -> ownerId.toString();
+
+        mockMvc.perform(delete("/api/vaults/{vaultId}/beneficiary", vaultId)
+                        .principal(mockPrincipal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Beneficiary removed successfully"));
+
+        verify(vaultService).removeBeneficiary(ownerId, vaultId);
     }
 }

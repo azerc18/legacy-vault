@@ -60,6 +60,9 @@ export const ownerApi = {
     assignBeneficiary: (vaultId, email, confirmReplace = false) =>
         http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap),
 
+    // FR-02 (V8): gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký (idempotent)
+    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`),
+
     // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
     uploadDocument: (vaultId, type, file) => {
