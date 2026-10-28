@@ -12,8 +12,6 @@ export default function CreateVault() {
     const navigate = useNavigate();
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [primaryExecutorEmail, setPrimaryExecutorEmail] = useState('');
-    const [backupExecutorEmail, setBackupExecutorEmail] = useState('');
     const [assets, setAssets] = useState([emptyAsset()]);
     const [showSecret, setShowSecret] = useState({});
     const [error, setError] = useState('');
@@ -39,8 +37,6 @@ export default function CreateVault() {
             const vault = await ownerApi.createVault({
                 name: name.trim(),
                 description: description.trim() || null,
-                primaryExecutorEmail: primaryExecutorEmail.trim() || null,
-                backupExecutorEmail: backupExecutorEmail.trim() || null,
                 assets: filled.map((a) => ({
                     assetType: a.assetType,
                     assetName: a.assetName.trim(),
@@ -71,35 +67,6 @@ export default function CreateVault() {
                             <span className="text-sm font-semibold text-on-surface-variant">Description</span>
                             <textarea rows={2} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)}
                                       className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
-                        </label>
-                    </div>
-                </Card>
-
-                <Card title="Digital Executors" icon="manage_accounts">
-                    <p className="text-sm text-on-surface-variant mb-4">
-                        Designate trusted executors to initiate verification and handover if you are inactive.
-                        Required for your first vault.
-                    </p>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                        <label className="block">
-                            <span className="text-sm font-semibold text-on-surface-variant">Primary Executor Email *</span>
-                            <input
-                                type="email"
-                                value={primaryExecutorEmail}
-                                onChange={(e) => setPrimaryExecutorEmail(e.target.value)}
-                                placeholder="executor@example.com"
-                                className={`${inputClass} mt-1`}
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-semibold text-on-surface-variant">Backup Executor Email (optional)</span>
-                            <input
-                                type="email"
-                                value={backupExecutorEmail}
-                                onChange={(e) => setBackupExecutorEmail(e.target.value)}
-                                placeholder="backup@example.com"
-                                className={`${inputClass} mt-1`}
-                            />
                         </label>
                     </div>
                 </Card>

@@ -17,15 +17,6 @@ public class CreateVaultRequest {
     @Size(max = 500, message = "Vault description must be at most 500 characters")
     private String description;
 
-    // V1: Chỉ định Executor khi tạo Vault (bắt buộc Executor chính nếu Owner chưa có)
-    @jakarta.validation.constraints.Email(message = "Invalid primary executor email format")
-    @Size(max = 255, message = "Email must be at most 255 characters")
-    private String primaryExecutorEmail;
-
-    @jakarta.validation.constraints.Email(message = "Invalid backup executor email format")
-    @Size(max = 255, message = "Email must be at most 255 characters")
-    private String backupExecutorEmail;
-
     // FR-01: Danh sách tài sản số sẽ lưu vào Vault (tối đa 50, validate từng phần tử)
     @Size(max = 50, message = "At most 50 assets are allowed")
     private List<@Valid DigitalAssetDto> assets;

@@ -37,10 +37,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import com.ltld.app.legacyvault.dto.executordto.AssignExecutorRequest;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.service.executorservice.ExecutorManagementService;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -63,40 +59,18 @@ public class VaultServiceImpl implements VaultService {
     private final AuditLogService auditLogService;
     private final EmailSender emailSender;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
-    private final ExecutorManagementService executorManagementService;
     private final VaultModificationGuard vaultModificationGuard;
     private final DmsConfigService dmsConfigService;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Vault createVault(UUID ownerId, CreateVaultRequest request) throws Exception {
-        // V1 / V2: Chặn tạo két nếu quy trình bàn giao DMS đã bắt đầu
+        // FR-01: Chặn tạo két nếu quy trình bàn giao DMS đã bắt đầu
         dmsConfigService.assertHandoverNotStarted(ownerId);
 
         // 1. Tìm thông tin chủ sở hữu (Owner)
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new VaultException("Owner not found", HttpStatus.NOT_FOUND));
-
-        // V1: Kiểm tra xem Owner đã có Primary Executor còn hiệu lực chưa
-        boolean hasPrimary = executorAssignmentRepository
-                .findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY)
-                .filter(a -> a.getStatus() != ExecutorStatus.REVOKED)
-                .isPresent();
-
-        if (!hasPrimary) {
-            if (request.getPrimaryExecutorEmail() == null || request.getPrimaryExecutorEmail().trim().isEmpty()) {
-                throw new VaultException("Assign a primary executor before creating a vault.", HttpStatus.BAD_REQUEST);
-            }
-            AssignExecutorRequest assignReq = new AssignExecutorRequest();
-            assignReq.setEmail(request.getPrimaryExecutorEmail().trim());
-            executorManagementService.assignExecutor(ownerId, ExecutorType.PRIMARY, assignReq);
-        }
-
-        if (request.getBackupExecutorEmail() != null && !request.getBackupExecutorEmail().trim().isEmpty()) {
-            AssignExecutorRequest backupReq = new AssignExecutorRequest();
-            backupReq.setEmail(request.getBackupExecutorEmail().trim());
-            executorManagementService.assignExecutor(ownerId, ExecutorType.BACKUP, backupReq);
-        }
 
         // 2. Tạo két sắt (Vault)
         Vault vault = Vault.builder()
@@ -322,7 +296,7 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
-    // V8 (FR-02): Owner gỡ người thụ hưởng hoặc hủy lời mời
+    // FR-02: Owner gỡ người thụ hưởng hoặc hủy lời mời
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void removeBeneficiary(UUID ownerId, UUID vaultId) {
@@ -360,13 +334,13 @@ public class VaultServiceImpl implements VaultService {
                 owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
     }
 
-    // FR-27 / V6 / V7: Owner xem danh sách Vault của mình kèm thông tin tóm tắt và trạng thái khóa
+    // FR-27: Owner xem danh sách Vault của mình kèm thông tin tóm tắt và trạng thái khóa
     @Override
     @Transactional(readOnly = true)
     public List<VaultResponse> getMyVaults(UUID ownerId) {
         List<Vault> vaults = vaultRepository.findByOwnerIdWithBeneficiary(ownerId);
 
-        // FR-27 (m3): tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
+        // FR-27: tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
         Map<UUID, String> lockReasonMap = vaultModificationGuard.lockReasons(ownerId, vaults);
 
         return vaults.stream()
@@ -397,11 +371,11 @@ public class VaultServiceImpl implements VaultService {
     }
 
 
-    // FR-27 / V7: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu, trả thêm modifiable & lockReason)
+    // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu, trả thêm modifiable & lockReason)
     @Override
     @Transactional(readOnly = true)
     public VaultDetailResponse getVaultDetail(UUID vaultId, UUID ownerId) {
-        // n3: Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
+        // Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
         Vault vault = loadOwnedVault(vaultId, ownerId);
 
         long docCount = legalDocumentRepository.countByVaultId(vaultId);
@@ -428,7 +402,7 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
-    // FR-27: Owner cập nhật tên/mô tả Vault (V5: dùng saveAndFlush để trả về updatedAt mới)
+    // FR-27: Owner cập nhật tên/mô tả Vault (dùng saveAndFlush để trả về updatedAt mới)
     @Override
     @Transactional
     public VaultResponse updateVault(UUID vaultId, UUID ownerId, UpdateVaultRequest request) {

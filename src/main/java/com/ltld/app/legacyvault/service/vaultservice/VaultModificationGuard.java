@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,7 +55,7 @@ public class VaultModificationGuard {
     }
 
     /**
-     * FR-27 (m3): tính lockReason theo lô cho tất cả Vault của một Owner —
+     * FR-27: tính lockReason theo lô cho tất cả Vault của một Owner —
      * đọc DmsConfig 1 lần và batch query verification thay vì N+1.
      * Chỉ dùng cho hiển thị (chỉ đọc); KHÔNG dùng để quyết định ghi.
      * Vault không có trong map kết quả nghĩa là modifiable = true.
@@ -63,7 +64,7 @@ public class VaultModificationGuard {
         Map<UUID, String> result = new HashMap<>();
         if (vaults.isEmpty()) return result;
 
-        List<Vault> activeVaults = new java.util.ArrayList<>();
+        List<Vault> activeVaults = new ArrayList<>();
         for (Vault v : vaults) {
             if (v.getStatus() != VaultStatus.ACTIVE) {
                 result.put(v.getId(), "This vault is no longer active.");
@@ -99,7 +100,7 @@ public class VaultModificationGuard {
     }
 
     /**
-     * V7: Kiểm tra lý do khóa không ném exception để trả về cho FE.
+     * FR-27: Kiểm tra lý do khóa không ném exception để trả về cho FE.
      * Dùng isHandoverStarted (chỉ đọc, không khóa) thay vì assertHandoverNotStarted
      * để tránh PESSIMISTIC_FORCE_INCREMENT bên trong @Transactional(readOnly=true)
      * gây UnexpectedRollbackException (HTTP 500) - C1.
@@ -108,9 +109,5 @@ public class VaultModificationGuard {
     public Optional<String> lockReason(Vault vault) {
         Map<UUID, String> reasons = lockReasons(vault.getOwner().getId(), List.of(vault));
         return Optional.ofNullable(reasons.get(vault.getId()));
-    }
-
-    public boolean isModifiable(Vault vault) {
-        return lockReason(vault).isEmpty();
     }
 }

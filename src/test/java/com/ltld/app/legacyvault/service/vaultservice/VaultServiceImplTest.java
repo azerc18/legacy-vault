@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -72,13 +73,11 @@ class VaultServiceImplTest {
     @Mock
     private FileStorageService fileStorageService;
     @Mock
-    private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
+    private AuditLogService auditLogService;
     @Mock
     private EmailSender emailSender;
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;
-    @Mock
-    private com.ltld.app.legacyvault.service.executorservice.ExecutorManagementService executorManagementService;
     @Mock
     private VaultModificationGuard vaultModificationGuard;
     @Mock
@@ -117,15 +116,10 @@ class VaultServiceImplTest {
         savedVault.setStatus(VaultStatus.ACTIVE);
         savedVault.setOwner(mockOwner);
 
-        com.ltld.app.legacyvault.entity.ExecutorAssignment primary = new com.ltld.app.legacyvault.entity.ExecutorAssignment();
-        primary.setStatus(com.ltld.app.legacyvault.enums.ExecutorStatus.ACTIVE);
-        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
-                .thenReturn(Optional.of(primary));
-
         // Kịch bản giả lập (Khi code gọi hàm A thì trả về B)
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
         when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
-        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password"); // Trọng tâm KT
+        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password");
 
         // Gọi hàm thực tế (Act)
         Vault result = vaultService.createVault(ownerId, request);
@@ -139,45 +133,19 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).save(any(Vault.class));
         verify(digitalAssetRepository, times(1)).save(any(DigitalAsset.class));
         verify(cryptoService, times(1)).encrypt("my-password");
+        verify(dmsConfigService).assertHandoverNotStarted(ownerId);
     }
 
     @Test
-    @DisplayName("createVault (V1): Vault đầu tiên chưa có Primary Executor mà không gửi email -> 400 Bad Request")
-    void createVault_withoutExistingPrimary_missingEmail_throwsBadRequest() {
+    @DisplayName("createVault (FR-01): DMS đã bắt đầu bàn giao -> ném DmsException 409")
+    void createVault_dmsTriggered_throwsDmsException() {
         CreateVaultRequest request = new CreateVaultRequest();
-        request.setName("First Vault");
-        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
-        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
-                .thenReturn(Optional.empty());
+        request.setName("New Vault");
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
 
-        VaultException ex = assertThrows(VaultException.class, () -> vaultService.createVault(ownerId, request));
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Assign a primary executor before creating a vault.", ex.getMessage());
+        assertThrows(DmsException.class, () -> vaultService.createVault(ownerId, request));
         verify(vaultRepository, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("createVault (V1): Vault đầu tiên có email Primary -> gọi assignExecutor và lưu Vault thành công")
-    void createVault_withoutExistingPrimary_withEmail_assignsPrimary() throws Exception {
-        CreateVaultRequest request = new CreateVaultRequest();
-        request.setName("First Vault");
-        request.setPrimaryExecutorEmail("exec@example.com");
-
-        Vault savedVault = new Vault();
-        savedVault.setId(UUID.randomUUID());
-        savedVault.setName("First Vault");
-        savedVault.setStatus(VaultStatus.ACTIVE);
-        savedVault.setOwner(mockOwner);
-
-        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
-        when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY))
-                .thenReturn(Optional.empty());
-        when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
-
-        Vault result = vaultService.createVault(ownerId, request);
-        assertNotNull(result);
-        verify(executorManagementService).assignExecutor(eq(ownerId), eq(com.ltld.app.legacyvault.enums.ExecutorType.PRIMARY), any());
-        verify(vaultRepository).save(any());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)
@@ -238,7 +206,7 @@ class VaultServiceImplTest {
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
         // và phải bao gồm vaultId để nhật ký có đủ context (N2)
         verify(auditLogService).log(
-                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditAction.VAULT_DELETE_DENIED),
                 eq(AuditResult.FAILURE),
                 eq(ownerId),
                 eq(mockOwner.getEmail()),
@@ -736,6 +704,50 @@ class VaultServiceImplTest {
 
         verify(vaultRepository, never()).saveAndFlush(any());
         verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): Vault không ACTIVE -> 409 Conflict + audit BENEFICIARY_REMOVE_DENIED")
+    void removeBeneficiary_VaultNotActive_ThrowsConflictAndAudits() {
+        Vault vault = activeVault();
+        vault.setStatus(VaultStatus.UNLOCKED);
+        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        assertVaultError(HttpStatus.CONFLICT, () -> vaultService.removeBeneficiary(ownerId, vault.getId()));
+        verify(vaultRepository, never()).saveAndFlush(any());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVE_DENIED), eq(AuditResult.FAILURE),
+                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
+                eq("vault status UNLOCKED"));
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): DMS TRIGGERED -> 409 Conflict")
+    void removeBeneficiary_DmsTriggered_ThrowsConflict() {
+        UUID vaultId = UUID.randomUUID();
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThrows(DmsException.class, () -> vaultService.removeBeneficiary(ownerId, vaultId));
+        verify(vaultRepository, never()).findByIdForUpdate(any());
+        verify(vaultRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): Người thụ hưởng đang chờ đăng ký -> xóa email chờ và audit thành công")
+    void removeBeneficiary_PendingBeneficiaryEmail_Success() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(null);
+        vault.setBeneficiaryEmail("pending@example.com");
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vault.getId());
+
+        assertNull(vault.getBeneficiary());
+        assertNull(vault.getBeneficiaryEmail());
+        verify(vaultRepository).saveAndFlush(vault);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
     }
 
     @Test

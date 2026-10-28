@@ -321,6 +321,7 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const [confirm, setConfirm] = useState(null);
+    const [removing, setRemoving] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const submit = async (confirmReplace = false) => {
@@ -346,19 +347,7 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
                 {current && editable && (
                     <button
                         type="button"
-                        onClick={async () => {
-                            if (window.confirm('Are you sure you want to remove the beneficiary?')) {
-                                setLoading(true); setError('');
-                                try {
-                                    await ownerApi.removeBeneficiary(vaultId);
-                                    onSaved();
-                                } catch (err) {
-                                    setError(getErrorMessage(err, 'Could not remove beneficiary.'));
-                                } finally {
-                                    setLoading(false);
-                                }
-                            }
-                        }}
+                        onClick={() => setRemoving(true)}
                         disabled={loading}
                         className="text-xs font-semibold text-error hover:underline"
                     >
@@ -383,6 +372,27 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
                     </button>
                 </form>
             )}
+            <ConfirmDialog
+                open={removing}
+                danger
+                title="Remove beneficiary?"
+                message="Are you sure you want to remove the beneficiary from this vault?"
+                confirmLabel="Remove"
+                busy={loading}
+                onConfirm={async () => {
+                    setLoading(true); setError('');
+                    try {
+                        await ownerApi.removeBeneficiary(vaultId);
+                        setRemoving(false);
+                        onSaved();
+                    } catch (err) {
+                        setError(getErrorMessage(err, 'Could not remove beneficiary.'));
+                    } finally {
+                        setLoading(false);
+                    }
+                }}
+                onCancel={() => setRemoving(false)}
+            />
             <ConfirmDialog
                 open={!!confirm}
                 title="Replace beneficiary?"

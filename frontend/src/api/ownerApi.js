@@ -29,18 +29,15 @@ async function saveBlob(url, fallbackName) {
 export const ownerApi = {
     /* ---------- Vault (FR-01, FR-27) ---------- */
     // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt, beneficiaryEmail, totalAssets, totalDocuments, modifiable, lockReason }]
-    listVaults: () => http.get('/vaults').then((r) => {
-        const d = unwrap(r);
-        return Array.isArray(d) ? d : (d?.content ?? []);
-    }),
+    listVaults: () => http.get('/vaults').then(unwrap),
 
     // -> VaultDetailResponse { id, name, description, status, ownerEmail, beneficiaryId, beneficiaryEmail,
     //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets, modifiable, lockReason }
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
-    // name ≤100 (bắt buộc), description ≤500, assets ≤50, primaryExecutorEmail, backupExecutorEmail
-    createVault: ({ name, description, assets, primaryExecutorEmail, backupExecutorEmail }) =>
-        http.post('/vaults', { name, description, assets, primaryExecutorEmail, backupExecutorEmail }).then(unwrap),
+    // name ≤100 (bắt buộc), description ≤500, assets ≤50
+    createVault: ({ name, description, assets }) =>
+        http.post('/vaults', { name, description, assets }).then(unwrap),
 
     // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
     updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
