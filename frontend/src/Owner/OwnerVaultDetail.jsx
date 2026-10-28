@@ -321,6 +321,7 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const [confirm, setConfirm] = useState(null);
+    const [removeOpen, setRemoveOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const submit = async (confirmReplace = false) => {
@@ -332,6 +333,21 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
         } catch (err) {
             if (needsReplaceConfirm(err)) setConfirm(getErrorMessage(err));
             else setError(getErrorMessage(err, 'Could not assign the beneficiary.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRemove = async () => {
+        setLoading(true); setError('');
+        try {
+            await ownerApi.removeBeneficiary(vaultId);
+            setRemoveOpen(false);
+            setResult(null);
+            onSaved();
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not remove the beneficiary.'));
+            setRemoveOpen(false);
         } finally {
             setLoading(false);
         }
@@ -357,8 +373,15 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
                     <button type="submit" disabled={loading} className={`${btnPrimary} shrink-0`}>
                         {loading ? 'Saving...' : current ? 'Replace' : 'Assign'}
                     </button>
+                    {current && (
+                        <button type="button" disabled={loading} onClick={() => setRemoveOpen(true)}
+                                className={`${btnDanger} shrink-0`}>
+                            Remove
+                        </button>
+                    )}
                 </form>
             )}
+            {/* ConfirmDialog: thay thế người thụ hưởng */}
             <ConfirmDialog
                 open={!!confirm}
                 title="Replace beneficiary?"
@@ -368,9 +391,21 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
                 onConfirm={() => submit(true)}
                 onCancel={() => setConfirm(null)}
             />
+            {/* ConfirmDialog: gỡ người thụ hưởng (V8) */}
+            <ConfirmDialog
+                open={removeOpen}
+                danger
+                title="Remove beneficiary?"
+                message={`Remove ${current} as the beneficiary? Any pending invitation will also be cancelled.`}
+                confirmLabel="Remove"
+                busy={loading}
+                onConfirm={handleRemove}
+                onCancel={() => setRemoveOpen(false)}
+            />
         </Card>
     );
 }
+
 
 /* ---------- FR-04: tài liệu pháp lý ---------- */
 const ALLOWED = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];

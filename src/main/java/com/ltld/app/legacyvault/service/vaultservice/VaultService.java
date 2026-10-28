@@ -19,6 +19,7 @@ public interface VaultService {
     Vault createVault(UUID ownerId, CreateVaultRequest request) throws Exception;
     void deleteVault(UUID vaultId, UUID ownerId) throws Exception;
     AssignBeneficiaryResponse assignBeneficiary(UUID ownerId, UUID vaultId, AssignBeneficiaryRequest request);
+    void removeBeneficiary(UUID ownerId, UUID vaultId);
 
     // FR-01/FR-27: Quản lý Vault cho Owner
     List<VaultResponse> getMyVaults(UUID ownerId);
