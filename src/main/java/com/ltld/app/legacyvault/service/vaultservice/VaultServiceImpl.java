@@ -61,8 +61,11 @@ public class VaultServiceImpl implements VaultService {
     private final DmsConfigService dmsConfigService;
 
     @Override
-    @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Vault createVault(UUID ownerId, CreateVaultRequest request) throws Exception {
+        // FR-01: Chặn tạo két nếu quy trình bàn giao DMS đã bắt đầu
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+
         // 1. Tìm thông tin chủ sở hữu (Owner)
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new VaultException("Owner not found", HttpStatus.NOT_FOUND));
@@ -189,7 +192,8 @@ public class VaultServiceImpl implements VaultService {
         if (!owner.getId().equals(ownerId)) {
             auditLogService.log(AuditAction.BENEFICIARY_ASSIGN_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
                     "Vault", vaultId.toString(), "not owner");
-            throw new VaultException("You do not have permission to act on this vault", HttpStatus.FORBIDDEN);
+            // V4: trả 404 thay vì 403 để tránh lộ sự tồn tại của vault khi non-owner tra cứu
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         // Vault đã bước vào quy trình bàn giao thì không được đổi người thụ hưởng (tương tự BR-08)
@@ -289,6 +293,45 @@ public class VaultServiceImpl implements VaultService {
                 .pendingRegistration(beneficiary == null)
                 .replaced(replaced)
                 .build();
+    }
+
+    // FR-02 (V8): Owner gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký
+    @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void removeBeneficiary(UUID ownerId, UUID vaultId) {
+        // Khóa DmsConfig TRƯỚC Vault — cùng thứ tự với assignBeneficiary để tránh deadlock
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+
+        Vault vault = vaultRepository.findByIdForUpdate(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+
+        User owner = vault.getOwner();
+        if (!owner.getId().equals(ownerId)) {
+            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
+                    "Vault", vaultId.toString(), "not owner");
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
+        }
+
+        if (vault.getStatus() != VaultStatus.ACTIVE) {
+            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, owner.getEmail(), vaultId,
+                    "Vault", vaultId.toString(), "vault status " + vault.getStatus());
+            throw new VaultException("A beneficiary can only be removed while the vault is ACTIVE", HttpStatus.CONFLICT);
+        }
+
+        // FR-02 (idempotent): chưa có người thụ hưởng → không đổi gì, không audit
+        String currentEmail = vault.getBeneficiary() != null
+                ? vault.getBeneficiary().getEmail()
+                : vault.getBeneficiaryEmail();
+        if (currentEmail == null) {
+            return;
+        }
+
+        vault.setBeneficiary(null);
+        vault.setBeneficiaryEmail(null);
+        vaultRepository.saveAndFlush(vault);
+
+        auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
+                owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
     }
 
     // FR-27: Owner xem danh sách Vault của mình

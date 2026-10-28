@@ -19,7 +19,7 @@ import java.util.UUID;
 @Component
 public class AuditDescriptionBuilder {
 
-    // FR-05: hành động chỉ Admin cần thấy, ẩn khỏi nhật ký Owner (dùng lại cho nhật ký Admin). Không sửa được.
+    // FR-05 (Q42): hành động nội bộ của Admin, ẩn khỏi nhật ký Owner và nhật ký Vault
     public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
             EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED));
 
@@ -76,7 +76,9 @@ public class AuditDescriptionBuilder {
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
             case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
             case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";
+            case BENEFICIARY_REMOVED -> "Removed the vault's beneficiary.";
             case BENEFICIARY_ASSIGN_DENIED -> "Beneficiary assignment denied.";
+            case BENEFICIARY_REMOVE_DENIED -> "Beneficiary removal denied.";
             case BENEFICIARY_LINKED -> "The beneficiary linked their account to the vault.";
             case VAULT_UNLOCK -> "The vault was unlocked after legal verification.";
             case VAULT_ARCHIVED -> "The vault was archived because the claim period expired.";
