@@ -626,7 +626,7 @@ class VaultServiceImplTest {
     @DisplayName("getMyVaults: Lấy danh sách két của Owner thành công")
     void getMyVaults_Success() {
         Vault vault = activeVault();
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of(vault));
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -634,13 +634,13 @@ class VaultServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("My Vault", result.get(0).getName());
         assertEquals(ownerId, result.get(0).getOwnerId());
-        verify(vaultRepository).findByOwnerIdOrderByCreatedAtDesc(ownerId);
+        verify(vaultRepository).findByOwnerIdWithBeneficiary(ownerId);
     }
 
     @Test
     @DisplayName("getMyVaults: Trả về danh sách rỗng khi Owner chưa có két")
     void getMyVaults_EmptyList() {
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of());
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -716,7 +716,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vaultRepository.saveAndFlush(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
         VaultResponse response = vaultService.updateVault(vId, ownerId, request);
@@ -724,7 +724,7 @@ class VaultServiceImplTest {
         assertEquals("Tên két mới", response.getName());
         assertEquals("Mô tả mới", response.getDescription());
         verify(vaultModificationGuard).ensureModifiable(vault);
-        verify(vaultRepository).save(vault);
+        verify(vaultRepository).saveAndFlush(vault);
         verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId),
                 eq("Vault"), eq(vId.toString()), any());
