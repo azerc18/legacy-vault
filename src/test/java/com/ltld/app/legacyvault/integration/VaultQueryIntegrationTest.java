@@ -11,14 +11,19 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
+import com.ltld.app.legacyvault.service.mailservice.EmailSender;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -27,9 +32,26 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@ActiveProfiles("test")
-public class VaultQueryIntegrationTest {
+@SpringBootTest(properties = {
+        "security.jwt.secret=integration-test-secret-key-at-least-32-bytes!!",
+        "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+        "spring.mail.username=test@example.com",
+        "spring.mail.password=test",
+        "spring.jpa.hibernate.ddl-auto=create",
+        "app.dms.scheduler.enabled=false",
+        "app.beneficiary.notify-retry.enabled=false",
+        "app.beneficiary.vault-purge.enabled=false",
+        "app.beneficiary.claim-expiry.enabled=false"
+})
+@Testcontainers(disabledWithoutDocker = true)
+class VaultQueryIntegrationTest {
+
+    @Container
+    @ServiceConnection
+    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+
+    @MockitoBean
+    private EmailSender emailSender;
 
     @Autowired private UserRepository userRepository;
     @Autowired private VaultRepository vaultRepository;
