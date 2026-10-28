@@ -107,4 +107,8 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             ORDER BY v.purgeEligibleAt ASC
             """)
     List<UUID> findPurgeableVaultIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    // B8: số Vault của từng Owner trong một truy vấn: [ownerId, count]
+    @Query("SELECT v.owner.id, COUNT(v) FROM Vault v WHERE v.owner.id IN :ownerIds GROUP BY v.owner.id")
+    List<Object[]> countByOwnerIds(@Param("ownerIds") Collection<UUID> ownerIds);
 }

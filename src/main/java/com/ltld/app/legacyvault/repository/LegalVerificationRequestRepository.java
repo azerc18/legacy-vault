@@ -76,4 +76,7 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Modifying
     @Query("UPDATE LegalVerificationRequest r SET r.executorLastReadAt = :readAt WHERE r.id = :id")
     int markExecutorRead(@Param("id") UUID id, @Param("readAt") LocalDateTime readAt);
+
+    // B8: mọi hồ sơ của một Executor (gồm nhiều Owner), mới nhất trước
+    List<LegalVerificationRequest> findByExecutorIdOrderByCreatedAtDesc(UUID executorId);
 }
