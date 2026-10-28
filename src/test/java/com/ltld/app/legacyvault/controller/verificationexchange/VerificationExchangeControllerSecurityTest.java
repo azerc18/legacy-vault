@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -33,6 +34,7 @@ import java.util.UUID;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -175,28 +177,29 @@ class VerificationExchangeControllerSecurityTest {
 
     @Test
     void history_returns200WithMessages() throws Exception {
-        when(verificationExchangeService.history(assignmentId, requestId, userId.toString()))
-                .thenReturn(List.of(response()));
+        when(verificationExchangeService.history(assignmentId, requestId, userId.toString(), 1, 10))
+                .thenReturn(new PageImpl<>(List.of(response())));
 
-        mockMvc.perform(get(MESSAGES_URL, assignmentId, requestId).with(token(userId)))
+        mockMvc.perform(get(MESSAGES_URL, assignmentId, requestId).param("page", "1").param("size", "10")
+                        .with(token(userId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].content").value("Bổ sung"))
-                .andExpect(jsonPath("$.data[0].senderName").value("Executor Name"));
+                .andExpect(jsonPath("$.data.content[0].content").value("Bổ sung"))
+                .andExpect(jsonPath("$.data.content[0].senderName").value("Executor Name"));
     }
 
     @Test
     void history_empty_returns200WithEmptyList() throws Exception {
-        when(verificationExchangeService.history(assignmentId, requestId, userId.toString()))
-                .thenReturn(Collections.emptyList());
+        when(verificationExchangeService.history(assignmentId, requestId, userId.toString(), 0, 50))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
 
         mockMvc.perform(get(MESSAGES_URL, assignmentId, requestId).with(token(userId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isEmpty());
+                .andExpect(jsonPath("$.data.content").isEmpty());
     }
 
     @Test
     void history_foreignRequest_returns404Not403() throws Exception {
-        when(verificationExchangeService.history(any(), any(), any()))
+        when(verificationExchangeService.history(any(), any(), any(), anyInt(), anyInt()))
                 .thenThrow(new VerificationRequestNotFoundException("Verification request not found."));
 
         mockMvc.perform(get(MESSAGES_URL, assignmentId, requestId).with(token(userId)))

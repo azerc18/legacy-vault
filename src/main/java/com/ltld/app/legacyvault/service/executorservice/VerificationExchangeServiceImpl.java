@@ -24,14 +24,18 @@ import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -43,6 +47,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
     private static final Set<LegalVerificationStatus> OPEN_STATUSES =
             EnumSet.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED);
     private static final int MAX_ATTACHMENT_NAME_LENGTH = 255;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final ExecutorAccessGuard executorAccessGuard;
     private final LegalVerificationRequestRepository legalVerificationRequestRepository;
@@ -120,14 +125,19 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<VerificationMessageResponse> history(UUID assignmentId, UUID requestId, String executorLogin) {
+    @Transactional
+    public Page<VerificationMessageResponse> history(UUID assignmentId, UUID requestId, String executorLogin,
+                                                     int page, int size) {
         ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
         findOwnRequest(assignment, requestId);
 
-        return verificationExchangeMessageRepository.findHistory(requestId).stream()
-                .map(message -> toResponse(message, message.getSender()))
-                .toList();
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        Page<VerificationMessageResponse> result = verificationExchangeMessageRepository
+                .findHistoryPage(requestId, pageable)
+                .map(message -> toResponse(message, message.getSender()));
+        legalVerificationRequestRepository.markExecutorRead(requestId, LocalDateTime.now());
+        return result;
     }
 
     @Override

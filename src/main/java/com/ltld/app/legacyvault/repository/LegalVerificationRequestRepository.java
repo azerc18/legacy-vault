@@ -3,9 +3,11 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -66,4 +68,12 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM LegalVerificationRequest r WHERE r.id = :id")
     Optional<LegalVerificationRequest> findByIdForUpdate(@Param("id") UUID id);
+
+    // B6: hồ sơ xác minh Executor đã gửi cho một Owner, phân trang
+    Page<LegalVerificationRequest> findByExecutorIdAndOwnerId(UUID executorId, UUID ownerId, Pageable pageable);
+
+    // B6: đánh dấu Executor đã đọc tin nhắn; bulk UPDATE không tăng version nên không xung đột với Verifier
+    @Modifying
+    @Query("UPDATE LegalVerificationRequest r SET r.executorLastReadAt = :readAt WHERE r.id = :id")
+    int markExecutorRead(@Param("id") UUID id, @Param("readAt") LocalDateTime readAt);
 }

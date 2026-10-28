@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
+import com.ltld.app.legacyvault.dto.executordto.ExecutorVerificationRequestResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
 import com.ltld.app.legacyvault.dto.executordto.MyExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.dto.executordto.SendVerificationMessageRequest;
@@ -18,6 +19,7 @@ import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeServ
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -118,13 +121,29 @@ public class ExecutorController {
                 .body(ApiResponse.success("Verification message sent", response));
     }
 
-    // FR-11: lịch sử trao đổi của một yêu cầu xác minh
-    @GetMapping("/{assignmentId}/verification-requests/{requestId}/messages")
-    public ResponseEntity<ApiResponse<List<VerificationMessageResponse>>> getVerificationMessages(
-            @PathVariable UUID assignmentId, @PathVariable UUID requestId, Principal principal) {
+    // B6: danh sách mọi hồ sơ xác minh Executor đã gửi cho Owner này (kể cả đã bị từ chối), phân trang
+    @GetMapping("/{assignmentId}/verification-requests")
+    public ResponseEntity<ApiResponse<Page<ExecutorVerificationRequestResponse>>> listVerificationRequests(
+            @PathVariable UUID assignmentId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Principal principal) {
 
-        List<VerificationMessageResponse> response =
-                verificationExchangeService.history(assignmentId, requestId, principal.getName());
+        Page<ExecutorVerificationRequestResponse> response =
+                executorHandoverService.listVerificationRequests(assignmentId, principal.getName(), page, size);
+        return ResponseEntity.ok(ApiResponse.success("Verification requests retrieved", response));
+    }
+
+    // FR-11: lịch sử trao đổi của một yêu cầu xác minh, mới nhất trước (B6: phân trang, đánh dấu đã đọc)
+    @GetMapping("/{assignmentId}/verification-requests/{requestId}/messages")
+    public ResponseEntity<ApiResponse<Page<VerificationMessageResponse>>> getVerificationMessages(
+            @PathVariable UUID assignmentId, @PathVariable UUID requestId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            Principal principal) {
+
+        Page<VerificationMessageResponse> response =
+                verificationExchangeService.history(assignmentId, requestId, principal.getName(), page, size);
         return ResponseEntity.ok(ApiResponse.success("Verification messages retrieved", response));
     }
 
