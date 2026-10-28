@@ -196,7 +196,7 @@ class VaultActivityLogServiceImplTest {
 
         Page<VaultActivityLogResponse> result = vaultActivityLogService.getVaultActivityLogs(
                 vaultId, ownerId, from, to, pageable);
-        assertThat(result).isNotNull();
+        // n3: kiểm service truyền đúng from/to xuống repository (không bị clamp về 1 năm)
         verify(auditLogRepository).findVaultActivity(
                 eq(vaultId),
                 same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS),
@@ -204,6 +204,7 @@ class VaultActivityLogServiceImplTest {
                 eq(to),
                 eq(pageable)
         );
+        assertThat(result.getTotalElements()).isZero();
     }
 
     // Trả về description của một log duy nhất do owner thực hiện
