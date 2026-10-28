@@ -20,16 +20,19 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
         value = "SELECT a FROM AuditLog a " +
                 "LEFT JOIN FETCH a.actor " +
                 "WHERE a.vaultId = :vaultId " +
+                "AND a.action NOT IN :hiddenActions " +
                 "AND a.createdAt >= :startDate " +
                 "AND a.createdAt <= :endDate " +
                 "ORDER BY a.createdAt DESC, a.id DESC",
         countQuery = "SELECT COUNT(a) FROM AuditLog a " +
                      "WHERE a.vaultId = :vaultId " +
+                     "AND a.action NOT IN :hiddenActions " +
                      "AND a.createdAt >= :startDate " +
                      "AND a.createdAt <= :endDate"
     )
     Page<AuditLog> findVaultActivity(
         @org.springframework.data.repository.query.Param("vaultId") UUID vaultId,
+        @org.springframework.data.repository.query.Param("hiddenActions") java.util.Collection<AuditAction> hiddenActions,
         @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate,
         @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
         Pageable pageable
