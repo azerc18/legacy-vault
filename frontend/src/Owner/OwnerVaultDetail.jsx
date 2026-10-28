@@ -28,8 +28,8 @@ export default function OwnerVaultDetail() {
 
     if (!user) return <Navigate to="/login" replace />;
 
-    // Chỉ sửa được khi vault ACTIVE (BE cũng chặn khi DMS đã kích hoạt / đang xác minh)
-    const editable = vault?.status === 'ACTIVE';
+    // V7: Chỉ sửa được khi vault.modifiable = true
+    const editable = vault?.modifiable ?? (vault?.status === 'ACTIVE');
 
     return (
         <OwnerLayout
@@ -43,7 +43,7 @@ export default function OwnerVaultDetail() {
             <Alert>{error}</Alert>
             {!vault && !error && <p className="text-on-surface-variant">Loading...</p>}
             {vault && !editable && (
-                <Alert type="warning">This vault is {vault.status.toLowerCase()} — it can no longer be changed.</Alert>
+                <Alert type="warning">{vault.lockReason || `This vault is ${vault.status.toLowerCase()} — it can no longer be changed.`}</Alert>
             )}
 
             {vault && (
@@ -321,6 +321,7 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
     const [confirm, setConfirm] = useState(null);
+    const [removing, setRemoving] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const submit = async (confirmReplace = false) => {
@@ -339,9 +340,21 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
 
     return (
         <Card title="Beneficiary" icon="family_restroom">
-            <p className="text-sm mb-4">
-                Current: <b>{current || 'Not assigned'}</b>
-            </p>
+            <div className="flex justify-between items-center mb-4">
+                <p className="text-sm">
+                    Current: <b>{current || 'Not assigned'}</b>
+                </p>
+                {current && editable && (
+                    <button
+                        type="button"
+                        onClick={() => setRemoving(true)}
+                        disabled={loading}
+                        className="text-xs font-semibold text-error hover:underline"
+                    >
+                        Remove
+                    </button>
+                )}
+            </div>
             <Alert>{error}</Alert>
             {result && (
                 <Alert type="success">
@@ -359,6 +372,27 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
                     </button>
                 </form>
             )}
+            <ConfirmDialog
+                open={removing}
+                danger
+                title="Remove beneficiary?"
+                message="Are you sure you want to remove the beneficiary from this vault?"
+                confirmLabel="Remove"
+                busy={loading}
+                onConfirm={async () => {
+                    setLoading(true); setError('');
+                    try {
+                        await ownerApi.removeBeneficiary(vaultId);
+                        setRemoving(false);
+                        onSaved();
+                    } catch (err) {
+                        setError(getErrorMessage(err, 'Could not remove beneficiary.'));
+                    } finally {
+                        setLoading(false);
+                    }
+                }}
+                onCancel={() => setRemoving(false)}
+            />
             <ConfirmDialog
                 open={!!confirm}
                 title="Replace beneficiary?"
@@ -440,9 +474,13 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                 <p className="font-semibold truncate">{d.fileName}</p>
                                 <p className="text-xs text-outline">{humanize(d.documentType)} · {formatDate(d.uploadedAt, true)}</p>
                             </div>
-                            <button onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1">
-                                <Icon name="download" className="text-[18px]" />
-                            </button>
+                            {!d.archived ? (
+                                <button onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1">
+                                    <Icon name="download" className="text-[18px]" />
+                                </button>
+                            ) : (
+                                <span className="text-xs text-outline px-2 py-1 bg-surface-container-low rounded">Archived</span>
+                            )}
                             {editable && (
                                 <button onClick={() => setDeleting(d)} className="h-9 px-3 rounded-lg font-semibold text-error hover:bg-error-container">Delete</button>
                             )}

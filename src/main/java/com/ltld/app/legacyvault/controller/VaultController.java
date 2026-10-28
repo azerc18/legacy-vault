@@ -53,7 +53,8 @@ public class VaultController {
                 .updatedAt(vault.getUpdatedAt())
                 .build();
                 
-        return ResponseEntity.ok(ApiResponse.success("Vault created successfully", response));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.success("Vault created successfully", response));
     }
 
     // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy
@@ -79,6 +80,17 @@ public class VaultController {
         UUID ownerId = UUID.fromString(principal.getName());
         AssignBeneficiaryResponse response = vaultService.assignBeneficiary(ownerId, vaultId, request);
         return ResponseEntity.ok(ApiResponse.success("Beneficiary assigned successfully", response));
+    }
+
+    // V8: Owner gỡ người thụ hưởng hoặc hủy lời mời
+    @DeleteMapping("/{vaultId}/beneficiary")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<Void>> removeBeneficiary(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        vaultService.removeBeneficiary(ownerId, vaultId);
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
     }
 
     // FR-27: Owner xem danh sách Vault của mình

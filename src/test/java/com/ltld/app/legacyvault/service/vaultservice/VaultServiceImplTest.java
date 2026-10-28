@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -72,7 +73,7 @@ class VaultServiceImplTest {
     @Mock
     private FileStorageService fileStorageService;
     @Mock
-    private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
+    private AuditLogService auditLogService;
     @Mock
     private EmailSender emailSender;
     @Mock
@@ -118,7 +119,7 @@ class VaultServiceImplTest {
         // Kịch bản giả lập (Khi code gọi hàm A thì trả về B)
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
         when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
-        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password"); // Trọng tâm KT
+        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password");
 
         // Gọi hàm thực tế (Act)
         Vault result = vaultService.createVault(ownerId, request);
@@ -132,6 +133,19 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).save(any(Vault.class));
         verify(digitalAssetRepository, times(1)).save(any(DigitalAsset.class));
         verify(cryptoService, times(1)).encrypt("my-password");
+        verify(dmsConfigService).assertHandoverNotStarted(ownerId);
+    }
+
+    @Test
+    @DisplayName("createVault (FR-01): DMS đã bắt đầu bàn giao -> ném DmsException 409")
+    void createVault_dmsTriggered_throwsDmsException() {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("New Vault");
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThrows(DmsException.class, () -> vaultService.createVault(ownerId, request));
+        verify(vaultRepository, never()).save(any());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)
@@ -164,7 +178,7 @@ class VaultServiceImplTest {
         verify(vaultRepository, times(1)).delete(vault);
     }
 
-    // Kịch bản 3: Cố tình xóa Vault của người khác -> Phải văng lỗi (Business Rule)
+    // Kịch bản 3: Cố tình xóa Vault của người khác -> Chặn 404 Not Found (V4)
     @Test
     void deleteVault_NotOwner_ThrowsException() {
         UUID vaultId = UUID.randomUUID();
@@ -179,19 +193,20 @@ class VaultServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Bắt lỗi phải là VaultException
-        Exception exception = assertThrows(VaultException.class, () -> {
+        // Bắt lỗi phải là VaultException mã 404
+        VaultException exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 
-        // Nội dung lỗi phải chuẩn xác
-        assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
+        // Nội dung lỗi phải là Vault not found chống dò ID (V4)
+        assertEquals("Vault not found", exception.getMessage());
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
         // và phải bao gồm vaultId để nhật ký có đủ context (N2)
         verify(auditLogService).log(
-                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditAction.VAULT_DELETE_DENIED),
                 eq(AuditResult.FAILURE),
                 eq(ownerId),
                 eq(mockOwner.getEmail()),
@@ -403,12 +418,12 @@ class VaultServiceImplTest {
     }
 
     @Test
-    void assignBeneficiary_notOwner_returns403AndAudits() {
+    void assignBeneficiary_notOwner_returns404AndAudits() {
         Vault vault = activeVault();
         when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
         UUID otherUserId = UUID.randomUUID();
 
-        assertVaultError(HttpStatus.FORBIDDEN,
+        assertVaultError(HttpStatus.NOT_FOUND,
                 () -> vaultService.assignBeneficiary(otherUserId, vault.getId(), assignRequest("ben@example.com", null)));
 
         verify(vaultRepository, never()).save(any());
@@ -626,7 +641,7 @@ class VaultServiceImplTest {
     @DisplayName("getMyVaults: Lấy danh sách két của Owner thành công")
     void getMyVaults_Success() {
         Vault vault = activeVault();
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of(vault));
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -634,18 +649,105 @@ class VaultServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("My Vault", result.get(0).getName());
         assertEquals(ownerId, result.get(0).getOwnerId());
-        verify(vaultRepository).findByOwnerIdOrderByCreatedAtDesc(ownerId);
+        verify(vaultRepository).findByOwnerIdWithBeneficiary(ownerId);
     }
 
     @Test
     @DisplayName("getMyVaults: Trả về danh sách rỗng khi Owner chưa có két")
     void getMyVaults_EmptyList() {
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId))
                 .thenReturn(List.of());
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
 
         assertTrue(result.isEmpty());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (V8): Gỡ người thụ hưởng thành công")
+    void removeBeneficiary_Success() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
+        UUID vId = vault.getId();
+        when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vId);
+
+        assertNull(vault.getBeneficiary());
+        assertNull(vault.getBeneficiaryEmail());
+        verify(vaultRepository).saveAndFlush(vault);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@example.com"), eq(vId), eq("Vault"), eq(vId.toString()), any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (V8/V4): Không phải chủ két -> 404 Not Found")
+    void removeBeneficiary_NotOwner_ThrowsNotFound() {
+        Vault vault = activeVault();
+        UUID otherId = UUID.randomUUID();
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        assertVaultError(HttpStatus.NOT_FOUND, () -> vaultService.removeBeneficiary(otherId, vault.getId()));
+        verify(vaultRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m1): Không có người thụ hưởng -> return sớm, không lưu hay audit (idempotent)")
+    void removeBeneficiary_NoBeneficiary_ReturnsEarlyIdempotently() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(null);
+        vault.setBeneficiaryEmail(null);
+        UUID vId = vault.getId();
+        when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vId);
+
+        verify(vaultRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): Vault không ACTIVE -> 409 Conflict + audit BENEFICIARY_REMOVE_DENIED")
+    void removeBeneficiary_VaultNotActive_ThrowsConflictAndAudits() {
+        Vault vault = activeVault();
+        vault.setStatus(VaultStatus.UNLOCKED);
+        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        assertVaultError(HttpStatus.CONFLICT, () -> vaultService.removeBeneficiary(ownerId, vault.getId()));
+        verify(vaultRepository, never()).saveAndFlush(any());
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVE_DENIED), eq(AuditResult.FAILURE),
+                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
+                eq("vault status UNLOCKED"));
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): DMS TRIGGERED -> 409 Conflict")
+    void removeBeneficiary_DmsTriggered_ThrowsConflict() {
+        UUID vaultId = UUID.randomUUID();
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThrows(DmsException.class, () -> vaultService.removeBeneficiary(ownerId, vaultId));
+        verify(vaultRepository, never()).findByIdForUpdate(any());
+        verify(vaultRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m2): Người thụ hưởng đang chờ đăng ký -> xóa email chờ và audit thành công")
+    void removeBeneficiary_PendingBeneficiaryEmail_Success() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(null);
+        vault.setBeneficiaryEmail("pending@example.com");
+        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vault.getId());
+
+        assertNull(vault.getBeneficiary());
+        assertNull(vault.getBeneficiaryEmail());
+        verify(vaultRepository).saveAndFlush(vault);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
+                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
     }
 
     @Test
@@ -716,7 +818,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vaultRepository.saveAndFlush(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
         VaultResponse response = vaultService.updateVault(vId, ownerId, request);
@@ -724,7 +826,7 @@ class VaultServiceImplTest {
         assertEquals("Tên két mới", response.getName());
         assertEquals("Mô tả mới", response.getDescription());
         verify(vaultModificationGuard).ensureModifiable(vault);
-        verify(vaultRepository).save(vault);
+        verify(vaultRepository).saveAndFlush(vault);
         verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId),
                 eq("Vault"), eq(vId.toString()), any());
