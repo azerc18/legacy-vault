@@ -20,10 +20,13 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -75,6 +78,7 @@ public class DmsActivationProcessor {
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
     @Transactional
@@ -206,12 +210,17 @@ public class DmsActivationProcessor {
         primary.setStatus(ExecutorStatus.REVOKED);
         primary.setRevokedAt(now);
         executorAssignmentRepository.save(primary);
+        // B3: gỡ role EXECUTOR nếu Primary không còn làm Executor cho Owner nào khác.
+        executorRoleManager.revokeIfUnused(primary.getExecutorUser(), primary.getId());
         markActive(backup, now);
 
         flushBeforeSideEffects();
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
         notifyActivated(config, backup, now);
+        User owner = config.getOwner();
+        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(ExecutorMail.revoked(
+                primary.getExecutorUser().getEmail(), owner.getFullName(), owner.getEmail(), ExecutorType.PRIMARY))));
     }
 
     /**

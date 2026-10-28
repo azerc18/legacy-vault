@@ -16,6 +16,7 @@ import java.util.UUID;
 public class ExecutorAccessGuard {
 
     static final String NOT_ACTIVE_MESSAGE = "Access is not available yet";
+    static final String REVOKED_MESSAGE = "Your executor role for this owner has been revoked";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 
@@ -25,6 +26,9 @@ public class ExecutorAccessGuard {
                 .filter(a -> isSameUser(a.getExecutorUser(), executorLogin))
                 .orElseThrow(() -> new ExecutorAssignmentNotFoundException("Executor assignment not found."));
 
+        if (assignment.getStatus() == ExecutorStatus.REVOKED) {
+            throw new ExecutorNotActiveException(REVOKED_MESSAGE);
+        }
         if (assignment.getStatus() != ExecutorStatus.ACTIVE) {
             throw new ExecutorNotActiveException(NOT_ACTIVE_MESSAGE);
         }

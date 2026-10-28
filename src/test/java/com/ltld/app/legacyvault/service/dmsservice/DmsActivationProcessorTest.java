@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -66,6 +68,7 @@ class DmsActivationProcessorTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private UserRepository userRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private DmsActivationProcessor processor;
 
@@ -83,7 +86,7 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService, userRepository);
+                auditLogService, executorNotificationService, userRepository, eventPublisher);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -436,6 +439,45 @@ class DmsActivationProcessorTest {
         verify(auditLogService).log(eq(AuditAction.EXECUTOR_REVOKE), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), isNull(), eq("ExecutorAssignment"), eq(primary.getId().toString()),
                 contains("executorType=PRIMARY, reason=BR03_TIMEOUT"));
+    }
+
+    @Test
+    @DisplayName("B3: leo thang -> Primary bị gỡ role EXECUTOR và nhận mail REVOKED")
+    void escalate_revokesPrimaryRoleAndMailsPrimary() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
+        primary.getExecutorUser().getRoles().add(executorRole);
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).doesNotContain(executorRole);
+        ArgumentCaptor<ExecutorAssignmentChangedEvent> captor = ArgumentCaptor.forClass(ExecutorAssignmentChangedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().mails()).singleElement().satisfies(mail -> {
+            assertThat(mail.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REVOKED);
+            assertThat(mail.recipientEmail()).isEqualTo("primary@example.test");
+            assertThat(mail.executorType()).isEqualTo(ExecutorType.PRIMARY);
+        });
+    }
+
+    @Test
+    @DisplayName("B3: Primary còn làm Executor cho Owner khác -> giữ role EXECUTOR")
+    void escalate_keepsRoleWhenPrimaryStillAssignedElsewhere() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
+        primary.getExecutorUser().getRoles().add(executorRole);
+        when(executorAssignmentRepository.existsByExecutorUserIdAndStatusNotAndIdNot(
+                primaryUserId, ExecutorStatus.REVOKED, primary.getId())).thenReturn(true);
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).contains(executorRole);
+    }
+
+    @Test
+    @DisplayName("B3: chưa leo thang -> không phát mail REVOKED")
+    void escalate_noEscalationPublishesNothing() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(13));
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

@@ -125,12 +125,13 @@ class ExecutorAccessGuardTest {
     }
 
     @Test
-    @DisplayName("Caller's REVOKED assignment -> 403")
+    @DisplayName("B3: caller's REVOKED assignment -> 403 with a revoked-specific message")
     void revokedAssignmentOfCaller_throwsNotActive() {
         when(executorAssignmentRepository.findById(assignmentId))
                 .thenReturn(Optional.of(assignment(ExecutorStatus.REVOKED)));
 
-        assertThrows(ExecutorNotActiveException.class,
+        ExecutorNotActiveException ex = assertThrows(ExecutorNotActiveException.class,
                 () -> guard.requireActiveAssignment(assignmentId, EMAIL));
+        assertEquals("Your executor role for this owner has been revoked", ex.getMessage());
     }
 }
