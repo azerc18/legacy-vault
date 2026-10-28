@@ -16,7 +16,7 @@ import java.util.UUID;
 public class ExecutorAccessGuard {
 
     static final String NOT_ACTIVE_MESSAGE = "Access is not available yet";
-    static final String REVOKED_MESSAGE = "Your executor role for this owner has been revoked";
+    static final String REVOKED_MESSAGE = "Quyền Executor của bạn với Owner này đã bị thu hồi";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 

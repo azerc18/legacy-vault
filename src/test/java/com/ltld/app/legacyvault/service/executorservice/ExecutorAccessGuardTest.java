@@ -132,6 +132,6 @@ class ExecutorAccessGuardTest {
 
         ExecutorNotActiveException ex = assertThrows(ExecutorNotActiveException.class,
                 () -> guard.requireActiveAssignment(assignmentId, EMAIL));
-        assertEquals("Your executor role for this owner has been revoked", ex.getMessage());
+        assertEquals("Quyền Executor của bạn với Owner này đã bị thu hồi", ex.getMessage());
     }
 }
