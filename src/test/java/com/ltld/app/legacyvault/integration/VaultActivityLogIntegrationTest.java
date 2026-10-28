@@ -18,6 +18,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,12 +61,14 @@ class VaultActivityLogIntegrationTest {
     @Autowired private AuditLogService auditLogService;
     @Autowired private UserRepository userRepository;
     @Autowired private VaultRepository vaultRepository;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private final List<UUID> userIds = new ArrayList<>();
     private final List<UUID> vaultIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
+        jdbcTemplate.update("DELETE FROM audit_logs");
         vaultIds.forEach(id -> vaultRepository.findById(id).ifPresent(vaultRepository::delete));
         userRepository.deleteAllById(userIds);
     }
