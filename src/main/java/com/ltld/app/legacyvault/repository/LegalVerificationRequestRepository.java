@@ -66,4 +66,12 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM LegalVerificationRequest r WHERE r.id = :id")
     Optional<LegalVerificationRequest> findByIdForUpdate(@Param("id") UUID id);
+
+    // B2: Executor này còn hồ sơ đang xử lý / đã xong với Owner này không (hạn thứ hai của BR-03)
+    boolean existsByExecutorIdAndOwnerIdAndStatusIn(UUID executorId, UUID ownerId,
+                                                    Collection<LegalVerificationStatus> statuses);
+
+    // B2: hồ sơ bị từ chối gần nhất, đồng hồ hạn thứ hai chạy lại từ decidedAt của nó
+    Optional<LegalVerificationRequest> findFirstByExecutorIdAndOwnerIdAndStatusOrderByDecidedAtDesc(
+            UUID executorId, UUID ownerId, LegalVerificationStatus status);
 }

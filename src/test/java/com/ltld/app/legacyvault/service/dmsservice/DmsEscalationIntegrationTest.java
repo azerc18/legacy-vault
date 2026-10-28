@@ -212,7 +212,7 @@ class DmsEscalationIntegrationTest {
     }
 
     @Test
-    void s4_acknowledgedPrimary_isNotEscalatedEvenAfter14Days() {
+    void s4_acknowledgedPrimary_isNotEscalatedBeforeSecondDeadline() {
         Seed s = seed(true, true, 14);
         dmsAutomationService.processOverdueDms(T0);
 
@@ -228,11 +228,20 @@ class DmsEscalationIntegrationTest {
         assertThat(activationNotification(s, s.primaryUserId).getStatus()).isEqualTo(NotificationStatus.READ);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACKNOWLEDGED)).isEqualTo(1);
 
-        dmsAutomationService.escalateUnresponsivePrimaries(T0.plusDays(20));
+        // B2: đã xác nhận thì không leo thang theo hạn 14 ngày kể từ kích hoạt...
+        LocalDateTime acknowledgedAt = primary(s).getAcknowledgedAt();
+        dmsAutomationService.escalateUnresponsivePrimaries(acknowledgedAt.plusDays(13));
 
         assertThat(primary(s).getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(backup(s).getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isZero();
+
+        // ...nhưng quá 14 ngày kể từ xác nhận mà vẫn chưa nộp hồ sơ thì leo thang sang Backup (hạn thứ hai).
+        dmsAutomationService.escalateUnresponsivePrimaries(acknowledgedAt.plusDays(14));
+
+        assertThat(primary(s).getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup(s).getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
     }
 
     // 401 (chưa đăng nhập) thuộc tầng security, không kiểm được ở mức service.

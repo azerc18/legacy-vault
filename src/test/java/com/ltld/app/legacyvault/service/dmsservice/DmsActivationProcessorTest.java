@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
@@ -10,11 +11,13 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -66,6 +69,7 @@ class DmsActivationProcessorTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private UserRepository userRepository;
+    @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
 
     private DmsActivationProcessor processor;
 
@@ -83,7 +87,7 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService, userRepository);
+                auditLogService, executorNotificationService, userRepository, legalVerificationRequestRepository);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -448,13 +452,69 @@ class DmsActivationProcessorTest {
     }
 
     @Test
-    @DisplayName("Primary đã xác nhận (acknowledgedAt) -> không leo thang dù quá 14 ngày")
-    void escalate_doesNothingWhenPrimaryAcknowledged() {
+    @DisplayName("B2: Primary đã xác nhận và còn hồ sơ PENDING/APPROVED/SIGNED -> không leo thang dù quá 14 ngày")
+    void escalate_doesNothingWhenAcknowledgedPrimaryHasOpenRequest() {
         primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(30));
         primary.setAcknowledgedAt(now.minusDays(20));
+        when(legalVerificationRequestRepository.existsByExecutorIdAndOwnerIdAndStatusIn(
+                eq(primaryUserId), eq(ownerId), any())).thenReturn(true);
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
         assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("B2: xác nhận rồi bỏ đi, đủ 14 ngày (đúng biên) không nộp hồ sơ -> leo thang, reason=BR03_NO_SUBMISSION")
+    void escalate_acknowledgedWithoutSubmission_escalatesAtExactlyWaitDays() {
+        primaryActiveAndNotified(NotificationStatus.READ, now.minusDays(30));
+        primary.setAcknowledgedAt(now.minusDays(14));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_REVOKE), eq(AuditResult.SUCCESS),
+                isNull(), isNull(), isNull(), eq("ExecutorAssignment"), eq(primary.getId().toString()),
+                contains("reason=BR03_NO_SUBMISSION"));
+    }
+
+    @Test
+    @DisplayName("B2: xác nhận mới 13 ngày, chưa nộp hồ sơ -> chưa leo thang")
+    void escalate_acknowledgedWithoutSubmission_waitsBeforeDeadline() {
+        primaryActiveAndNotified(NotificationStatus.READ, now.minusDays(30));
+        primary.setAcknowledgedAt(now.minusDays(13));
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("B2: hồ sơ bị từ chối 13 ngày trước (xác nhận 30 ngày trước) -> đồng hồ chạy lại từ lúc từ chối, chưa leo thang")
+    void escalate_rejectedRecently_restartsClockFromRejection() {
+        primaryActiveAndNotified(NotificationStatus.READ, now.minusDays(40));
+        primary.setAcknowledgedAt(now.minusDays(30));
+        when(legalVerificationRequestRepository.findFirstByExecutorIdAndOwnerIdAndStatusOrderByDecidedAtDesc(
+                primaryUserId, ownerId, LegalVerificationStatus.REJECTED))
+                .thenReturn(Optional.of(LegalVerificationRequest.builder().decidedAt(now.minusDays(13)).build()));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("B2: bị từ chối 14 ngày trước mà không nộp lại -> leo thang")
+    void escalate_rejectedAndNotResubmitted_escalates() {
+        primaryActiveAndNotified(NotificationStatus.READ, now.minusDays(40));
+        primary.setAcknowledgedAt(now.minusDays(30));
+        when(legalVerificationRequestRepository.findFirstByExecutorIdAndOwnerIdAndStatusOrderByDecidedAtDesc(
+                primaryUserId, ownerId, LegalVerificationStatus.REJECTED))
+                .thenReturn(Optional.of(LegalVerificationRequest.builder().decidedAt(now.minusDays(14)).build()));
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
     }
 
     @Test

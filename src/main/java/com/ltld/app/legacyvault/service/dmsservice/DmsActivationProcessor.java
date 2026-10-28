@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
@@ -11,12 +12,14 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -31,8 +34,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -67,6 +72,10 @@ public class DmsActivationProcessor {
     static final int MAX_TRIGGER_DEFERRALS = 3;
     static final Duration TRIGGER_DEFERRAL = Duration.ofHours(24);
 
+    // B2: Primary đã xác nhận mà có hồ sơ ở các trạng thái này thì coi là đang xử lý, không leo thang.
+    private static final Set<LegalVerificationStatus> ENGAGED_REQUEST_STATUSES = EnumSet.of(
+            LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED, LegalVerificationStatus.SIGNED);
+
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
@@ -75,6 +84,7 @@ public class DmsActivationProcessor {
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
     private final UserRepository userRepository;
+    private final LegalVerificationRequestRepository legalVerificationRequestRepository;
 
     /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
     @Transactional
@@ -178,17 +188,25 @@ public class DmsActivationProcessor {
 
         ExecutorAssignment primary = executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY).orElse(null);
-        if (primary == null || primary.getStatus() != ExecutorStatus.ACTIVE || primary.getAcknowledgedAt() != null) {
+        if (primary == null || primary.getStatus() != ExecutorStatus.ACTIVE) {
             return;
         }
 
-        Notification activation = findActivationNotification(
-                config, primary.getExecutorUser().getId()).orElse(null);
-        // BR-03 (B2): đồng hồ bắt đầu từ lúc gửi thành công nếu có; nếu mail chưa bao giờ gửi được
-        // thì từ lúc kích hoạt, để Primary không liên lạc được vẫn bị leo thang sang Backup.
-        LocalDateTime clockStart = activation != null && activation.getSentAt() != null
-                ? activation.getSentAt()
-                : primary.getActivatedAt();
+        LocalDateTime clockStart;
+        String reason;
+        if (primary.getAcknowledgedAt() == null) {
+            Notification activation = findActivationNotification(
+                    config, primary.getExecutorUser().getId()).orElse(null);
+            // BR-03 (B2): đồng hồ bắt đầu từ lúc gửi thành công nếu có; nếu mail chưa bao giờ gửi được
+            // thì từ lúc kích hoạt, để Primary không liên lạc được vẫn bị leo thang sang Backup.
+            clockStart = activation != null && activation.getSentAt() != null
+                    ? activation.getSentAt()
+                    : primary.getActivatedAt();
+            reason = "BR03_TIMEOUT";
+        } else {
+            clockStart = submissionClockStart(ownerId, primary);
+            reason = "BR03_NO_SUBMISSION";
+        }
         if (clockStart == null
                 || clockStart.plusDays(config.getBackupActivationWaitDays()).isAfter(now)) {
             return;
@@ -210,8 +228,28 @@ public class DmsActivationProcessor {
 
         flushBeforeSideEffects();
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
-                ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
+                ownerDetail(ownerId) + ", executorType=PRIMARY, reason=" + reason + ", activatedBackupId=" + backup.getId());
         notifyActivated(config, backup, now);
+    }
+
+    /**
+     * B2: hạn thứ hai cho Primary đã xác nhận. Còn hồ sơ chưa bị từ chối (PENDING/APPROVED/SIGNED) thì null =
+     * không leo thang; ngược lại đồng hồ chạy từ lúc xác nhận, hoặc từ lần bị từ chối gần nhất nếu muộn hơn,
+     * để Primary có đủ backupActivationWaitDays ngày nộp lại.
+     */
+    private LocalDateTime submissionClockStart(UUID ownerId, ExecutorAssignment primary) {
+        UUID executorId = primary.getExecutorUser().getId();
+        if (legalVerificationRequestRepository.existsByExecutorIdAndOwnerIdAndStatusIn(
+                executorId, ownerId, ENGAGED_REQUEST_STATUSES)) {
+            return null;
+        }
+        LocalDateTime clockStart = primary.getAcknowledgedAt();
+        LocalDateTime lastRejectedAt = legalVerificationRequestRepository
+                .findFirstByExecutorIdAndOwnerIdAndStatusOrderByDecidedAtDesc(
+                        executorId, ownerId, LegalVerificationStatus.REJECTED)
+                .map(LegalVerificationRequest::getDecidedAt)
+                .orElse(null);
+        return lastRejectedAt != null && lastRejectedAt.isAfter(clockStart) ? lastRejectedAt : clockStart;
     }
 
     /**
