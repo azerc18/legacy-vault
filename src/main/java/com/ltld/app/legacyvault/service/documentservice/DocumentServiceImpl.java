@@ -131,7 +131,7 @@ public class DocumentServiceImpl implements DocumentService {
                         .documentType(doc.getDocumentType())
                         .fileName(doc.getFileName())
                         .uploadedAt(doc.getUploadedAt())
-                        .archived(vault.getStatus() == com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED)
+                        .archived(vault.getStatus() == VaultStatus.ARCHIVED_LOCKED)
                         .build())
                 .toList();
     }
