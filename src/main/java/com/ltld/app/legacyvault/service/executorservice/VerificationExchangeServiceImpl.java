@@ -60,7 +60,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
         String content = normalize(request == null ? null : request.getContent());
         boolean hasFile = file != null && !file.isEmpty();
         if (content == null && !hasFile) {
-            throw new InvalidVerificationDocumentException("Message content or attachment is required.");
+            throw new InvalidVerificationDocumentException("Cần nhập nội dung tin nhắn hoặc đính kèm tệp.");
         }
 
         byte[] encryptedContent = null;
@@ -71,7 +71,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
         ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
         LegalVerificationRequest verificationRequest = findOwnRequest(assignment, requestId);
         if (!OPEN_STATUSES.contains(verificationRequest.getStatus())) {
-            throw new VerificationRequestClosedException("This verification request is closed.");
+            throw new VerificationRequestClosedException("Yêu cầu xác minh này đã đóng.");
         }
 
         User executor = assignment.getExecutorUser();
@@ -140,7 +140,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
         VerificationExchangeMessage message = verificationExchangeMessageRepository
                 .findByIdAndRequestId(messageId, requestId)
                 .filter(m -> m.getAttachmentPath() != null)
-                .orElseThrow(() -> new VerificationRequestNotFoundException("Attachment not found."));
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy tệp đính kèm."));
 
         // Cùng cách giải mã với phía Verifier (VerifierMessageServiceImpl.getAttachment).
         byte[] plain;
@@ -148,7 +148,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
             plain = cryptoService.decryptBytes(fileStorageService.readFile(message.getAttachmentPath()));
         } catch (Exception e) {
             log.error("Attachment read/decrypt failed for message {}", messageId, e);
-            throw new IllegalStateException("Could not read the attachment. Please try again later.");
+            throw new IllegalStateException("Không thể đọc tệp đính kèm. Vui lòng thử lại sau.");
         }
 
         User executor = assignment.getExecutorUser();
@@ -167,7 +167,7 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
         return legalVerificationRequestRepository.findById(requestId)
                 .filter(r -> r.getOwner().getId().equals(assignment.getOwner().getId())
                         && r.getExecutor().getId().equals(assignment.getExecutorUser().getId()))
-                .orElseThrow(() -> new VerificationRequestNotFoundException("Verification request not found."));
+                .orElseThrow(() -> new VerificationRequestNotFoundException("Không tìm thấy yêu cầu xác minh."));
     }
 
     private void registerCleanupOnRollback(String storedPath) {

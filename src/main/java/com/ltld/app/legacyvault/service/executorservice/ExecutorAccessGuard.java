@@ -15,7 +15,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutorAccessGuard {
 
-    static final String NOT_ACTIVE_MESSAGE = "Access is not available yet";
+    static final String NOT_ACTIVE_MESSAGE = "Chưa đến thời điểm thực hiện quyền";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 
@@ -23,7 +23,7 @@ public class ExecutorAccessGuard {
     public ExecutorAssignment requireActiveAssignment(UUID assignmentId, String executorLogin) {
         ExecutorAssignment assignment = executorAssignmentRepository.findById(assignmentId)
                 .filter(a -> isSameUser(a.getExecutorUser(), executorLogin))
-                .orElseThrow(() -> new ExecutorAssignmentNotFoundException("Executor assignment not found."));
+                .orElseThrow(() -> new ExecutorAssignmentNotFoundException("Không tìm thấy phân công Executor."));
 
         if (assignment.getStatus() != ExecutorStatus.ACTIVE) {
             throw new ExecutorNotActiveException(NOT_ACTIVE_MESSAGE);

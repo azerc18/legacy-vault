@@ -58,7 +58,7 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
     public DeathVerificationResponse submit(UUID assignmentId, String executorLogin,
                                             MultipartFile file, CreateDeathVerificationRequest request) {
         if (request == null || request.getVaultIds() == null || request.getVaultIds().isEmpty()) {
-            throw new InvalidVerificationDocumentException("At least one vault ID must be selected.");
+            throw new InvalidVerificationDocumentException("Cần chọn ít nhất một Vault.");
         }
 
         byte[] plain = uploadedDocumentValidator.readAndValidate(file);
@@ -69,22 +69,22 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
         UUID ownerId = assignment.getOwner().getId();
 
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
-                .orElseThrow(() -> new DmsNotTriggeredException("Dead Man's Switch configuration not found."));
+                .orElseThrow(() -> new DmsNotTriggeredException("Không tìm thấy cấu hình Dead Man's Switch."));
 
         if (config.getStatus() != DmsStatus.TRIGGERED) {
-            throw new DmsNotTriggeredException("Dead Man's Switch has not been triggered.");
+            throw new DmsNotTriggeredException("Dead Man's Switch chưa được kích hoạt.");
         }
 
         List<Vault> linkedVaults = new ArrayList<>();
         for (UUID vaultId : new LinkedHashSet<>(request.getVaultIds())) {
             Vault vault = vaultRepository.findById(vaultId)
-                    .orElseThrow(() -> new VaultException("Vault not found: " + vaultId, HttpStatus.NOT_FOUND));
+                    .orElseThrow(() -> new VaultException("Không tìm thấy Vault: " + vaultId, HttpStatus.NOT_FOUND));
 
             if (!vault.getOwner().getId().equals(ownerId)) {
-                throw new VaultException("Vault not found: " + vaultId, HttpStatus.NOT_FOUND);
+                throw new VaultException("Không tìm thấy Vault: " + vaultId, HttpStatus.NOT_FOUND);
             }
             if (vault.getStatus() != VaultStatus.ACTIVE) {
-                throw new VaultException("Vault is not active: " + vaultId, HttpStatus.CONFLICT);
+                throw new VaultException("Vault không còn hoạt động: " + vaultId, HttpStatus.CONFLICT);
             }
             linkedVaults.add(vault);
         }
@@ -93,7 +93,7 @@ public class ExecutorVerificationServiceImpl implements ExecutorVerificationServ
                 linkedVaults.stream().map(Vault::getId).toList(), OPEN_REQUEST_STATUSES);
         if (!busyVaultIds.isEmpty()) {
             throw new DuplicateVerificationRequestException(
-                    "A verification request is already in progress for vault(s): " + busyVaultIds);
+                    "Đã có yêu cầu xác minh đang được xử lý cho Vault: " + busyVaultIds);
         }
 
         // B2 (F1): nộp hồ sơ = đã phản hồi, nên BR-03 không thu hồi Primary làm hồ sơ bị kẹt.

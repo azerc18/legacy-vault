@@ -121,7 +121,7 @@ class ExecutorAccessGuardTest {
 
         ExecutorNotActiveException ex = assertThrows(ExecutorNotActiveException.class,
                 () -> guard.requireActiveAssignment(assignmentId, EMAIL));
-        assertEquals("Access is not available yet", ex.getMessage());
+        assertEquals("Chưa đến thời điểm thực hiện quyền", ex.getMessage());
     }
 
     @Test

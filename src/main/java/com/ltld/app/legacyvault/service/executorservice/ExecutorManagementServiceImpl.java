@@ -54,7 +54,7 @@ import java.util.UUID;
 public class ExecutorManagementServiceImpl implements ExecutorManagementService {
 
     static final String LAST_EXECUTOR_MESSAGE =
-            "You cannot revoke your last executor while the Dead Man's Switch is active. Assign a replacement executor first.";
+            "Không thể thu hồi Executor cuối cùng khi Dead Man's Switch đang hoạt động. Hãy chỉ định Executor thay thế trước.";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
@@ -79,11 +79,11 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         User candidate = userRepository.findByEmail(email)
                 .filter(u -> u.getStatus() == UserStatus.ACTIVE)
                 .orElseThrow(() -> new ExecutorManagementException(
-                        "This email has no verified LegacyVault account. The executor must register and verify their account first.",
+                        "Email này chưa có tài khoản LegacyVault đã xác minh. Executor cần đăng ký và xác minh tài khoản trước.",
                         HttpStatus.UNPROCESSABLE_ENTITY));
 
         if (candidate.getId().equals(ownerId)) {
-            throw new ExecutorManagementException("You cannot assign yourself as an executor.",
+            throw new ExecutorManagementException("Bạn không thể tự chỉ định mình làm Executor.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -91,7 +91,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         // Đặt trước nhánh "cùng người" để cả trường hợp Executor hiện tại vừa trở thành người thụ hưởng cũng bị chặn.
         if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
             throw new ExecutorManagementException(
-                    "This person is your beneficiary and cannot also be your Digital Executor.",
+                    "Người này là người thụ hưởng của bạn nên không thể đồng thời làm Digital Executor.",
                     HttpStatus.CONFLICT);
         }
 
@@ -111,13 +111,13 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .filter(a -> a.getExecutorUser().getId().equals(candidate.getId()))
                 .isPresent();
         if (holdsOtherPosition) {
-            throw new ExecutorManagementException("This person is already your " + otherType
-                    + " executor. The primary and backup executors must be different people.", HttpStatus.CONFLICT);
+            throw new ExecutorManagementException("Người này đã là Executor " + otherType + " của bạn."
+                    + " Executor chính và dự phòng phải là hai người khác nhau.", HttpStatus.CONFLICT);
         }
 
         if (occupied && !request.isConfirmReplace()) {
-            throw new ExecutorManagementException("The " + type + " executor position is already taken ("
-                    + current.getExecutorUser().getEmail() + "). Resend with confirmReplace=true to replace them.",
+            throw new ExecutorManagementException("Vị trí Executor " + type + " đã có người ("
+                    + current.getExecutorUser().getEmail() + "). Gửi lại với confirmReplace=true để thay thế.",
                     HttpStatus.CONFLICT);
         }
 
@@ -170,7 +170,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .findByOwnerIdAndExecutorType(ownerId, type)
                 .filter(a -> a.getStatus() != ExecutorStatus.REVOKED)
                 .orElseThrow(() -> new ExecutorManagementException(
-                        "There is no " + type + " executor to revoke.", HttpStatus.NOT_FOUND));
+                        "Không có Executor " + type + " để thu hồi.", HttpStatus.NOT_FOUND));
 
         User executor = assignment.getExecutorUser();
         // Không đọc executor.getRoles() trước dòng này (xem comment ở assignExecutor).
@@ -223,7 +223,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         Optional<DmsConfig> config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId);
         if (config.filter(c -> c.getStatus() == DmsStatus.TRIGGERED).isPresent()) {
             throw new ExecutorManagementException(
-                    "The Dead Man's Switch has started the handover process; the executor cannot be changed.",
+                    "Dead Man's Switch đã bắt đầu quy trình bàn giao, không thể thay đổi Executor.",
                     HttpStatus.CONFLICT);
         }
         return config;
@@ -258,7 +258,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
 
     private User loadOwner(UUID ownerId) {
         return userRepository.findById(ownerId)
-                .orElseThrow(() -> new ExecutorManagementException("Account not found.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new ExecutorManagementException("Không tìm thấy tài khoản.", HttpStatus.NOT_FOUND));
     }
 
     /**
@@ -284,8 +284,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         } catch (DataIntegrityViolationException e) {
             log.warn("FR-06: concurrent write on executor position {} of owner {}: {}",
                     type, assignment.getOwner().getId(), e.getMessage());
-            throw new ExecutorManagementException("The " + type
-                    + " executor position was just updated by another request. Please reload and try again.", HttpStatus.CONFLICT);
+            throw new ExecutorManagementException("Vị trí Executor " + type
+                    + " vừa được cập nhật bởi một yêu cầu khác. Vui lòng tải lại và thử lại.", HttpStatus.CONFLICT);
         }
     }
 
