@@ -179,19 +179,20 @@ class VaultServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Bắt lỗi phải là VaultException
-        Exception exception = assertThrows(VaultException.class, () -> {
+        // Bắt lỗi phải là VaultException (404 để chống enum vault ID)
+        VaultException exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 
-        // Nội dung lỗi phải chuẩn xác
-        assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
+        // Nội dung lỗi phải chuẩn xác (404)
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("Vault not found", exception.getMessage());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
         // và phải bao gồm vaultId để nhật ký có đủ context (N2)
         verify(auditLogService).log(
-                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditAction.VAULT_DELETE_DENIED),
                 eq(AuditResult.FAILURE),
                 eq(ownerId),
                 eq(mockOwner.getEmail()),

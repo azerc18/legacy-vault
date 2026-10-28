@@ -109,14 +109,14 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        // 2. Chỉ chủ sở hữu mới được xóa
+        // 2. Chỉ chủ sở hữu mới được xóa (chống lộ ID bằng 404)
         if (!vault.getOwner().getId().equals(ownerId)) {
             String callerEmail = userRepository.findById(ownerId)
                     .map(User::getEmail).orElse("unknown");
             auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
                     ownerId, callerEmail, vaultId, "Vault", vaultId.toString(),
                     "Unauthorized: You don't own this vault");
-            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         String ownerEmail = vault.getOwner().getEmail();
