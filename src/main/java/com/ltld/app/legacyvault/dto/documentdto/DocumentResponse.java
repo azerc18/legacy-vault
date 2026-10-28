@@ -15,4 +15,6 @@ public class DocumentResponse {
     private DocumentType documentType;
     private String fileName;
     private LocalDateTime uploadedAt;
+    /** true khi Vault ở trạng thái ARCHIVED_LOCKED — FE dùng để ẩn nút tải tài liệu. */
+    private boolean archived;
 }
