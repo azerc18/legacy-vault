@@ -45,6 +45,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -84,7 +85,7 @@ public class VaultServiceImpl implements VaultService {
 
         if (!hasPrimary) {
             if (request.getPrimaryExecutorEmail() == null || request.getPrimaryExecutorEmail().trim().isEmpty()) {
-                throw new VaultException("Vault đầu tiên cần chỉ định Executor chính.", HttpStatus.BAD_REQUEST);
+                throw new VaultException("Assign a primary executor before creating a vault.", HttpStatus.BAD_REQUEST);
             }
             AssignExecutorRequest assignReq = new AssignExecutorRequest();
             assignReq.setEmail(request.getPrimaryExecutorEmail().trim());
@@ -321,7 +322,7 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
-    // V8: Owner gỡ người thụ hưởng hoặc hủy lời mời
+    // V8 (FR-02): Owner gỡ người thụ hưởng hoặc hủy lời mời
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void removeBeneficiary(UUID ownerId, UUID vaultId) {
@@ -332,15 +333,23 @@ public class VaultServiceImpl implements VaultService {
 
         User owner = vault.getOwner();
         if (!owner.getId().equals(ownerId)) {
-            auditLogService.log(AuditAction.BENEFICIARY_ASSIGN_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
+            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
                     "Vault", vaultId.toString(), "not owner");
             throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         if (vault.getStatus() != VaultStatus.ACTIVE) {
-            auditLogService.log(AuditAction.BENEFICIARY_ASSIGN_DENIED, AuditResult.FAILURE, ownerId, owner.getEmail(), vaultId,
+            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, owner.getEmail(), vaultId,
                     "Vault", vaultId.toString(), "vault status " + vault.getStatus());
             throw new VaultException("A beneficiary can only be removed while the vault is ACTIVE", HttpStatus.CONFLICT);
+        }
+
+        // FR-02 (m1): chưa có người thụ hưởng → không đổi gì, không audit (idempotent)
+        String currentEmail = vault.getBeneficiary() != null
+                ? vault.getBeneficiary().getEmail()
+                : vault.getBeneficiaryEmail();
+        if (currentEmail == null) {
+            return;
         }
 
         vault.setBeneficiary(null);
@@ -355,12 +364,16 @@ public class VaultServiceImpl implements VaultService {
     @Override
     @Transactional(readOnly = true)
     public List<VaultResponse> getMyVaults(UUID ownerId) {
-        return vaultRepository.findByOwnerIdWithBeneficiary(ownerId)
-                .stream()
+        List<Vault> vaults = vaultRepository.findByOwnerIdWithBeneficiary(ownerId);
+
+        // FR-27 (m3): tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
+        Map<UUID, String> lockReasonMap = vaultModificationGuard.lockReasons(ownerId, vaults);
+
+        return vaults.stream()
                 .map(vault -> {
                     long docCount = legalDocumentRepository.countByVaultId(vault.getId());
                     long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
-                    Optional<String> lockReason = vaultModificationGuard.lockReason(vault);
+                    String lockReason = lockReasonMap.get(vault.getId());
                     String benEmail = vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail();
                     boolean pendingReg = vault.getBeneficiary() == null && vault.getBeneficiaryEmail() != null;
 
@@ -376,12 +389,13 @@ public class VaultServiceImpl implements VaultService {
                             .pendingRegistration(pendingReg)
                             .totalAssets(assetCount)
                             .totalDocuments(docCount)
-                            .modifiable(lockReason.isEmpty())
-                            .lockReason(lockReason.orElse(null))
+                            .modifiable(lockReason == null)
+                            .lockReason(lockReason)
                             .build();
                 })
                 .toList();
     }
+
 
     // FR-27 / V7: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu, trả thêm modifiable & lockReason)
     @Override

@@ -10,7 +10,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -47,27 +54,48 @@ public class VaultModificationGuard {
     }
 
     /**
+     * FR-27 (m3): tính lockReason theo lô cho tất cả Vault của một Owner —
+     * đọc DmsConfig 1 lần và batch query verification thay vì N+1.
+     * Chỉ dùng cho hiển thị (chỉ đọc); KHÔNG dùng để quyết định ghi.
+     * Vault không có trong map kết quả nghĩa là modifiable = true.
+     */
+    public Map<UUID, String> lockReasons(UUID ownerId, Collection<Vault> vaults) {
+        Map<UUID, String> result = new HashMap<>();
+        if (vaults.isEmpty()) return result;
+
+        // 1. Đọc DMS 1 lần cho toàn bộ Owner (C1: isHandoverStarted không khóa, an toàn trong readOnly tx)
+        boolean handoverStarted = dmsConfigService.isHandoverStarted(ownerId);
+
+        // 2. Batch query verification cho tất cả vault id
+        List<UUID> vaultIds = vaults.stream().map(Vault::getId).toList();
+        Set<UUID> openVerificationIds = new HashSet<>(
+                verificationRequestVaultRepository.findVaultIdsWithOpenRequest(
+                        vaultIds,
+                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED)));
+
+        for (Vault v : vaults) {
+            if (v.getStatus() != VaultStatus.ACTIVE) {
+                result.put(v.getId(), "This vault is no longer active.");
+            } else if (handoverStarted) {
+                result.put(v.getId(), "The handover process has started.");
+            } else if (openVerificationIds.contains(v.getId())) {
+                result.put(v.getId(), "A verification request is pending or approved.");
+            }
+            // Không có entry = modifiable
+        }
+        return result;
+    }
+
+    /**
      * V7: Kiểm tra lý do khóa không ném exception để trả về cho FE.
      * Dùng isHandoverStarted (chỉ đọc, không khóa) thay vì assertHandoverNotStarted
      * để tránh PESSIMISTIC_FORCE_INCREMENT bên trong @Transactional(readOnly=true)
      * gây UnexpectedRollbackException (HTTP 500) - C1.
+     * Cho một Vault đơn lẻ: delegate sang lockReasons để không trùng logic.
      */
-    public java.util.Optional<String> lockReason(Vault vault) {
-        if (vault.getStatus() != VaultStatus.ACTIVE) {
-            return java.util.Optional.of("Cannot modify vault that is not in active state");
-        }
-        if (dmsConfigService.isHandoverStarted(vault.getOwner().getId())) {
-            return java.util.Optional.of("Handover process has started");
-        }
-        boolean hasOpenVerification = !verificationRequestVaultRepository
-                .findVaultIdsWithOpenRequest(
-                        List.of(vault.getId()),
-                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED))
-                .isEmpty();
-        if (hasOpenVerification) {
-            return java.util.Optional.of("A verification request is pending or approved");
-        }
-        return java.util.Optional.empty();
+    public Optional<String> lockReason(Vault vault) {
+        Map<UUID, String> reasons = lockReasons(vault.getOwner().getId(), List.of(vault));
+        return Optional.ofNullable(reasons.get(vault.getId()));
     }
 
     public boolean isModifiable(Vault vault) {

@@ -121,7 +121,7 @@ class VaultModificationGuardTest {
         Optional<String> reason = guard.lockReason(vault);
 
         assertTrue(reason.isPresent());
-        assertEquals("Cannot modify vault that is not in active state", reason.get());
+        assertEquals("This vault is no longer active.", reason.get());
         verifyNoInteractions(dmsConfigService);
     }
 
@@ -133,7 +133,7 @@ class VaultModificationGuardTest {
         Optional<String> reason = guard.lockReason(vault);
 
         assertTrue(reason.isPresent());
-        assertEquals("Handover process has started", reason.get());
+        assertEquals("The handover process has started.", reason.get());
         // Phải gọi isHandoverStarted, KHÔNG được gọi assertHandoverNotStarted (C1)
         verify(dmsConfigService).isHandoverStarted(ownerId);
         verify(dmsConfigService, never()).assertHandoverNotStarted(any());
