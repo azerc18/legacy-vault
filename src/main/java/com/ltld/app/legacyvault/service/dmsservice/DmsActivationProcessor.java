@@ -171,7 +171,8 @@ public class DmsActivationProcessor {
         UUID ownerId = config.getOwner().getId();
 
         for (ExecutorAssignment assignment : executorAssignmentRepository.findAllByOwnerId(ownerId)) {
-            if (assignment.getStatus() == ExecutorStatus.ACTIVE) {
+            // B4: đã xác nhận (kể cả qua nộp hồ sơ) thì không gửi lại mail "vui lòng xác nhận".
+            if (assignment.getStatus() == ExecutorStatus.ACTIVE && assignment.getAcknowledgedAt() == null) {
                 retryFailedNotification(config, assignment, now);
             }
         }

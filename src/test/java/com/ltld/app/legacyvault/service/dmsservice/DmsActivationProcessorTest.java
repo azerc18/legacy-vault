@@ -486,6 +486,22 @@ class DmsActivationProcessorTest {
     }
 
     @Test
+    @DisplayName("B4: Executor đã xác nhận (vd. qua nộp hồ sơ) -> không gửi lại thông báo FAILED")
+    void escalate_doesNotRetryFailedNotificationAfterAcknowledge() {
+        config.setStatus(DmsStatus.TRIGGERED);
+        primary.setStatus(ExecutorStatus.ACTIVE);
+        primary.setAcknowledgedAt(now.minusHours(1));
+        Notification failed = activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED,
+                NotificationStatus.FAILED, null);
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(notificationRepository, never()).save(any());
+        assertThat(failed.getStatus()).isEqualTo(NotificationStatus.FAILED);
+    }
+
+    @Test
     @DisplayName("Gửi lại vẫn lỗi -> giữ FAILED, không leo thang")
     void escalate_keepsFailedWhenRetryFails() {
         config.setStatus(DmsStatus.TRIGGERED);
