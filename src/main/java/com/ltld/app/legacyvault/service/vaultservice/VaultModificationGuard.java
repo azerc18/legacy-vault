@@ -63,20 +63,32 @@ public class VaultModificationGuard {
         Map<UUID, String> result = new HashMap<>();
         if (vaults.isEmpty()) return result;
 
-        // 1. Đọc DMS 1 lần cho toàn bộ Owner (C1: isHandoverStarted không khóa, an toàn trong readOnly tx)
-        boolean handoverStarted = dmsConfigService.isHandoverStarted(ownerId);
-
-        // 2. Batch query verification cho tất cả vault id
-        List<UUID> vaultIds = vaults.stream().map(Vault::getId).toList();
-        Set<UUID> openVerificationIds = new HashSet<>(
-                verificationRequestVaultRepository.findVaultIdsWithOpenRequest(
-                        vaultIds,
-                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED)));
-
+        List<Vault> activeVaults = new java.util.ArrayList<>();
         for (Vault v : vaults) {
             if (v.getStatus() != VaultStatus.ACTIVE) {
                 result.put(v.getId(), "This vault is no longer active.");
-            } else if (handoverStarted) {
+            } else {
+                activeVaults.add(v);
+            }
+        }
+
+        if (activeVaults.isEmpty()) {
+            return result;
+        }
+
+        // 1. Đọc DMS 1 lần cho toàn bộ Owner (C1: isHandoverStarted không khóa, an toàn trong readOnly tx)
+        boolean handoverStarted = dmsConfigService.isHandoverStarted(ownerId);
+
+        // 2. Batch query verification cho tất cả active vault id
+        List<UUID> activeVaultIds = activeVaults.stream().map(Vault::getId).toList();
+        Set<UUID> openVerificationIds = handoverStarted
+                ? Set.of()
+                : new HashSet<>(verificationRequestVaultRepository.findVaultIdsWithOpenRequest(
+                        activeVaultIds,
+                        List.of(LegalVerificationStatus.PENDING, LegalVerificationStatus.APPROVED)));
+
+        for (Vault v : activeVaults) {
+            if (handoverStarted) {
                 result.put(v.getId(), "The handover process has started.");
             } else if (openVerificationIds.contains(v.getId())) {
                 result.put(v.getId(), "A verification request is pending or approved.");

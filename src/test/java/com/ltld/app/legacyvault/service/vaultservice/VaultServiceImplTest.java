@@ -152,7 +152,7 @@ class VaultServiceImplTest {
 
         VaultException ex = assertThrows(VaultException.class, () -> vaultService.createVault(ownerId, request));
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals("Vault đầu tiên cần chỉ định Executor chính.", ex.getMessage());
+        assertEquals("Assign a primary executor before creating a vault.", ex.getMessage());
         verify(vaultRepository, never()).save(any());
     }
 
@@ -721,6 +721,21 @@ class VaultServiceImplTest {
 
         assertVaultError(HttpStatus.NOT_FOUND, () -> vaultService.removeBeneficiary(otherId, vault.getId()));
         verify(vaultRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("removeBeneficiary (m1): Không có người thụ hưởng -> return sớm, không lưu hay audit (idempotent)")
+    void removeBeneficiary_NoBeneficiary_ReturnsEarlyIdempotently() {
+        Vault vault = activeVault();
+        vault.setBeneficiary(null);
+        vault.setBeneficiaryEmail(null);
+        UUID vId = vault.getId();
+        when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
+
+        vaultService.removeBeneficiary(ownerId, vId);
+
+        verify(vaultRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test

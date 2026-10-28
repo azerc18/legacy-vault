@@ -149,7 +149,7 @@ class VaultModificationGuardTest {
         Optional<String> reason = guard.lockReason(vault);
 
         assertTrue(reason.isPresent());
-        assertEquals("A verification request is pending or approved", reason.get());
+        assertEquals("A verification request is pending or approved.", reason.get());
         verify(dmsConfigService).isHandoverStarted(ownerId);
         verify(dmsConfigService, never()).assertHandoverNotStarted(any());
     }
