@@ -85,7 +85,7 @@ public class DocumentServiceImpl implements DocumentService {
             String attackerEmail = userRepository.findById(ownerId)
                     .map(User::getEmail).orElse("unknown");
             auditLogService.failure(AuditAction.DOCUMENT_UPLOADED, ownerId, attackerEmail, "Unauthorized: You don't own this vault");
-            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         // FR-04: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS triggered, hồ sơ xác minh mở)
@@ -130,6 +130,7 @@ public class DocumentServiceImpl implements DocumentService {
                         .documentType(doc.getDocumentType())
                         .fileName(doc.getFileName())
                         .uploadedAt(doc.getUploadedAt())
+                        .archived(vault.getStatus() == com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED)
                         .build())
                 .toList();
     }
@@ -145,6 +146,12 @@ public class DocumentServiceImpl implements DocumentService {
         if (!vault.getOwner().getId().equals(ownerId)) {
             throw new VaultException("Document not found", HttpStatus.NOT_FOUND);
         }
+
+        // V2: Vault đã bị xóa vật lý (scheduler đã xóa file) → trả 410 GONE thay vì để readFile() ném 500
+        if (vault.getStatus() == com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED) {
+            throw new VaultException("Nội dung két đã bị xóa theo chính sách lưu trữ.", HttpStatus.GONE);
+        }
+
         byte[] encryptedBytes = fileStorageService.readFile(doc.getFileUrlEncrypted());
         byte[] decryptedBytes = cryptoService.decryptBytes(encryptedBytes);
 

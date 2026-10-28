@@ -58,7 +58,7 @@ public class DocumentControllerTest {
                         .param("type", "WILL")
                         .with(csrf()) // Chống giả mạo CSRF
                         .principal(mockPrincipal))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Document uploaded and encrypted securely"));
     }
