@@ -53,7 +53,8 @@ public class VaultController {
                 .updatedAt(vault.getUpdatedAt())
                 .build();
                 
-        return ResponseEntity.ok(ApiResponse.success("Vault created successfully", response));
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.success("Vault created successfully", response));
     }
 
     // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy

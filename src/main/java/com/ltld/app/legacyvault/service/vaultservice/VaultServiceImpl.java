@@ -61,8 +61,11 @@ public class VaultServiceImpl implements VaultService {
     private final DmsConfigService dmsConfigService;
 
     @Override
-    @Transactional // Nếu có lỗi xảy ra ở bất kỳ dòng nào, DB sẽ undo lại toàn bộ (rollback)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Vault createVault(UUID ownerId, CreateVaultRequest request) throws Exception {
+        // FR-01: Chặn tạo két nếu quy trình bàn giao DMS đã bắt đầu
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+
         // 1. Tìm thông tin chủ sở hữu (Owner)
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new VaultException("Owner not found", HttpStatus.NOT_FOUND));
