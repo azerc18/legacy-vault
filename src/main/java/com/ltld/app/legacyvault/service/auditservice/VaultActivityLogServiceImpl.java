@@ -41,8 +41,8 @@ public class VaultActivityLogServiceImpl implements VaultActivityLogService {
         Instant from = startDate != null ? startDate : Instant.EPOCH;
         if (from.isAfter(to)) throw new VaultException("Start date must be before end date.", HttpStatus.BAD_REQUEST);
 
-        // 3. Truy vấn logs từ AuditLog (ẩn các thao tác nội bộ của Admin)
-        Page<AuditLog> logs = auditLogRepository.findVaultActivity(vaultId, AuditDescriptionBuilder.HIDDEN_ACTIONS, from, to, pageable);
+        // 3. Truy vấn logs từ AuditLog (ẩn các thao tác nội bộ của Admin theo Q42)
+        Page<AuditLog> logs = auditLogRepository.findVaultActivity(vaultId, AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS, from, to, pageable);
 
         // 4. Map sang Response & Masking Identity (dùng chung với nhật ký cấp Owner)
         return logs.map(log -> descriptionBuilder.toResponse(log, vault.getOwner().getId()));

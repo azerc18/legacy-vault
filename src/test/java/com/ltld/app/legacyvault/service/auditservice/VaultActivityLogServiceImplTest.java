@@ -33,6 +33,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -135,6 +136,14 @@ class VaultActivityLogServiceImplTest {
         Page<VaultActivityLogResponse> result = vaultActivityLogService.getVaultActivityLogs(
                 vaultId, ownerId, null, null, pageable);
 
+        verify(auditLogRepository).findVaultActivity(
+                eq(vaultId),
+                same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS),
+                any(),
+                any(),
+                eq(pageable)
+        );
+
         assertThat(result.getContent()).hasSize(4);
 
         // Owner: actorName = "Bạn", IP nguyên vẹn
@@ -188,6 +197,13 @@ class VaultActivityLogServiceImplTest {
         Page<VaultActivityLogResponse> result = vaultActivityLogService.getVaultActivityLogs(
                 vaultId, ownerId, from, to, pageable);
         assertThat(result).isNotNull();
+        verify(auditLogRepository).findVaultActivity(
+                eq(vaultId),
+                same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS),
+                eq(from),
+                eq(to),
+                eq(pageable)
+        );
     }
 
     // Trả về description của một log duy nhất do owner thực hiện
