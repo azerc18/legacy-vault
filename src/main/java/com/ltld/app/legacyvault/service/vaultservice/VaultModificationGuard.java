@@ -47,15 +47,16 @@ public class VaultModificationGuard {
     }
 
     /**
-     * V7: Kiểm tra lý do khóa không ném exception để trả về cho FE
+     * V7: Kiểm tra lý do khóa không ném exception để trả về cho FE.
+     * Dùng isHandoverStarted (chỉ đọc, không khóa) thay vì assertHandoverNotStarted
+     * để tránh PESSIMISTIC_FORCE_INCREMENT bên trong @Transactional(readOnly=true)
+     * gây UnexpectedRollbackException (HTTP 500) - C1.
      */
     public java.util.Optional<String> lockReason(Vault vault) {
         if (vault.getStatus() != VaultStatus.ACTIVE) {
             return java.util.Optional.of("Cannot modify vault that is not in active state");
         }
-        try {
-            dmsConfigService.assertHandoverNotStarted(vault.getOwner().getId());
-        } catch (Exception ex) {
+        if (dmsConfigService.isHandoverStarted(vault.getOwner().getId())) {
             return java.util.Optional.of("Handover process has started");
         }
         boolean hasOpenVerification = !verificationRequestVaultRepository
