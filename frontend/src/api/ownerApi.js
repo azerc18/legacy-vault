@@ -69,7 +69,7 @@ export const ownerApi = {
         form.append('file', file);
         return http.post('/documents/upload', form).then(unwrap);
     },
-    // -> [{ id, vaultId, documentType, fileName, uploadedAt }]
+    // -> [{ id, vaultId, documentType, fileName, uploadedAt, archived }]
     listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
     downloadDocument: (docId, fileName) => saveBlob(`/documents/${docId}/download`, fileName || 'document'),
     // 409 nếu tài liệu đang nằm trong hồ sơ xác minh

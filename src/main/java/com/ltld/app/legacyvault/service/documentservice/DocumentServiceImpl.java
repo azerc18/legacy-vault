@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DocumentType;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -147,9 +148,11 @@ public class DocumentServiceImpl implements DocumentService {
             throw new VaultException("Document not found", HttpStatus.NOT_FOUND);
         }
 
-        // V2: Vault đã bị xóa vật lý (scheduler đã xóa file) → trả 410 GONE thay vì để readFile() ném 500
-        if (vault.getStatus() == com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED) {
-            throw new VaultException("Nội dung két đã bị xóa theo chính sách lưu trữ.", HttpStatus.GONE);
+        // FR-04 / BR-04: Vault đã lưu trữ thì file tài liệu đã bị xóa khi lưu trữ (ClaimTimeoutScheduler),
+        // chỉ còn metadata -> 410 thay vì để readFile() ném lỗi thành 500. Kiểm SAU bước kiểm chủ sở hữu.
+        if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
+            throw new VaultException("This vault has been archived; its documents were deleted under the retention policy.",
+                    HttpStatus.GONE);
         }
 
         byte[] encryptedBytes = fileStorageService.readFile(doc.getFileUrlEncrypted());

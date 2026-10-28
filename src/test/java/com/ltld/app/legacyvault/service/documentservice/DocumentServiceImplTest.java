@@ -222,6 +222,42 @@ class DocumentServiceImplTest {
     }
 
     @Test
+    @DisplayName("getDocumentsByVault: Vault ARCHIVED_LOCKED trả về cờ archived = true, Vault ACTIVE trả về false")
+    void getDocumentsByVault_archivedVault_flagsArchived() {
+        Vault archivedVault = Vault.builder()
+                .id(UUID.randomUUID())
+                .name("Archived Vault")
+                .owner(mockOwner)
+                .status(VaultStatus.ARCHIVED_LOCKED)
+                .build();
+
+        LegalDocument doc = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(archivedVault)
+                .fileName("doc_archived.pdf")
+                .fileUrlEncrypted("uploads/enc_archived.bin")
+                .documentType(DocumentType.WILL)
+                .uploadedAt(LocalDateTime.now())
+                .build();
+
+        when(vaultRepository.findById(archivedVault.getId())).thenReturn(Optional.of(archivedVault));
+        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(archivedVault.getId()))
+                .thenReturn(List.of(doc));
+
+        List<DocumentResponse> result = documentService.getDocumentsByVault(archivedVault.getId(), ownerId);
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isArchived()).isTrue();
+
+        // Kiểm tra đối với Vault ACTIVE
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId))
+                .thenReturn(List.of(doc));
+        List<DocumentResponse> activeResult = documentService.getDocumentsByVault(vaultId, ownerId);
+        assertThat(activeResult).hasSize(1);
+        assertThat(activeResult.get(0).isArchived()).isFalse();
+    }
+
+    @Test
     @DisplayName("getDocumentsByVault: Người khác xem trộm tài liệu -> Chặn 404 Not Found (m1)")
     void getDocumentsByVault_Unauthorized_ThrowsNotFound() {
         UUID attackerId = UUID.randomUUID();
@@ -273,6 +309,35 @@ class DocumentServiceImplTest {
                 .vault(mockVault)
                 .fileName("dichuc_2026.pdf")
                 .fileUrlEncrypted("uploads/encrypted_dichuc.bin")
+                .build();
+
+        when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));
+
+        assertThatThrownBy(() -> documentService.downloadDocumentForOwner(docId, attackerId))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.NOT_FOUND);
+
+        verifyNoInteractions(fileStorageService);
+        verifyNoInteractions(cryptoService);
+    }
+
+    @Test
+    @DisplayName("downloadDocumentForOwner: Người không phải chủ + Vault ARCHIVED_LOCKED -> 404 Not Found (kiểm chủ sở hữu trước)")
+    void downloadDocumentForOwner_notOwner_archived_returns404() {
+        UUID docId = UUID.randomUUID();
+        UUID attackerId = UUID.randomUUID();
+        Vault archivedVault = Vault.builder()
+                .id(UUID.randomUUID())
+                .name("Archived Vault")
+                .owner(mockOwner)
+                .status(VaultStatus.ARCHIVED_LOCKED)
+                .build();
+
+        LegalDocument doc = LegalDocument.builder()
+                .id(docId)
+                .vault(archivedVault)
+                .fileName("dichuc.pdf")
+                .fileUrlEncrypted("uploads/enc.bin")
                 .build();
 
         when(legalDocumentRepository.findById(docId)).thenReturn(Optional.of(doc));

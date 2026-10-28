@@ -85,4 +85,22 @@ public class DocumentControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("File exceeds the allowed size (10MB)."));
     }
+
+    @Test
+    void downloadDocument_ArchivedVault_Returns410() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        Principal mockPrincipal = () -> ownerId.toString();
+
+        when(documentService.downloadDocumentForOwner(eq(documentId), eq(ownerId)))
+                .thenThrow(new com.ltld.app.legacyvault.exception.VaultException(
+                        "This vault has been archived; its documents were deleted under the retention policy.",
+                        org.springframework.http.HttpStatus.GONE));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/documents/{documentId}/download", documentId)
+                        .principal(mockPrincipal))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("This vault has been archived; its documents were deleted under the retention policy."));
+    }
 }
