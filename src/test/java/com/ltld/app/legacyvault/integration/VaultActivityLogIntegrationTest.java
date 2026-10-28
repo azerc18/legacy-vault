@@ -48,7 +48,7 @@ class VaultActivityLogIntegrationTest {
 
     @Container
     @ServiceConnection
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4");
+    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
 
     @MockitoBean
     private EmailSender emailSender;
