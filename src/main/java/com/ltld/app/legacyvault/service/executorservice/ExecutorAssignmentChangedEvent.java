@@ -15,21 +15,29 @@ public record ExecutorAssignmentChangedEvent(List<ExecutorMail> mails) {
     }
 
     public enum MailType {
-        ASSIGNED, REVOKED
+        ASSIGNED, REVOKED,
+        // FR-07 / BR-03: hệ thống tự thu hồi Primary vì không xác nhận trong hạn, không phải Owner thu hồi
+        REVOKED_TIMEOUT
     }
 
     /** Một mail cho một Executor; chỉ chứa thông tin của Owner và vị trí của chính người nhận. */
     public record ExecutorMail(MailType type, String recipientEmail, String ownerName, String ownerEmail,
-                               ExecutorType executorType) {
+                               ExecutorType executorType, int waitDays) {
 
         public static ExecutorMail assigned(String recipientEmail, String ownerName, String ownerEmail,
                                             ExecutorType executorType) {
-            return new ExecutorMail(MailType.ASSIGNED, recipientEmail, ownerName, ownerEmail, executorType);
+            return new ExecutorMail(MailType.ASSIGNED, recipientEmail, ownerName, ownerEmail, executorType, 0);
         }
 
         public static ExecutorMail revoked(String recipientEmail, String ownerName, String ownerEmail,
                                            ExecutorType executorType) {
-            return new ExecutorMail(MailType.REVOKED, recipientEmail, ownerName, ownerEmail, executorType);
+            return new ExecutorMail(MailType.REVOKED, recipientEmail, ownerName, ownerEmail, executorType, 0);
+        }
+
+        public static ExecutorMail revokedByTimeout(String recipientEmail, String ownerName, String ownerEmail,
+                                                    int waitDays) {
+            return new ExecutorMail(MailType.REVOKED_TIMEOUT, recipientEmail, ownerName, ownerEmail,
+                    ExecutorType.PRIMARY, waitDays);
         }
     }
 }

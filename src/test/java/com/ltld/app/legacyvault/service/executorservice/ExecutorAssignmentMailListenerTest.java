@@ -67,6 +67,16 @@ class ExecutorAssignmentMailListenerTest {
     }
 
     @Test
+    @DisplayName("FR-07 / BR-03: REVOKED_TIMEOUT gọi sendExecutorTimeoutRevokedNotice, không dùng mẫu Owner thu hồi")
+    void revokedTimeout_usesTimeoutNotice() {
+        listener.on(new ExecutorAssignmentChangedEvent(List.of(
+                ExecutorMail.revokedByTimeout("old@example.test", "Owner A", "owner@example.test", 14))));
+
+        verify(emailSender).sendExecutorTimeoutRevokedNotice("old@example.test", "Owner A", "owner@example.test", 14);
+        verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Event rỗng: không gửi gì")
     void emptyEvent_sendsNothing() {
         listener.on(new ExecutorAssignmentChangedEvent(List.of()));
