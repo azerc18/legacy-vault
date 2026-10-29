@@ -442,7 +442,7 @@ class DmsActivationProcessorTest {
     }
 
     @Test
-    @DisplayName("B3: leo thang -> Primary bị gỡ role EXECUTOR và nhận mail REVOKED")
+    @DisplayName("FR-07 / BR-03: leo thang -> khóa User, gỡ role EXECUTOR của Primary, mail REVOKED_TIMEOUT")
     void escalate_revokesPrimaryRoleAndMailsPrimary() {
         primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
         primary.getExecutorUser().getRoles().add(executorRole);
@@ -450,17 +450,22 @@ class DmsActivationProcessorTest {
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
         assertThat(primary.getExecutorUser().getRoles()).doesNotContain(executorRole);
+        // Khóa User phải đứng trước câu kiểm tra "còn assignment nào khác không" (cùng điều kiện với FR-06)
+        InOrder lockThenCheck = inOrder(userRepository, executorAssignmentRepository);
+        lockThenCheck.verify(userRepository).findByIdForUpdate(primaryUserId);
+        lockThenCheck.verify(executorAssignmentRepository).existsByExecutorUserIdAndStatusNotAndIdNot(
+                primaryUserId, ExecutorStatus.REVOKED, primary.getId());
         ArgumentCaptor<ExecutorAssignmentChangedEvent> captor = ArgumentCaptor.forClass(ExecutorAssignmentChangedEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().mails()).singleElement().satisfies(mail -> {
-            assertThat(mail.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REVOKED);
+            assertThat(mail.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REVOKED_TIMEOUT);
             assertThat(mail.recipientEmail()).isEqualTo("primary@example.test");
-            assertThat(mail.executorType()).isEqualTo(ExecutorType.PRIMARY);
+            assertThat(mail.waitDays()).isEqualTo(config.getBackupActivationWaitDays());
         });
     }
 
     @Test
-    @DisplayName("B3: Primary còn làm Executor cho Owner khác -> giữ role EXECUTOR")
+    @DisplayName("FR-07 / BR-03: Primary còn làm Executor cho Owner khác -> giữ role EXECUTOR")
     void escalate_keepsRoleWhenPrimaryStillAssignedElsewhere() {
         primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
         primary.getExecutorUser().getRoles().add(executorRole);
@@ -473,7 +478,7 @@ class DmsActivationProcessorTest {
     }
 
     @Test
-    @DisplayName("B3: chưa leo thang -> không phát mail REVOKED")
+    @DisplayName("FR-07 / BR-03: chưa leo thang -> không phát mail thu hồi")
     void escalate_noEscalationPublishesNothing() {
         primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(13));
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);

@@ -125,7 +125,7 @@ class ExecutorAccessGuardTest {
     }
 
     @Test
-    @DisplayName("B3: caller's REVOKED assignment -> 403 with a revoked-specific message")
+    @DisplayName("FR-07 / BR-03: caller's REVOKED assignment -> 403 with a revoked-specific message")
     void revokedAssignmentOfCaller_throwsNotActive() {
         when(executorAssignmentRepository.findById(assignmentId))
                 .thenReturn(Optional.of(assignment(ExecutorStatus.REVOKED)));

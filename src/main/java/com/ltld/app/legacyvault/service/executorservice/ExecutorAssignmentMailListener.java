@@ -34,6 +34,8 @@ public class ExecutorAssignmentMailListener {
                             mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.executorType());
                     case REVOKED -> emailSender.sendExecutorRevokedNotice(
                             mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.executorType());
+                    case REVOKED_TIMEOUT -> emailSender.sendExecutorTimeoutRevokedNotice(
+                            mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.waitDays());
                 }
             } catch (RuntimeException e) {
                 log.warn("FR-06: sending {} notice for executor position {} failed: {}",

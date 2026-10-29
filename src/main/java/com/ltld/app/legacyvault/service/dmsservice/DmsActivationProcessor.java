@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -165,8 +166,11 @@ public class DmsActivationProcessor {
     /**
      * Ngoại lệ 3a của FR-07: Primary không xác nhận sau N ngày (mặc định 14, BR-03)
      * -> thu hồi hoàn toàn Primary, kích hoạt Backup. Đồng thời gửi lại thông báo đã FAILED.
+     *
+     * <p>READ_COMMITTED (như FR-06): sau khi khóa User, câu kiểm tra của revokeIfUnused phải thấy assignment
+     * mà Owner khác vừa commit, nếu không sẽ gỡ nhầm role của người vẫn đang là Executor hợp lệ.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void escalateIfPrimaryUnresponsive(UUID configId, LocalDateTime now) {
         DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
         if (config == null || config.getStatus() != DmsStatus.TRIGGERED) {
@@ -210,7 +214,9 @@ public class DmsActivationProcessor {
         primary.setStatus(ExecutorStatus.REVOKED);
         primary.setRevokedAt(now);
         executorAssignmentRepository.save(primary);
-        // B3: gỡ role EXECUTOR nếu Primary không còn làm Executor cho Owner nào khác.
+        // FR-07 / BR-03: khóa User trước khi quyết định gỡ role (cùng điều kiện với FR-06), rồi gỡ role
+        // EXECUTOR nếu Primary không còn làm Executor cho Owner nào khác.
+        userRepository.findByIdForUpdate(primary.getExecutorUser().getId());
         executorRoleManager.revokeIfUnused(primary.getExecutorUser(), primary.getId());
         markActive(backup, now);
 
@@ -219,8 +225,9 @@ public class DmsActivationProcessor {
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
         notifyActivated(config, backup, now);
         User owner = config.getOwner();
-        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(ExecutorMail.revoked(
-                primary.getExecutorUser().getEmail(), owner.getFullName(), owner.getEmail(), ExecutorType.PRIMARY))));
+        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(ExecutorMail.revokedByTimeout(
+                primary.getExecutorUser().getEmail(), owner.getFullName(), owner.getEmail(),
+                config.getBackupActivationWaitDays()))));
     }
 
     /**
