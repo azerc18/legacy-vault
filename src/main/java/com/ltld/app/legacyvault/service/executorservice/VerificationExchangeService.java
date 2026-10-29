@@ -14,7 +14,10 @@ public interface VerificationExchangeService {
     VerificationMessageResponse send(UUID assignmentId, UUID requestId, String executorLogin,
                                      MultipartFile file, SendVerificationMessageRequest request);
 
-    /** B6: phân trang, mới nhất trước; đồng thời đánh dấu Executor đã đọc tin của Verifier. */
+    /**
+     * FR-11: phân trang, mới nhất trước. Dù là GET, trang 0 có GHI DB: đánh dấu Executor đã đọc tới tin mới nhất
+     * vừa trả về. Lệnh UPDATE có thể chờ ngắn khi Verifier đang giữ khóa hồ sơ (approve/reject/sign).
+     */
     Page<VerificationMessageResponse> history(UUID assignmentId, UUID requestId, String executorLogin,
                                               int page, int size);
 

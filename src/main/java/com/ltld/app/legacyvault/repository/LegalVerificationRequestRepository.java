@@ -69,12 +69,14 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Query("SELECT r FROM LegalVerificationRequest r WHERE r.id = :id")
     Optional<LegalVerificationRequest> findByIdForUpdate(@Param("id") UUID id);
 
-    // B6: hồ sơ xác minh Executor đã gửi cho một Owner, phân trang
+    // FR-11: hồ sơ xác minh Executor đã gửi cho một Owner, phân trang
     Page<LegalVerificationRequest> findByExecutorIdAndOwnerId(UUID executorId, UUID ownerId, Pageable pageable);
 
-    // B6: đánh dấu Executor đã đọc tin nhắn; bulk UPDATE không tăng version nên không xung đột với Verifier
+    // FR-11: đánh dấu Executor đã đọc tin nhắn; bulk UPDATE không tăng version nên không xung đột với Verifier.
+    // Mốc chỉ tiến lên, không lùi (hai lần mở song song trả về thứ tự commit khác nhau).
     @Modifying
-    @Query("UPDATE LegalVerificationRequest r SET r.executorLastReadAt = :readAt WHERE r.id = :id")
+    @Query("UPDATE LegalVerificationRequest r SET r.executorLastReadAt = :readAt "
+            + "WHERE r.id = :id AND (r.executorLastReadAt IS NULL OR r.executorLastReadAt < :readAt)")
     int markExecutorRead(@Param("id") UUID id, @Param("readAt") LocalDateTime readAt);
 
     // B8: mọi hồ sơ của một Executor (gồm nhiều Owner), mới nhất trước

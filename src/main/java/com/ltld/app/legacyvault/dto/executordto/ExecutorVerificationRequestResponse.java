@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-/** B6: một hồ sơ xác minh Executor đã gửi, kể cả hồ sơ cũ đã bị từ chối. */
+/** FR-11: một hồ sơ xác minh Executor đã gửi, kể cả hồ sơ cũ đã bị từ chối. */
 @Getter
 @Builder
 public class ExecutorVerificationRequestResponse {

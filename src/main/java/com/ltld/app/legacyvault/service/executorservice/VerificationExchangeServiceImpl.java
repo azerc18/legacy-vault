@@ -133,11 +133,13 @@ public class VerificationExchangeServiceImpl implements VerificationExchangeServ
 
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
                 Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        Page<VerificationMessageResponse> result = verificationExchangeMessageRepository
-                .findHistoryPage(requestId, pageable)
-                .map(message -> toResponse(message, message.getSender()));
-        legalVerificationRequestRepository.markExecutorRead(requestId, LocalDateTime.now());
-        return result;
+        Page<VerificationExchangeMessage> messages = verificationExchangeMessageRepository.findHistoryPage(requestId, pageable);
+        // FR-11: chỉ đánh dấu đã đọc tới tin mới nhất Executor thực sự nhận được (trang 0 = mới nhất), không dùng now():
+        // tin của Verifier tạo/commit sau lần truy vấn vẫn được tính là chưa đọc.
+        if (pageable.getPageNumber() == 0 && !messages.isEmpty()) {
+            legalVerificationRequestRepository.markExecutorRead(requestId, messages.getContent().get(0).getCreatedAt());
+        }
+        return messages.map(message -> toResponse(message, message.getSender()));
     }
 
     @Override
