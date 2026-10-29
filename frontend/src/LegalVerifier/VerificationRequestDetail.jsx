@@ -173,7 +173,7 @@ export default function VerificationRequestDetail() {
             const res = await getDocumentBlob(req.id);
             if (tab) {
                 showBlobInTab(tab, res.data);
-                load(); // FR-13: BE vừa ghi nhận đã xem -> mở khóa bước Check / Reject
+                load(); // FR-13: BE vừa ghi nhận đã xem -> mở khóa Approve
             } else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
         } catch (e) {
             if (tab) tab.close();
@@ -204,7 +204,7 @@ export default function VerificationRequestDetail() {
     }
 
     const dialog = confirm ? CONFIRM_TEXT[confirm] : null;
-    // FR-13: bắt buộc View → Check (hợp lệ) → Approve; Reject chỉ cần đã View
+    // FR-13: bắt buộc Check (hợp lệ) → View → Approve; Reject chỉ cần đã Check
     const isPending = req.status === 'PENDING';
     const canApprove = isPending && req.documentViewed && req.documentChecked && req.documentValid === true;
     const checkResult = docCheck ?? (req.documentChecked
@@ -249,8 +249,8 @@ export default function VerificationRequestDetail() {
 
             <button
                 onClick={askReject}
-                disabled={busy || (isPending && !req.documentViewed)}
-                title={isPending && !req.documentViewed ? 'View the document first' : undefined}
+                disabled={busy || (isPending && !req.documentChecked)}
+                title={isPending && !req.documentChecked ? 'Check the document first' : undefined}
                 className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
             >
                 Reject request
@@ -319,23 +319,23 @@ export default function VerificationRequestDetail() {
                                 </p>
                                 {isPending && (
                                     <div className="flex flex-wrap gap-3">
-                                        {/* Bước 1: xem tài liệu thật (BE ghi nhận), sau đó mới Check / Reject / Approve */}
-                                        <button
-                                            onClick={handleViewDocument}
-                                            disabled={busy || viewing}
-                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
-                                        >
-                                            <span className="material-symbols-outlined text-[20px]">visibility</span>
-                                            {viewing ? 'Opening...' : 'View document'}
-                                        </button>
+                                        {/* Bước 1: Check (sàng lọc tự động). Bước 2: View (xem tài liệu thật, BE ghi nhận) */}
                                         <button
                                             onClick={handleCheckDocument}
-                                            disabled={busy || !req.documentViewed}
-                                            title={req.documentViewed ? undefined : 'View the document first'}
+                                            disabled={busy}
                                             className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
                                         >
                                             <span className="material-symbols-outlined text-[20px]">fact_check</span>
                                             {checking ? 'Checking...' : 'Check document'}
+                                        </button>
+                                        <button
+                                            onClick={handleViewDocument}
+                                            disabled={busy || viewing || !req.documentChecked}
+                                            title={req.documentChecked ? undefined : 'Check the document first'}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                            {viewing ? 'Opening...' : 'View document'}
                                         </button>
                                     </div>
                                 )}
@@ -362,8 +362,8 @@ export default function VerificationRequestDetail() {
                             <div className="mt-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant/40">
                                 <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold">
                                     {[
-                                        { n: 1, label: 'View', done: !!req.documentViewed },
-                                        { n: 2, label: 'Check', done: !!req.documentChecked && req.documentValid !== false },
+                                        { n: 1, label: 'Check', done: !!req.documentChecked && req.documentValid !== false },
+                                        { n: 2, label: 'View', done: !!req.documentViewed },
                                         { n: 3, label: 'Approve', done: false },
                                     ].map((st, i) => (
                                         <React.Fragment key={st.n}>
@@ -379,7 +379,7 @@ export default function VerificationRequestDetail() {
                                         </React.Fragment>
                                     ))}
                                 </ol>
-                                <p className="mt-2 text-xs text-on-surface-variant">Rejecting only needs step 1 (View).</p>
+                                <p className="mt-2 text-xs text-on-surface-variant">Rejecting only needs step 1 (Check).</p>
                             </div>
                         )}
                     </section>

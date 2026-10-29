@@ -119,24 +119,25 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         return dto;
     }
 
-    // UC13 + FR-13: kiểm tra tài liệu. Phải là hồ sơ PENDING và chính verifier này đã View.
-    // Kiểm tra theo nội dung thật (magic bytes), không dựa vào đuôi tên file.
+    // UC13 + FR-13: Check là bước ĐẦU (sàng lọc tự động, chưa cần View). Hồ sơ phải PENDING.
+    // Kiểm tra theo nội dung thật (magic bytes), không dựa vào đuôi tên file. Check lại được nhiều lần.
     @Override
     @Transactional
     public DocumentVerificationResponseDto verifyDocument(UUID requestId, UUID verifierId) {
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         assertPending(request);
-        VerificationReviewProgress progress = progressOf(requestId, verifierId);
-        if (progress == null || progress.getViewedAt() == null) {
-            throw new VerificationStepRequiredException("Please view the document before checking it.");
-        }
 
         byte[] plain = readDecryptedDocument(request, requestId);
         boolean valid = !UNKNOWN_CONTENT_TYPE.equals(UploadedDocumentValidator.detectContentType(plain));
 
-        progress.setCheckedAt(LocalDateTime.now());
-        progress.setDocumentValid(valid);
-        progressRepository.save(progress);
+        VerificationReviewProgress progress = progressOf(requestId, verifierId);
+        if (progress == null) {
+            recordChecked(requestId, verifierId, valid);
+        } else {
+            progress.setCheckedAt(LocalDateTime.now());
+            progress.setDocumentValid(valid);
+            progressRepository.save(progress);
+        }
 
         return DocumentVerificationResponseDto.builder()
                 .requestId(requestId)
@@ -164,6 +165,15 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         // Xung đột lợi ích -> 404; đã xử lý -> chỉ verifier được giao (m2: dùng chung guard)
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
 
+        // FR-13: hồ sơ PENDING phải Check xong (hợp lệ hay không) thì verifier mới được View
+        VerificationReviewProgress progress = null;
+        if (request.getStatus() == LegalVerificationStatus.PENDING) {
+            progress = progressOf(requestId, verifierId);
+            if (progress == null || progress.getCheckedAt() == null) {
+                throw new VerificationStepRequiredException("Please check the document before viewing it.");
+            }
+        }
+
         String email = emailOf(verifierId);
         byte[] plain;
         try {
@@ -178,8 +188,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         }
 
         // FR-13: ghi nhận verifier đã xem (chỉ hồ sơ PENDING), không đụng tiến độ của verifier khác
-        if (request.getStatus() == LegalVerificationStatus.PENDING) {
-            recordViewed(requestId, verifierId);
+        if (progress != null && progress.getViewedAt() == null) {
+            progress.setViewedAt(LocalDateTime.now());
+            progressRepository.save(progress);
         }
 
         String contentType = UploadedDocumentValidator.detectContentType(plain);
@@ -209,7 +220,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestForUpdateOrThrow(requestId);
         assertPending(request);
         assertNoConflictOfInterest(request, verifierId);
-        assertViewedCheckedAndValid(request, verifierId); // FR-13: View → Check (hợp lệ) → Approve
+        assertCheckedValidAndViewed(request, verifierId); // FR-13: Check (hợp lệ) → View → Approve
         assertHandoverStillValid(request); // FR-14: DMS còn TRIGGERED và Executor còn ACTIVE mới được duyệt
 
         User verifier = userRepository.getReferenceById(verifierId); // M5: dùng getReferenceById
@@ -235,11 +246,11 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestForUpdateOrThrow(requestId);
         assertPendingOrApprovedUnsigned(request, verifierId);
         assertNoConflictOfInterest(request, verifierId);
-        // FR-13: từ chối hồ sơ PENDING thì cũng phải đã xem tài liệu (APPROVED do mình duyệt thì đã xem rồi)
+        // FR-13: từ chối hồ sơ PENDING thì phải đã Check (hợp lệ hay không đều được; không bắt buộc View)
         if (request.getStatus() == LegalVerificationStatus.PENDING) {
             VerificationReviewProgress progress = progressOf(requestId, verifierId);
-            if (progress == null || progress.getViewedAt() == null) {
-                throw new VerificationStepRequiredException("Please view the document before rejecting.");
+            if (progress == null || progress.getCheckedAt() == null) {
+                throw new VerificationStepRequiredException("Please check the document before rejecting.");
             }
         }
         RejectionReason reasonCode = dto.getReason();
@@ -494,17 +505,17 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                         "Request not found: " + requestId));
     }
 
-    // FR-13: chính verifier này phải đã View và Check, và kết quả Check là hợp lệ
-    private void assertViewedCheckedAndValid(LegalVerificationRequest request, UUID verifierId) {
+    // FR-13: chính verifier này phải đã Check (kết quả hợp lệ) rồi mới View
+    private void assertCheckedValidAndViewed(LegalVerificationRequest request, UUID verifierId) {
         VerificationReviewProgress progress = progressOf(request.getId(), verifierId);
-        if (progress == null || progress.getViewedAt() == null) {
-            throw new VerificationStepRequiredException("Please view the document before approving.");
-        }
-        if (progress.getCheckedAt() == null) {
+        if (progress == null || progress.getCheckedAt() == null) {
             throw new VerificationStepRequiredException("Please check the document before approving.");
         }
         if (!Boolean.TRUE.equals(progress.getDocumentValid())) {
             throw new VerificationStepRequiredException("The document is invalid and cannot be approved.");
+        }
+        if (progress.getViewedAt() == null) {
+            throw new VerificationStepRequiredException("Please view the document before approving.");
         }
     }
 
@@ -513,15 +524,13 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         return progressRepository.findByRequestIdAndVerifierId(requestId, verifierId).orElse(null);
     }
 
-    // FR-13: tạo dòng "đã xem" nếu chưa có. Hai request song song cùng tạo thì bên thua (unique) coi như đã xem.
-    private void recordViewed(UUID requestId, UUID verifierId) {
-        if (progressOf(requestId, verifierId) != null) {
-            return;
-        }
+    // FR-13: tạo dòng tiến độ khi Check lần đầu. Hai request song song cùng tạo thì bên thua (unique) bỏ qua,
+    // vì cùng một tệp nên kết quả Check giống nhau.
+    private void recordChecked(UUID requestId, UUID verifierId, boolean valid) {
         try {
-            progressRecorder.recordViewed(requestId, verifierId);
+            progressRecorder.recordChecked(requestId, verifierId, valid);
         } catch (DataIntegrityViolationException e) {
-            log.debug("View progress of request {} already recorded by a parallel call", requestId);
+            log.debug("Check progress of request {} already recorded by a parallel call", requestId);
         }
     }
 
