@@ -109,12 +109,14 @@ export default function ExecutorCase() {
                         {data && <VaultList vaults={data.vaults} progress={progress} />}
 
                         {data && (
-                            <SubmitVerification
-                                assignmentId={assignmentId}
-                                vaults={data.vaults}
-                                progress={progress}
-                                onSubmitted={load}
-                            />
+                            <div id="submit-verification">
+                                <SubmitVerification
+                                    assignmentId={assignmentId}
+                                    vaults={data.vaults}
+                                    progress={progress}
+                                    onSubmitted={load}
+                                />
+                            </div>
                         )}
 
                         <ProgressSection progress={progress} />
@@ -303,6 +305,7 @@ function MessagesSection({ assignmentId, progress }) {
     useEffect(() => { loadMessages(); }, [loadMessages]);
 
     if (requests.length === 0) return null;
+    const selectedRequest = requests.find((r) => r.requestId === requestId);
 
     const send = async (e) => {
         e.preventDefault();
@@ -348,6 +351,16 @@ function MessagesSection({ assignmentId, progress }) {
                     );
                 })}
             </div>
+            {/* B1: hồ sơ REJECTED đã đóng (backend trả 409 khi nhắn), nên mời nộp hồ sơ mới thay cho ô nhắn tin */}
+            {selectedRequest?.handoverStatus === 'REJECTED' ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-surface-container-low">
+                    <p className="text-sm text-on-surface-variant">This request was rejected and is closed for messages.</p>
+                    <button type="button" className={btnPrimary}
+                        onClick={() => document.getElementById('submit-verification')?.scrollIntoView({ behavior: 'smooth' })}>
+                        <Icon name="upload_file" className="text-[18px]" /> Submit a new request
+                    </button>
+                </div>
+            ) : (
             <form onSubmit={send} className="space-y-3">
                 <textarea rows={2} maxLength={2000} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Write a message..."
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
@@ -359,6 +372,7 @@ function MessagesSection({ assignmentId, progress }) {
                     </button>
                 </div>
             </form>
+            )}
         </Card>
     );
 }
