@@ -7,7 +7,16 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-/** B7: một thông báo trong app của người đang đăng nhập; referenceType/referenceId để FE mở đúng màn hình. */
+/**
+ * Một thông báo trong app của người đang đăng nhập; FE dựa vào referenceType (không dựa vào type) để mở màn hình:
+ * <ul>
+ *   <li>{@code "Vault"}: referenceId = id Vault → trang Vault của Beneficiary (FR-16);</li>
+ *   <li>{@code "LegalVerificationRequest"}: referenceId = id hồ sơ xác minh → trang hồ sơ của Executor
+ *       (FR-11 / FR-12 / FR-14). Trang Executor điều hướng theo assignmentId, nên FE tra hồ sơ trong
+ *       danh sách hồ sơ của từng assignment.</li>
+ * </ul>
+ * Cùng type VAULT_UNLOCKED có thể gửi cho cả hai vai trò, phân biệt bằng referenceType.
+ */
 @Getter
 @Builder
 public class NotificationResponse {

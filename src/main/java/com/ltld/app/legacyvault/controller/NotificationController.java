@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.security.Principal;
 import java.util.UUID;
 
-/** B7: thông báo trong app của người đang đăng nhập (mọi vai trò; chỉ cần đăng nhập, lọc theo người nhận). */
+/** FR-11 / FR-12 / FR-14 / FR-16: thông báo trong app của người đang đăng nhập (mọi vai trò; chỉ cần đăng nhập, lọc theo người nhận). */
 @RestController
 @RequestMapping("/api/notifications")
 @RequiredArgsConstructor

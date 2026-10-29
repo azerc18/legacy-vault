@@ -5,7 +5,7 @@ import org.springframework.data.domain.Page;
 
 import java.util.UUID;
 
-/** B7: thông báo trong app (channel IN_APP) của chính người đang đăng nhập, dùng chung cho mọi vai trò. */
+/** FR-11 / FR-12 / FR-14 / FR-16: thông báo trong app (channel IN_APP) của chính người đang đăng nhập, dùng chung cho mọi vai trò. */
 public interface InAppNotificationService {
 
     Page<NotificationResponse> listMine(UUID userId, int page, int size);

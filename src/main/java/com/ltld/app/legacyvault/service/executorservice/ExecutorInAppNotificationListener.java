@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * B7: lưu thông báo trong app (IN_APP) cho Executor khi Vault mở khóa, Verifier trả lời hoặc hồ sơ được quyết định.
+ * FR-11 / FR-12 / FR-14: lưu thông báo trong app (IN_APP) cho Executor khi Vault mở khóa, Verifier trả lời hoặc hồ sơ được quyết định.
  *
  * <p>Tách khỏi các listener gửi mail: mail lỗi thì bản ghi trong app vẫn còn, Executor vẫn thấy trên giao diện.
  * AFTER_COMMIT + @Async như các listener khác; ghi trong transaction REQUIRES_NEW riêng, lỗi chỉ log warn.
@@ -86,7 +86,7 @@ public class ExecutorInAppNotificationListener {
             writeTx.executeWithoutResult(status -> {
                 LegalVerificationRequest request = requestRepository.findById(requestId).orElse(null);
                 if (request == null) {
-                    log.warn("B7: verification request {} not found, skipping {} notification", requestId, type);
+                    log.warn("FR-12/FR-14 in-app: verification request {} not found, skipping {} notification", requestId, type);
                     return;
                 }
                 String owner = ownerLabel(request.getOwner());
@@ -102,7 +102,7 @@ public class ExecutorInAppNotificationListener {
                         .build());
             });
         } catch (RuntimeException e) {
-            log.warn("B7: saving {} notification for request {} failed: {}", type, requestId, e.getMessage());
+            log.warn("FR-12/FR-14 in-app: saving {} notification for request {} failed: {}", type, requestId, e.getMessage());
         }
     }
 
