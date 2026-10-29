@@ -28,8 +28,8 @@ export default function OwnerVaultDetail() {
 
     if (!user) return <Navigate to="/login" replace />;
 
-    // Chỉ sửa được khi vault ACTIVE (BE cũng chặn khi DMS đã kích hoạt / đang xác minh)
-    const editable = vault?.status === 'ACTIVE';
+    // FR-27: BE quyết định có sửa được không (ACTIVE, DMS chưa bàn giao, không có hồ sơ xác minh mở)
+    const editable = vault?.modifiable ?? (vault?.status === 'ACTIVE');
 
     return (
         <OwnerLayout
@@ -43,7 +43,7 @@ export default function OwnerVaultDetail() {
             <Alert>{error}</Alert>
             {!vault && !error && <p className="text-on-surface-variant">Loading...</p>}
             {vault && !editable && (
-                <Alert type="warning">This vault is {vault.status.toLowerCase()} — it can no longer be changed.</Alert>
+                <Alert type="warning">{vault.lockReason || `This vault is ${vault.status.toLowerCase()} — it can no longer be changed.`}</Alert>
             )}
 
             {vault && (

@@ -192,19 +192,20 @@ class VaultServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
 
-        // Bắt lỗi phải là VaultException
-        Exception exception = assertThrows(VaultException.class, () -> {
+        // Bắt lỗi phải là VaultException (404 để chống enum vault ID)
+        VaultException exception = assertThrows(VaultException.class, () -> {
             vaultService.deleteVault(vaultId, ownerId);
         });
 
-        // Nội dung lỗi phải chuẩn xác
-        assertEquals("Unauthorized: You don't own this vault", exception.getMessage());
+        // Nội dung lỗi phải chuẩn xác (404)
+        assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
+        assertEquals("Vault not found", exception.getMessage());
         // Hàm xóa sẽ KHÔNG BAO GIỜ ĐƯỢC CHẠY
         verify(vaultRepository, never()).delete(any());
         // Đảm bảo ghi log với email của kẻ gọi (caller/mockOwner), không phải nạn nhân
         // và phải bao gồm vaultId để nhật ký có đủ context (N2)
         verify(auditLogService).log(
-                eq(com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETE_DENIED),
+                eq(AuditAction.VAULT_DELETE_DENIED),
                 eq(AuditResult.FAILURE),
                 eq(ownerId),
                 eq(mockOwner.getEmail()),
@@ -640,7 +641,7 @@ class VaultServiceImplTest {
     @DisplayName("getMyVaults: Lấy danh sách két của Owner thành công")
     void getMyVaults_Success() {
         Vault vault = activeVault();
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiaryNewestFirst(ownerId))
                 .thenReturn(List.of(vault));
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -648,13 +649,13 @@ class VaultServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("My Vault", result.get(0).getName());
         assertEquals(ownerId, result.get(0).getOwnerId());
-        verify(vaultRepository).findByOwnerIdOrderByCreatedAtDesc(ownerId);
+        verify(vaultRepository).findByOwnerIdWithBeneficiaryNewestFirst(ownerId);
     }
 
     @Test
     @DisplayName("getMyVaults: Trả về danh sách rỗng khi Owner chưa có két")
     void getMyVaults_EmptyList() {
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId))
+        when(vaultRepository.findByOwnerIdWithBeneficiaryNewestFirst(ownerId))
                 .thenReturn(List.of());
 
         List<VaultResponse> result = vaultService.getMyVaults(ownerId);
@@ -819,7 +820,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(vaultRepository.saveAndFlush(any(Vault.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateVaultRequest request = new UpdateVaultRequest("Tên két mới", "Mô tả mới");
         VaultResponse response = vaultService.updateVault(vId, ownerId, request);
@@ -827,7 +828,7 @@ class VaultServiceImplTest {
         assertEquals("Tên két mới", response.getName());
         assertEquals("Mô tả mới", response.getDescription());
         verify(vaultModificationGuard).ensureModifiable(vault);
-        verify(vaultRepository).save(vault);
+        verify(vaultRepository).saveAndFlush(vault);
         verify(auditLogService).log(eq(AuditAction.VAULT_UPDATED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId),
                 eq("Vault"), eq(vId.toString()), any());

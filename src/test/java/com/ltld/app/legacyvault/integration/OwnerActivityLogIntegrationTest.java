@@ -21,6 +21,7 @@ import com.ltld.app.legacyvault.service.auditservice.OwnerActivityLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

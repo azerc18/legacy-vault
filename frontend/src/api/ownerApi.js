@@ -28,11 +28,12 @@ async function saveBlob(url, fallbackName) {
 
 export const ownerApi = {
     /* ---------- Vault (FR-01, FR-27) ---------- */
-    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt }]
+    // -> [VaultResponse { id, ownerId, name, description, status, createdAt, updatedAt,
+    //      beneficiaryEmail, pendingRegistration, totalAssets, totalDocuments, modifiable, lockReason }]
     listVaults: () => http.get('/vaults').then((r) => unwrap(r) ?? []),
 
     // -> VaultDetailResponse { id, name, description, status, ownerEmail, beneficiaryId, beneficiaryEmail,
-    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
+    //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets, modifiable, lockReason }
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
     // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]

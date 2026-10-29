@@ -17,4 +17,10 @@ public class VaultResponse {
     private VaultStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private String beneficiaryEmail;
+    private boolean pendingRegistration;
+    private long totalAssets;
+    private long totalDocuments;
+    private boolean modifiable;
+    private String lockReason;
 }
