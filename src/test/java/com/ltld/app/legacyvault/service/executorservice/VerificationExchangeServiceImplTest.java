@@ -332,7 +332,7 @@ class VerificationExchangeServiceImplTest {
     }
 
     @Test
-    @DisplayName("B6 history: newest first page, both roles, readable when closed, marks executor read")
+    @DisplayName("FR-11 history: newest first page, both roles, readable when closed, marks executor read")
     void history_returnsMessagesOfOwnRequest() {
         stubGuardAllows();
         when(legalVerificationRequestRepository.findById(requestId))
@@ -358,7 +358,27 @@ class VerificationExchangeServiceImplTest {
         assertEquals("Executor Name", history.get(1).getSenderName());
         assertEquals(100, pageable.getValue().getPageSize());
         assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
-        verify(legalVerificationRequestRepository).markExecutorRead(eq(requestId), any(LocalDateTime.class));
+        // Mốc đọc = createdAt của tin mới nhất đã trả về, không phải now()
+        verify(legalVerificationRequestRepository).markExecutorRead(requestId, second.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("FR-11 history: older page (page > 0) or empty page does not move the read marker")
+    void history_olderOrEmptyPage_doesNotMarkRead() {
+        stubGuardAllows();
+        when(legalVerificationRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(request(LegalVerificationStatus.PENDING, verifier)));
+        VerificationExchangeMessage old = VerificationExchangeMessage.builder().id(UUID.randomUUID())
+                .request(verificationRequest).sender(verifier).senderRole(ExchangeSenderRole.VERIFIER)
+                .content("Cũ").createdAt(LocalDateTime.of(2026, 10, 1, 8, 0)).build();
+        when(verificationExchangeMessageRepository.findHistoryPage(eq(requestId), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(old), inv.getArgument(1), 51))
+                .thenAnswer(inv -> new PageImpl<>(List.of(), inv.getArgument(1), 0));
+
+        service.history(assignmentId, requestId, LOGIN, 1, 50);
+        service.history(assignmentId, requestId, LOGIN, 0, 50);
+
+        verify(legalVerificationRequestRepository, never()).markExecutorRead(any(), any());
     }
 
     @Test

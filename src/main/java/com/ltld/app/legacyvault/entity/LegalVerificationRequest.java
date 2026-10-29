@@ -72,7 +72,7 @@ public class LegalVerificationRequest {
     @Builder.Default
     private int signAttempts = 0;
 
-    // B6: lần cuối Executor mở lịch sử tin nhắn, để đếm tin chưa đọc của Verifier. Chỉ ghi bằng
+    // FR-11: lần cuối Executor mở lịch sử tin nhắn, để đếm tin chưa đọc của Verifier. Chỉ ghi bằng
     // markExecutorRead (bulk UPDATE, không tăng @Version) để không đụng xung đột với Verifier đang duyệt;
     // insertable/updatable = false để lần save entity của Verifier không ghi đè giá trị cũ lên.
     @Column(name = "executor_last_read_at", insertable = false, updatable = false)

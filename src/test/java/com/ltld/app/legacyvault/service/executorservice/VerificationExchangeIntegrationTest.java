@@ -75,6 +75,7 @@ class VerificationExchangeIntegrationTest {
     private User owner;
     private User executor;
     private User backupExecutor;
+    private User verifier;
     private ExecutorAssignment primary;
     private ExecutorAssignment backup;
     private LegalVerificationRequest request;
@@ -85,6 +86,7 @@ class VerificationExchangeIntegrationTest {
         owner = user("owner-" + tag);
         executor = user("executor-" + tag);
         backupExecutor = user("backup-" + tag);
+        verifier = user("verifier-" + tag);
         primary = assignment(executor, ExecutorType.PRIMARY);
         backup = assignment(backupExecutor, ExecutorType.BACKUP);
         request = legalVerificationRequestRepository.save(LegalVerificationRequest.builder()
@@ -94,7 +96,7 @@ class VerificationExchangeIntegrationTest {
 
     @AfterEach
     void cleanUp() throws InterruptedException {
-        List<UUID> userIds = List.of(owner.getId(), executor.getId(), backupExecutor.getId());
+        List<UUID> userIds = List.of(owner.getId(), executor.getId(), backupExecutor.getId(), verifier.getId());
         awaitAuditRowsSettled();
         for (UUID id : userIds) {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE actor_id = UUID_TO_BIN(?)", id.toString());
@@ -129,9 +131,9 @@ class VerificationExchangeIntegrationTest {
     }
 
     @Test
-    void b6_unreadCount_dropsToZeroAfterExecutorReadsHistory_andSurvivesVerifierSave() {
+    void fr11_unreadCount_dropsToZeroAfterExecutorReadsHistory_andSurvivesVerifierSave() {
         verificationExchangeMessageRepository.save(VerificationExchangeMessage.builder()
-                .request(request).sender(backupExecutor).senderRole(ExchangeSenderRole.VERIFIER)
+                .request(request).sender(verifier).senderRole(ExchangeSenderRole.VERIFIER)
                 .content("Please resend a clearer scan").build());
         verificationExchangeService.send(primary.getId(), request.getId(), executor.getEmail(), null,
                 new SendVerificationMessageRequest("tin của chính Executor không tính là chưa đọc"));

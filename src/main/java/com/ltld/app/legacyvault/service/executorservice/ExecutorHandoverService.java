@@ -12,7 +12,7 @@ public interface ExecutorHandoverService {
 
     List<VaultHandoverProgressResponse> getHandoverProgress(UUID assignmentId, String executorLogin);
 
-    /** B6: mọi hồ sơ xác minh Executor đã gửi cho Owner này, mới nhất trước, có số tin chưa đọc. */
+    /** FR-11: mọi hồ sơ xác minh Executor đã gửi cho Owner này, mới nhất trước, có số tin chưa đọc. */
     Page<ExecutorVerificationRequestResponse> listVerificationRequests(UUID assignmentId, String executorLogin,
                                                                        int page, int size);
 }

@@ -231,10 +231,10 @@ class ExecutorHandoverServiceImplTest {
         }
     }
 
-    // ---------- B6: danh sách hồ sơ xác minh ----------
+    // ---------- FR-11: danh sách hồ sơ xác minh ----------
 
     @Test
-    @DisplayName("B6: trả cả hồ sơ cũ bị từ chối, kèm Vault, lý do và số tin chưa đọc")
+    @DisplayName("FR-11: trả cả hồ sơ cũ bị từ chối, kèm Vault, lý do và số tin chưa đọc")
     void listVerificationRequests_returnsAllRequestsWithVaultsAndUnread() {
         stubGuardAllows();
         LegalVerificationRequest rejected = request(LegalVerificationStatus.REJECTED);
@@ -265,7 +265,7 @@ class ExecutorHandoverServiceImplTest {
     }
 
     @Test
-    @DisplayName("B6: size bị giới hạn tối đa 100, page âm về 0, mới nhất trước")
+    @DisplayName("FR-11: size bị giới hạn tối đa 100, page âm về 0, mới nhất trước")
     void listVerificationRequests_clampsPaging() {
         stubGuardAllows();
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
@@ -282,7 +282,7 @@ class ExecutorHandoverServiceImplTest {
     }
 
     @Test
-    @DisplayName("B6: assignment không phải của mình -> 404, không đọc hồ sơ")
+    @DisplayName("FR-11: assignment không phải của mình -> 404, không đọc hồ sơ")
     void listVerificationRequests_foreignAssignment_isNotFound() {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
                 .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));

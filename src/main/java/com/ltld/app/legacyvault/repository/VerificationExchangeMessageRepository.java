@@ -24,7 +24,7 @@ public interface VerificationExchangeMessageRepository extends JpaRepository<Ver
 
     Optional<VerificationExchangeMessage> findByIdAndRequestId(UUID id, UUID requestId);
 
-    // B6: lịch sử phân trang cho Executor, thứ tự lấy từ Pageable
+    // FR-11: lịch sử phân trang cho Executor, thứ tự lấy từ Pageable
     @Query(value = """
             SELECT m FROM VerificationExchangeMessage m JOIN FETCH m.sender
             WHERE m.request.id = :requestId
@@ -32,7 +32,7 @@ public interface VerificationExchangeMessageRepository extends JpaRepository<Ver
             countQuery = "SELECT COUNT(m) FROM VerificationExchangeMessage m WHERE m.request.id = :requestId")
     Page<VerificationExchangeMessage> findHistoryPage(@Param("requestId") UUID requestId, Pageable pageable);
 
-    // B6: số tin của Verifier mà Executor chưa đọc, theo từng hồ sơ: [requestId, count]
+    // FR-11: số tin của Verifier mà Executor chưa đọc, theo từng hồ sơ: [requestId, count]
     @Query("""
             SELECT m.request.id, COUNT(m) FROM VerificationExchangeMessage m
             WHERE m.request.id IN :requestIds

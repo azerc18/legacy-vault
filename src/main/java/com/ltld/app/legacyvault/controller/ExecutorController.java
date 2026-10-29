@@ -121,7 +121,7 @@ public class ExecutorController {
                 .body(ApiResponse.success("Verification message sent", response));
     }
 
-    // B6: danh sách mọi hồ sơ xác minh Executor đã gửi cho Owner này (kể cả đã bị từ chối), phân trang
+    // FR-11: danh sách mọi hồ sơ xác minh Executor đã gửi cho Owner này (kể cả đã bị từ chối), phân trang
     @GetMapping("/{assignmentId}/verification-requests")
     public ResponseEntity<ApiResponse<Page<ExecutorVerificationRequestResponse>>> listVerificationRequests(
             @PathVariable UUID assignmentId,
@@ -134,7 +134,7 @@ public class ExecutorController {
         return ResponseEntity.ok(ApiResponse.success("Verification requests retrieved", response));
     }
 
-    // FR-11: lịch sử trao đổi của một yêu cầu xác minh, mới nhất trước (B6: phân trang, đánh dấu đã đọc)
+    // FR-11: lịch sử trao đổi của một yêu cầu xác minh, mới nhất trước (phân trang, đánh dấu đã đọc)
     @GetMapping("/{assignmentId}/verification-requests/{requestId}/messages")
     public ResponseEntity<ApiResponse<Page<VerificationMessageResponse>>> getVerificationMessages(
             @PathVariable UUID assignmentId, @PathVariable UUID requestId,
