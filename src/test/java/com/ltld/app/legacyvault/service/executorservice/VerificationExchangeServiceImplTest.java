@@ -33,6 +33,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -329,7 +332,7 @@ class VerificationExchangeServiceImplTest {
     }
 
     @Test
-    @DisplayName("History: oldest first, both roles, available even when the request is closed")
+    @DisplayName("FR-11 history: newest first page, both roles, readable when closed, marks executor read")
     void history_returnsMessagesOfOwnRequest() {
         stubGuardAllows();
         when(legalVerificationRequestRepository.findById(requestId))
@@ -341,15 +344,41 @@ class VerificationExchangeServiceImplTest {
                 .request(verificationRequest).sender(verifier).senderRole(ExchangeSenderRole.VERIFIER)
                 .content("Trả lời").attachmentName("form.pdf").attachmentSize(10L)
                 .createdAt(LocalDateTime.of(2026, 10, 5, 9, 0)).build();
-        when(verificationExchangeMessageRepository.findHistory(requestId)).thenReturn(List.of(first, second));
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(verificationExchangeMessageRepository.findHistoryPage(eq(requestId), pageable.capture()))
+                .thenAnswer(inv -> new PageImpl<>(List.of(second, first), inv.getArgument(1), 2));
 
-        List<VerificationMessageResponse> history = service.history(assignmentId, requestId, LOGIN);
+        List<VerificationMessageResponse> history = service.history(assignmentId, requestId, LOGIN, 0, 500)
+                .getContent();
 
         assertEquals(2, history.size());
-        assertEquals(ExchangeSenderRole.EXECUTOR, history.get(0).getSenderRole());
-        assertEquals("Executor Name", history.get(0).getSenderName());
-        assertEquals(ExchangeSenderRole.VERIFIER, history.get(1).getSenderRole());
-        assertEquals("form.pdf", history.get(1).getAttachmentName());
+        assertEquals(ExchangeSenderRole.VERIFIER, history.get(0).getSenderRole());
+        assertEquals("form.pdf", history.get(0).getAttachmentName());
+        assertEquals(ExchangeSenderRole.EXECUTOR, history.get(1).getSenderRole());
+        assertEquals("Executor Name", history.get(1).getSenderName());
+        assertEquals(100, pageable.getValue().getPageSize());
+        assertEquals(Sort.Direction.DESC, pageable.getValue().getSort().getOrderFor("createdAt").getDirection());
+        // Mốc đọc = createdAt của tin mới nhất đã trả về, không phải now()
+        verify(legalVerificationRequestRepository).markExecutorRead(requestId, second.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("FR-11 history: older page (page > 0) or empty page does not move the read marker")
+    void history_olderOrEmptyPage_doesNotMarkRead() {
+        stubGuardAllows();
+        when(legalVerificationRequestRepository.findById(requestId))
+                .thenReturn(Optional.of(request(LegalVerificationStatus.PENDING, verifier)));
+        VerificationExchangeMessage old = VerificationExchangeMessage.builder().id(UUID.randomUUID())
+                .request(verificationRequest).sender(verifier).senderRole(ExchangeSenderRole.VERIFIER)
+                .content("Cũ").createdAt(LocalDateTime.of(2026, 10, 1, 8, 0)).build();
+        when(verificationExchangeMessageRepository.findHistoryPage(eq(requestId), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(old), inv.getArgument(1), 51))
+                .thenAnswer(inv -> new PageImpl<>(List.of(), inv.getArgument(1), 0));
+
+        service.history(assignmentId, requestId, LOGIN, 1, 50);
+        service.history(assignmentId, requestId, LOGIN, 0, 50);
+
+        verify(legalVerificationRequestRepository, never()).markExecutorRead(any(), any());
     }
 
     @Test
@@ -358,9 +387,10 @@ class VerificationExchangeServiceImplTest {
         stubGuardAllows();
         when(legalVerificationRequestRepository.findById(requestId)).thenReturn(Optional.empty());
 
-        assertThrows(VerificationRequestNotFoundException.class, () -> service.history(assignmentId, requestId, LOGIN));
+        assertThrows(VerificationRequestNotFoundException.class, () -> service.history(assignmentId, requestId, LOGIN, 0, 50));
 
         verifyNoInteractions(verificationExchangeMessageRepository);
+        verify(legalVerificationRequestRepository, never()).markExecutorRead(any(), any());
     }
 
     @Test
@@ -369,7 +399,7 @@ class VerificationExchangeServiceImplTest {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
                 .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
 
-        assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.history(assignmentId, requestId, LOGIN));
+        assertThrows(ExecutorAssignmentNotFoundException.class, () -> service.history(assignmentId, requestId, LOGIN, 0, 50));
 
         verifyNoInteractions(legalVerificationRequestRepository, verificationExchangeMessageRepository);
     }

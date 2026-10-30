@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.VerificationExchangeMessage;
+import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
@@ -62,6 +63,7 @@ class VerificationExchangeIntegrationTest {
     @MockitoBean private EmailSender emailSender;
 
     @Autowired private VerificationExchangeService verificationExchangeService;
+    @Autowired private ExecutorHandoverService executorHandoverService;
     @Autowired private VerificationExchangeMessageRepository verificationExchangeMessageRepository;
     @Autowired private LegalVerificationRequestRepository legalVerificationRequestRepository;
     @Autowired private ExecutorAssignmentRepository executorAssignmentRepository;
@@ -73,6 +75,7 @@ class VerificationExchangeIntegrationTest {
     private User owner;
     private User executor;
     private User backupExecutor;
+    private User verifier;
     private ExecutorAssignment primary;
     private ExecutorAssignment backup;
     private LegalVerificationRequest request;
@@ -83,6 +86,7 @@ class VerificationExchangeIntegrationTest {
         owner = user("owner-" + tag);
         executor = user("executor-" + tag);
         backupExecutor = user("backup-" + tag);
+        verifier = user("verifier-" + tag);
         primary = assignment(executor, ExecutorType.PRIMARY);
         backup = assignment(backupExecutor, ExecutorType.BACKUP);
         request = legalVerificationRequestRepository.save(LegalVerificationRequest.builder()
@@ -92,7 +96,7 @@ class VerificationExchangeIntegrationTest {
 
     @AfterEach
     void cleanUp() throws InterruptedException {
-        List<UUID> userIds = List.of(owner.getId(), executor.getId(), backupExecutor.getId());
+        List<UUID> userIds = List.of(owner.getId(), executor.getId(), backupExecutor.getId(), verifier.getId());
         awaitAuditRowsSettled();
         for (UUID id : userIds) {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE actor_id = UUID_TO_BIN(?)", id.toString());
@@ -119,10 +123,39 @@ class VerificationExchangeIntegrationTest {
         assertThat(cryptoService.decryptBytes(onDisk)).isEqualTo(PDF);
 
         List<VerificationMessageResponse> history =
-                verificationExchangeService.history(primary.getId(), request.getId(), executor.getEmail());
+                verificationExchangeService.history(primary.getId(), request.getId(), executor.getEmail(), 0, 50)
+                        .getContent();
         assertThat(history).hasSize(1);
         assertThat(history.get(0).getContent()).isEqualTo("Bổ sung giấy xác nhận");
         assertThat(history.get(0).getSenderName()).isEqualTo(executor.getFullName());
+    }
+
+    @Test
+    void fr11_unreadCount_dropsToZeroAfterExecutorReadsHistory_andSurvivesVerifierSave() {
+        verificationExchangeMessageRepository.save(VerificationExchangeMessage.builder()
+                .request(request).sender(verifier).senderRole(ExchangeSenderRole.VERIFIER)
+                .content("Please resend a clearer scan").build());
+        verificationExchangeService.send(primary.getId(), request.getId(), executor.getEmail(), null,
+                new SendVerificationMessageRequest("tin của chính Executor không tính là chưa đọc"));
+
+        assertThat(executorHandoverService.listVerificationRequests(primary.getId(), executor.getEmail(), 0, 20)
+                .getContent()).singleElement()
+                .satisfies(r -> assertThat(r.getUnreadMessageCount()).isEqualTo(1));
+
+        verificationExchangeService.history(primary.getId(), request.getId(), executor.getEmail(), 0, 50);
+        assertThat(legalVerificationRequestRepository.findById(request.getId()).orElseThrow().getExecutorLastReadAt())
+                .isNotNull();
+
+        // Verifier lưu entity cũ (đọc trước khi Executor đọc tin): không được ghi đè executorLastReadAt về null.
+        request.setStatus(LegalVerificationStatus.APPROVED);
+        legalVerificationRequestRepository.save(request);
+
+        assertThat(executorHandoverService.listVerificationRequests(primary.getId(), executor.getEmail(), 0, 20)
+                .getContent()).singleElement()
+                .satisfies(r -> {
+                    assertThat(r.getUnreadMessageCount()).isZero();
+                    assertThat(r.getStatus()).isEqualTo(LegalVerificationStatus.APPROVED);
+                });
     }
 
     @Test
@@ -131,7 +164,7 @@ class VerificationExchangeIntegrationTest {
                 backupExecutor.getEmail(), null, new SendVerificationMessageRequest("xen vào")))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
         assertThatThrownBy(() -> verificationExchangeService.history(backup.getId(), request.getId(),
-                backupExecutor.getEmail()))
+                backupExecutor.getEmail(), 0, 50))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
 
         assertThat(verificationExchangeMessageRepository.findHistory(request.getId())).isEmpty();
@@ -148,8 +181,8 @@ class VerificationExchangeIntegrationTest {
                 executor.getEmail(), null, new SendVerificationMessageRequest("sau khi bị từ chối")))
                 .isInstanceOf(VerificationRequestClosedException.class);
 
-        assertThat(verificationExchangeService.history(primary.getId(), request.getId(), executor.getEmail()))
-                .hasSize(1);
+        assertThat(verificationExchangeService.history(primary.getId(), request.getId(), executor.getEmail(), 0, 50)
+                .getContent()).hasSize(1);
     }
 
     private void awaitAuditRowsSettled() throws InterruptedException {

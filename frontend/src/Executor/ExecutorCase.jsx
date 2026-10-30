@@ -286,6 +286,8 @@ function MessagesSection({ assignmentId, progress }) {
     const requests = [...new Map(progress.filter((p) => p.requestId).map((p) => [p.requestId, p])).values()];
     const [requestId, setRequestId] = useState('');
     const [messages, setMessages] = useState([]);
+    const [page, setPage] = useState(0);
+    const [hasOlder, setHasOlder] = useState(false);
     const [content, setContent] = useState('');
     const [file, setFile] = useState(null);
     const [error, setError] = useState('');
@@ -298,9 +300,20 @@ function MessagesSection({ assignmentId, progress }) {
     const loadMessages = useCallback(() => {
         if (!requestId) return;
         executorApi.getMessages(assignmentId, requestId)
-            .then(setMessages)
+            .then(({ messages: list, last }) => { setMessages(list); setPage(0); setHasOlder(!last); })
             .catch((e) => setError(getErrorMessage(e, 'Could not load messages.')));
     }, [assignmentId, requestId]);
+
+    // Nối trang cũ hơn lên đầu; bỏ trùng theo id vì tin mới đến sau lần tải trước làm các trang lệch đi
+    const loadOlder = () => {
+        executorApi.getMessages(assignmentId, requestId, { page: page + 1 })
+            .then(({ messages: older, last }) => {
+                setMessages((cur) => [...older.filter((m) => !cur.some((c) => c.id === m.id)), ...cur]);
+                setPage(page + 1);
+                setHasOlder(!last);
+            })
+            .catch((e) => setError(getErrorMessage(e, 'Could not load messages.')));
+    };
 
     useEffect(() => { loadMessages(); }, [loadMessages]);
 
@@ -337,6 +350,11 @@ function MessagesSection({ assignmentId, progress }) {
             )}
             <Alert>{error}</Alert>
             <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
+                {hasOlder && (
+                    <button type="button" onClick={loadOlder} className="block mx-auto text-xs font-semibold text-primary hover:underline">
+                        Load older messages
+                    </button>
+                )}
                 {messages.length === 0 && <p className="text-sm text-on-surface-variant">No messages yet.</p>}
                 {messages.map((m) => {
                     const mine = m.senderRole === 'EXECUTOR';

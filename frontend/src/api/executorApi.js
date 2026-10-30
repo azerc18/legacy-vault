@@ -31,9 +31,20 @@ export const executorApi = {
         return http.post(`${BASE}/${assignmentId}/verification-requests`, form).then(unwrap);
     },
 
+    // FR-11: mọi hồ sơ xác minh đã gửi (kể cả bị từ chối), mới nhất trước
+    // -> Page { content: [{ id, status, vaults: [{ id, name }], rejectionReason, createdAt, decidedAt, unreadMessageCount }], totalElements, ... }
+    listVerificationRequests: (assignmentId, { page = 0, size = 20 } = {}) =>
+        http.get(`${BASE}/${assignmentId}/verification-requests`, { params: { page, size } }).then(unwrap),
+
     // FR-11: trao đổi với Legal Verifier (nội dung ≤2000 ký tự và/hoặc 1 tệp)
-    getMessages: (assignmentId, requestId) =>
-        http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`).then((r) => unwrap(r) ?? []),
+    // FR-11: BE phân trang mới nhất trước và đánh dấu đã đọc; đảo lại để hiển thị cũ nhất trước như cũ
+    // -> { messages (cũ nhất trước), last } — last = false thì còn trang tin cũ hơn
+    getMessages: (assignmentId, requestId, { page = 0, size = 50 } = {}) =>
+        http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`, { params: { page, size } })
+            .then((r) => {
+                const data = unwrap(r);
+                return { messages: [...(data?.content ?? [])].reverse(), last: data?.last ?? true };
+            }),
     sendMessage: (assignmentId, requestId, { content, file }) => {
         const form = new FormData();
         if (content) form.append('content', content);

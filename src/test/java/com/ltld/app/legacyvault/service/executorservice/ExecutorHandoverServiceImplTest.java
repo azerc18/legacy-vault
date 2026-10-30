@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.dto.executordto.ExecutorVerificationRequestResponse;
 import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
@@ -12,14 +13,20 @@ import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VerificationExchangeMessageRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -28,11 +35,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -44,6 +54,8 @@ class ExecutorHandoverServiceImplTest {
 
     @Mock private ExecutorAccessGuard executorAccessGuard;
     @Mock private VerificationRequestVaultRepository verificationRequestVaultRepository;
+    @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
+    @Mock private VerificationExchangeMessageRepository verificationExchangeMessageRepository;
     @InjectMocks private ExecutorHandoverServiceImpl service;
 
     private UUID assignmentId;
@@ -217,5 +229,67 @@ class ExecutorHandoverServiceImplTest {
                             || name.contains("attachment") || name.contains("certificate"),
                     "Sensitive field in DTO: " + field.getName());
         }
+    }
+
+    // ---------- FR-11: danh sách hồ sơ xác minh ----------
+
+    @Test
+    @DisplayName("FR-11: trả cả hồ sơ cũ bị từ chối, kèm Vault, lý do và số tin chưa đọc")
+    void listVerificationRequests_returnsAllRequestsWithVaultsAndUnread() {
+        stubGuardAllows();
+        LegalVerificationRequest rejected = request(LegalVerificationStatus.REJECTED);
+        rejected.setRejectionReason("Document unreadable");
+        rejected.setDecidedAt(LocalDateTime.of(2026, 10, 2, 9, 0));
+        LegalVerificationRequest pending = request(LegalVerificationStatus.PENDING);
+        Vault v1 = vault("Bank", VaultStatus.ACTIVE);
+        when(legalVerificationRequestRepository.findByExecutorIdAndOwnerId(eq(executor.getId()), eq(owner.getId()),
+                any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(pending, rejected), inv.getArgument(2), 2));
+        when(verificationRequestVaultRepository.findByRequestIdIn(List.of(pending.getId(), rejected.getId())))
+                .thenReturn(List.of(row(pending, v1), row(rejected, v1)));
+        when(verificationExchangeMessageRepository.countUnreadForExecutor(List.of(pending.getId(), rejected.getId())))
+                .thenReturn(List.<Object[]>of(new Object[]{rejected.getId(), 3L}));
+
+        Page<ExecutorVerificationRequestResponse> page = service.listVerificationRequests(assignmentId, LOGIN, 0, 20);
+
+        assertThat(page.getTotalElements()).isEqualTo(2);
+        ExecutorVerificationRequestResponse first = page.getContent().get(0);
+        assertThat(first.getStatus()).isEqualTo(LegalVerificationStatus.PENDING);
+        assertThat(first.getUnreadMessageCount()).isZero();
+        ExecutorVerificationRequestResponse second = page.getContent().get(1);
+        assertThat(second.getRejectionReason()).isEqualTo("Document unreadable");
+        assertThat(second.getDecidedAt()).isEqualTo(LocalDateTime.of(2026, 10, 2, 9, 0));
+        assertThat(second.getUnreadMessageCount()).isEqualTo(3);
+        assertThat(second.getVaults()).containsExactly(
+                new ExecutorVerificationRequestResponse.VaultRef(v1.getId(), "Bank"));
+    }
+
+    @Test
+    @DisplayName("FR-11: size bị giới hạn tối đa 100, page âm về 0, mới nhất trước")
+    void listVerificationRequests_clampsPaging() {
+        stubGuardAllows();
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        when(legalVerificationRequestRepository.findByExecutorIdAndOwnerId(any(), any(), pageable.capture()))
+                .thenReturn(Page.empty());
+
+        Page<ExecutorVerificationRequestResponse> page = service.listVerificationRequests(assignmentId, LOGIN, -1, 500);
+
+        assertThat(page.getContent()).isEmpty();
+        assertThat(pageable.getValue().getPageNumber()).isZero();
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(100);
+        assertThat(pageable.getValue().getSort().getOrderFor("createdAt").isDescending()).isTrue();
+        verifyNoInteractions(verificationExchangeMessageRepository);
+    }
+
+    @Test
+    @DisplayName("FR-11: assignment không phải của mình -> 404, không đọc hồ sơ")
+    void listVerificationRequests_foreignAssignment_isNotFound() {
+        when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))
+                .thenThrow(new ExecutorAssignmentNotFoundException("Executor assignment not found."));
+
+        assertThrows(ExecutorAssignmentNotFoundException.class,
+                () -> service.listVerificationRequests(assignmentId, LOGIN, 0, 20));
+
+        verifyNoInteractions(legalVerificationRequestRepository, verificationExchangeMessageRepository);
     }
 }
