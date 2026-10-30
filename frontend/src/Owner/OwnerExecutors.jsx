@@ -107,6 +107,9 @@ function ExecutorCard({ position, assignment, onChanged }) {
                         <p className="text-xs text-outline">
                             Since {formatDate(assignment.assignedAt)}
                             {assignment.activatedAt && ` · activated ${formatDate(assignment.activatedAt, true)}`}
+                            {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
+                                ? ` · acknowledged ${formatDate(assignment.acknowledgedAt, true)}`
+                                : ' · awaiting acknowledgement')}
                         </p>
                     </div>
                 </div>
