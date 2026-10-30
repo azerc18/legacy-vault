@@ -51,6 +51,10 @@ export const executorApi = {
         if (file) form.append('file', file);
         return http.post(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`, form).then(unwrap);
     },
+    // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
+    getAttachmentBlob: (assignmentId, requestId, messageId) =>
+        http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
+            { responseType: 'blob' }),
 };
 
 // Bước hiện tại của 1 hồ sơ, dựa trên assignment + tiến độ bàn giao
