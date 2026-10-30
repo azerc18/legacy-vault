@@ -305,6 +305,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .fullName(executor.getFullName())
                 .assignedAt(assignment.getAssignedAt() != null ? assignment.getAssignedAt() : assignment.getCreatedAt())
                 .activatedAt(assignment.getActivatedAt())
+                .acknowledgedAt(assignment.getAcknowledgedAt())
                 .revokedAt(assignment.getRevokedAt())
                 .build();
     }
