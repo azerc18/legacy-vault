@@ -20,16 +20,18 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -51,7 +53,7 @@ class OwnerActivityLogServiceImplTest {
 
     @Test
     void getOwnerActivityLogs_queriesByOwnerAndDmsExecutorEntityTypes() {
-        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any()))
+        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Page.empty(pageable));
         Instant from = Instant.now().minus(10, ChronoUnit.DAYS);
         Instant to = Instant.now();
@@ -60,12 +62,12 @@ class OwnerActivityLogServiceImplTest {
 
         verify(auditLogRepository).findOwnerActivity(eq(ownerId),
                 eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(DmsActivationProcessor.ENTITY_EXECUTOR_ASSIGNMENT),
-                eq(from), eq(to), eq(pageable));
+                same(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS), eq(from), eq(to), eq(pageable));
     }
 
     @Test
-    void getOwnerActivityLogs_noDates_defaultsToLast30Days() {
-        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any()))
+    void getOwnerActivityLogs_noDates_defaultsFromEpoch() {
+        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Page.empty(pageable));
         Instant before = Instant.now();
 
@@ -73,10 +75,11 @@ class OwnerActivityLogServiceImplTest {
 
         ArgumentCaptor<Instant> fromCaptor = ArgumentCaptor.forClass(Instant.class);
         ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
-        verify(auditLogRepository).findOwnerActivity(eq(ownerId), any(), any(),
+        verify(auditLogRepository).findOwnerActivity(eq(ownerId), any(), any(), any(),
                 fromCaptor.capture(), toCaptor.capture(), eq(pageable));
+        // FR-05: không truyền from -> xem toàn bộ lịch sử
+        assertThat(fromCaptor.getValue()).isEqualTo(Instant.EPOCH);
         assertThat(toCaptor.getValue()).isAfterOrEqualTo(before);
-        assertThat(Duration.between(fromCaptor.getValue(), toCaptor.getValue())).isEqualTo(Duration.ofDays(30));
     }
 
     @Test
@@ -91,19 +94,34 @@ class OwnerActivityLogServiceImplTest {
     }
 
     @Test
-    void getOwnerActivityLogs_rangeExceedsOneYear_throwsBadRequest() {
+    void getOwnerActivityLogs_rangeOverOneYear_isAllowed() {
+        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(Page.empty(pageable));
         Instant to = Instant.now();
+        Instant from = to.minus(400, ChronoUnit.DAYS);
 
-        assertThatThrownBy(() -> ownerActivityLogService.getOwnerActivityLogs(
-                ownerId, to.minus(400, ChronoUnit.DAYS), to, pageable))
-                .isInstanceOf(DmsException.class)
-                .satisfies(ex -> assertThat(((DmsException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
-        verifyNoInteractions(auditLogRepository);
+        // FR-05: bỏ giới hạn 1 năm
+        assertThatCode(() -> ownerActivityLogService.getOwnerActivityLogs(ownerId, from, to, pageable))
+                .doesNotThrowAnyException();
+        verify(auditLogRepository).findOwnerActivity(eq(ownerId), any(), any(), any(), eq(from), eq(to), eq(pageable));
+    }
+
+    @Test
+    void ownerHiddenActions_areAdminOnlyActions_andUnmodifiable() {
+        Set<AuditAction> hidden = AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS;
+
+        assertThat(hidden).containsExactlyInAnyOrder(
+                AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED);
+        assertThatThrownBy(() -> hidden.add(AuditAction.VAULT_CREATED))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(() -> hidden.remove(AuditAction.DMS_SUSPENDED))
+                .isInstanceOf(UnsupportedOperationException.class);
+        assertThatThrownBy(hidden::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void getOwnerActivityLogs_ownerWithoutDmsOrExecutor_returnsEmptyPage() {
-        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any()))
+        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Page.empty(pageable));
 
         Page<VaultActivityLogResponse> result = ownerActivityLogService.getOwnerActivityLogs(
@@ -130,7 +148,7 @@ class OwnerActivityLogServiceImplTest {
                 .action(AuditAction.DMS_TRIGGERED)
                 .createdAt(Instant.now())
                 .build();
-        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), eq(pageable)))
+        when(auditLogRepository.findOwnerActivity(any(), any(), any(), any(), any(), any(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(checkin, triggered), pageable, 12));
 
         Page<VaultActivityLogResponse> result = ownerActivityLogService.getOwnerActivityLogs(

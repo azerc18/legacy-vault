@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.auditservice.AuditDescriptionBuilder;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.auditservice.OwnerActivityLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
@@ -36,7 +37,10 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -73,6 +77,7 @@ class OwnerActivityLogIntegrationTest {
 
     @Autowired private OwnerActivityLogService ownerActivityLogService;
     @Autowired private DmsConfigService dmsConfigService;
+    @Autowired private VaultService vaultService;
     @Autowired private AuditLogService auditLogService;
     @Autowired private UserRepository userRepository;
     @Autowired private RoleRepository roleRepository;
@@ -99,6 +104,10 @@ class OwnerActivityLogIntegrationTest {
             vaultRepository.deleteAll(vaultRepository.findAll().stream()
                     .filter(v -> v.getOwner().getId().equals(ownerId))
                     .toList());
+        }
+        // VAULT_DELETED / ADMIN_VAULT_VIEWED không có ownerId trong detail: xóa theo actor, nếu không FK actor_id chặn xóa user
+        for (UUID userId : userIds) {
+            jdbcTemplate.update("DELETE FROM audit_logs WHERE BIN_TO_UUID(actor_id) = ?", userId.toString());
         }
         userRepository.deleteAllById(userIds);
     }
@@ -131,7 +140,7 @@ class OwnerActivityLogIntegrationTest {
         assertThat(logsA.getContent()).extracting(VaultActivityLogResponse::getCreatedAt)
                 .isSortedAccordingTo(Comparator.reverseOrder());
 
-        // Owner tự làm -> "Bạn"; BR-03 tự thu hồi (actor null) -> "Hệ thống"
+        // Owner tự làm -> "You"; BR-03 tự thu hồi (actor null) -> "System"
         assertThat(logsA.getContent())
                 .filteredOn(r -> r.getAction() == AuditAction.EXECUTOR_REVOKE)
                 .singleElement()
@@ -146,26 +155,105 @@ class OwnerActivityLogIntegrationTest {
                 .satisfies(r -> assertThat(r.getActorName()).isEqualTo("You"));
     }
 
+    // FR-05: thay test cũ suspendByAdmin_appearsInOwnerLog_... (DMS_SUSPENDED nay bị ẩn khỏi nhật ký Owner)
     @Test
-    void suspendByAdmin_appearsInOwnerLog_withAdminActorAndDescription() {
+    void adminOnlyActions_hiddenFromOwnerLog_andNotCounted() {
         Fixture a = fixture("s");
-        User admin = user("admin-" + UUID.randomUUID().toString().substring(0, 8));
-        admin.getRoles().add(roleRepository.findByCode("ADMIN").orElseThrow());
-        userRepository.save(admin);
+        User admin = admin();
+        Vault vault = vault(a.ownerId, "viewed");
 
-        // O5 qua service thật: ghi DMS_SUSPENDED với entityId = id DmsConfig, detail có reason
+        // Qua service thật: O5 ghi DMS_SUSPENDED / DMS_RESUMED (entity DmsConfig, vaultId null),
+        // FR-20 ghi ADMIN_VAULT_VIEWED (vaultId của Owner, actor Admin)
         dmsConfigService.suspendByAdmin(a.ownerId, admin.getId(), "Owner yêu cầu tạm dừng");
+        dmsConfigService.resumeByAdmin(a.ownerId, admin.getId());
+        vaultService.getAdminVaultDetail(vault.getId(), admin.getId());
+        Integer hiddenRows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_logs WHERE action IN ('DMS_SUSPENDED', 'DMS_RESUMED', 'ADMIN_VAULT_VIEWED')"
+                        + " AND (JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ? OR BIN_TO_UUID(vault_id) = ?)",
+                Integer.class, "%ownerId=" + a.ownerId + "%", vault.getId().toString());
+        assertThat(hiddenRows).as("đã ghi đủ 3 log bị ẩn").isEqualTo(3);
+
+        Page<VaultActivityLogResponse> logs = ownerActivityLogService.getOwnerActivityLogs(
+                a.ownerId, null, null, PageRequest.of(0, 50));
+        // Trang nhỏ hơn tổng số dòng -> Spring Data phải chạy countQuery để tính totalElements
+        Page<VaultActivityLogResponse> firstOfOne = ownerActivityLogService.getOwnerActivityLogs(
+                a.ownerId, null, null, PageRequest.of(0, 1));
+
+        assertThat(logs.getContent()).extracting(VaultActivityLogResponse::getId)
+                .containsExactlyInAnyOrderElementsOf(a.ownerLogIds());
+        assertThat(logs.getContent()).extracting(VaultActivityLogResponse::getAction)
+                .doesNotContainAnyElementsOf(AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS);
+        assertThat(logs.getTotalElements()).isEqualTo(a.ownerLogIds().size());
+        assertThat(firstOfOne.getTotalElements()).as("countQuery không được đếm action bị ẩn")
+                .isEqualTo(a.ownerLogIds().size());
+    }
+
+    // FR-05: Owner thấy VAULT_DELETED do chính mình xóa; không thấy của Owner khác hay của người khác (Admin)
+    @Test
+    void ownVaultDeleted_appearsInOwnerLog_otherOwnersAndAdminDoNot() throws Exception {
+        Fixture a = fixture("d");
+        Fixture b = fixture("e");
+        User admin = admin();
+        Vault vaultA = vault(a.ownerId, "deleted-a");
+        Vault vaultB = vault(b.ownerId, "deleted-b");
+        Vault vaultAByAdmin = vault(a.ownerId, "admin-a");
+
+        // Qua service thật: VAULT_DELETED có actor = Owner, vaultId = id Vault, entity "Vault", detail "name=<tên>"
+        vaultService.deleteVault(vaultA.getId(), a.ownerId);
+        vaultService.deleteVault(vaultB.getId(), b.ownerId);
+        // Phòng thủ: hiện chưa có luồng Admin xóa Vault; giả lập log cùng tham số với deleteVault nhưng actor là Admin
+        auditLogService.log(AuditAction.VAULT_DELETED, AuditResult.SUCCESS, admin.getId(), admin.getEmail(),
+                vaultAByAdmin.getId(), "Vault", vaultAByAdmin.getId().toString(), null);
+        UUID deletedByA = vaultDeletedLogId(a.ownerId);
+        UUID deletedByB = vaultDeletedLogId(b.ownerId);
+        UUID deletedByAdmin = vaultDeletedLogId(admin.getId());
+
+        Page<VaultActivityLogResponse> logsA = ownerActivityLogService.getOwnerActivityLogs(
+                a.ownerId, null, null, PageRequest.of(0, 50));
+        Page<VaultActivityLogResponse> logsB = ownerActivityLogService.getOwnerActivityLogs(
+                b.ownerId, null, null, PageRequest.of(0, 50));
+        Page<VaultActivityLogResponse> firstOfOneA = ownerActivityLogService.getOwnerActivityLogs(
+                a.ownerId, null, null, PageRequest.of(0, 1));
+
+        assertThat(logsA.getContent()).extracting(VaultActivityLogResponse::getId)
+                .contains(deletedByA)
+                .doesNotContain(deletedByB, deletedByAdmin);
+        assertThat(logsA.getContent())
+                .filteredOn(r -> r.getAction() == AuditAction.VAULT_DELETED)
+                .singleElement()
+                .satisfies(r -> {
+                    assertThat(r.getId()).isEqualTo(deletedByA);
+                    assertThat(r.getActorName()).isEqualTo("You");
+                    // FR-05: Vault đã xóa cứng, tên lấy từ detail
+                    assertThat(r.getDescription()).isEqualTo("Deleted the vault \"Vault deleted-a\".");
+                });
+        assertThat(logsA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
+        assertThat(firstOfOneA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
+
+        assertThat(logsB.getContent()).extracting(VaultActivityLogResponse::getId)
+                .contains(deletedByB)
+                .doesNotContain(deletedByA, deletedByAdmin);
+    }
+
+    // FR-05: không truyền from -> log cũ hơn 30 ngày (và hơn 1 năm) vẫn được trả về
+    @Test
+    void noFromDate_returnsLogsOlderThan30Days() {
+        Fixture a = fixture("o");
+        UUID configured = UUID.fromString(jdbcTemplate.queryForObject(
+                "SELECT BIN_TO_UUID(id) FROM audit_logs WHERE action = 'DMS_CONFIGURED'"
+                        + " AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
+                String.class, "%ownerId=" + a.ownerId + "%"));
+        jdbcTemplate.update("UPDATE audit_logs SET created_at = ? WHERE BIN_TO_UUID(id) = ?",
+                Timestamp.from(Instant.now().minus(400, ChronoUnit.DAYS)), configured.toString());
 
         Page<VaultActivityLogResponse> logs = ownerActivityLogService.getOwnerActivityLogs(
                 a.ownerId, null, null, PageRequest.of(0, 50));
 
         assertThat(logs.getContent())
-                .filteredOn(r -> r.getAction() == AuditAction.DMS_SUSPENDED)
+                .filteredOn(r -> r.getId().equals(configured))
                 .singleElement()
-                .satisfies(r -> {
-                    assertThat(r.getActorName()).isEqualTo("System administrator");
-                    assertThat(r.getDescription()).isEqualTo("An administrator suspended the Dead Man's Switch.");
-                });
+                .satisfies(r -> assertThat(r.getCreatedAt()).isBefore(Instant.now().minus(30, ChronoUnit.DAYS)));
+        assertThat(logs.getTotalElements()).isEqualTo(a.ownerLogIds().size());
     }
 
     @Test
@@ -240,6 +328,26 @@ class OwnerActivityLogIntegrationTest {
         assertThat(ownerLogIds).hasSize(4);
         assertThat(vaultLogIds).hasSize(2);
         return new Fixture(owner.getId(), ownerLogIds, vaultLogIds);
+    }
+
+    private User admin() {
+        User admin = user("admin-" + UUID.randomUUID().toString().substring(0, 8));
+        admin.getRoles().add(roleRepository.findByCode("ADMIN").orElseThrow());
+        return userRepository.save(admin);
+    }
+
+    private Vault vault(UUID ownerId, String name) {
+        return vaultRepository.save(Vault.builder()
+                .owner(userRepository.findById(ownerId).orElseThrow())
+                .name("Vault " + name)
+                .build());
+    }
+
+    // id log VAULT_DELETED do actor này ghi (detail không có ownerId nên không tra theo ownerId trong detail được)
+    private UUID vaultDeletedLogId(UUID actorId) {
+        return UUID.fromString(jdbcTemplate.queryForObject(
+                "SELECT BIN_TO_UUID(id) FROM audit_logs WHERE action = 'VAULT_DELETED' AND BIN_TO_UUID(actor_id) = ?",
+                String.class, actorId.toString()));
     }
 
     // id các audit log của Owner này, tách theo có / không có vault_id

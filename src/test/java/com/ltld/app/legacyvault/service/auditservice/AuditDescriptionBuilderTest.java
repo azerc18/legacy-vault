@@ -106,6 +106,21 @@ class AuditDescriptionBuilderTest {
                 .isEqualTo("Created a new vault.");
     }
 
+    // FR-05: deleteVault ghi detail "name=<tên>" nên mô tả có tên Vault
+    @Test
+    void describe_vaultDeletedWithName_includesVaultName() {
+        assertThat(builder.describe(log(AuditAction.VAULT_DELETED, owner(),
+                Map.of("result", "SUCCESS", "detail", "name=Family Vault"))))
+                .isEqualTo("Deleted the vault \"Family Vault\".");
+    }
+
+    // FR-05: log cũ ghi trước khi có tên (detail null) giữ câu cũ
+    @Test
+    void describe_vaultDeletedWithoutDetail_keepsGenericSentence() {
+        assertThat(builder.describe(log(AuditAction.VAULT_DELETED, owner(), Map.of("result", "SUCCESS"))))
+                .isEqualTo("Deleted the vault.");
+    }
+
     @Test
     void toResponse_executorActor_isMaskedAndIpHidden() {
         User executor = new User();
