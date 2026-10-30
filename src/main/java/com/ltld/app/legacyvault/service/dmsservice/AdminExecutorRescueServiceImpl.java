@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -46,12 +47,8 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
                 .orElseThrow(() -> new DmsException("This owner has not configured a Dead Man's Switch.", HttpStatus.NOT_FOUND));
         List<ExecutorAssignment> assignments = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
         LocalDateTime now = LocalDateTime.now();
-        if (!ExecutorRescueRule.rescueNeeded(config, assignments, now,
-                a -> legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
-                        ownerId, a.getExecutorUser().getId(), a.getActivatedAt()))) {
-            throw new DmsException(config.getStatus() != DmsStatus.TRIGGERED
-                    ? "Rescue is only available after the Dead Man's Switch has been triggered."
-                    : "This owner still has an active executor who can handle the handover.", HttpStatus.CONFLICT);
+        if (!ExecutorRescueRule.rescueNeeded(config, assignments, now, a -> hasSubmitted(ownerId, a))) {
+            throw new DmsException(refusedMessage(config, assignments), HttpStatus.CONFLICT);
         }
 
         User owner = config.getOwner();
@@ -80,8 +77,18 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
                 && !primary.getExecutorUser().getId().equals(candidate.getId())
                 ? primary.getExecutorUser() : null;
 
-        // Khóa user theo thứ tự id TRƯỚC khi đọc roles (LAZY), giống ExecutorManagementServiceImpl
-        lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
+        // FR-07: Executor ACTIVE khác dòng PRIMARY (Backup đã được kích hoạt rồi bỏ dở) cũng bị thu hồi,
+        // để mỗi Owner chỉ có một Executor ACTIVE.
+        List<ExecutorAssignment> displaced = assignments.stream()
+                .filter(a -> a != primary && a.getStatus() == ExecutorStatus.ACTIVE)
+                .toList();
+
+        // Khóa MỌI user liên quan theo thứ tự id tăng dần TRƯỚC khi đọc roles (LAZY), giống ExecutorManagementServiceImpl
+        List<UUID> toLock = new ArrayList<>();
+        toLock.add(candidate.getId());
+        if (previous != null) toLock.add(previous.getId());
+        displaced.forEach(a -> toLock.add(a.getExecutorUser().getId()));
+        lockUsersInOrder(toLock.toArray(new UUID[0]));
 
         ExecutorAssignment assignment = primary != null
                 ? primary
@@ -97,11 +104,13 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         if (previous != null) {
             executorRoleManager.revokeIfUnused(previous, assignment.getId());
         }
+        for (ExecutorAssignment d : displaced) {
+            d.setStatus(ExecutorStatus.REVOKED);
+            d.setRevokedAt(now);
+            executorRoleManager.revokeIfUnused(d.getExecutorUser(), d.getId());
+        }
         ExecutorAssignment saved = executorAssignmentRepository.saveAndFlush(assignment);
 
-        // Mail kích hoạt: lưu Notification FAILED, attemptCount = 0.
-        // Job escalateUnresponsivePrimaries (mỗi 5 phút) sẽ gửi qua retryFailedNotification và đặt sentAt,
-        // nên đồng hồ 14 ngày BR-03 và cơ chế gửi lại dùng đúng logic hiện có, không gửi mail trong transaction.
         notificationRepository.save(Notification.builder()
                 .recipient(candidate)
                 .type(NotificationType.EXECUTOR_ACTIVATED)
@@ -113,17 +122,29 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
                 .attemptCount(0)
                 .build());
 
+        // Mail "Admin đã thay bạn" cho mọi người bị thay, gửi sau commit qua listener có sẵn
+        int waitDays = config.getBackupActivationWaitDays();
+        List<ExecutorMail> mails = new ArrayList<>();
         if (previous != null) {
-            // Gửi sau commit qua listener có sẵn
-            eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(
-                    ExecutorMail.revoked(previous.getEmail(), owner.getFullName(), owner.getEmail(), ExecutorType.PRIMARY))));
+            mails.add(ExecutorMail.replacedByAdmin(previous.getEmail(), owner.getFullName(), owner.getEmail(),
+                    ExecutorType.PRIMARY, waitDays));
+        }
+        for (ExecutorAssignment d : displaced) {
+            mails.add(ExecutorMail.replacedByAdmin(d.getExecutorUser().getEmail(), owner.getFullName(),
+                    owner.getEmail(), d.getExecutorType(), waitDays));
+        }
+        if (!mails.isEmpty()) {
+            eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(mails));
         }
 
+        String revokedIds = displaced.stream().map(d -> d.getExecutorUser().getId().toString())
+                .collect(Collectors.joining(","));
         String adminEmail = userRepository.findById(adminId).map(User::getEmail).orElse(null);
         auditLogService.log(AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN, AuditResult.SUCCESS, adminId, adminEmail, null,
                 DmsActivationProcessor.ENTITY_EXECUTOR_ASSIGNMENT, saved.getId().toString(),
                 "ownerId=" + ownerId + ", executorUserId=" + candidate.getId()
-                        + (previous != null ? ", previousExecutorUserId=" + previous.getId() : ""));
+                        + (previous != null ? ", previousExecutorUserId=" + previous.getId() : "")
+                        + (displaced.isEmpty() ? "" : ", revokedExecutorUserIds=" + revokedIds));
 
         return ExecutorAssignmentResponse.builder()
                 .assignmentId(saved.getId())
@@ -133,8 +154,24 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
                 .fullName(candidate.getFullName())
                 .assignedAt(saved.getAssignedAt())
                 .activatedAt(saved.getActivatedAt())
+                .acknowledgedAt(saved.getAcknowledgedAt())
                 .revokedAt(saved.getRevokedAt())
                 .build();
+    }
+
+    private boolean hasSubmitted(UUID ownerId, ExecutorAssignment a) {
+        return legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
+                ownerId, a.getExecutorUser().getId(), a.getActivatedAt());
+    }
+
+    private static String refusedMessage(DmsConfig config, Collection<ExecutorAssignment> assignments) {
+        if (config.getStatus() != DmsStatus.TRIGGERED) {
+            return "Rescue is only available after the Dead Man's Switch has been triggered.";
+        }
+        if (ExecutorRescueRule.hasStandbyBackup(assignments)) {
+            return "This owner has a standby backup executor who can take over the handover.";
+        }
+        return "This owner still has an active executor who can handle the handover.";
     }
 
     private void lockUsersInOrder(UUID... ids) {

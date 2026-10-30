@@ -25,8 +25,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
 import java.time.LocalDateTime;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -159,9 +159,9 @@ public class AdminUserServiceImpl implements AdminUserService{
                 .collect(Collectors.toMap(c -> c.getOwner().getId(), c -> c));
         Map<UUID, List<ExecutorAssignment>> active = executorAssignmentRepository.findActiveWithUserByOwnerIdIn(ids)
                 .stream().collect(Collectors.groupingBy(a -> a.getOwner().getId()));
+        LocalDateTime now = LocalDateTime.now();
         return users.map(u -> {
             DmsConfig c = configs.get(u.getId());
-            LocalDateTime now = LocalDateTime.now();
             return build(u, c, ExecutorRescueRule.rescueNeeded(c, active.getOrDefault(u.getId(), List.of()), now,
                     a -> legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
                             u.getId(), a.getExecutorUser().getId(), a.getActivatedAt())));
