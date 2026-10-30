@@ -5,6 +5,7 @@ import { getErrorMessage } from '../api/http.js';
 import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -304,6 +305,20 @@ function MessagesSection({ assignmentId, progress }) {
 
     useEffect(() => { loadMessages(); }, [loadMessages]);
 
+    // Mở tab ngay trong lúc click (trước await) để trình duyệt không chặn pop-up, giống trang Verifier
+    const openAttachment = async (messageId) => {
+        setError('');
+        const tab = window.open('', '_blank');
+        try {
+            const res = await executorApi.getAttachmentBlob(assignmentId, requestId, messageId);
+            if (tab) showBlobInTab(tab, res.data);
+            else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
+        } catch (err) {
+            if (tab) tab.close();
+            setError(await getBlobErrorMessage(err, 'Could not open the attachment.'));
+        }
+    };
+
     if (requests.length === 0) return null;
     const selectedRequest = requests.find((r) => r.requestId === requestId);
 
@@ -345,7 +360,10 @@ function MessagesSection({ assignmentId, progress }) {
                             <p className="text-xs text-outline mb-1">{mine ? 'You' : m.senderName || 'Legal Verifier'} · {formatDate(m.createdAt, true)}</p>
                             {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
                             {m.attachmentName && (
-                                <p className="mt-1 text-xs flex items-center gap-1"><Icon name="attach_file" className="text-[16px]" />{m.attachmentName}</p>
+                                <button type="button" onClick={() => openAttachment(m.id)}
+                                    className="mt-1 text-xs flex items-center gap-1 text-primary underline hover:no-underline">
+                                    <Icon name="attach_file" className="text-[16px]" />{m.attachmentName}
+                                </button>
                             )}
                         </div>
                     );
