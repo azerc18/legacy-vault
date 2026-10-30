@@ -4,6 +4,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager, isAdmin } from './adminUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const STATUS = {
     ACTIVE: { label: 'Active', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
@@ -48,7 +49,7 @@ export default function AdminVaults() {
 
             <Alert>{error}</Alert>
             {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && <p className="text-on-surface-variant">No vaults found.</p>}
+            {data && rows.length === 0 && 	<EmptyState bordered icon="inventory_2" title="No vaults found" text="Try another status filter." />}
 
             {rows.length > 0 && (
                 <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">

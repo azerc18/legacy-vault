@@ -5,6 +5,34 @@ import http from './http.js';
 const BASE = '/executor-assignments';
 const unwrap = (res) => res.data?.data;
 
+// Lấy tên file từ header Content-Disposition (hỗ trợ filename*=UTF-8''...)
+function fileNameFrom(res, fallback) {
+    const cd = res.headers['content-disposition'] || '';
+    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (star) return decodeURIComponent(star[1]);
+    const plain = cd.match(/filename="?([^";]+)"?/i);
+    return plain ? plain[1] : fallback;
+}
+
+// Tải blob về máy. Lỗi trả về dạng Blob JSON -> đọc lại để getErrorMessage lấy được message của BE
+async function downloadBlob(url, fallbackName) {
+    try {
+        const res = await http.get(url, { responseType: 'blob' });
+        const href = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = fileNameFrom(res, fallbackName);
+        a.click();
+        URL.revokeObjectURL(href);
+    } catch (err) {
+        const blob = err.response?.data;
+        if (blob instanceof Blob) {
+            try { err.response.data = JSON.parse(await blob.text()); } catch { /* giữ nguyên */ }
+        }
+        throw err;
+    }
+}
+
 export const executorApi = {
     // B1: các assignment chưa REVOKED của người đang đăng nhập
     // -> [{ assignmentId, ownerFullName, executorType, status, assignedAt, activatedAt, acknowledgedAt }]
@@ -51,6 +79,11 @@ export const executorApi = {
         if (file) form.append('file', file);
         return http.post(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages`, form).then(unwrap);
     },
+    // B5: tải tệp đính kèm (đã giải mã) của một tin nhắn trong hồ sơ của mình
+    downloadAttachment: (assignmentId, requestId, messageId, fileName) =>
+        downloadBlob(
+            `${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
+            fileName || 'attachment'),
     // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,

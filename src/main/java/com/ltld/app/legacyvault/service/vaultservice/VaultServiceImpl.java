@@ -146,12 +146,12 @@ public class VaultServiceImpl implements VaultService {
         String vaultName = vault.getName();
 
         // 4. Thu thập đường dẫn file TRƯỚC khi xóa DB — N1 fix
-        List<LegalDocument> docs = legalDocumentRepository.findByVaultId(vaultId);
-        List<String> filesToDelete = docs.stream().map(LegalDocument::getFileUrlEncrypted).toList();
+        List<String> filesToDelete = legalDocumentRepository.findFileUrlsByVaultId(vaultId);
 
-        // Xóa DB bằng batch (nhanh hơn forEach) — ràng buộc FK theo thứ tự
-        legalDocumentRepository.deleteAllInBatch(docs);
-        digitalAssetRepository.deleteAllInBatch(digitalAssetRepository.findByVaultId(vaultId));
+        // Bulk DELETE theo vaultId: không nạp entity con vào persistence context,
+        // nên khi xóa Vault không còn DigitalAsset/LegalDocument nào trỏ tới nó (tránh TransientPropertyValueException)
+        legalDocumentRepository.deleteByVaultId(vaultId);
+        digitalAssetRepository.deleteByVaultId(vaultId);
 
         // 5. Đập cái két (Vault)
         vaultRepository.delete(vault);

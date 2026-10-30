@@ -157,8 +157,7 @@ class VaultServiceImplTest {
         vault.setStatus(VaultStatus.ACTIVE);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
-        when(digitalAssetRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
-        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(Collections.emptyList());
+        when(legalDocumentRepository.findFileUrlsByVaultId(vaultId)).thenReturn(Collections.emptyList());
 
         // Bật synchronization để registerSynchronization trong service không ném IllegalStateException
         TransactionSynchronizationManager.initSynchronization();
@@ -172,9 +171,12 @@ class VaultServiceImplTest {
         }
 
         // Đảm bảo phải tìm tài sản và tài liệu để xóa trước, rồi mới xóa vault sau
-        verify(digitalAssetRepository, times(1)).findByVaultId(vaultId);
-        verify(legalDocumentRepository, times(1)).findByVaultId(vaultId);
-        verify(vaultRepository, times(1)).delete(vault);
+        // Lấy đường dẫn file trước, rồi bulk delete con, cuối cùng mới xóa vault
+        verify(legalDocumentRepository).findFileUrlsByVaultId(vaultId);
+        verify(legalDocumentRepository).deleteByVaultId(vaultId);
+        verify(digitalAssetRepository).deleteByVaultId(vaultId);
+        verify(vaultRepository).delete(vault);
+        verifyNoInteractions(fileStorageService);
     }
 
     // Kịch bản 3: Cố tình xóa Vault của người khác -> Phải văng lỗi (Business Rule)
@@ -225,16 +227,8 @@ class VaultServiceImplTest {
         vault.setOwner(mockOwner);
         vault.setStatus(VaultStatus.ACTIVE);
 
-        DigitalAsset asset = new DigitalAsset();
-        asset.setId(UUID.randomUUID());
-
-        com.ltld.app.legacyvault.entity.LegalDocument doc = new com.ltld.app.legacyvault.entity.LegalDocument();
-        doc.setId(UUID.randomUUID());
-        doc.setFileUrlEncrypted("uploads/test-file.pdf");
-
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
-        when(digitalAssetRepository.findByVaultId(vaultId)).thenReturn(List.of(asset));
-        when(legalDocumentRepository.findByVaultId(vaultId)).thenReturn(List.of(doc));
+        when(legalDocumentRepository.findFileUrlsByVaultId(vaultId)).thenReturn(List.of("uploads/test-file.pdf"));
 
         // Bật synchronization để registerSynchronization trong service không ném IllegalStateException
         TransactionSynchronizationManager.initSynchronization();
@@ -247,8 +241,8 @@ class VaultServiceImplTest {
             TransactionSynchronizationManager.clearSynchronization();
         }
 
-        verify(legalDocumentRepository).deleteAllInBatch(List.of(doc));
-        verify(digitalAssetRepository).deleteAllInBatch(List.of(asset));
+        verify(legalDocumentRepository).deleteByVaultId(vaultId);
+        verify(digitalAssetRepository).deleteByVaultId(vaultId);
         verify(vaultRepository).delete(vault);
         // File phải bị xóa TRONG afterCommit (sau khi DB commit), không phải trong transaction
         verify(fileStorageService).deleteFile("uploads/test-file.pdf");

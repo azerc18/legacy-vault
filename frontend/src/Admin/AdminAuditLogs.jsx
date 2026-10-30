@@ -4,6 +4,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager } from './adminUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 // <input type="datetime-local"> -> ISO string cho BE
 const toIso = (local) => (local ? new Date(local).toISOString() : undefined);
@@ -72,7 +73,9 @@ export default function AdminAuditLogs() {
             <Alert>{error}</Alert>
 
             {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && <p className="text-on-surface-variant">No log entries match these filters.</p>}
+            {data && rows.length === 0 && <EmptyState bordered icon={status === 'OPEN' ? 'verified' : 'notifications_off'}
+                                                      title={status === 'OPEN' ? 'All clear' : 'No acknowledged alerts yet'}
+                                                      text={status === 'OPEN' ? 'Failed notifications and stuck hand-overs will show up here.' : 'Alerts you acknowledge will be listed here.'} />}
 
             {rows.length > 0 && (
                 <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">

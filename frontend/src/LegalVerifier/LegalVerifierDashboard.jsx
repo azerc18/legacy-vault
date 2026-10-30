@@ -5,6 +5,8 @@ import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
 import VerifierHeader from './VerifierHeader.jsx';
+import {PAGE_WIDTH} from "../Common/AppHeader.jsx";
+import EmptyState from '../Common/EmptyState.jsx';
 
 export default function LegalVerifierDashboard() {
     const [requests, setRequests] = useState([]);
@@ -28,7 +30,7 @@ export default function LegalVerifierDashboard() {
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col">
             <VerifierHeader title="Verification Requests" subtitle="Select a case to view details and process it." />
 
-            <main className="w-full pt-8 pb-12 flex-1 max-w-[1440px] mx-auto px-6">
+            <main className={`${PAGE_WIDTH} w-full pt-6 pb-12 flex-1`}>
                 <Link to="/verifier/history" className="inline-flex items-center gap-1.5 mb-8 text-secondary font-semibold hover:text-primary">
                     <span className="material-symbols-outlined text-[20px]">history</span>
                     View verification history
@@ -37,7 +39,8 @@ export default function LegalVerifierDashboard() {
                 {loading && <p>Loading...</p>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
                 {!loading && !error && requests.length === 0 && (
-                    <p className="text-on-surface-variant">You're all caught up — no requests waiting.</p>
+                    <EmptyState bordered icon="task_alt" title="You're all caught up"
+                                text="No requests are waiting for review. New requests from executors will appear here." />
                 )}
 
                 <RequestGroup title="Awaiting your signature" items={awaitingSign} />

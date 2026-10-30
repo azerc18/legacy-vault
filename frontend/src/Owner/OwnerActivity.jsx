@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 // Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
 // Không gửi startDate thì BE trả toàn bộ lịch sử, không giới hạn độ dài khoảng ngày. value 0 = "All time".
@@ -47,7 +48,10 @@ export default function OwnerActivity() {
             <Alert>{error}</Alert>
             <Card>
                 {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
-                {data && rows.length === 0 && <p className="text-sm text-on-surface-variant">No activity in this period.</p>}
+                {data && rows.length === 0 && (
+                    <EmptyState compact icon="history" title={days > 0 ? 'No activity in this period' : 'No activity yet'}
+                                text={days > 0 ? 'Choose a longer range above to see older events.' : "Check-ins, Dead Man's Switch changes and executor events will appear here."} />
+                )}
                 {rows.length > 0 && (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">

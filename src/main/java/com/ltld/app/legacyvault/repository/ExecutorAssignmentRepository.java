@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,4 +46,9 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
     List<ExecutorAssignment> findLiveByExecutorEmail(@Param("email") String email);
     // D3: Executor này còn assignment ACTIVE với Owner này không.
     boolean existsByOwnerIdAndExecutorUserIdAndStatus(UUID ownerId, UUID executorUserId, ExecutorStatus status);
+
+    // Admin: assignment ACTIVE của nhiều Owner, kèm user để kiểm tra tài khoản còn ACTIVE (1 query, không N+1)
+    @Query("select a from ExecutorAssignment a join fetch a.executorUser " +
+            "where a.owner.id in :ownerIds and a.status = com.ltld.app.legacyvault.enums.ExecutorStatus.ACTIVE")
+    List<ExecutorAssignment> findActiveWithUserByOwnerIdIn(@Param("ownerIds") Collection<UUID> ownerIds);
 }
