@@ -7,7 +7,8 @@ const unwrap = (res) => res.data?.data;
 
 export const executorApi = {
     // B1: các assignment chưa REVOKED của người đang đăng nhập
-    // -> [{ assignmentId, ownerFullName, executorType, status, assignedAt, activatedAt, acknowledgedAt }]
+    // -> [{ assignmentId, ownerFullName, ownerEmail, executorType, status, assignedAt, activatedAt, acknowledgedAt,
+    //      vaultCount, latestRequestStatus, unreadMessageCount, acknowledgeDeadlineAt (chỉ khi ACTIVE và chưa xác nhận) }]
     listMine: () => http.get(`${BASE}/me`).then((r) => unwrap(r) ?? []),
 
     // FR-07: xác nhận đã nhận thông báo kích hoạt -> { id, executorType, status, activatedAt, acknowledgedAt }
