@@ -189,8 +189,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
         // FR-13: ghi nhận verifier đã xem (chỉ hồ sơ PENDING), không đụng tiến độ của verifier khác
         if (progress != null && progress.getViewedAt() == null) {
-            progress.setViewedAt(LocalDateTime.now());
-            progressRepository.save(progress);
+            progressRepository.markViewed(requestId, verifierId, LocalDateTime.now());
         }
 
         String contentType = UploadedDocumentValidator.detectContentType(plain);
@@ -246,11 +245,12 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         LegalVerificationRequest request = findRequestForUpdateOrThrow(requestId);
         assertPendingOrApprovedUnsigned(request, verifierId);
         assertNoConflictOfInterest(request, verifierId);
-        // FR-13: từ chối hồ sơ PENDING thì phải đã Check (hợp lệ hay không đều được; không bắt buộc View)
+        // FR-13: từ chối hồ sơ PENDING phải đã XEM tài liệu (View chỉ mở được sau Check; Check chỉ kiểm tự động
+        // theo loại tệp nên quyết định từ chối luôn có người xem thật). APPROVED do mình duyệt thì đã xem rồi.
         if (request.getStatus() == LegalVerificationStatus.PENDING) {
             VerificationReviewProgress progress = progressOf(requestId, verifierId);
-            if (progress == null || progress.getCheckedAt() == null) {
-                throw new VerificationStepRequiredException("Please check the document before rejecting.");
+            if (progress == null || progress.getViewedAt() == null) {
+                throw new VerificationStepRequiredException("Please view the document before rejecting.");
             }
         }
         RejectionReason reasonCode = dto.getReason();

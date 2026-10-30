@@ -204,7 +204,7 @@ export default function VerificationRequestDetail() {
     }
 
     const dialog = confirm ? CONFIRM_TEXT[confirm] : null;
-    // FR-13: bắt buộc Check (hợp lệ) → View → Approve; Reject chỉ cần đã Check
+    // FR-13: bắt buộc Check (hợp lệ) → View → Approve; Reject cần đã View (View chỉ mở được sau Check)
     const isPending = req.status === 'PENDING';
     const canApprove = isPending && req.documentViewed && req.documentChecked && req.documentValid === true;
     const checkResult = docCheck ?? (req.documentChecked
@@ -249,8 +249,8 @@ export default function VerificationRequestDetail() {
 
             <button
                 onClick={askReject}
-                disabled={busy || (isPending && !req.documentChecked)}
-                title={isPending && !req.documentChecked ? 'Check the document first' : undefined}
+                disabled={busy || (isPending && !req.documentViewed)}
+                title={isPending && !req.documentViewed ? 'View the document first' : undefined}
                 className="w-full h-12 rounded-xl bg-error-container text-on-error-container font-bold hover:bg-error hover:text-on-error transition-all disabled:opacity-50"
             >
                 Reject request
@@ -322,7 +322,7 @@ export default function VerificationRequestDetail() {
                                         {/* Bước 1: Check (sàng lọc tự động). Bước 2: View (xem tài liệu thật, BE ghi nhận) */}
                                         <button
                                             onClick={handleCheckDocument}
-                                            disabled={busy}
+                                            disabled={busy || viewing}
                                             className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
                                         >
                                             <span className="material-symbols-outlined text-[20px]">fact_check</span>
@@ -362,16 +362,16 @@ export default function VerificationRequestDetail() {
                             <div className="mt-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant/40">
                                 <ol className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold">
                                     {[
-                                        { n: 1, label: 'Check', done: !!req.documentChecked && req.documentValid !== false },
-                                        { n: 2, label: 'View', done: !!req.documentViewed },
-                                        { n: 3, label: 'Approve', done: false },
+                                        { n: 1, label: 'Check', state: !req.documentChecked ? 'todo' : (req.documentValid === false ? 'failed' : 'done') },
+                                        { n: 2, label: 'View', state: req.documentViewed ? 'done' : 'todo' },
+                                        { n: 3, label: 'Approve', state: 'todo' },
                                     ].map((st, i) => (
                                         <React.Fragment key={st.n}>
                                             {i > 0 && <span className="material-symbols-outlined text-[18px] text-outline">arrow_forward</span>}
-                                            <li className={`flex items-center gap-2 ${st.done ? 'text-success' : 'text-on-surface-variant'}`}>
-                                                {st.done ? (
-                                                    <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                                                ) : (
+                                            <li className={`flex items-center gap-2 ${st.state === 'done' ? 'text-success' : st.state === 'failed' ? 'text-error' : 'text-on-surface-variant'}`}>
+                                                {st.state === 'done' && <span className="material-symbols-outlined text-[20px]">check_circle</span>}
+                                                {st.state === 'failed' && <span className="material-symbols-outlined text-[20px]">cancel</span>}
+                                                {st.state === 'todo' && (
                                                     <span className="w-5 h-5 rounded-full border border-outline-variant text-xs flex items-center justify-center">{st.n}</span>
                                                 )}
                                                 {st.label}
@@ -379,7 +379,7 @@ export default function VerificationRequestDetail() {
                                         </React.Fragment>
                                     ))}
                                 </ol>
-                                <p className="mt-2 text-xs text-on-surface-variant">Rejecting only needs step 1 (Check).</p>
+                                <p className="mt-2 text-xs text-on-surface-variant">Rejecting needs steps 1–2 (Check, View).</p>
                             </div>
                         )}
                     </section>

@@ -185,7 +185,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void reject_success_setsStatusRejectedAndSavesReason() {
         RejectVerificationRequestDto dto = rejectDto(RejectionReason.DOCUMENT_INVALID, null);
-        checkedOnly();
+        viewedAndChecked();
 
         User verifierUser = User.builder().id(verifierId).build();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
@@ -211,7 +211,7 @@ public class LegalVerificationServiceImplTest {
     // FR-12: chọn "Lý do khác" kèm ghi chú -> cột text lưu "label: note", audit không ghi note
     @Test
     void reject_otherWithNote_savesLabelAndNote_auditHasNoNote() {
-        checkedOnly();
+        viewedAndChecked();
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
         when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
         when(requestRepository.save(any(LegalVerificationRequest.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -225,9 +225,9 @@ public class LegalVerificationServiceImplTest {
                 eq("reason=OTHER"));
     }
 
-    // FR-13: từ chối hồ sơ PENDING khi chưa Check -> 409
+    // FR-13: từ chối hồ sơ PENDING khi chưa xem tài liệu -> 409
     @Test
-    void reject_pendingNotChecked_throwsStepRequired() {
+    void reject_pendingNotViewed_throwsStepRequired() {
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId,
@@ -237,9 +237,34 @@ public class LegalVerificationServiceImplTest {
         verify(requestRepository, never()).save(any());
     }
 
-    // FR-13: người khác đã Check thì không tính cho verifier này
+    // FR-13: đã Check nhưng chưa View thì chưa được từ chối
     @Test
-    void reject_pendingCheckedByAnotherVerifier_throwsStepRequired() {
+    void reject_checkedButNotViewed_throwsStepRequired() {
+        checkedOnly();
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.reject(requestId, verifierId,
+                rejectDto(RejectionReason.DOCUMENT_INVALID, null)))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verify(requestRepository, never()).save(any());
+    }
+
+    // FR-13: Check không hợp lệ nhưng đã View thì từ chối được (trường hợp phổ biến nhất)
+    @Test
+    void reject_checkedInvalidAndViewed_rejects() {
+        viewedAndChecked().setDocumentValid(false);
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
+        when(requestRepository.save(any(LegalVerificationRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.reject(requestId, verifierId, rejectDto(RejectionReason.DOCUMENT_INVALID, null));
+
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.REJECTED);
+    }
+
+    // FR-13: người khác đã xem thì không tính cho verifier này
+    @Test
+    void reject_pendingViewedByAnotherVerifier_throwsStepRequired() {
         otherVerifierHasFullProgress(UUID.randomUUID());
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
@@ -1070,7 +1095,7 @@ public class LegalVerificationServiceImplTest {
 
     @Test
     void getDocument_pendingAfterCheck_returnsDecryptedBytesAndRecordsView() throws Exception {
-        VerificationReviewProgress progress = checkedOnly();
+        checkedOnly();
         byte[] cipher = "cipher-bytes".getBytes();
         byte[] plain = "%PDF-1.4 noi dung giay chung tu".getBytes();
 
@@ -1084,8 +1109,7 @@ public class LegalVerificationServiceImplTest {
         assertThat(dto.getContentType()).isEqualTo("application/pdf");
         assertThat(dto.getFileName()).endsWith(".pdf");
         // FR-13: ghi nhận verifier đã xem (dòng riêng của verifier này)
-        assertThat(progress.getViewedAt()).isNotNull();
-        verify(progressRepository).save(progress);
+        verify(progressRepository).markViewed(eq(requestId), eq(verifierId), any());
         verify(auditLogService).log(eq(AuditAction.LEGAL_DOCUMENT_VIEWED), eq(AuditResult.SUCCESS),
                 eq(verifierId), any(), eq("LegalVerificationRequest"), eq(requestId.toString()), isNull());
     }
@@ -1099,7 +1123,7 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(VerificationStepRequiredException.class);
 
         verify(fileStorageService, never()).readFile(any());
-        verify(progressRepository, never()).save(any());
+        verify(progressRepository, never()).markViewed(any(), any(), any());
     }
 
     // FR-13: người khác đã Check thì không tính cho verifier này
@@ -1124,14 +1148,13 @@ public class LegalVerificationServiceImplTest {
 
         service.getDocument(requestId, verifierId);
 
-        assertThat(progress.getViewedAt()).isNotNull();
+        verify(progressRepository).markViewed(eq(requestId), eq(verifierId), any());
     }
 
     // FR-13: đã View rồi thì xem lại không ghi đè thời điểm cũ
     @Test
-    void getDocument_alreadyViewed_keepsFirstViewTime() throws Exception {
-        VerificationReviewProgress progress = viewedAndChecked();
-        java.time.LocalDateTime firstView = progress.getViewedAt();
+    void getDocument_alreadyViewed_doesNotOverwriteFirstViewTime() throws Exception {
+        viewedAndChecked();
         byte[] cipher = "c".getBytes();
         when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
         when(fileStorageService.readFile("enc://test.pdf")).thenReturn(cipher);
@@ -1139,8 +1162,7 @@ public class LegalVerificationServiceImplTest {
 
         service.getDocument(requestId, verifierId);
 
-        assertThat(progress.getViewedAt()).isEqualTo(firstView);
-        verify(progressRepository, never()).save(any());
+        verify(progressRepository, never()).markViewed(any(), any(), any());
     }
 
     // FR-13: xem lại hồ sơ đã APPROVED không ghi tiến độ và không cần Check
@@ -1154,7 +1176,7 @@ public class LegalVerificationServiceImplTest {
 
         service.getDocument(requestId, verifierId);
 
-        verify(progressRepository, never()).save(any());
+        verify(progressRepository, never()).markViewed(any(), any(), any());
         verifyNoInteractions(progressRecorder);
     }
 
