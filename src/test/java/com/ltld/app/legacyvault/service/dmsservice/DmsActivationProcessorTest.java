@@ -701,9 +701,10 @@ class DmsActivationProcessorTest {
     void activationMessage_withoutOwnerName_doesNotPrintNull() {
         User owner = User.builder().id(ownerId).email("owner@example.test").build();
 
-        String content = DmsActivationProcessor.activationMessage(owner, backup);
+        String content = DmsActivationProcessor.activationMessage(owner, backup, 14);
 
         assertThat(content)
+                .contains("within 14 days")
                 .contains("The Dead Man's Switch of owner@example.test has been triggered")
                 .contains("Backup executor")
                 .contains(backup.getId().toString())
