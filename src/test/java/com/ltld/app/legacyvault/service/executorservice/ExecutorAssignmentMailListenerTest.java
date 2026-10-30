@@ -81,10 +81,10 @@ class ExecutorAssignmentMailListenerTest {
     void replacedByAdmin_usesAdminNotice() {
         listener.on(new ExecutorAssignmentChangedEvent(List.of(
                 ExecutorMail.replacedByAdmin("old@example.test", "Owner A", "owner@example.test",
-                        ExecutorType.BACKUP, 14))));
+                        ExecutorType.BACKUP))));
 
         verify(emailSender).sendExecutorReplacedByAdminNotice(
-                "old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP, 14);
+                "old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP);
         verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
     }
 

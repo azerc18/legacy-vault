@@ -79,6 +79,6 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
             + "WHERE r.id = :id AND (r.executorLastReadAt IS NULL OR r.executorLastReadAt < :readAt)")
     int markExecutorRead(@Param("id") UUID id, @Param("readAt") LocalDateTime readAt);
 
-    // D3: Executor đã nộp hồ sơ xác minh cho Owner này sau thời điểm `after` chưa
+    // FR-07: Executor đã nộp hồ sơ xác minh cho Owner này sau thời điểm `after` chưa
     boolean existsByOwnerIdAndExecutorIdAndCreatedAtAfter(UUID ownerId, UUID executorId, LocalDateTime after);
 }

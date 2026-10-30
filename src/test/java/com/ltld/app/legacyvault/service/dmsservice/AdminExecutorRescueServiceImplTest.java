@@ -9,7 +9,12 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
-import com.ltld.app.legacyvault.repository.*;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
@@ -63,7 +68,7 @@ class AdminExecutorRescueServiceImplTest {
                 .executorUser(u).status(status).activatedAt(activatedAt).build();
     }
 
-    // m3(e): predicate truyền đúng ownerId / executorId / activatedAt vào repository
+    // FR-07: predicate truyền đúng ownerId / executorId / activatedAt vào repository
     @Test
     void rescue_passesOwnerExecutorAndActivatedAtToRepository() {
         User exec = user("exec@example.test");
@@ -81,7 +86,7 @@ class AdminExecutorRescueServiceImplTest {
                 .existsByOwnerIdAndExecutorIdAndCreatedAtAfter(ownerId, exec.getId(), activatedAt);
     }
 
-    // M2: Backup đã được kích hoạt rồi bỏ dở -> bị thu hồi, chỉ còn một Executor ACTIVE
+    // FR-07: Backup đã được kích hoạt rồi bỏ dở -> bị thu hồi, chỉ còn một Executor ACTIVE
     @Test
     void rescue_revokesStalledActiveBackup_andLeavesOneActiveExecutor() {
         User oldPrimaryUser = user("oldprimary@example.test");

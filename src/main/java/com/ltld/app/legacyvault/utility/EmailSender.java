@@ -199,15 +199,14 @@ public class EmailSender {
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 
-    // FR-07: Admin thay Executor đã kích hoạt nhưng không bắt đầu bàn giao trong hạn (Owner thường đã mất)
+    // FR-07: Admin chỉ định Executor mới để tiếp tục bàn giao (người cũ bỏ dở hoặc không còn dùng được)
     public void sendExecutorReplacedByAdminNotice(String to, String ownerName, String ownerEmail,
-                                                  ExecutorType type, int waitDays) {
+                                                  ExecutorType type) {
         String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
         sendWithoutOtpFooter(to,
                 "Your Digital Executor role has ended - LegacyVault",
-                "An administrator has replaced you as " + role + " for " + ownerLabel(ownerName, ownerEmail)
-                        + " because the handover was not started within " + waitDays
-                        + " days of your activation."
+                "An administrator has assigned a new " + role + " for " + ownerLabel(ownerName, ownerEmail)
+                        + " to continue the handover process."
                         + "\nYou can no longer carry out the handover process for "
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
