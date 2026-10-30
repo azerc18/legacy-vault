@@ -50,12 +50,29 @@ export default function OwnerVaults() {
                         >
                             <div className="flex justify-between items-start gap-3">
                                 <h3 className="font-title-lg text-title-lg">{v.name}</h3>
-                                <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                                    {v.status}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    {!v.modifiable && (
+                                        <span
+                                            title={v.lockReason}
+                                            className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
+                                        >
+                                            <Icon name="lock" className="text-[14px]" /> Locked
+                                        </span>
+                                    )}
+                                    <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                                        {v.status}
+                                    </span>
+                                </div>
                             </div>
                             {v.description && <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">{v.description}</p>}
-                            <p className="mt-4 text-xs text-outline">Created {formatDate(v.createdAt)}</p>
+                            <div className="mt-4 flex flex-wrap gap-4 text-xs text-on-surface-variant">
+                                <span>Beneficiary: <strong className="text-on-surface">{v.beneficiaryEmail || 'None'}</strong></span>
+                                <span>·</span>
+                                <span>{v.totalAssets ?? 0} asset(s)</span>
+                                <span>·</span>
+                                <span>{v.totalDocuments ?? 0} doc(s)</span>
+                            </div>
+                            <p className="mt-2 text-xs text-outline">Created {formatDate(v.createdAt)}</p>
                         </Link>
                     ))}
                 </div>

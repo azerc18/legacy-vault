@@ -125,12 +125,13 @@ class ExecutorAccessGuardTest {
     }
 
     @Test
-    @DisplayName("Caller's REVOKED assignment -> 403")
+    @DisplayName("FR-07 / BR-03: caller's REVOKED assignment -> 403 with a revoked-specific message")
     void revokedAssignmentOfCaller_throwsNotActive() {
         when(executorAssignmentRepository.findById(assignmentId))
                 .thenReturn(Optional.of(assignment(ExecutorStatus.REVOKED)));
 
-        assertThrows(ExecutorNotActiveException.class,
+        ExecutorNotActiveException ex = assertThrows(ExecutorNotActiveException.class,
                 () -> guard.requireActiveAssignment(assignmentId, EMAIL));
+        assertEquals("Quyền Executor của bạn với Owner này đã bị thu hồi", ex.getMessage());
     }
 }

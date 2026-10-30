@@ -189,6 +189,16 @@ public class EmailSender {
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 
+    // FR-07 / BR-03: hệ thống tự thu hồi vì Primary không xác nhận trong hạn, Owner không làm gì (thường đã mất)
+    public void sendExecutorTimeoutRevokedNotice(String to, String ownerName, String ownerEmail, int waitDays) {
+        sendWithoutOtpFooter(to,
+                "Your Digital Executor role has ended - LegacyVault",
+                "You did not confirm the handover for " + ownerLabel(ownerName, ownerEmail)
+                        + " within " + waitDays + " days, so the role was passed to the backup executor."
+                        + "\nYou can no longer carry out the handover process for "
+                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+    }
+
     // FR-06: Owner tạo trước khi có fullName (null/rỗng) thì hiển thị email, không in chữ "null".
     private static String ownerDisplayName(String ownerName, String ownerEmail) {
         return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName;

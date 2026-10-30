@@ -41,6 +41,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -110,14 +112,14 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        // 2. Chỉ chủ sở hữu mới được xóa
+        // 2. Chỉ chủ sở hữu mới được xóa (chống lộ ID bằng 404)
         if (!vault.getOwner().getId().equals(ownerId)) {
             String callerEmail = userRepository.findById(ownerId)
                     .map(User::getEmail).orElse("unknown");
             auditLogService.log(AuditAction.VAULT_DELETE_DENIED, AuditResult.FAILURE,
                     ownerId, callerEmail, vaultId, "Vault", vaultId.toString(),
                     "Unauthorized: You don't own this vault");
-            throw new VaultException("Unauthorized: You don't own this vault", HttpStatus.FORBIDDEN);
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
         String ownerEmail = vault.getOwner().getEmail();
@@ -337,33 +339,52 @@ public class VaultServiceImpl implements VaultService {
                 owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
     }
 
-    // FR-27: Owner xem danh sách Vault của mình
+    // FR-27: Owner xem danh sách Vault của mình kèm thông tin tóm tắt và trạng thái khóa
     @Override
     @Transactional(readOnly = true)
     public List<VaultResponse> getMyVaults(UUID ownerId) {
-        return vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
-                .stream()
-                .map(vault -> VaultResponse.builder()
-                        .id(vault.getId())
-                        .name(vault.getName())
-                        .description(vault.getDescription())
-                        .status(vault.getStatus())
-                        .ownerId(vault.getOwner() != null ? vault.getOwner().getId() : ownerId)
-                        .createdAt(vault.getCreatedAt())
-                        .updatedAt(vault.getUpdatedAt())
-                        .build())
+        List<Vault> vaults = vaultRepository.findByOwnerIdWithBeneficiaryNewestFirst(ownerId);
+
+        // FR-27: tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
+        Map<UUID, String> lockReasonMap = vaultModificationGuard.lockReasons(ownerId, vaults);
+
+        return vaults.stream()
+                .map(vault -> {
+                    long docCount = legalDocumentRepository.countByVaultId(vault.getId());
+                    long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
+                    String lockReason = lockReasonMap.get(vault.getId());
+                    String benEmail = vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail();
+                    boolean pendingReg = vault.getBeneficiary() == null && vault.getBeneficiaryEmail() != null;
+
+                    return VaultResponse.builder()
+                            .id(vault.getId())
+                            .name(vault.getName())
+                            .description(vault.getDescription())
+                            .status(vault.getStatus())
+                            .ownerId(vault.getOwner() != null ? vault.getOwner().getId() : ownerId)
+                            .createdAt(vault.getCreatedAt())
+                            .updatedAt(vault.getUpdatedAt())
+                            .beneficiaryEmail(benEmail)
+                            .pendingRegistration(pendingReg)
+                            .totalAssets(assetCount)
+                            .totalDocuments(docCount)
+                            .modifiable(lockReason == null)
+                            .lockReason(lockReason)
+                            .build();
+                })
                 .toList();
     }
 
-    // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu)
+    // FR-27: Owner xem chi tiết một Vault (trả 404 nếu không phải chủ sở hữu, trả thêm modifiable & lockReason)
     @Override
     @Transactional(readOnly = true)
     public VaultDetailResponse getVaultDetail(UUID vaultId, UUID ownerId) {
-        // n3: Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
+        // Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
         Vault vault = loadOwnedVault(vaultId, ownerId);
 
         long docCount = legalDocumentRepository.countByVaultId(vaultId);
         long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
+        Optional<String> lockReason = vaultModificationGuard.lockReason(vault);
 
         return VaultDetailResponse.builder()
                 .id(vault.getId())
@@ -380,10 +401,12 @@ public class VaultServiceImpl implements VaultService {
                 .updatedAt(vault.getUpdatedAt())
                 .totalDocuments(docCount)
                 .totalAssets(assetCount)
+                .modifiable(lockReason.isEmpty())
+                .lockReason(lockReason.orElse(null))
                 .build();
     }
 
-    // FR-27: Owner cập nhật tên/mô tả Vault
+    // FR-27: Owner cập nhật tên/mô tả Vault (dùng saveAndFlush để trả về updatedAt mới)
     @Override
     @Transactional
     public VaultResponse updateVault(UUID vaultId, UUID ownerId, UpdateVaultRequest request) {
@@ -395,12 +418,15 @@ public class VaultServiceImpl implements VaultService {
 
         vault.setName(request.getName());
         vault.setDescription(request.getDescription());
-        Vault updated = vaultRepository.save(vault);
+        Vault updated = vaultRepository.saveAndFlush(vault);
 
         // m4: Ghi nhật ký cập nhật để audit trail đầy đủ
         auditLogService.log(AuditAction.VAULT_UPDATED, AuditResult.SUCCESS,
                 ownerId, vault.getOwner().getEmail(), vaultId,
                 "Vault", vaultId.toString(), null);
+
+        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
 
         return VaultResponse.builder()
                 .id(updated.getId())
@@ -410,6 +436,12 @@ public class VaultServiceImpl implements VaultService {
                 .ownerId(updated.getOwner() != null ? updated.getOwner().getId() : ownerId)
                 .createdAt(updated.getCreatedAt())
                 .updatedAt(updated.getUpdatedAt())
+                .beneficiaryEmail(updated.getBeneficiary() != null ? updated.getBeneficiary().getEmail() : updated.getBeneficiaryEmail())
+                .pendingRegistration(updated.getBeneficiary() == null && updated.getBeneficiaryEmail() != null)
+                .totalAssets(assetCount)
+                .totalDocuments(docCount)
+                .modifiable(true)
+                .lockReason(null)
                 .build();
     }
 
