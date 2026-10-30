@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
 import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
+import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
+import FilePicker from '../Common/FilePicker.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -64,25 +67,15 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-5xl mx-auto h-16 px-5 flex items-center gap-3">
-                    <Link to="/executor/home" className="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant">
-                        <Icon name="arrow_back" />
-                    </Link>
-                    <div className="min-w-0">
-                        <h1 className="font-headline-sm text-primary font-bold truncate">
-                            Estate of {assignment?.ownerFullName || data?.ownerFullName || '…'}
-                        </h1>
-                        {assignment && (
-                            <p className="text-xs text-on-surface-variant">
-                                {assignment.executorType === 'PRIMARY' ? 'Primary executor' : 'Backup executor'} · activated {formatDate(assignment.activatedAt, true)}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            </header>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
 
-            <main className="max-w-5xl mx-auto px-5 py-8 space-y-6">
+            <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
+                <PageTitle
+                    className=""
+                    back={{ to: '/executor/home', label: 'All estates' }}
+                    title={`Estate of ${assignment?.ownerFullName || data?.ownerFullName || '…'}`}
+                    subtitle={assignment && `${assignment.executorType === 'PRIMARY' ? 'Primary executor' : 'Backup executor'} · activated ${formatDate(assignment.activatedAt, true)}`}
+                />
                 <Alert>{error}</Alert>
                 {loading && <p className="text-on-surface-variant">Loading...</p>}
 
@@ -214,7 +207,7 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
         try {
             await executorApi.submitVerification(assignmentId, { file, vaultIds: selected, notes: notes.trim() });
             setSuccess('Submitted. A Legal Verifier will review your request.');
-            setFile(null); setNotes(''); e.target.reset();
+            setFile(null); setNotes('');
             onSubmitted();
         } catch (err) {
             setError(getErrorMessage(err, 'Submission failed.'));
@@ -238,8 +231,8 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
                         </label>
                     ))}
                 </div>
-                <input type="file" accept={FILE_TYPES} onChange={(e) => setFile(e.target.files?.[0] || null)}
-                    className="text-sm file:mr-3 file:h-10 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:font-semibold" />
+                <FilePicker file={file} onChange={setFile} accept={FILE_TYPES}
+                            label="Choose death certificate" hint="PDF, PNG or JPG, up to 10MB" />
                 <textarea rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for the verifier (optional)"
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
                 <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Submitting...' : 'Submit for verification'}</button>
@@ -289,6 +282,7 @@ function MessagesSection({ assignmentId, progress }) {
     const [messages, setMessages] = useState([]);
     const [page, setPage] = useState(0);
     const [hasOlder, setHasOlder] = useState(false);
+    const [downloadingId, setDownloadingId] = useState(null);
     const [content, setContent] = useState('');
     const [file, setFile] = useState(null);
     const [error, setError] = useState('');
@@ -335,6 +329,18 @@ function MessagesSection({ assignmentId, progress }) {
     if (requests.length === 0) return null;
     const selectedRequest = requests.find((r) => r.requestId === requestId);
 
+    const downloadAttachment = async (m) => {
+        setError('');
+        setDownloadingId(m.id);
+        try {
+            await executorApi.downloadAttachment(assignmentId, requestId, m.id, m.attachmentName);
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not download the attachment.'));
+        } finally {
+            setDownloadingId(null);
+        }
+    };
+
     const send = async (e) => {
         e.preventDefault();
         setError('');
@@ -343,7 +349,7 @@ function MessagesSection({ assignmentId, progress }) {
         setSending(true);
         try {
             await executorApi.sendMessage(assignmentId, requestId, { content: content.trim(), file });
-            setContent(''); setFile(null); e.target.reset();
+            setContent(''); setFile(null);
             loadMessages();
         } catch (err) {
             setError(getErrorMessage(err, 'Could not send.'));
@@ -370,7 +376,10 @@ function MessagesSection({ assignmentId, progress }) {
                         Load older messages
                     </button>
                 )}
-                {messages.length === 0 && <p className="text-sm text-on-surface-variant">No messages yet.</p>}
+                {messages.length === 0 && (
+                    <EmptyState compact icon="forum" title="No messages yet"
+                                text="Send a message if the Legal Verifier needs more information about your request." />
+                )}
                 {messages.map((m) => {
                     const mine = m.senderRole === 'EXECUTOR';
                     return (
@@ -378,10 +387,19 @@ function MessagesSection({ assignmentId, progress }) {
                             <p className="text-xs text-outline mb-1">{mine ? 'You' : m.senderName || 'Legal Verifier'} · {formatDate(m.createdAt, true)}</p>
                             {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
                             {m.attachmentName && (
-                                <button type="button" onClick={() => openAttachment(m.id)}
-                                    className="mt-1 text-xs flex items-center gap-1 text-primary underline hover:no-underline">
-                                    <Icon name="attach_file" className="text-[16px]" />{m.attachmentName}
-                                </button>
+                                <div className="mt-2 flex items-center gap-1.5 max-w-full">
+                                    <button type="button" onClick={() => openAttachment(m.id)}
+                                            title="View attachment" aria-label={`View ${m.attachmentName}`}
+                                            className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary hover:bg-surface-container">
+                                        <Icon name="visibility" className="text-[16px]" />
+                                    </button>
+                                    <button type="button" onClick={() => downloadAttachment(m)} disabled={downloadingId === m.id}
+                                            title="Download attachment" aria-label={`Download ${m.attachmentName}`}
+                                            className="inline-flex items-center gap-1.5 min-w-0 h-8 px-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-xs font-semibold text-primary hover:bg-surface-container disabled:opacity-60">
+                                        <Icon name={downloadingId === m.id ? 'hourglass_top' : 'download'} className="text-[16px] shrink-0" />
+                                        <span className="truncate">{m.attachmentName}</span>
+                                    </button>
+                                </div>
                             )}
                         </div>
                     );
@@ -401,8 +419,7 @@ function MessagesSection({ assignmentId, progress }) {
                 <textarea rows={2} maxLength={2000} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Write a message..."
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <input type="file" accept={FILE_TYPES} onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="text-sm file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border-0 file:bg-surface-container file:font-semibold" />
+                    <FilePicker file={file} onChange={setFile} accept={FILE_TYPES} label="Attach file" disabled={sending} />
                     <button type="submit" disabled={sending} className={btnOutline}>
                         <Icon name="send" className="text-[18px]" /> {sending ? 'Sending...' : 'Send'}
                     </button>

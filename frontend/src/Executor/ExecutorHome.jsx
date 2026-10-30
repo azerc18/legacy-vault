@@ -1,9 +1,10 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {Link, Navigate, useNavigate} from 'react-router-dom';
-import {getUser, logout} from '../auth/auth.js';
+import {Link, Navigate} from 'react-router-dom';
+import {getUser} from '../auth/auth.js';
 import {getErrorMessage} from '../api/http.js';
 import {executorApi, caseStep} from '../api/executorApi.js';
-import UserAvatar from '../Common/UserAvatar.jsx';
+import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const EXECUTOR = 'EXECUTOR';
 const STEPS = ['Acknowledge', 'Submit documents', 'Legal verification', 'Hand-over'];
@@ -86,7 +87,6 @@ function CaseCard({c, busy, onAcknowledge}) {
 }
 
 export default function ExecutorHome() {
-    const navigate = useNavigate();
     const user = getUser();
     const [cases, setCases] = useState(null);
     const [error, setError] = useState('');
@@ -141,45 +141,11 @@ export default function ExecutorHome() {
         }
     };
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
-    };
-
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/executor/home" className="flex items-center gap-2">
-                        <span
-                            className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="badge" className="text-[20px]"/>
-                        </span>
-                        <span>
-                            <span
-                                className="font-headline-sm text-primary font-bold text-xl block leading-tight">LegacyVault</span>
-                            <span className="text-[11px] text-secondary font-semibold tracking-wide uppercase block">Executor Workspace</span>
-                        </span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <Link to="/home"
-                              className="hidden sm:flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary">
-                            <Icon name="swap_horiz" className="text-[18px]"/> User home
-                        </Link>
-                        <Link to="/me"
-                              className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
-                              title={user?.email}>
-                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
-                        </Link>
-                        <button onClick={handleLogout}
-                                className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low">
-                            <Icon name="logout" className="text-[18px]"/> Log out
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
 
-            <main className="max-w-6xl mx-auto px-5 py-10">
+            <main className={`${PAGE_WIDTH} py-10`}>
                 <div className="mb-8">
                     <h1 className="font-headline-md text-headline-md">Welcome back, {user.name}</h1>
                     <p className="mt-1 text-on-surface-variant">Here are the estates you are handling as an
@@ -200,7 +166,8 @@ export default function ExecutorHome() {
                     <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Active estates</h2>
                     {cases === null && <p className="text-on-surface-variant">Loading...</p>}
                     {cases !== null && active.length === 0 &&
-                        <p className="text-on-surface-variant">No active estates right now.</p>}
+                        <EmptyState bordered icon="badge" title="No active estates right now"
+                                    text="You'll get an email when an owner's Dead Man's Switch is triggered and you need to act." />}
                     <div className="flex flex-col gap-5">
                         {active.map((c) => (
                             <CaseCard key={c.assignmentId} c={c} busy={busyId === c.assignmentId}

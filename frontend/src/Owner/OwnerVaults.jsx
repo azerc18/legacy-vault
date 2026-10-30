@@ -4,6 +4,7 @@ import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 export default function OwnerVaults() {
     const user = getUser();
@@ -35,11 +36,9 @@ export default function OwnerVaults() {
             {loading ? (
                 <p className="text-on-surface-variant">Loading...</p>
             ) : vaults.length === 0 ? (
-                <div className="text-center py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
-                    <Icon name="inventory_2" className="text-[40px] text-outline" />
-                    <p className="mt-3 text-on-surface-variant">You have not created any vault yet.</p>
-                    <Link to="/owner/vaults/new" className={`${btnPrimary} mt-5`}>Create your first vault</Link>
-                </div>
+                <EmptyState bordered icon="inventory_2" title="No vaults yet"
+                            text="A vault holds the assets and documents you want to pass on. Create one, then choose who receives it."
+                            action={{ to: '/owner/vaults/new', label: 'Create your first vault', icon: 'add' }} />
             ) : (
                 <div className="grid sm:grid-cols-2 gap-5">
                     {vaults.map((v) => (

@@ -1,13 +1,15 @@
 // Trang hồ sơ cá nhân (/me) — dùng chung cho mọi role
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import UserAvatar from '../Common/UserAvatar.jsx';
 import { getErrorMessage } from '../api/http.js';
-import { logout, updateStoredUser } from '../auth/auth.js';
+import { updateStoredUser } from '../auth/auth.js';
 import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
 import PasswordStrengthMeter from "../Common/PasswordStrengthMeter.jsx";
 import {isPasswordValid} from "../Common/passwordPolicy.js";
+import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
+import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 
 const ROLE_LABEL = {
     OWNER: 'Vault Owner',
@@ -136,6 +138,8 @@ function AvatarEditor({ profile, onChanged }) {
 }
 
 function SummaryCard({ profile, onChanged }) {
+    const namedBeneficiary = useNamedBeneficiary(profile.roles.includes('BENEFICIARY'));
+    const shownRoles = profile.roles.filter((r) => r !== 'BENEFICIARY' || namedBeneficiary);
     return (
         <Card>
             <div className="flex flex-col items-center text-center">
@@ -150,7 +154,7 @@ function SummaryCard({ profile, onChanged }) {
             <div className="mt-6 pt-5 border-t border-outline-variant/30">
                 <p className="text-xs font-semibold text-on-surface-variant mb-2">ROLES</p>
                 <div className="flex flex-wrap gap-2">
-                    {profile.roles.map((r) => (
+                    {shownRoles.map((r) => (
                         <span key={r} className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
                             {ROLE_LABEL[r] || r}
                         </span>
@@ -293,7 +297,6 @@ function ChangePasswordForm() {
 
 // ---------- Trang ----------
 export default function ProfilePage() {
-    const navigate = useNavigate();
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState('');
 
@@ -311,29 +314,12 @@ export default function ProfilePage() {
         updateStoredUser(toStoredUser(p));
     };
 
-    const handleLogout = () => { logout(); navigate('/login'); };
-
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-5xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/home" className="flex items-center gap-2">
-                        <span className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="shield_locked" className="text-[20px]" />
-                        </span>
-                        <span className="font-headline-sm text-primary font-bold text-xl">LegacyVault</span>
-                    </Link>
-                    <button onClick={handleLogout} className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low">
-                        <Icon name="logout" className="text-[18px]" /> Log out
-                    </button>
-                </div>
-            </header>
+            <AppHeader/>
 
-            <main className="max-w-5xl mx-auto px-5 py-10">
-                <Link to="/home" className="inline-flex items-center gap-1 text-sm font-semibold text-secondary mb-4">
-                    <Icon name="arrow_back" className="text-[18px]" /> Back to home
-                </Link>
-                <h1 className="font-headline-md text-headline-md mb-8">My profile</h1>
+            <main className={`${PAGE_WIDTH} py-10`}>
+                <PageTitle back={{ to: '/home', label: 'Back to home' }} title="My profile" />
 
                 <Alert>{error}</Alert>
                 {!profile && !error && <p className="text-on-surface-variant">Loading...</p>}

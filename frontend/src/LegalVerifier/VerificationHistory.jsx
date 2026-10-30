@@ -4,6 +4,8 @@ import { getHistory } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { STATUS_LABEL, STATUS_CLASS, formatDate } from './verifierUi.js';
 import VerifierHeader from './VerifierHeader.jsx';
+import {PAGE_WIDTH} from "../Common/AppHeader.jsx";
+import EmptyState from '../Common/EmptyState.jsx';
 
 const PAGE_SIZE = 20;
 
@@ -42,7 +44,7 @@ export default function VerificationHistory() {
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased">
             <VerifierHeader title="Verification History" backTo="/verifier/home" />
 
-            <main className="max-w-[1200px] mx-auto p-5 mt-6">
+            <main className={`${PAGE_WIDTH} py-8`}>
                 <div className="flex flex-wrap items-end gap-4 mb-6">
                     <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
                         Result
@@ -73,7 +75,15 @@ export default function VerificationHistory() {
 
                 {loading && items.length === 0 && <p>Loading...</p>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
-                {!loading && !error && items.length === 0 && <p>No history found.</p>}
+                {!loading && !error && items.length === 0 && ((status || from || to) ? (
+                    <EmptyState bordered icon="filter_alt_off" title="No results for these filters"
+                                text="Try another result type or a wider date range."
+                                action={{ label: 'Clear filters', onClick: () => { setStatus(''); setFrom(''); setTo(''); setPage(0); } }} />
+                ) : (
+                    <EmptyState bordered icon="history" title="No decisions yet"
+                                text="Requests you approve, sign or reject will appear here."
+                                action={{ to: '/verifier', label: 'Open pending requests', icon: 'gavel' }} />
+                ))}
 
                 {items.length > 0 && (
                     <div className={`bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-x-auto transition-opacity ${loading ? 'opacity-50' : ''}`}>

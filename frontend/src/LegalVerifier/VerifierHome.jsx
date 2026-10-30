@@ -1,10 +1,11 @@
 import React, {useEffect, useState} from 'react';
-import {Link, Navigate, useNavigate} from 'react-router-dom';
-import {getUser, logout, ROLES} from '../auth/auth.js';
+import {Link, Navigate} from 'react-router-dom';
+import {getUser, ROLES} from '../auth/auth.js';
 import {getRequests, getSummary} from '../api/verifierApi.js';
 import {getErrorMessage} from '../api/http.js';
 import {formatDate, STATUS_LABEL} from './verifierUi.js';
-import UserAvatar from '../Common/UserAvatar.jsx';
+import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
+import EmptyState from '../Common/EmptyState.jsx';
 
 // Trang home của Legal Verifier — cùng bố cục với UserHome.
 // to = null => chưa làm, hiện "Coming soon".
@@ -72,7 +73,6 @@ function StatCard({icon, label, value, to}) {
 }
 
 export default function VerifierHome() {
-    const navigate = useNavigate();
     const user = getUser();
     const [requests, setRequests] = useState(null);
     const [summary, setSummary] = useState(null);
@@ -99,51 +99,12 @@ export default function VerifierHome() {
     const todo = (requests ?? []).filter((r) => r.status === 'PENDING' || r.status === 'APPROVED').slice(0, 5);
     const hasOtherRoles = roles.some((r) => r !== ROLES.LEGAL_VERIFIER);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
-    };
-
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             {/* Top bar */}
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/verifier/home" className="flex items-center gap-2">
-                        <span
-                            className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="verified_user" className="text-[20px]"/>
-                        </span>
-                        <span>
-                            <span
-                                className="font-headline-sm text-primary font-bold text-xl block leading-tight">LegacyVault</span>
-                            <span className="text-[11px] text-secondary font-semibold tracking-wide uppercase block">Legal Verifier Portal</span>
-                        </span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        {hasOtherRoles && (
-                            <Link to="/home"
-                                  className="hidden sm:flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary">
-                                <Icon name="swap_horiz" className="text-[18px]"/> User home
-                            </Link>
-                        )}
-                        <Link to="/me"
-                              className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
-                              title={user?.email}>
-                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low"
-                        >
-                            <Icon name="logout" className="text-[18px]"/> Log out
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <AppHeader icon="verified_user" workspace="Legal Verifier portal" home="/verifier/home" userHome={hasOtherRoles}/>
 
-            <main className="max-w-6xl mx-auto px-5 py-10">
+            <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
                 <div className="mb-8">
                     <h1 className="font-headline-md text-headline-md">Welcome back, {user.name}</h1>
@@ -188,7 +149,9 @@ export default function VerifierHome() {
 
                     {requests === null && !error && <p className="text-on-surface-variant">Loading...</p>}
                     {requests !== null && todo.length === 0 && (
-                        <p className="text-on-surface-variant">You're all caught up — no requests waiting.</p>
+                        <EmptyState bordered compact icon="task_alt" title="You're all caught up"
+                                    text="No requests are waiting for review."
+                                    action={{ to: '/verifier/history', label: 'View history', icon: 'history' }} />
                     )}
 
                     {todo.length > 0 && (

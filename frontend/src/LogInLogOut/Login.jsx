@@ -132,7 +132,7 @@ export default function Login() {
             {/* Security Footer Note */}
             <div className="mt-8 flex items-center gap-2 text-xs text-outline">
                 <span className="material-symbols-outlined text-[16px]">lock</span>
-                <span>256-bit encryption • JWT authentication</span>
+                <span>End-to-end encrypted • Released only after legal verification</span>
             </div>
         </div>
     );

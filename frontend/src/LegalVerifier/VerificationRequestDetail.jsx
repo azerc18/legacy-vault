@@ -12,6 +12,7 @@ import VerificationMessages from './VerificationMessages.jsx';
 import VerifierHeader from './VerifierHeader.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
+import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
@@ -271,7 +272,7 @@ export default function VerificationRequestDetail() {
                 }
             />
 
-            <main className="max-w-[1600px] mx-auto p-5 grid grid-cols-1 xl:grid-cols-3 gap-8 mt-8">
+            <main className={`${PAGE_WIDTH} py-8 grid grid-cols-1 xl:grid-cols-3 gap-8`}>
                 {/* Left column: case information */}
                 <div className="xl:col-span-2 space-y-8">
                     <section className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30">

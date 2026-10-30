@@ -4,6 +4,10 @@ import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
 
+// Báo ProtectionBanner tải lại sau khi Owner đổi vault / người thụ hưởng / Executor / DMS
+export const PROTECTION_CHANGED = 'lv:owner-protection-changed';
+const changed = (result) => { window.dispatchEvent(new Event(PROTECTION_CHANGED)); return result; };
+
 // Lấy tên file từ Content-Disposition rồi cho trình duyệt tải về
 async function saveBlob(url, fallbackName) {
     try {
@@ -37,13 +41,13 @@ export const ownerApi = {
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
     // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
-    createVault: ({ name, description, assets }) => http.post('/vaults', { name, description, assets }).then(unwrap),
+    createVault: ({ name, description, assets }) => http.post('/vaults', { name, description, assets }).then(unwrap).then(changed),
 
     // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
     updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
 
     // Chỉ xoá được khi vault ACTIVE
-    deleteVault: (vaultId) => http.delete(`/vaults/${vaultId}`),
+    deleteVault: (vaultId) => http.delete(`/vaults/${vaultId}`).then(changed),
 
     /* ---------- Tài sản số (FR-27) ---------- */
     // Danh sách KHÔNG có secret -> [{ id, assetType, assetName, status, createdAt, updatedAt }]
@@ -59,10 +63,10 @@ export const ownerApi = {
     // FR-02: chỉ định / thay người thụ hưởng. 409 + "confirmReplace" => gửi lại với confirmReplace=true
     // -> { vaultId, beneficiaryEmail, beneficiaryName, pendingRegistration, replaced }
     assignBeneficiary: (vaultId, email, confirmReplace = false) =>
-        http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap),
+        http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap).then(changed),
 
     // FR-02 (V8): gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký (idempotent)
-    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`),
+    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`).then(changed),
 
     // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
@@ -100,7 +104,7 @@ export const ownerApi = {
     // 404 = chưa cấu hình
     getDms: () => http.get('/dms').then(unwrap),
     // { checkinIntervalDays 1-365, gracePeriodDays 1-90, reminderCount 1-10 }
-    saveDms: (config) => http.put('/dms', config).then(unwrap),
+    saveDms: (config) => http.put('/dms', config).then(unwrap).then(changed),
     checkIn: () => http.post('/dms/check-in').then(unwrap),
 
     /* ---------- Executor (FR-06) ---------- */
@@ -108,8 +112,8 @@ export const ownerApi = {
     listExecutors: () => http.get('/owner/executors').then(unwrap),
     // type: PRIMARY | BACKUP
     assignExecutor: (type, email, confirmReplace = false) =>
-        http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap),
-    revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap),
+        http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap).then(changed),
+    revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap).then(changed),
 };
 
 // BE báo "đã có người, gửi lại với confirmReplace=true" bằng 409 + message chứa "confirmReplace"
