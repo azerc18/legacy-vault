@@ -18,6 +18,7 @@ const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS c
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
 const otpKey = (id) => `lv_sign_otp_${id}`;
 // Thông báo của BE khi mã ký không còn dùng được (khớp InvalidSignCodeException trong sign)
+const OTP_UNUSABLE_CODES = ['SIGN_CODE_EXPIRED', 'SIGN_CODE_ATTEMPTS_EXHAUSTED']; // tên mã chốt với H3
 const OTP_UNUSABLE = /no attempts left|too many attempts|has expired|was not generated/i;
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
@@ -111,7 +112,7 @@ export default function VerificationRequestDetail() {
             const message = getErrorMessage(e, fallback);
             setError(message);
             if (e.response?.status === 409) load();
-            onFail?.(message);
+            onFail?.(message, e.response?.data?.errorCode);
             return false;
         } finally {
             setBusy(false);
@@ -142,9 +143,10 @@ export default function VerificationRequestDetail() {
         if (action === 'approve') await run(() => approveRequest(req.id), 'Could not approve.');
         if (action === 'reject') await run(() => rejectRequest(req.id, rejectChoice, rejectNoteText), 'Could not reject.');
         if (action === 'sign') {
-            const ok = await run(() => signRequest(req.id, code), 'Could not sign.', (message) => {
+            const ok = await run(() => signRequest(req.id, code), 'Could not sign.', (message, errorCode) => {
                 // Mã hết hạn / hết lượt thử: bỏ trạng thái "đã gửi mã", quay về nút Send code
-                if (OTP_UNUSABLE.test(message)) {
+                // Ưu tiên errorCode của BE (H3); chưa có thì dùng regex theo message
+                if (errorCode ? OTP_UNUSABLE_CODES.includes(errorCode) : OTP_UNUSABLE.test(message)) {
                     forgetOtpSent(req.id);
                     setCodeSent(false);
                     setCode('');
