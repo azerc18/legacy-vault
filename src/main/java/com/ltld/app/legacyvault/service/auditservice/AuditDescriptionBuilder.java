@@ -68,7 +68,10 @@ public class AuditDescriptionBuilder {
         return switch (log.getAction()) {
             case VAULT_CREATED -> "Created a new vault.";
             case VAULT_UPDATED -> "Updated vault details.";
-            case VAULT_DELETED -> "Deleted the vault.";
+            // FR-05: detail "name=<tên>" ghi từ deleteVault; log cũ detail null thì không có tên
+            case VAULT_DELETED -> detail != null && detail.startsWith("name=")
+                    ? "Deleted the vault \"" + detail.substring("name=".length()) + "\"."
+                    : "Deleted the vault.";
             case VAULT_DELETE_DENIED -> "Vault deletion denied: " + (detail != null ? detail : "");
             case DOCUMENT_UPLOADED -> "Uploaded a new document.";
             case DOCUMENT_DELETED -> "Deleted a document.";

@@ -79,7 +79,7 @@ export const ownerApi = {
     deleteDocument: (docId) => http.delete(`/documents/${docId}`),
 
     // Nhật ký hoạt động: trả Page { content[], totalPages, totalElements, number, size }
-    // startDate/endDate: ISO date-time (vd 2026-10-01T00:00:00Z), tối đa 1 năm
+    // startDate/endDate: ISO date-time (vd 2026-10-01T00:00:00Z); không gửi startDate thì xem toàn bộ lịch sử
     getActivityLogs: (vaultId, { startDate, endDate, page = 0, size = 20 } = {}) => {
         const params = { page, size };
         if (startDate) params.startDate = startDate;

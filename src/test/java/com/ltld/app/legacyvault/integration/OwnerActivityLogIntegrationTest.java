@@ -198,7 +198,7 @@ class OwnerActivityLogIntegrationTest {
         Vault vaultB = vault(b.ownerId, "deleted-b");
         Vault vaultAByAdmin = vault(a.ownerId, "admin-a");
 
-        // Qua service thật: VAULT_DELETED có actor = Owner, vaultId = id Vault, entity "Vault", detail null
+        // Qua service thật: VAULT_DELETED có actor = Owner, vaultId = id Vault, entity "Vault", detail "name=<tên>"
         vaultService.deleteVault(vaultA.getId(), a.ownerId);
         vaultService.deleteVault(vaultB.getId(), b.ownerId);
         // Phòng thủ: hiện chưa có luồng Admin xóa Vault; giả lập log cùng tham số với deleteVault nhưng actor là Admin
@@ -224,7 +224,8 @@ class OwnerActivityLogIntegrationTest {
                 .satisfies(r -> {
                     assertThat(r.getId()).isEqualTo(deletedByA);
                     assertThat(r.getActorName()).isEqualTo("You");
-                    assertThat(r.getDescription()).isEqualTo("Deleted the vault.");
+                    // FR-05: Vault đã xóa cứng, tên lấy từ detail
+                    assertThat(r.getDescription()).isEqualTo("Deleted the vault \"Vault deleted-a\".");
                 });
         assertThat(logsA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
         assertThat(firstOfOneA.getTotalElements()).isEqualTo(a.ownerLogIds().size() + 1);
@@ -342,7 +343,7 @@ class OwnerActivityLogIntegrationTest {
                 .build());
     }
 
-    // id log VAULT_DELETED do actor này ghi (detail null nên không tra theo ownerId trong detail được)
+    // id log VAULT_DELETED do actor này ghi (detail không có ownerId nên không tra theo ownerId trong detail được)
     private UUID vaultDeletedLogId(UUID actorId) {
         return UUID.fromString(jdbcTemplate.queryForObject(
                 "SELECT BIN_TO_UUID(id) FROM audit_logs WHERE action = 'VAULT_DELETED' AND BIN_TO_UUID(actor_id) = ?",

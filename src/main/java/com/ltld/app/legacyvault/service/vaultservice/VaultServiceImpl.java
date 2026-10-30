@@ -140,6 +140,9 @@ public class VaultServiceImpl implements VaultService {
             throw new VaultException("Cannot delete vault that is not in active state");
         }
 
+        // FR-05: lấy tên TRƯỚC khi xóa để nhật ký Owner hiển thị Vault nào đã bị xóa
+        String vaultName = vault.getName();
+
         // 4. Thu thập đường dẫn file TRƯỚC khi xóa DB — N1 fix
         List<LegalDocument> docs = legalDocumentRepository.findByVaultId(vaultId);
         List<String> filesToDelete = docs.stream().map(LegalDocument::getFileUrlEncrypted).toList();
@@ -170,7 +173,7 @@ public class VaultServiceImpl implements VaultService {
 
         auditLogService.log(AuditAction.VAULT_DELETED, AuditResult.SUCCESS,
                 ownerId, ownerEmail, vault.getId(),
-                "Vault", vaultId.toString(), null);
+                "Vault", vaultId.toString(), "name=" + vaultName);
     }
 
     // FR-02: Owner chỉ định (hoặc thay thế) người thụ hưởng cho Vault

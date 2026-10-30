@@ -220,6 +220,7 @@ class VaultServiceImplTest {
         UUID vaultId = UUID.randomUUID();
         Vault vault = new Vault();
         vault.setId(vaultId);
+        vault.setName("Family Vault");
         vault.setOwner(mockOwner);
         vault.setStatus(VaultStatus.ACTIVE);
 
@@ -258,7 +259,8 @@ class VaultServiceImplTest {
                 eq(vaultId),
                 eq("Vault"),
                 eq(vaultId.toString()),
-                isNull()
+                // FR-05: tên Vault lưu vào detail để nhật ký Owner hiển thị sau khi Vault bị xóa cứng
+                eq("name=Family Vault")
         );
     }
 

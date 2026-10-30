@@ -529,7 +529,7 @@ function ActivitySection({ vaultId }) {
     const totalPages = data?.totalPages ?? 0;
 
     return (
-        <Card title="Activity log (last 30 days)" icon="history">
+        <Card title="Activity log" icon="history">
             <Alert>{error}</Alert>
             {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
             {data && rows.length === 0 && <p className="text-sm text-on-surface-variant">No activity yet.</p>}
