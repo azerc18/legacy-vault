@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -48,6 +49,7 @@ class AdminUserServiceImplTest {
     @Mock private AuditLogService auditLogService;
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
+    @Mock private LegalVerificationRequestRepository legalVerificationRequestRepository;
 
     @InjectMocks
     private AdminUserServiceImpl service;

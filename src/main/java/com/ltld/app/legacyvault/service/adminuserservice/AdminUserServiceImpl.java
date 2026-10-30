@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,6 +39,7 @@ public class AdminUserServiceImpl implements AdminUserService{
     private final AuditLogService auditLogService;
     private final DmsConfigRepository dmsConfigRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final LegalVerificationRequestRepository legalVerificationRequestRepository;
 
 
     private static final int MAX_PAGE_SIZE = 100;
@@ -158,7 +161,10 @@ public class AdminUserServiceImpl implements AdminUserService{
                 .stream().collect(Collectors.groupingBy(a -> a.getOwner().getId()));
         return users.map(u -> {
             DmsConfig c = configs.get(u.getId());
-            return build(u, c, ExecutorRescueRule.rescueNeeded(c, active.getOrDefault(u.getId(), List.of())));
+            LocalDateTime now = LocalDateTime.now();
+            return build(u, c, ExecutorRescueRule.rescueNeeded(c, active.getOrDefault(u.getId(), List.of()), now,
+                    a -> legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
+                            u.getId(), a.getExecutorUser().getId(), a.getActivatedAt())));
         });
     }
 

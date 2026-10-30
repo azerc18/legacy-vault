@@ -36,6 +36,7 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
     private final NotificationRepository notificationRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    private final LegalVerificationRequestRepository legalVerificationRequestRepository;
 
     // READ_COMMITTED + thứ tự khóa DmsConfig -> ExecutorAssignment -> User, giống FR-06/FR-07, để không deadlock
     @Override
@@ -44,7 +45,10 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
                 .orElseThrow(() -> new DmsException("This owner has not configured a Dead Man's Switch.", HttpStatus.NOT_FOUND));
         List<ExecutorAssignment> assignments = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
-        if (!ExecutorRescueRule.rescueNeeded(config, assignments)) {
+        LocalDateTime now = LocalDateTime.now();
+        if (!ExecutorRescueRule.rescueNeeded(config, assignments, now,
+                a -> legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
+                        ownerId, a.getExecutorUser().getId(), a.getActivatedAt()))) {
             throw new DmsException(config.getStatus() != DmsStatus.TRIGGERED
                     ? "Rescue is only available after the Dead Man's Switch has been triggered."
                     : "This owner still has an active executor who can handle the handover.", HttpStatus.CONFLICT);
@@ -79,7 +83,6 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         // Khóa user theo thứ tự id TRƯỚC khi đọc roles (LAZY), giống ExecutorManagementServiceImpl
         lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
 
-        LocalDateTime now = LocalDateTime.now();
         ExecutorAssignment assignment = primary != null
                 ? primary
                 : ExecutorAssignment.builder().owner(owner).executorType(ExecutorType.PRIMARY).build();
