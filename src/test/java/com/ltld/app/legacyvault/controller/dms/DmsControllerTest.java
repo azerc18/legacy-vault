@@ -1,13 +1,18 @@
 package com.ltld.app.legacyvault.controller.dms;
 
 import com.ltld.app.legacyvault.controller.DmsController;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
+import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -16,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -72,14 +78,73 @@ public class DmsControllerTest {
     }
 
     @Test
-    void getConfig_notConfigured_returns404() throws Exception {
+    void getConfig_notConfigured_returns200WithConfiguredFalse() throws Exception {
         when(dmsConfigService.getConfig(ownerId))
-                .thenThrow(new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
+                .thenReturn(DmsConfigResponse.builder().configured(false).hasUsableExecutor(true).build());
 
         mockMvc.perform(get("/api/dms").principal(principal))
-                .andExpect(status().isNotFound())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Dead Man's Switch configuration retrieved successfully"))
+                .andExpect(jsonPath("$.data.configured").value(false))
+                .andExpect(jsonPath("$.data.hasUsableExecutor").value(true));
+    }
+
+    // ---------- GET /api/dms/check-ins ----------
+
+    @Test
+    void getCheckins_defaultPaging_returns200WithPage() throws Exception {
+        DmsCheckinResponse row = DmsCheckinResponse.builder()
+                .checkinType(DmsCheckinType.OWNER_RESPONDED)
+                .occurredAt(LocalDateTime.of(2026, 10, 1, 9, 0))
+                .build();
+        when(dmsConfigService.getCheckins(eq(ownerId), any()))
+                .thenReturn(new PageImpl<>(List.of(row), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/dms/check-ins").principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content[0].checkinType").value("OWNER_RESPONDED"))
+                .andExpect(jsonPath("$.data.content[0].occurredAt").value("2026-10-01T09:00:00"))
+                .andExpect(jsonPath("$.data.content[0].channel").doesNotExist())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+
+        verify(dmsConfigService).getCheckins(eq(ownerId),
+                argThat(p -> p.getPageNumber() == 0 && p.getPageSize() == 20));
+    }
+
+    @Test
+    void getCheckins_passesRequestedPage() throws Exception {
+        when(dmsConfigService.getCheckins(eq(ownerId), any())).thenReturn(Page.empty(PageRequest.of(2, 5)));
+
+        mockMvc.perform(get("/api/dms/check-ins").principal(principal).param("page", "2").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isEmpty())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+
+        verify(dmsConfigService).getCheckins(eq(ownerId),
+                argThat(p -> p.getPageNumber() == 2 && p.getPageSize() == 5));
+    }
+
+    @Test
+    void getCheckins_negativePage_returns400AndSkipsService() throws Exception {
+        mockMvc.perform(get("/api/dms/check-ins").principal(principal).param("page", "-1"))
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("The Dead Man's Switch has not been configured."));
+                .andExpect(jsonPath("$.message").value("Invalid page number (must be >= 0)."));
+
+        verify(dmsConfigService, never()).getCheckins(any(), any());
+    }
+
+    @Test
+    void getCheckins_sizeOutOfRange_returns400AndSkipsService() throws Exception {
+        for (String size : List.of("0", "101")) {
+            mockMvc.perform(get("/api/dms/check-ins").principal(principal).param("size", size))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("Page size must be between 1 and 100."));
+        }
+
+        verify(dmsConfigService, never()).getCheckins(any(), any());
     }
 
     @Test

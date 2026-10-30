@@ -1,11 +1,15 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
+import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,5 +49,22 @@ public class DmsController {
     public ResponseEntity<ApiResponse<DmsConfigResponse>> checkIn(Principal principal) {
         UUID ownerId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Checked in successfully", dmsConfigService.checkIn(ownerId)));
+    }
+
+    // Lịch sử check-in của chính Owner đang đăng nhập, mới nhất trước.
+    @GetMapping("/check-ins")
+    public ResponseEntity<ApiResponse<Page<DmsCheckinResponse>>> getCheckins(
+            Principal principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        if (page < 0) {
+            throw new DmsException("Invalid page number (must be >= 0).", HttpStatus.BAD_REQUEST);
+        }
+        if (size < 1 || size > 100) {
+            throw new DmsException("Page size must be between 1 and 100.", HttpStatus.BAD_REQUEST);
+        }
+        return ResponseEntity.ok(ApiResponse.success("Check-in history retrieved successfully",
+                dmsConfigService.getCheckins(ownerId, PageRequest.of(page, size))));
     }
 }
