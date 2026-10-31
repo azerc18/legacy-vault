@@ -4,6 +4,7 @@ import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
 import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
@@ -67,7 +68,7 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle

@@ -88,6 +88,24 @@ export const executorApi = {
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
             { responseType: 'blob' }),
+
+    // D6: thông báo trong app của người đang đăng nhập (API chung /api/notifications, mới nhất trước)
+    // -> [{ id, type, content, referenceType, referenceId, read, createdAt }]
+    listNotifications: ({ page = 0, size = 20 } = {}) =>
+        http.get('/notifications/me', { params: { page, size } }).then((r) => unwrap(r)?.content ?? []),
+    unreadCount: () => http.get('/notifications/me/unread-count').then((r) => unwrap(r) ?? 0),
+    markRead: (id) => http.patch(`/notifications/${id}/read`),
+
+    // D6: thông báo của Executor chỉ mang id hồ sơ xác minh; trang hồ sơ đi theo assignmentId nên tra ngược.
+    // Chỉ assignment ACTIVE mới xem được hồ sơ. Không tìm thấy (hồ sơ cũ quá 100 bản) -> null.
+    findAssignmentOfRequest: async (requestId) => {
+        const active = (await executorApi.listMine()).filter((a) => a.status === 'ACTIVE');
+        for (const a of active) {
+            const page = await executorApi.listVerificationRequests(a.assignmentId, { size: 100 });
+            if (page?.content?.some((r) => r.id === requestId)) return a.assignmentId;
+        }
+        return null;
+    },
 };
 
 // Bước hiện tại của 1 hồ sơ, dựa trên assignment + tiến độ bàn giao
