@@ -87,7 +87,6 @@ function App() {
                 <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
                 <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
 
-                <Route path="/home" element={guard(null, <UserHome />)} />
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
 
                 <Route path="*" element={<NotFound />} />
