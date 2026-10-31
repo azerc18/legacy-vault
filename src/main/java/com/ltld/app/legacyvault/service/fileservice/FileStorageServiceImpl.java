@@ -74,7 +74,10 @@ public class FileStorageServiceImpl implements FileStorageService {
     public void deleteFile(String filePath) {
         if (filePath == null || filePath.trim().isEmpty()) return;
         try {
-            Path fileToDelete = resolve(filePath, Paths.get(uploadDir).toAbsolutePath().normalize());
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path fileToDelete = resolve(filePath, uploadPath);
+            // Giống readFile: không xoá gì nằm ngoài thư mục upload
+            if (!fileToDelete.startsWith(uploadPath) || fileToDelete.equals(uploadPath)) return;
             Files.deleteIfExists(fileToDelete);
         } catch (Exception e) {
             System.err.println("Failed to delete file: " + filePath);

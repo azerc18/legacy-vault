@@ -8,8 +8,8 @@ import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
-import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
+import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
@@ -26,7 +26,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +34,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class UserProfileServiceImpl implements UserProfileService {
 
+    private static final byte CIPHER_VERSION = 1;
     static final long MAX_AVATAR_SIZE = 2L * 1024 * 1024; // 2MB
     private static final Set<String> AVATAR_TYPES = Set.of("image/png", "image/jpeg");
 
@@ -134,12 +134,14 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
     }
 
-    // Avatar lưu trước H1 là ảnh gốc (chưa mã hóa): giải mã không được thì dùng nguyên bytes đã lưu
+    // Avatar lưu trước H1 là ảnh gốc (PNG/JPG không bao giờ bắt đầu bằng byte 0x01 = version của CryptoServiceImpl):
+    // không phải định dạng bản mã thì dùng nguyên. Bản mã bị sửa hoặc sai khóa vẫn trả 500, không trả bytes rác.
     private byte[] decryptAvatar(byte[] stored) {
+        if (stored.length == 0 || stored[0] != CIPHER_VERSION) {
+            return stored;
+        }
         try {
             return cryptoService.decryptBytes(stored);
-        } catch (GeneralSecurityException e) {
-            return stored;
         } catch (Exception e) {
             throw new UserProfileException("Could not read the avatar", HttpStatus.INTERNAL_SERVER_ERROR);
         }

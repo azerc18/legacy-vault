@@ -50,6 +50,17 @@ class FileStorageServiceImplTest {
     }
 
     @Test
+    void deleteFile_outsideUploadDir_deletesNothing(@TempDir Path elsewhere) throws Exception {
+        Path outside = Files.writeString(elsewhere.resolve("secret.txt"), "x");
+
+        service.deleteFile(outside.toString());
+        service.deleteFile("..");
+
+        assertThat(outside).exists();
+        assertThat(uploadDir).exists();
+    }
+
+    @Test
     void readFile_pathOutsideUploadDir_isRejected(@TempDir Path elsewhere) throws Exception {
         Path outside = Files.writeString(elsewhere.resolve("secret.txt"), "x");
 

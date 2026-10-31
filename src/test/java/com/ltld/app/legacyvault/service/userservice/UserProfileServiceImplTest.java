@@ -296,7 +296,7 @@ class UserProfileServiceImplTest {
     void getAvatar_decryptsStoredBytes() throws Exception {
         User u = user();
         u.setAvatarPath("key.png");
-        byte[] cipher = {9, 9};
+        byte[] cipher = {1, 9, 9}; // byte đầu = version bản mã
         when(userRepository.findById(userId)).thenReturn(Optional.of(u));
         when(fileStorageService.readFile("key.png")).thenReturn(cipher);
         when(cryptoService.decryptBytes(cipher)).thenReturn(PNG);
@@ -313,8 +313,21 @@ class UserProfileServiceImplTest {
         u.setAvatarPath("/old/uploads/key.png");
         when(userRepository.findById(userId)).thenReturn(Optional.of(u));
         when(fileStorageService.readFile("/old/uploads/key.png")).thenReturn(PNG);
-        when(cryptoService.decryptBytes(PNG)).thenThrow(new GeneralSecurityException("not ciphertext"));
-
         assertArrayEquals(PNG, service.getAvatar(userId).content());
+        verify(cryptoService, never()).decryptBytes(any());
+    }
+
+    // Bản mã bị sửa hoặc sai khóa: trả 500, không trả bytes rác như ảnh
+    @Test
+    void getAvatar_tamperedCiphertext_throws500() throws Exception {
+        User u = user();
+        u.setAvatarPath("key.png");
+        byte[] cipher = {1, 9, 9};
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        when(fileStorageService.readFile("key.png")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenThrow(new GeneralSecurityException("bad tag"));
+
+        UserProfileException ex = assertThrows(UserProfileException.class, () -> service.getAvatar(userId));
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, ex.getStatus());
     }
 }
