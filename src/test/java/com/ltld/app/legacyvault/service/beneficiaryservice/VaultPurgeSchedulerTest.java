@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -51,6 +52,7 @@ class VaultPurgeSchedulerTest {
     @Mock private LegalDocumentRepository legalDocumentRepository;
     @Mock private DigitalAssetRepository digitalAssetRepository;
     @Mock private BeneficiaryClaimRepository claimRepository;
+    @Mock private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock private FileStorageService fileStorageService;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
@@ -65,7 +67,8 @@ class VaultPurgeSchedulerTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         scheduler = new VaultPurgeScheduler(vaultRepository, accessRecordRepository,
                 identityVerificationRepository, requestVaultRepository, legalDocumentRepository,
-                digitalAssetRepository, claimRepository, fileStorageService, auditLogService, transactionManager);
+                digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,
+                fileStorageService, auditLogService, transactionManager);
     }
 
     private Vault vault(UUID id, VaultStatus status, LocalDateTime purgeEligibleAt) {
@@ -87,14 +90,15 @@ class VaultPurgeSchedulerTest {
         scheduler.purgeExpiredVaults(now);
 
         InOrder order = inOrder(accessRecordRepository, identityVerificationRepository, requestVaultRepository,
-                legalDocumentRepository, digitalAssetRepository, claimRepository, vaultRepository,
-                transactionManager, fileStorageService);
+                legalDocumentRepository, digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,
+                vaultRepository, transactionManager, fileStorageService);
         order.verify(accessRecordRepository).deleteByVaultId(vaultId);
         order.verify(identityVerificationRepository).deleteByVaultId(vaultId);
         order.verify(requestVaultRepository).deleteByVaultId(vaultId);
         order.verify(legalDocumentRepository).deleteByVaultId(vaultId);
         order.verify(digitalAssetRepository).deleteByVaultId(vaultId);
         order.verify(claimRepository).deleteByVaultId(vaultId);
+        order.verify(vaultBeneficiaryRepository).deleteByVaultId(vaultId);
         order.verify(vaultRepository).delete(vault);
         order.verify(transactionManager).commit(any());
         order.verify(fileStorageService).deleteFile("/uploads/a.enc");

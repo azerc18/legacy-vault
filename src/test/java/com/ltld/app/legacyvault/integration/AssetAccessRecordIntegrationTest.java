@@ -4,8 +4,10 @@ import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -13,6 +15,7 @@ import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 // Kiểm chứng trên MySQL thật: INSERT IGNORE bind UUID đúng, ghi trùng không lỗi, findUnaccessedAssets lọc đúng.
 // Mỗi test chạy trong một transaction và tự rollback, nên không cần dọn dữ liệu.
@@ -60,6 +65,7 @@ class AssetAccessRecordIntegrationTest {
     @Autowired private DigitalAssetRepository assetRepository;
     @Autowired private BeneficiaryClaimRepository claimRepository;
     @Autowired private AssetAccessRecordRepository accessRepository;
+    @Autowired private VaultBeneficiaryRepository vaultBeneficiaryRepository;
 
     private User owner;
     private User beneficiary;
@@ -131,5 +137,24 @@ class AssetAccessRecordIntegrationTest {
         List<DigitalAsset> result = assetRepository.findUnaccessedAssets(vault.getId(), claim.getId());
 
         assertThat(result).extracting(DigitalAsset::getAssetName).containsExactlyInAnyOrder("A1", "A2");
+    }
+
+    // N2a: cùng vault khác email -> lưu được; trùng (vault, email) -> vi phạm unique
+    @Test
+    void vaultBeneficiaries_uniquePerVaultAndEmail() {
+        vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
+                .vault(vault).user(beneficiary).email("ben@example.com")
+                .status(BeneficiaryInviteStatus.INVITED).build());
+        vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
+                .vault(vault).email("ben2@example.com").build());   // status mặc định PENDING_REGISTRATION
+
+        // Kiểm tra truy vấn TRƯỚC khi gây lỗi
+        assertThat(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vault.getId())).hasSize(2);
+        assertThat(vaultBeneficiaryRepository.findPendingByEmail("BEN2@example.com")).hasSize(1);
+        assertThat(vaultBeneficiaryRepository.existsByOwnerIdAndEmail(owner.getId(), "ben@example.com")).isTrue();
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
+                        .vault(vault).email("ben@example.com").build()));
     }
 }

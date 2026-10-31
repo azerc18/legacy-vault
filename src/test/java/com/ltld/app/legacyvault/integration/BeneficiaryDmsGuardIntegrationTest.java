@@ -106,6 +106,7 @@ class BeneficiaryDmsGuardIntegrationTest {
         jdbcTemplate.update("DELETE FROM executor_assignments");
         jdbcTemplate.update("DELETE FROM dms_checkins");
         jdbcTemplate.update("DELETE FROM dms_configs");
+        jdbcTemplate.update("DELETE FROM vault_beneficiaries");
         jdbcTemplate.update("DELETE FROM vaults");
         jdbcTemplate.update("DELETE FROM user_roles");
         jdbcTemplate.update("DELETE FROM users");

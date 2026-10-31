@@ -6,8 +6,10 @@ import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
@@ -16,6 +18,7 @@ import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
@@ -29,6 +32,7 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -81,6 +85,8 @@ class VaultServiceImplTest {
     private VaultModificationGuard vaultModificationGuard;
     @Mock
     private DmsConfigService dmsConfigService;
+    @Mock
+    private VaultBeneficiaryRepository vaultBeneficiaryRepository;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -175,6 +181,7 @@ class VaultServiceImplTest {
         verify(legalDocumentRepository).findFileUrlsByVaultId(vaultId);
         verify(legalDocumentRepository).deleteByVaultId(vaultId);
         verify(digitalAssetRepository).deleteByVaultId(vaultId);
+        verify(vaultBeneficiaryRepository).deleteByVaultId(vaultId);
         verify(vaultRepository).delete(vault);
         verifyNoInteractions(fileStorageService);
     }
@@ -361,6 +368,13 @@ class VaultServiceImplTest {
         assertFalse(response.isReplaced());
         assertEquals("Ben", response.getBeneficiaryName());
         verify(vaultRepository).save(vault);
+        ArgumentCaptor<VaultBeneficiary> rowCaptor = ArgumentCaptor.forClass(VaultBeneficiary.class);
+        verify(vaultBeneficiaryRepository).deleteByVaultId(vault.getId());
+        verify(vaultBeneficiaryRepository).save(rowCaptor.capture());
+        assertSame(vault, rowCaptor.getValue().getVault());
+        assertSame(ben, rowCaptor.getValue().getUser());
+        assertEquals("ben@example.com", rowCaptor.getValue().getEmail());
+        assertEquals(BeneficiaryInviteStatus.INVITED, rowCaptor.getValue().getStatus());
         verify(emailSender).sendBeneficiaryAssignedNotice("ben@example.com", "Owner", "My Vault");
         verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "ben@example.com", false);
         verify(emailSender, never()).sendBeneficiaryInvitation(any(), any(), any());
@@ -382,6 +396,11 @@ class VaultServiceImplTest {
         assertNull(vault.getBeneficiary());
         assertEquals("new@example.com", vault.getBeneficiaryEmail());
         assertTrue(response.isPendingRegistration());
+        ArgumentCaptor<VaultBeneficiary> rowCaptor = ArgumentCaptor.forClass(VaultBeneficiary.class);
+        verify(vaultBeneficiaryRepository).save(rowCaptor.capture());
+        assertNull(rowCaptor.getValue().getUser());
+        assertEquals("new@example.com", rowCaptor.getValue().getEmail());
+        assertEquals(BeneficiaryInviteStatus.PENDING_REGISTRATION, rowCaptor.getValue().getStatus());
         verify(emailSender).sendBeneficiaryInvitation("new@example.com", "Owner", "My Vault");
         verify(emailSender).sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "new@example.com", true);
         // m5: người chưa có tài khoản chỉ ghi cờ chờ đăng ký, không ghi email
@@ -532,6 +551,7 @@ class VaultServiceImplTest {
         assertNull(vault.getBeneficiary());
         assertEquals("new@example.com", vault.getBeneficiaryEmail());
         assertTrue(response.isReplaced());
+        verify(vaultBeneficiaryRepository).deleteByVaultId(vault.getId());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REPLACED), eq(AuditResult.SUCCESS), eq(ownerId),
                 any(), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
                 eq("pendingRegistration=true, previousUserId=" + old.getId()));
@@ -600,6 +620,7 @@ class VaultServiceImplTest {
         assertSame(ben, vault.getBeneficiary());
         verify(vaultRepository, never()).save(any());
         verifyNoInteractions(emailSender);
+        verifyNoInteractions(vaultBeneficiaryRepository);
     }
 
     @Test
@@ -674,6 +695,7 @@ class VaultServiceImplTest {
         assertNull(vault.getBeneficiary());
         assertNull(vault.getBeneficiaryEmail());
         verify(vaultRepository).saveAndFlush(vault);
+        verify(vaultBeneficiaryRepository).deleteByVaultId(vId);
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vId), eq("Vault"), eq(vId.toString()), any());
     }
@@ -702,6 +724,7 @@ class VaultServiceImplTest {
 
         verify(vaultRepository, never()).saveAndFlush(any());
         verifyNoInteractions(auditLogService);
+        verifyNoInteractions(vaultBeneficiaryRepository);
     }
 
     @Test
@@ -744,6 +767,7 @@ class VaultServiceImplTest {
         assertNull(vault.getBeneficiary());
         assertNull(vault.getBeneficiaryEmail());
         verify(vaultRepository).saveAndFlush(vault);
+        verify(vaultBeneficiaryRepository).deleteByVaultId(vault.getId());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
     }
