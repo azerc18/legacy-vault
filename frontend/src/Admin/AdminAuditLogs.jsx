@@ -73,9 +73,10 @@ export default function AdminAuditLogs() {
             <Alert>{error}</Alert>
 
             {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && <EmptyState bordered icon={status === 'OPEN' ? 'verified' : 'notifications_off'}
-                                                      title={status === 'OPEN' ? 'All clear' : 'No acknowledged alerts yet'}
-                                                      text={status === 'OPEN' ? 'Failed notifications and stuck hand-overs will show up here.' : 'Alerts you acknowledge will be listed here.'} />}
+            {data && rows.length === 0 && (
+                <EmptyState bordered icon="manage_search" title="No log entries match these filters"
+                            text="Try a wider date range or clear the action and user filters." />
+            )}
 
             {rows.length > 0 && (
                 <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
