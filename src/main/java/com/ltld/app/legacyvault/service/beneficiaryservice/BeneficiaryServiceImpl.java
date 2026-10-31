@@ -31,6 +31,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -501,6 +502,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         try {
             // Đọc bản mã hóa từ đĩa rồi giải mã trong bộ nhớ, không lưu lại bản rõ
             plain = cryptoService.decryptBytes(fileStorageService.readFile(document.getFileUrlEncrypted()));
+        } catch (StorageUnavailableException e) {
+            // H1: storage mất kết nối -> 503; không ghi audit FAILURE vì đây không phải dấu hiệu tệp bị sửa hay sai khóa
+            throw e;
         } catch (Exception e) {
             log.error("Document read/decrypt failed for document {}", document.getId(), e);
             // Giải mã thất bại có thể là dấu hiệu tệp bị sửa hoặc sai khóa, nên cần nằm trong audit

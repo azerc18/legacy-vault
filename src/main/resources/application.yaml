@@ -50,7 +50,22 @@ app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   storage:
+    # Thư mục lưu file upload. Khi deploy production, override bằng biến môi trường:
+    # APP_STORAGE_UPLOAD_DIR=/data/legacyvault/uploads
     upload-dir: ${APP_STORAGE_UPLOAD_DIR:uploads/}
+    # H1: local (mặc định, ghi vào upload-dir) | s3 (MinIO / Cloudflare R2 / AWS S3). File luôn được mã hóa trước khi lưu.
+    provider: ${APP_STORAGE_PROVIDER:local}
+    # Chạy một lần khi khởi động: đưa file cũ trong upload-dir lên bucket và đổi đường dẫn trong DB sang key.
+    migrate-local: ${APP_STORAGE_MIGRATE_LOCAL:false}
+    s3:
+      # MinIO: http://localhost:9000 · R2: https://<account_id>.r2.cloudflarestorage.com · AWS S3: để trống
+      endpoint: ${S3_ENDPOINT:}
+      # R2 dùng "auto"
+      region: ${S3_REGION:us-east-1}
+      bucket: ${S3_BUCKET:legacyvault}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      path-style: ${S3_PATH_STYLE:true}
   security:
     crypto:
       master-key: ${CRYPTO_MASTER_KEY}

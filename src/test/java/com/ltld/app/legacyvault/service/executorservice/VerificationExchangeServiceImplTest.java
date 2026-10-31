@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.VerificationRequestClosedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VerificationExchangeMessageRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -434,6 +435,21 @@ class VerificationExchangeServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.VERIFICATION_ATTACHMENT_VIEWED), eq(AuditResult.SUCCESS),
                 eq(executor.getId()), eq(LOGIN), eq("VerificationExchangeMessage"), eq(messageId.toString()),
                 anyString());
+    }
+
+    @Test
+    @DisplayName("H1: storage unavailable while reading an attachment -> 503 STORAGE_UNAVAILABLE, not 500, no audit")
+    void attachment_storageUnavailable_propagates503() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        stubGuardAllows();
+        stubRequestFound();
+        messageWithAttachment(messageId, "stored/a.enc", "giay-to.pdf");
+        when(fileStorageService.readFile("stored/a.enc"))
+                .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
+
+        assertThrows(StorageUnavailableException.class,
+                () -> service.getAttachment(assignmentId, requestId, messageId, LOGIN));
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
