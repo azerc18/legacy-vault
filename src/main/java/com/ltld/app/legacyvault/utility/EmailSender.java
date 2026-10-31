@@ -151,12 +151,24 @@ public class EmailSender {
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
+        sendDmsCheckinReminder(email, checkinDueAt, triggerAt, reminderNumber, reminderCount, null);
+    }
+
+    /**
+     * F2: nhắc Owner check-in Dead Man's Switch kèm nút/liên kết một chạm ("Tôi vẫn an toàn / I'm OK").
+     */
+    public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
+                                       int reminderNumber, int reminderCount, String oneClickCheckinUrl) {
+        String linkSection = (oneClickCheckinUrl != null && !oneClickCheckinUrl.isBlank())
+                ? "\n\nOne-click check-in (Tôi vẫn an toàn / I'm OK): " + oneClickCheckinUrl
+                : "";
         sendWithoutOtpFooter(email,
                 "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
                 "You have not checked in to your Dead Man's Switch on LegacyVault."
                         + "\nCheck-in deadline: " + formatDeadline(checkinDueAt) + " (Vietnam time)"
                         + "\nIf you do not respond, the system will start the handover process at "
                         + formatDeadline(triggerAt) + " (Vietnam time) and notify your Digital Executor."
+                        + linkSection
                         + "\n\nTo check in, sign in to LegacyVault and choose \"Check-in\" in the Dead Man's Switch settings."
                         + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
     }

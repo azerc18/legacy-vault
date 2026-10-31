@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface DmsCheckinRepository extends JpaRepository<DmsCheckin, UUID> {
     List<DmsCheckin> findAllByDmsConfigIdOrderByOccurredAtDesc(UUID dmsConfigId);
+
+    boolean existsByTokenJti(String tokenJti);
 }
