@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
+import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -37,6 +39,7 @@ public class AdminUserServiceImpl implements AdminUserService{
     private final AuditLogService auditLogService;
     private final DmsConfigRepository dmsConfigRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final LegalVerificationRequestRepository legalVerificationRequestRepository;
 
 
     private static final int MAX_PAGE_SIZE = 100;
@@ -156,9 +159,12 @@ public class AdminUserServiceImpl implements AdminUserService{
                 .collect(Collectors.toMap(c -> c.getOwner().getId(), c -> c));
         Map<UUID, List<ExecutorAssignment>> active = executorAssignmentRepository.findActiveWithUserByOwnerIdIn(ids)
                 .stream().collect(Collectors.groupingBy(a -> a.getOwner().getId()));
+        LocalDateTime now = LocalDateTime.now();
         return users.map(u -> {
             DmsConfig c = configs.get(u.getId());
-            return build(u, c, ExecutorRescueRule.rescueNeeded(c, active.getOrDefault(u.getId(), List.of())));
+            return build(u, c, ExecutorRescueRule.rescueNeeded(c, active.getOrDefault(u.getId(), List.of()), now,
+                    a -> legalVerificationRequestRepository.existsByOwnerIdAndExecutorIdAndCreatedAtAfter(
+                            u.getId(), a.getExecutorUser().getId(), a.getActivatedAt())));
         });
     }
 

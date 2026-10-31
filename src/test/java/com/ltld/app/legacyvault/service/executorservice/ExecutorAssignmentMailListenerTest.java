@@ -77,6 +77,18 @@ class ExecutorAssignmentMailListenerTest {
     }
 
     @Test
+    @DisplayName("FR-07: REPLACED_BY_ADMIN gọi mẫu 'Admin đã thay', không dùng mẫu Owner thu hồi")
+    void replacedByAdmin_usesAdminNotice() {
+        listener.on(new ExecutorAssignmentChangedEvent(List.of(
+                ExecutorMail.replacedByAdmin("old@example.test", "Owner A", "owner@example.test",
+                        ExecutorType.BACKUP))));
+
+        verify(emailSender).sendExecutorReplacedByAdminNotice(
+                "old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP);
+        verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("Event rỗng: không gửi gì")
     void emptyEvent_sendsNothing() {
         listener.on(new ExecutorAssignmentChangedEvent(List.of()));

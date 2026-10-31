@@ -58,6 +58,19 @@ class EmailSenderExecutorNoticeTest {
                 .doesNotContain("has revoked", "OTP", "The code is valid for");
     }
 
+    @Test
+    void replacedByAdminNotice_saysAdministratorAssignedNewExecutor() {
+        emailSender.sendExecutorReplacedByAdminNotice("old@example.test", "Owner A", "owner@example.test",
+                ExecutorType.BACKUP);
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("old@example.test");
+        assertThat(message.getText())
+                .contains("Owner A", "owner@example.test", "BACKUP", "administrator",
+                        "assigned a new", "continue the handover process")
+                .doesNotContain("has revoked", "OTP", "The code is valid for", "not started", "days");
+    }
+
     // T5: Owner không có fullName -> dùng email làm tên hiển thị, không in chữ "null".
     @Test
     void assignedNotice_ownerWithoutName_usesEmailAndNeverPrintsNull() {
