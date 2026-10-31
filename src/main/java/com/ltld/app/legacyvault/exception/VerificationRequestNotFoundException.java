@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class VerificationRequestNotFoundException extends BusinessException {
     public VerificationRequestNotFoundException(String message) {
-        super(message, HttpStatus.NOT_FOUND);
+        super(message, HttpStatus.NOT_FOUND, ErrorCode.NOT_FOUND);
     }
 }
