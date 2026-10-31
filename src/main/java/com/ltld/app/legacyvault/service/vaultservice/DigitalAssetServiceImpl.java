@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -33,6 +34,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     private final CryptoService cryptoService;
     private final AuditLogService auditLogService;
     private final VaultModificationGuard vaultModificationGuard;
+    private final AssetAllocationRepository assetAllocationRepository;
 
     // =========================================================
     // FR-27: Xem danh sách tài sản ACTIVE của Vault
@@ -168,6 +170,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
         // Xóa và flush DB thành công trước khi ghi audit (tránh audit ma khi rollback)
+        assetAllocationRepository.deleteByAssetId(assetId);
         digitalAssetRepository.delete(asset);
         digitalAssetRepository.flush();
 

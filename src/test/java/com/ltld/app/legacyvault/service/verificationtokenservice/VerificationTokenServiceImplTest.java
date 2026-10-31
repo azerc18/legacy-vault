@@ -5,13 +5,16 @@ import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -61,6 +64,9 @@ public class VerificationTokenServiceImplTest {
 
     @Spy
     private OtpHasher otpHasher = new OtpHasher();
+
+    @Mock
+    private VaultBeneficiaryRepository vaultBeneficiaryRepository;
 
     @InjectMocks
     private VerificationTokenServiceImpl tokenService;
@@ -395,6 +401,10 @@ public class VerificationTokenServiceImplTest {
         when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com"))
                 .thenReturn(List.of(firstVault, secondVault));
 
+        VaultBeneficiary firstRow = VaultBeneficiary.builder().vault(firstVault).email("test@example.com").build();
+        VaultBeneficiary secondRow = VaultBeneficiary.builder().vault(secondVault).email("test@example.com").build();
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com"))
+                .thenReturn(List.of(firstRow, secondRow));
         tokenService.verifyEmail(request);
 
         verify(vaultRepository).findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com");
@@ -406,6 +416,11 @@ public class VerificationTokenServiceImplTest {
                     "test@example.com", vault.getId(), "Vault", vault.getId().toString(), null);
         }
         verify(vaultRepository).saveAll(List.of(firstVault, secondVault));
+        for (VaultBeneficiary row : List.of(firstRow, secondRow)) {
+            assertThat(row.getUser()).isSameAs(user);
+            assertThat(row.getStatus()).isEqualTo(BeneficiaryInviteStatus.INVITED);
+        }
+        verify(vaultBeneficiaryRepository).saveAll(List.of(firstRow, secondRow));
     }
 
     @Test
@@ -424,6 +439,7 @@ public class VerificationTokenServiceImplTest {
                 .isInstanceOf(InvalidOtpException.class);
 
         verifyNoInteractions(vaultRepository);
+        verifyNoInteractions(vaultBeneficiaryRepository);
     }
 
     @Test
