@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -43,6 +44,7 @@ class DigitalAssetServiceImplTest {
     @Mock private CryptoService cryptoService;
     @Mock private AuditLogService auditLogService;
     @Mock private VaultModificationGuard vaultModificationGuard;
+    @Mock private AssetAllocationRepository assetAllocationRepository;
 
     @InjectMocks private DigitalAssetServiceImpl assetService;
 
@@ -365,6 +367,7 @@ class DigitalAssetServiceImplTest {
 
         assetService.deleteAsset(ownerId, vaultId, assetId);
 
+        verify(assetAllocationRepository).deleteByAssetId(assetId);
         verify(digitalAssetRepository).delete(mockAsset);
         verify(digitalAssetRepository).flush();
         verify(auditLogService).log(eq(AuditAction.ASSET_DELETED), eq(AuditResult.SUCCESS),

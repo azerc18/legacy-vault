@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -26,4 +27,6 @@ public class VaultDetailResponse {
     private final long totalAssets;
     private final boolean modifiable;
     private final String lockReason;
-}
+    @Builder.Default
+    private final List<VaultBeneficiaryResponse> beneficiaries = List.of();
+}
