@@ -42,4 +42,13 @@ public interface BeneficiaryClaimRepository extends JpaRepository<BeneficiaryCla
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM BeneficiaryClaim c WHERE c.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
+    // N2b: claim của đúng một người trong một vault
+    Optional<BeneficiaryClaim> findByVaultIdAndBeneficiaryId(UUID vaultId, UUID beneficiaryId);
+
+    // N2b: toàn bộ claim của một vault (kiểm tra "mọi phần đã xong")
+    List<BeneficiaryClaim> findAllByVaultId(UUID vaultId);
+
+    // N2b: claim của một người trong nhiều vault (listMyVaults)
+    List<BeneficiaryClaim> findByVaultIdInAndBeneficiaryId(Collection<UUID> vaultIds, UUID beneficiaryId);
 }
