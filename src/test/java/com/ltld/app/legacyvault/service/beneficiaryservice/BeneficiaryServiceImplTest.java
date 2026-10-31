@@ -34,6 +34,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -1717,6 +1718,25 @@ public class BeneficiaryServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.DOCUMENT_DOWNLOADED), eq(AuditResult.FAILURE),
                 eq(currentUserId), any(), eq(vaultId), eq("LegalDocument"), any(),
                 eq("Read or decrypt failed"));
+    }
+
+    // H1: storage mất kết nối -> 503, file vẫn còn nên không ghi audit FAILURE "Read or decrypt failed"
+    @Test
+    void downloadVaultDocument_storageUnavailable_propagates503WithoutFailureAudit() throws Exception {
+        UUID docId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+                .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
+        when(fileStorageService.readFile(any()))
+                .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
+
+        assertThrows(StorageUnavailableException.class,
+                () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
+
+        verify(auditLogService, never()).log(eq(AuditAction.DOCUMENT_DOWNLOADED), any(),
+                any(), any(), any(), any(), any(), any());
+        verify(cryptoService, never()).decryptBytes(any());
     }
 
     @Test

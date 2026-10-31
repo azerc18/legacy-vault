@@ -29,4 +29,8 @@ public class DmsException extends BusinessException {
     public String getErrorCode() {
         return errorCode;
     }
+
+    public DmsException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }
