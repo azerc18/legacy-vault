@@ -7,6 +7,8 @@ import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
     ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger,
 } from './ownerUi.jsx';
+import FilePicker from '../Common/FilePicker.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
@@ -170,7 +172,10 @@ function AssetSection({ vaultId, editable, onChanged }) {
     return (
         <Card title={`Assets (${assets.length})`} icon="key">
             <Alert>{error}</Alert>
-            {assets.length === 0 && <p className="text-sm text-on-surface-variant mb-4">No assets yet.</p>}
+            {assets.length === 0 && (
+                <EmptyState compact icon="key" title="No assets yet"
+                            text={editable ? 'Add bank accounts, crypto wallets or social accounts below.' : 'This vault has no assets.'} />
+            )}
             {assets.length > 0 && (
                 <ul className="divide-y divide-outline-variant/30 mb-4">
                     {assets.map((a) => (
@@ -434,7 +439,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
         setLoading(true);
         try {
             await ownerApi.uploadDocument(vaultId, type, file);
-            setFile(null); e.target.reset();
+            setFile(null);
             load(); onChanged();
         } catch (err) {
             setError(getErrorMessage(err, 'Upload failed.'));
@@ -492,8 +497,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
                             {DOCUMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                         </select>
-                        <input type="file" accept={ALLOWED.join(',')} onChange={(e) => setFile(e.target.files?.[0] || null)}
-                               className="text-sm file:mr-3 file:h-10 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:font-semibold" />
+                        <FilePicker file={file} onChange={setFile} accept={ALLOWED.join(',')} disabled={loading} />
                         <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Uploading...' : 'Upload'}</button>
                     </form>
                 </>
@@ -532,7 +536,7 @@ function ActivitySection({ vaultId }) {
         <Card title="Activity log" icon="history">
             <Alert>{error}</Alert>
             {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && <p className="text-sm text-on-surface-variant">No activity yet.</p>}
+            {data && rows.length === 0 && ( <EmptyState compact icon="history" title="No activity yet" text="Changes to this vault will be recorded here." /> )}
             {rows.length > 0 && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">

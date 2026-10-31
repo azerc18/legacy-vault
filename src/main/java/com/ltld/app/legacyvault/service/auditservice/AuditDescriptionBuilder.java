@@ -21,7 +21,7 @@ public class AuditDescriptionBuilder {
 
     // FR-05 (Q42): hành động nội bộ của Admin, ẩn khỏi nhật ký Owner và nhật ký Vault
     public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
-            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED));
+            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN));
 
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
     public VaultActivityLogResponse toResponse(AuditLog log, UUID ownerId) {
@@ -117,6 +117,7 @@ public class AuditDescriptionBuilder {
             case DMS_RESUMED -> "An administrator resumed the Dead Man's Switch and started a new check-in cycle.";
             case EXECUTOR_ASSIGNED -> "Assigned an executor.";
             case EXECUTOR_REPLACED -> "Changed the executor.";
+            case EXECUTOR_ASSIGNED_BY_ADMIN -> "An administrator assigned an executor because none was available.";
             // Owner thu hồi luôn ghi actor = Owner; BR-03 (FR-07 tự thu hồi Primary) ghi actor = null
             case EXECUTOR_REVOKE -> log.getActor() == null
                     ? "The system automatically revoked the primary executor for not acknowledging in time."

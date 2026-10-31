@@ -25,20 +25,20 @@ class ReviewProgressRecorderTest {
     @InjectMocks private ReviewProgressRecorder recorder;
 
     @Test
-    void recordViewed_createsRowForThisVerifierOnly() {
+    void recordChecked_createsRowForThisVerifierOnly() {
         UUID requestId = UUID.randomUUID();
         UUID verifierId = UUID.randomUUID();
         LegalVerificationRequest ref = LegalVerificationRequest.builder().id(requestId).build();
         when(requestRepository.getReferenceById(requestId)).thenReturn(ref);
 
-        recorder.recordViewed(requestId, verifierId);
+        recorder.recordChecked(requestId, verifierId, true);
 
         ArgumentCaptor<VerificationReviewProgress> captor = ArgumentCaptor.forClass(VerificationReviewProgress.class);
         verify(progressRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getRequest()).isSameAs(ref);
         assertThat(captor.getValue().getVerifierId()).isEqualTo(verifierId);
-        assertThat(captor.getValue().getViewedAt()).isNotNull();
-        assertThat(captor.getValue().getCheckedAt()).isNull();
-        assertThat(captor.getValue().getDocumentValid()).isNull();
+        assertThat(captor.getValue().getCheckedAt()).isNotNull();
+        assertThat(captor.getValue().getDocumentValid()).isTrue();
+        assertThat(captor.getValue().getViewedAt()).isNull();
     }
 }

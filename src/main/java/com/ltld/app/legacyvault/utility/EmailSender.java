@@ -199,6 +199,18 @@ public class EmailSender {
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 
+    // FR-07: Admin chỉ định Executor mới để tiếp tục bàn giao (người cũ bỏ dở hoặc không còn dùng được)
+    public void sendExecutorReplacedByAdminNotice(String to, String ownerName, String ownerEmail,
+                                                  ExecutorType type) {
+        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
+        sendWithoutOtpFooter(to,
+                "Your Digital Executor role has ended - LegacyVault",
+                "An administrator has assigned a new " + role + " for " + ownerLabel(ownerName, ownerEmail)
+                        + " to continue the handover process."
+                        + "\nYou can no longer carry out the handover process for "
+                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+    }
+
     // FR-06: Owner tạo trước khi có fullName (null/rỗng) thì hiển thị email, không in chữ "null".
     private static String ownerDisplayName(String ownerName, String ownerEmail) {
         return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName;

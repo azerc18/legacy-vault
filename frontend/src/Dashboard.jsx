@@ -12,7 +12,7 @@ const NAV = [
 
 const BADGES = [
     { icon: 'lock', text: 'AES-256 encryption' },
-    { icon: 'key', text: 'JWT authentication' },
+    { icon: 'verified_user', text: 'Two-step verification' },
     { icon: 'gavel', text: 'Legal verification' },
     { icon: 'favorite', text: "Dead Man's Switch" },
 ];

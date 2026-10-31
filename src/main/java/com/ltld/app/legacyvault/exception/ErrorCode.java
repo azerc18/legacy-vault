@@ -1,0 +1,104 @@
+package com.ltld.app.legacyvault.exception;
+
+import org.springframework.http.HttpStatus;
+
+public enum ErrorCode {
+    // Mã chung, dùng khi constructor cũ chỉ truyền HttpStatus
+    BAD_REQUEST(HttpStatus.BAD_REQUEST),
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED),
+    FORBIDDEN(HttpStatus.FORBIDDEN),
+    NOT_FOUND(HttpStatus.NOT_FOUND),
+    CONFLICT(HttpStatus.CONFLICT),
+    UNPROCESSABLE_ENTITY(HttpStatus.UNPROCESSABLE_ENTITY),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
+    SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // Request
+    VALIDATION_FAILED(HttpStatus.BAD_REQUEST),
+    MALFORMED_BODY(HttpStatus.BAD_REQUEST),
+    INVALID_PARAMETER(HttpStatus.BAD_REQUEST),
+    MISSING_PARAMETER(HttpStatus.BAD_REQUEST),
+    INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT),
+    DATA_CONFLICT(HttpStatus.CONFLICT),
+
+    // Auth / OTP
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED),
+    ACCOUNT_LOCKED(HttpStatus.FORBIDDEN),
+    ACCOUNT_NOT_ACTIVE(HttpStatus.FORBIDDEN),
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT),
+    OTP_INVALID(HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(HttpStatus.BAD_REQUEST),
+    OTP_NOT_FOUND(HttpStatus.BAD_REQUEST),
+    TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS),
+    TOO_MANY_OTP_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
+    MFA_REQUIRED(HttpStatus.UNAUTHORIZED),
+    MFA_INVALID_CODE(HttpStatus.BAD_REQUEST),
+
+    // Executor / DMS / Vault
+    DMS_NOT_TRIGGERED(HttpStatus.CONFLICT),
+    EXECUTOR_NOT_ACTIVE(HttpStatus.FORBIDDEN),
+    VAULT_STATE_CONFLICT(HttpStatus.CONFLICT),
+    CHECKIN_TOKEN_INVALID(HttpStatus.BAD_REQUEST),
+    CONFIRMER_TOKEN_INVALID(HttpStatus.BAD_REQUEST),
+    REMINDER_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
+    EMERGENCY_REQUEST_EXISTS(HttpStatus.CONFLICT),
+
+    // Verifier
+    INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),
+    SIGN_CODE_EXPIRED(HttpStatus.BAD_REQUEST),
+    VERIFICATION_STEP_REQUIRED(HttpStatus.CONFLICT),
+    REQUEST_ALREADY_REVIEWED(HttpStatus.CONFLICT),
+    REQUEST_NOT_APPROVED(HttpStatus.CONFLICT),
+    REQUEST_CLOSED(HttpStatus.CONFLICT),
+    DUPLICATE_VERIFICATION_REQUEST(HttpStatus.CONFLICT),
+    INVALID_VERIFICATION_DOCUMENT(HttpStatus.BAD_REQUEST),
+    CONFLICT_OF_INTEREST(HttpStatus.FORBIDDEN),
+
+    // Beneficiary / phân bổ
+    BENEFICIARY_REQUIRED(HttpStatus.BAD_REQUEST),
+    BENEFICIARY_SELF(HttpStatus.BAD_REQUEST),
+    LAST_BENEFICIARY(HttpStatus.CONFLICT),
+    BENEFICIARY_IN_USE(HttpStatus.CONFLICT),
+    BENEFICIARY_CONFLICT(HttpStatus.CONFLICT),
+    ALLOCATION_PERCENT_INVALID(HttpStatus.BAD_REQUEST),
+    ALLOCATION_MODE_NOT_ALLOWED(HttpStatus.BAD_REQUEST),
+    ASSET_FIELD_INVALID(HttpStatus.BAD_REQUEST),
+    ASSET_NOT_ALLOCATED_TO_YOU(HttpStatus.FORBIDDEN),
+    CLAIM_NOT_READY(HttpStatus.FORBIDDEN),
+    IDENTITY_NOT_VERIFIED(HttpStatus.FORBIDDEN),
+    CLAIM_ALREADY_RESPONDED(HttpStatus.CONFLICT),
+    CLAIM_EXTEND_LIMIT(HttpStatus.CONFLICT),
+    INVALID_LEGACY_CODE(HttpStatus.BAD_REQUEST),
+
+    // Gói / thanh toán / hạ tầng
+    PLAN_LIMIT_REACHED(HttpStatus.FORBIDDEN),
+    PAYMENT_SIGNATURE_INVALID(HttpStatus.BAD_REQUEST),
+    PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST),
+    STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
+
+    private final HttpStatus status;
+
+    ErrorCode(HttpStatus status) { this.status = status; }
+
+    public HttpStatus getStatus() { return status; }
+
+    /** Constructor cũ chỉ có HttpStatus -> chọn mã chung tương ứng. */
+    public static ErrorCode fromStatus(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> BAD_REQUEST;
+            case UNAUTHORIZED -> UNAUTHORIZED;
+            case FORBIDDEN -> FORBIDDEN;
+            case NOT_FOUND -> NOT_FOUND;
+            case CONFLICT -> CONFLICT;
+            case UNPROCESSABLE_ENTITY -> UNPROCESSABLE_ENTITY;
+            case TOO_MANY_REQUESTS -> TOO_MANY_REQUESTS;
+            case SERVICE_UNAVAILABLE -> SERVICE_UNAVAILABLE;
+            default -> INTERNAL_ERROR;
+        };
+    }
+}

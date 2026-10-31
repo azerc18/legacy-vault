@@ -17,7 +17,9 @@ public record ExecutorAssignmentChangedEvent(List<ExecutorMail> mails) {
     public enum MailType {
         ASSIGNED, REVOKED,
         // FR-07 / BR-03: hệ thống tự thu hồi Primary vì không xác nhận trong hạn, không phải Owner thu hồi
-        REVOKED_TIMEOUT
+        REVOKED_TIMEOUT,
+        // FR-07: Admin chỉ định Executor mới thay người cũ
+        REPLACED_BY_ADMIN
     }
 
     /** Một mail cho một Executor; chỉ chứa thông tin của Owner và vị trí của chính người nhận. */
@@ -38,6 +40,12 @@ public record ExecutorAssignmentChangedEvent(List<ExecutorMail> mails) {
                                                     int waitDays) {
             return new ExecutorMail(MailType.REVOKED_TIMEOUT, recipientEmail, ownerName, ownerEmail,
                     ExecutorType.PRIMARY, waitDays);
+        }
+
+        public static ExecutorMail replacedByAdmin(String recipientEmail, String ownerName, String ownerEmail,
+                                                   ExecutorType executorType) {
+            return new ExecutorMail(MailType.REPLACED_BY_ADMIN, recipientEmail, ownerName, ownerEmail,
+                    executorType, 0);
         }
     }
 }

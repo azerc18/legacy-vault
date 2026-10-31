@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,4 +30,7 @@ public interface DmsConfigRepository extends JpaRepository<DmsConfig, UUID> {
     // FR-03: id các DMS đã tới lần nhắc check-in kế tiếp (dùng index status, next_reminder_at).
     @Query("select c.id from DmsConfig c where c.status = :status and c.nextReminderAt <= :now")
     List<UUID> findIdsDueForReminder(@Param("status") DmsStatus status, @Param("now") LocalDateTime now);
+
+    // Admin: lấy DMS của nhiều Owner trong 1 query (danh sách user có phân trang)
+    List<DmsConfig> findAllByOwnerIdIn(Collection<UUID> ownerIds);
 }

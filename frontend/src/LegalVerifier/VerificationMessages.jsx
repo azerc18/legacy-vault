@@ -3,6 +3,8 @@ import { getMessages, sendMessage, getAttachmentBlob } from '../api/verifierApi.
 import { getErrorMessage } from '../api/http.js';
 import { formatDate } from './verifierUi.js';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
+import FilePicker from '../Common/FilePicker.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // khớp giới hạn 10MB của BE
 const POLL_MS = 30000;                   // hồ sơ còn mở: tự tải tin mới mỗi 30 giây
@@ -11,7 +13,6 @@ export default function VerificationMessages({ requestId, status }) {
     const [messages, setMessages] = useState([]);
     const [text, setText] = useState('');
     const [file, setFile] = useState(null);
-    const [fileKey, setFileKey] = useState(0);   // đổi key để xoá ô chọn file
     const [sending, setSending] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState('');
@@ -44,12 +45,10 @@ export default function VerificationMessages({ requestId, status }) {
         setRefreshing(false);
     };
 
-    const handleFileChange = (e) => {
-        const picked = e.target.files?.[0] ?? null;
+    const handleFileChange = (picked) => {
         if (picked && picked.size > MAX_FILE_BYTES) {
             setError('File exceeds the 10MB limit.');
             setFile(null);
-            setFileKey((k) => k + 1);
             return;
         }
         setError('');
@@ -65,7 +64,6 @@ export default function VerificationMessages({ requestId, status }) {
             await sendMessage(requestId, text.trim(), file);
             setText('');
             setFile(null);
-            setFileKey((k) => k + 1);
             await load();
         } catch (err) {
             setError(getErrorMessage(err, 'Could not send the message.'));
@@ -108,9 +106,8 @@ export default function VerificationMessages({ requestId, status }) {
             {error && <p role="alert" className="text-sm text-error mb-3">{error}</p>}
 
             <div className="space-y-3 mb-4 max-h-96 overflow-y-auto">
-                {messages.length === 0 && (
-                    <p className="text-sm text-on-surface-variant">No messages yet.</p>
-                )}
+                {messages.length === 0 && (<EmptyState compact icon="forum" title="No messages yet"
+                                                       text={canSend ? 'Ask the executor for a clearer copy or extra documents if needed.' : 'No messages were exchanged for this request.'} />)}
                 {messages.map((m) => (
                     <div
                         key={m.id}
@@ -147,14 +144,8 @@ export default function VerificationMessages({ requestId, status }) {
                         className="w-full p-3 rounded-xl border border-outline-variant/40 text-sm"
                     />
                     <div className="text-xs text-outline text-right">{text.length}/2000</div>
-                    <input
-                        key={fileKey}
-                        type="file"
-                        accept=".pdf,.png,.jpg,.jpeg"
-                        onChange={handleFileChange}
-                        aria-label="Attach a file (pdf, png, jpg, max 10MB)"
-                        className="text-sm"
-                    />
+                    <FilePicker file={file} onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg"
+                                label="Attach file" hint="PDF, PNG or JPG, up to 10MB" disabled={sending} />
                     <div>
                         <button
                             type="submit"
