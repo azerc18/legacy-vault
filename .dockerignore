@@ -1,0 +1,10 @@
+.git
+.idea
+**/node_modules
+frontend/dist
+target
+uploads
+.env
+.mcp.json
+CLAUDE.md
+docs
