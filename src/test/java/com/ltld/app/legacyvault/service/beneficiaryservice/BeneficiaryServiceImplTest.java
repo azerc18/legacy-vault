@@ -1828,6 +1828,7 @@ public class BeneficiaryServiceImplTest {
                 eq(List.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED, VaultStatus.ARCHIVED_LOCKED))))
                 .thenReturn(List.of(v1, v2));
         when(claimRepository.findByBeneficiaryIdAndVaultIdIn(eq(currentUserId), eq(List.of(id1, id2)))).thenReturn(List.of(c1));
+
         List<BeneficiaryVaultSummaryResponse> result = beneficiaryService.listMyVaults(currentUserId);
 
         assertEquals(2, result.size());

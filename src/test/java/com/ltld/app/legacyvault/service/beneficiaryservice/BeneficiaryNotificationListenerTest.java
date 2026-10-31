@@ -116,13 +116,13 @@ class BeneficiaryNotificationListenerTest {
 
     // Chưa có claim: save gán id và nhớ lại claim; findById trả đúng claim đó
     private void stubNewClaimPersistence() {
-        lenient().when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        lenient().when(claimRepository.findByVaultIdAndBeneficiaryId(eq(vaultId), any())).thenReturn(Optional.empty());
         stubSaveAndFindById();
     }
 
     private void stubExistingClaim(BeneficiaryClaim claim) {
         storedClaim = claim;
-        lenient().when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(claim));
+        lenient().when(claimRepository.findByVaultIdAndBeneficiaryId(eq(vaultId), any())).thenReturn(Optional.of(claim));
         stubSaveAndFindById();
     }
 

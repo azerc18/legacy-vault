@@ -22,7 +22,7 @@ public class BeneficiaryClaim {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // 1 Vault có nhiều Claim (mỗi người thụ hưởng một claim)
+    // N2b: 1 Vault có nhiều Claim (mỗi người thụ hưởng một claim)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "vault_id", nullable = false)
     private Vault vault;

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Container;
@@ -31,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 // Kiểm chứng trên MySQL thật: INSERT IGNORE bind UUID đúng, ghi trùng không lỗi, findUnaccessedAssets lọc đúng.
 // Mỗi test chạy trong một transaction và tự rollback, nên không cần dọn dữ liệu.
@@ -131,5 +133,25 @@ class AssetAccessRecordIntegrationTest {
         List<DigitalAsset> result = assetRepository.findUnaccessedAssets(vault.getId(), claim.getId());
 
         assertThat(result).extracting(DigitalAsset::getAssetName).containsExactlyInAnyOrder("A1", "A2");
+    }
+
+    // N2b: cùng vault, khác beneficiary -> lưu được; cùng (vault, beneficiary) -> vi phạm unique
+    @Test
+    void claims_uniquePerVaultAndBeneficiary() {
+        User other = newUser("ben2@example.com");
+
+        // `claim` (vault, beneficiary) đã tạo ở setUp
+        claimRepository.saveAndFlush(BeneficiaryClaim.builder()
+                .vault(vault).beneficiary(other).status(ClaimStatus.PENDING)
+                .claimDeadlineAt(LocalDateTime.now().plusDays(30)).build());
+
+        // Kiểm tra truy vấn TRƯỚC khi gây lỗi: sau lỗi flush, session Hibernate không còn đáng tin
+        assertThat(claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), beneficiary.getId())).isPresent();
+        assertThat(claimRepository.findByBeneficiaryIdAndVaultIdIn(other.getId(), List.of(vault.getId()))).hasSize(1);
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> claimRepository.saveAndFlush(BeneficiaryClaim.builder()
+                        .vault(vault).beneficiary(beneficiary).status(ClaimStatus.PENDING)
+                        .claimDeadlineAt(LocalDateTime.now().plusDays(30)).build()));
     }
 }
