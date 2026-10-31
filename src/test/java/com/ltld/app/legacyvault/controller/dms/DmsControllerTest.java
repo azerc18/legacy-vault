@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -131,6 +132,7 @@ public class DmsControllerTest {
         mockMvc.perform(get("/api/dms/check-ins").principal(principal).param("page", "-1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.INVALID_PARAMETER.name()))
                 .andExpect(jsonPath("$.message").value("Invalid page number (must be >= 0)."));
 
         verify(dmsConfigService, never()).getCheckins(any(), any());
@@ -141,6 +143,8 @@ public class DmsControllerTest {
         for (String size : List.of("0", "101")) {
             mockMvc.perform(get("/api/dms/check-ins").principal(principal).param("size", size))
                     .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.success").value(false))
+                    .andExpect(jsonPath("$.errorCode").value(ErrorCode.INVALID_PARAMETER.name()))
                     .andExpect(jsonPath("$.message").value("Page size must be between 1 and 100."));
         }
 

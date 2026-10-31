@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
@@ -59,10 +60,10 @@ public class DmsController {
             @RequestParam(defaultValue = "20") int size) {
         UUID ownerId = UUID.fromString(principal.getName());
         if (page < 0) {
-            throw new DmsException("Invalid page number (must be >= 0).", HttpStatus.BAD_REQUEST);
+            throw new DmsException(ErrorCode.INVALID_PARAMETER, "Invalid page number (must be >= 0).");
         }
         if (size < 1 || size > 100) {
-            throw new DmsException("Page size must be between 1 and 100.", HttpStatus.BAD_REQUEST);
+            throw new DmsException(ErrorCode.INVALID_PARAMETER, "Page size must be between 1 and 100.");
         }
         return ResponseEntity.ok(ApiResponse.success("Check-in history retrieved successfully",
                 dmsConfigService.getCheckins(ownerId, PageRequest.of(page, size))));
