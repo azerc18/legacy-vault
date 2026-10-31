@@ -114,6 +114,12 @@
             <artifactId>testcontainers-mysql</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- H1: lưu file lên object storage tương thích S3 (MinIO khi phát triển, Cloudflare R2 / AWS S3 khi demo) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.56.0</version>
+        </dependency>
 
     </dependencies>
 

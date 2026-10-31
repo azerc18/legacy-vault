@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.fileservice;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -10,7 +11,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
+// H1: bản mặc định (đĩa local); app.storage.provider=s3 thì dùng S3FileStorageService
 @Service
+@ConditionalOnProperty(name = "app.storage.provider", havingValue = "local", matchIfMissing = true)
 public class FileStorageServiceImpl implements FileStorageService {
 
     // Thư mục lưu file trên ổ cứng. Nếu file cấu hình không có, mặc định lưu vào folder 'uploads/'
