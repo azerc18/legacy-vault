@@ -4,5 +4,6 @@ import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 
 import java.util.UUID;
 
-public record VaultBeneficiaryResponse(UUID id, String email, BeneficiaryInviteStatus status) {
+public record VaultBeneficiaryResponse(UUID id, String email, String fullName,
+                                       String relationship, BeneficiaryInviteStatus status) {
 }

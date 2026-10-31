@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
@@ -17,6 +18,7 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -33,6 +35,7 @@ import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,6 +72,7 @@ public class VaultServiceImpl implements VaultService {
     private final DmsConfigService dmsConfigService;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final AssetAllocationRepository assetAllocationRepository;
+    private final EntitlementService entitlementService;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -323,7 +327,7 @@ public class VaultServiceImpl implements VaultService {
 
     private static List<VaultBeneficiaryResponse> toBeneficiaryResponses(List<VaultBeneficiary> rows) {
         return rows.stream()
-                .map(b -> new VaultBeneficiaryResponse(b.getId(), b.getEmail(), b.getStatus()))
+                .map(b -> new VaultBeneficiaryResponse(b.getId(), b.getEmail(), b.getFullName(), b.getRelationship(), b.getStatus()))
                 .toList();
     }
 
@@ -366,6 +370,121 @@ public class VaultServiceImpl implements VaultService {
 
         auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
                 owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
+    }
+
+    // N2-owner: thêm một người thụ hưởng vào Vault
+    @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public VaultBeneficiaryResponse addBeneficiary(UUID ownerId, UUID vaultId, AddBeneficiaryRequest request) {
+        dmsConfigService.assertHandoverNotStarted(ownerId);   // khóa DmsConfig trước Vault
+        Vault vault = lockActiveOwnedVault(ownerId, vaultId, AuditAction.BENEFICIARY_ASSIGN_DENIED);
+        User owner = vault.getOwner();
+
+        String email = request.getEmail().trim().toLowerCase();
+        if (email.equals(owner.getEmail())) {
+            throw new VaultException(ErrorCode.BENEFICIARY_SELF, "You cannot assign yourself as a beneficiary");
+        }
+        if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, email)) {
+            throw new VaultException(ErrorCode.BENEFICIARY_CONFLICT,
+                    "This person is your Digital Executor and cannot also be your beneficiary.");
+        }
+        if (vaultBeneficiaryRepository.existsByVaultIdAndEmail(vaultId, email)) {
+            throw new VaultException("This person is already a beneficiary of this vault", HttpStatus.CONFLICT);
+        }
+
+        List<VaultBeneficiary> current = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId);
+        entitlementService.assertCanAddBeneficiaries(ownerId, current.size() + 1);
+
+        User user = userRepository.findByEmail(email)
+                .filter(u -> u.getStatus() != UserStatus.PENDING)
+                .orElse(null);
+        VaultBeneficiary row = vaultBeneficiaryRepository.save(VaultBeneficiary.builder()
+                .vault(vault)
+                .user(user)
+                .email(email)
+                .fullName(request.getFullName())
+                .relationship(request.getRelationship())
+                .status(user == null ? BeneficiaryInviteStatus.PENDING_REGISTRATION : BeneficiaryInviteStatus.INVITED)
+                .build());
+
+        if (current.isEmpty()) {
+            syncLegacyPrimary(vault, row);   // người đầu tiên = người chính của luồng cũ
+        }
+
+        boolean pending = user == null;
+        auditLogService.log(AuditAction.BENEFICIARY_ASSIGNED, AuditResult.SUCCESS, ownerId, owner.getEmail(),
+                vaultId, "Vault", vaultId.toString(),
+                pending ? "pendingRegistration=true" : "beneficiaryUserId=" + user.getId());
+
+        String ownerName = owner.getFullName();
+        String ownerEmail = owner.getEmail();
+        String vaultName = vault.getName();
+        runAfterCommit(() -> {
+            if (pending) {
+                emailSender.sendBeneficiaryInvitation(email, ownerName, vaultName);
+            } else {
+                emailSender.sendBeneficiaryAssignedNotice(email, ownerName, vaultName);
+            }
+            emailSender.sendBeneficiaryAssignmentConfirmation(ownerEmail, vaultName, email, pending);
+        });
+
+        return new VaultBeneficiaryResponse(row.getId(), row.getEmail(), row.getFullName(),
+                row.getRelationship(), row.getStatus());
+    }
+
+    // N2-owner: xóa một người thụ hưởng cụ thể
+    @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public void removeBeneficiary(UUID ownerId, UUID vaultId, UUID beneficiaryId) {
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+        Vault vault = lockActiveOwnedVault(ownerId, vaultId, AuditAction.BENEFICIARY_REMOVE_DENIED);
+
+        List<VaultBeneficiary> rows = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId);
+        VaultBeneficiary target = rows.stream()
+                .filter(b -> b.getId().equals(beneficiaryId))
+                .findFirst()
+                .orElseThrow(() -> new VaultException("Beneficiary not found", HttpStatus.NOT_FOUND));
+
+        if (rows.size() == 1) {
+            throw new VaultException(ErrorCode.LAST_BENEFICIARY, "A vault must keep at least one beneficiary");
+        }
+        if (assetAllocationRepository.existsByBeneficiaryId(beneficiaryId)) {
+            throw new VaultException(ErrorCode.BENEFICIARY_IN_USE,
+                    "This beneficiary is allocated assets. Reassign those assets first.");
+        }
+
+        assetAllocationRepository.clearContingentByBeneficiaryId(beneficiaryId);
+        boolean wasPrimary = rows.get(0).getId().equals(beneficiaryId);
+        vaultBeneficiaryRepository.delete(target);
+        vaultBeneficiaryRepository.flush();
+        if (wasPrimary) {
+            syncLegacyPrimary(vault, rows.get(1));
+        }
+
+        auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
+                vault.getOwner().getEmail(), vaultId, "Vault", vaultId.toString(),
+                "beneficiaryRowId=" + beneficiaryId);
+    }
+
+    private Vault lockActiveOwnedVault(UUID ownerId, UUID vaultId, AuditAction deniedAction) {
+        Vault vault = vaultRepository.findByIdForUpdate(vaultId)
+                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
+        if (!vault.getOwner().getId().equals(ownerId)) {
+            auditLogService.log(deniedAction, AuditResult.FAILURE, ownerId, null, vaultId,
+                    "Vault", vaultId.toString(), "not owner");
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
+        }
+        if (vault.getStatus() != VaultStatus.ACTIVE) {
+            throw new VaultException("Beneficiaries can only be changed while the vault is ACTIVE", HttpStatus.CONFLICT);
+        }
+        return vault;
+    }
+
+    // Tạm thời: cột cũ vault.beneficiary / beneficiaryEmail mirror người thụ hưởng cũ nhất (N2b/N2-access sẽ gỡ)
+    private void syncLegacyPrimary(Vault vault, VaultBeneficiary primary) {
+        vault.setBeneficiary(primary.getUser());
+        vault.setBeneficiaryEmail(primary.getUser() == null ? primary.getEmail() : null);
+        vaultRepository.save(vault);
     }
 
     // FR-27: Owner xem danh sách Vault của mình kèm thông tin tóm tắt và trạng thái khóa

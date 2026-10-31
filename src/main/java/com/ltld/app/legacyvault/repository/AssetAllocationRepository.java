@@ -25,4 +25,10 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM AssetAllocation al WHERE al.asset.id = :assetId")
     int deleteByAssetId(@Param("assetId") UUID assetId);
+
+    boolean existsByBeneficiaryId(UUID beneficiaryId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE AssetAllocation al SET al.contingentBeneficiary = NULL WHERE al.contingentBeneficiary.id = :bid")
+    int clearContingentByBeneficiaryId(@Param("bid") UUID bid);
 }

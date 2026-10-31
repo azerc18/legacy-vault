@@ -32,4 +32,6 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM VaultBeneficiary b WHERE b.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
+    boolean existsByVaultIdAndEmail(UUID vaultId, String email);
 }
