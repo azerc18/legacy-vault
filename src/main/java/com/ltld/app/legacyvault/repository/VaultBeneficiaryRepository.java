@@ -30,6 +30,15 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Query("SELECT b FROM VaultBeneficiary b WHERE b.user IS NULL AND b.email = :email")
     List<VaultBeneficiary> findPendingByEmail(@Param("email") String email);
 
+    // N2-verifier: verifier là beneficiary của bất kỳ vault nào trong hồ sơ (theo tài khoản hoặc email)
+    @Query("""
+            SELECT COUNT(b) > 0 FROM VaultBeneficiary b
+            WHERE b.vault.id IN (SELECT rv.vault.id FROM VerificationRequestVault rv WHERE rv.request.id = :requestId)
+              AND (b.user.id = :verifierId
+                   OR LOWER(b.email) = (SELECT LOWER(u.email) FROM User u WHERE u.id = :verifierId))
+            """)
+    boolean isBeneficiaryOfRequest(@Param("requestId") UUID requestId, @Param("verifierId") UUID verifierId);
+
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM VaultBeneficiary b WHERE b.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);

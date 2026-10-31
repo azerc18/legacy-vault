@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
 import com.ltld.app.legacyvault.entity.VerificationReviewProgress;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -39,6 +40,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -117,6 +119,9 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private VerifierAccessGuard verifierAccessGuard;
+
+    @Mock
+    private VaultBeneficiaryRepository beneficiaryRepository;
 
     @Mock
     private VerificationReviewProgressRepository progressRepository;
@@ -327,6 +332,19 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId, new RejectVerificationRequestDto()))
                 .isInstanceOf(RequestAlreadyReviewedException.class);
+
+        verify(requestRepository, never()).save(any());
+    }
+
+    // N2: verifier là beneficiary (kể cả người thứ 2) của vault trong hồ sơ -> không được xử lý
+    @Test
+    void reject_verifierIsBeneficiary_throwsConflictOfInterest() {
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(verifierAccessGuard.hasBeneficiaryConflict(requestId, verifierId)).thenReturn(true);
+        RejectVerificationRequestDto dto = rejectDto(RejectionReason.OTHER, "test");
+
+        assertThatThrownBy(() -> service.reject(requestId, verifierId, dto))
+                .isInstanceOf(ConflictOfInterestException.class);
 
         verify(requestRepository, never()).save(any());
     }
@@ -1033,6 +1051,26 @@ public class LegalVerificationServiceImplTest {
 
         assertThat(service.getById(requestId, verifierId).getCreatedAt())
                 .isEqualTo(LocalDateTime.of(2026, 10, 1, 9, 0));
+    }
+
+    // N2: danh sách hiện beneficiary của từng vault, email đã che, lấy theo lô
+    @Test
+    void getPendingRequests_includesMaskedBeneficiaries() {
+        Vault vault = vaultOf(VaultStatus.ACTIVE);
+        VerificationRequestVault link = VerificationRequestVault.builder()
+                .request(pendingRequest).vault(vault).build();
+        VaultBeneficiary first = VaultBeneficiary.builder().vault(vault).email("alice@gmail.com").build();
+        VaultBeneficiary second = VaultBeneficiary.builder().vault(vault).email("bob@example.com").build();
+        when(requestRepository.findPendingVisibleTo(LegalVerificationStatus.PENDING, verifierId))
+                .thenReturn(List.of(pendingRequest));
+        when(requestVaultRepository.findByRequestIdIn(anyCollection())).thenReturn(List.of(link));
+        when(beneficiaryRepository.findByVaultIdInOrderByCreatedAtAsc(anyCollection()))
+                .thenReturn(List.of(first, second));
+
+        List<VerificationRequestResponseDto> result = service.getPendingRequests(verifierId);
+
+        assertThat(result.get(0).getVaults().get(0).getBeneficiaries())
+                .containsExactly("a***@gmail.com", "b***@example.com");
     }
 
     // T7: danh sách PENDING dùng query đã loại Owner/Executor (N6) và lấy vault theo lô (M1)
