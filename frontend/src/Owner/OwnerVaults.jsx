@@ -5,6 +5,7 @@ import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import EstateReadinessCard from './EstateReadinessCard.jsx';
 
 export default function OwnerVaults() {
     const user = getUser();
@@ -32,6 +33,8 @@ export default function OwnerVaults() {
             }
         >
             <Alert>{error}</Alert>
+
+            <EstateReadinessCard />
 
             {loading ? (
                 <p className="text-on-surface-variant">Loading...</p>

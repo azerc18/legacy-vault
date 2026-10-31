@@ -1,5 +1,5 @@
 // API cho Vault Owner — khớp VaultController, DigitalAssetController, DocumentController, VaultActivityLogController,
-// DmsController, OwnerExecutorController. Dùng http.js chung (tự gắn token + refresh).
+// DmsController, OwnerExecutorController, OwnerReadinessController. Dùng http.js chung (tự gắn token + refresh).
 import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
@@ -114,6 +114,9 @@ export const ownerApi = {
     assignExecutor: (type, email, confirmReplace = false) =>
         http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap).then(changed),
     revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap).then(changed),
+
+    /* ---------- Estate Readiness Score (F1) ---------- */
+    getReadiness: () => http.get('/owner/readiness').then(unwrap),
 };
 
 // BE báo "đã có người, gửi lại với confirmReplace=true" bằng 409 + message chứa "confirmReplace"
