@@ -23,6 +23,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.RequestAlreadyReviewedException;
@@ -526,7 +527,8 @@ public class LegalVerificationServiceImplTest {
         when(otpHasher.matches(requestId, "111111", "hashedOtp")).thenReturn(false);
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
-                .isInstanceOf(InvalidSignCodeException.class);
+                .isInstanceOf(InvalidSignCodeException.class)
+                .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.INVALID_SIGN_CODE));
 
         verify(signatureRepository, never()).save(any());
         verifyNoInteractions(requestVaultRepository);
@@ -542,9 +544,31 @@ public class LegalVerificationServiceImplTest {
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
-                .isInstanceOf(InvalidSignCodeException.class);
+                .isInstanceOf(InvalidSignCodeException.class)
+                .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.SIGN_CODE_EXPIRED));
 
         verify(signatureRepository, never()).save(any());
+    }
+
+    // V1: sai mã ở lần cuối (hết lượt) -> SIGN_CODE_ATTEMPTS_EXHAUSTED để FE quay về nút Send code
+    @Test
+    void sign_wrongCodeOnLastAttempt_throwsAttemptsExhausted() {
+        approvedByVerifier();
+        handoverStillValid();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+        pendingRequest.setSignAttempts(4); // lần thứ 5 = lần cuối, sai thì còn 0 lượt
+
+        SignVerificationRequestDto badDto = new SignVerificationRequestDto();
+        badDto.setMethod(SignatureMethod.MOCK_OTP);
+        badDto.setCode("111111");
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(otpHasher.matches(requestId, "111111", "hashedOtp")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
+                .isInstanceOf(InvalidSignCodeException.class)
+                .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED));
     }
 
     // T2: sai quá 5 lần -> hủy mã + audit "Too many sign attempts"
@@ -559,7 +583,8 @@ public class LegalVerificationServiceImplTest {
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, signDto()))
-                .isInstanceOf(InvalidSignCodeException.class);
+                .isInstanceOf(InvalidSignCodeException.class)
+                .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED));
 
         assertThat(pendingRequest.getSignOtpHash()).isNull();
         verify(auditLogService).log(eq(AuditAction.LEGAL_SIGN_FAILED), eq(AuditResult.FAILURE),
@@ -1197,7 +1222,8 @@ public class LegalVerificationServiceImplTest {
 
         assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
                 .isInstanceOf(InvalidSignCodeException.class)
-                .hasMessageContaining("Attempts left: 4");
+                .hasMessageContaining("Attempts left: 4")
+                .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.INVALID_SIGN_CODE));
     }
 
     // FR-12: DTO trả cả tên vault (không chỉ UUID)

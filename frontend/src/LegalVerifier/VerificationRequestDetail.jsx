@@ -4,7 +4,7 @@ import {
     getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
     getDocumentBlob, getRejectionReasons,
 } from '../api/verifierApi.js';
-import { getErrorMessage } from '../api/http.js';
+import { getErrorCode, getErrorMessage } from '../api/http.js';
 import {
     STATUS_LABEL, STATUS_CLASS, formatDate, shortId, REJECT_REASON_OTHER,
 } from './verifierUi.js';
@@ -17,9 +17,8 @@ import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
 const otpKey = (id) => `lv_sign_otp_${id}`;
-// Thông báo của BE khi mã ký không còn dùng được (khớp InvalidSignCodeException trong sign)
-const OTP_UNUSABLE_CODES = ['SIGN_CODE_EXPIRED', 'SIGN_CODE_ATTEMPTS_EXHAUSTED']; // tên mã chốt với H3
-const OTP_UNUSABLE = /no attempts left|too many attempts|has expired|was not generated/i;
+// V1: mã ký không còn dùng được (hết hạn / hết lượt thử) -> quay về nút Send code
+const OTP_UNUSABLE_CODES = ['SIGN_CODE_EXPIRED', 'SIGN_CODE_ATTEMPTS_EXHAUSTED'];
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
 const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
@@ -112,7 +111,7 @@ export default function VerificationRequestDetail() {
             const message = getErrorMessage(e, fallback);
             setError(message);
             if (e.response?.status === 409) load();
-            onFail?.(message, e.response?.data?.errorCode);
+            onFail?.(message, getErrorCode(e), e);
             return false;
         } finally {
             setBusy(false);
@@ -145,8 +144,7 @@ export default function VerificationRequestDetail() {
         if (action === 'sign') {
             const ok = await run(() => signRequest(req.id, code), 'Could not sign.', (message, errorCode) => {
                 // Mã hết hạn / hết lượt thử: bỏ trạng thái "đã gửi mã", quay về nút Send code
-                // Ưu tiên errorCode của BE (H3); chưa có thì dùng regex theo message
-                if (errorCode ? OTP_UNUSABLE_CODES.includes(errorCode) : OTP_UNUSABLE.test(message)) {
+                if (OTP_UNUSABLE_CODES.includes(errorCode)) {
                     forgetOtpSent(req.id);
                     setCodeSent(false);
                     setCode('');
@@ -187,7 +185,14 @@ export default function VerificationRequestDetail() {
     };
 
     const handleSendCode = async () => {
-        const ok = await run(async () => { await sendSignOtp(req.id); return null; }, 'Could not send the code.');
+        const ok = await run(async () => { await sendSignOtp(req.id); return null; }, 'Could not send the code.',
+            (message, errorCode, e) => {
+                // V1: bị chặn gửi lại (429) -> đồng hồ chờ theo retryAfterSeconds của BE, đúng cả sau khi F5
+                if (errorCode === 'TOO_MANY_OTP_REQUESTS') {
+                    const wait = Number(e?.response?.data?.data?.retryAfterSeconds);
+                    if (wait > 0) { setCooldown(wait); setCodeSent(true); }
+                }
+            });
         if (ok) {
             rememberOtpSent(req.id);
             setCodeSent(true);
