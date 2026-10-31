@@ -100,6 +100,14 @@ export const ownerApi = {
         return http.get('/owner/activity-logs', { params }).then(unwrap);
     },
 
+    // F6: Nhật ký minh bạch "Ai đã xem di sản của bạn" (Executor / Beneficiary / Admin / Khẩn cấp)
+    getEstateAccessLogs: ({ startDate, endDate, page = 0, size = 20 } = {}) => {
+        const params = { page, size };
+        if (startDate) params.startDate = startDate;
+        if (endDate) params.endDate = endDate;
+        return http.get('/owner/activity-logs/access', { params }).then(unwrap);
+    },
+
     /* ---------- Dead Man's Switch (FR-03) ---------- */
     // 404 = chưa cấu hình
     getDms: () => http.get('/dms').then(unwrap),

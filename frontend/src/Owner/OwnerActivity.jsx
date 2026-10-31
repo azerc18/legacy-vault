@@ -4,7 +4,7 @@ import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 
-// Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
+// Nhật ký cấp Owner (FR-05 & F6): sự kiện DMS/Executor và nhật ký minh bạch "Ai đã xem di sản của bạn".
 // Không gửi startDate thì BE trả toàn bộ lịch sử, không giới hạn độ dài khoảng ngày. value 0 = "All time".
 const RANGES = [
     { value: 0, label: 'All time' },
@@ -13,7 +13,13 @@ const RANGES = [
     { value: 365, label: 'Last 12 months' },
 ];
 
+const TABS = [
+    { id: 'dms', label: 'DMS & Executor Events' },
+    { id: 'access', label: 'Who Accessed My Estate' },
+];
+
 export default function OwnerActivity() {
+    const [tab, setTab] = useState('dms');
     const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
     const [data, setData] = useState(null);
@@ -21,16 +27,18 @@ export default function OwnerActivity() {
 
     useEffect(() => {
         setError('');
+        setData(null);
         const range = {};
         if (days > 0) {
             const end = new Date();
             range.startDate = new Date(end.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
             range.endDate = end.toISOString();
         }
-        ownerApi.getOwnerActivityLogs({ ...range, page, size: 20 })
+        const fetcher = tab === 'access' ? ownerApi.getEstateAccessLogs : ownerApi.getOwnerActivityLogs;
+        fetcher({ ...range, page, size: 20 })
             .then(setData)
             .catch((e) => setError(getErrorMessage(e, 'Could not load activity.')));
-    }, [days, page]);
+    }, [tab, days, page]);
 
     const rows = data?.content ?? [];
     const totalPages = data?.totalPages ?? 0;
@@ -38,19 +46,42 @@ export default function OwnerActivity() {
     return (
         <OwnerLayout
             title="Activity log"
-            subtitle="Dead Man's Switch and executor events. Vault-specific events are in each vault's page."
+            subtitle={tab === 'access'
+                ? 'Transparency log showing every time an Executor, Beneficiary, Admin, or Emergency Access viewed or downloaded your vaults, assets, or legal documents.'
+                : "Dead Man's Switch and executor events. Vault-specific events are in each vault's page."}
             actions={
                 <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
                     {RANGES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
             }
         >
+            <div className="flex gap-2 mb-4 border-b border-outline-variant/20 pb-2">
+                {TABS.map((t) => (
+                    <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => { setTab(t.id); setPage(0); }}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                            tab === t.id
+                                ? 'bg-secondary text-on-secondary'
+                                : 'text-on-surface-variant hover:bg-surface-container-high'
+                        }`}
+                    >
+                        {t.label}
+                    </button>
+                ))}
+            </div>
             <Alert>{error}</Alert>
             <Card>
                 {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
                 {data && rows.length === 0 && (
-                    <EmptyState compact icon="history" title={days > 0 ? 'No activity in this period' : 'No activity yet'}
-                                text={days > 0 ? 'Choose a longer range above to see older events.' : "Check-ins, Dead Man's Switch changes and executor events will appear here."} />
+                    <EmptyState compact icon={tab === 'access' ? 'visibility' : 'history'}
+                                title={days > 0 ? 'No activity in this period' : (tab === 'access' ? 'No external access recorded yet' : 'No activity yet')}
+                                text={days > 0
+                                    ? 'Choose a longer range above to see older events.'
+                                    : (tab === 'access'
+                                        ? 'When an Executor, Beneficiary, Admin, or Emergency Access views your vault, assets, or documents, it will be recorded here.'
+                                        : "Check-ins, Dead Man's Switch changes and executor events will appear here.")} />
                 )}
                 {rows.length > 0 && (
                     <div className="overflow-x-auto">

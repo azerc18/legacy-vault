@@ -78,6 +78,29 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
         Pageable pageable
     );
 
+    // F6: Nhật ký minh bạch "Ai đã xem gì" (Transparency Access Log) trên mọi Vault của Owner
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT a FROM AuditLog a " +
+                "LEFT JOIN FETCH a.actor " +
+                "WHERE a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                "AND a.action IN :accessActions " +
+                "AND a.createdAt >= :startDate " +
+                "AND a.createdAt <= :endDate " +
+                "ORDER BY a.createdAt DESC, a.id DESC",
+        countQuery = "SELECT COUNT(a) FROM AuditLog a " +
+                     "WHERE a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                     "AND a.action IN :accessActions " +
+                     "AND a.createdAt >= :startDate " +
+                     "AND a.createdAt <= :endDate"
+    )
+    Page<AuditLog> findEstateAccessActivity(
+        @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
+        @org.springframework.data.repository.query.Param("accessActions") java.util.Collection<AuditAction> accessActions,
+        @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate,
+        @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
+        Pageable pageable
+    );
+
     @Query(value = """
     SELECT a FROM AuditLog a LEFT JOIN FETCH a.actor act
     WHERE (:action IS NULL OR a.action = :action)
