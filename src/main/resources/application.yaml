@@ -50,6 +50,8 @@ app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
   storage:
+    # Thư mục lưu file upload. Khi deploy production, override bằng biến môi trường:
+    # APP_STORAGE_UPLOAD_DIR=/data/legacyvault/uploads
     upload-dir: ${APP_STORAGE_UPLOAD_DIR:uploads/}
     # H1: local (mặc định, ghi vào upload-dir) | s3 (MinIO / Cloudflare R2 / AWS S3). File luôn được mã hóa trước khi lưu.
     provider: ${APP_STORAGE_PROVIDER:local}
