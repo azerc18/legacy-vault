@@ -4,7 +4,9 @@ import com.ltld.app.legacyvault.entity.Subscription;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
@@ -15,12 +17,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -109,7 +114,8 @@ class EntitlementServiceImplTest {
                 PlanLimitReachedException.class,
                 () -> entitlementService.assertCanCreateVault(owner.getId())
         );
-        assertEquals(PlanLimitReachedException.ERROR_CODE, ex.getErrorCode());
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, ex.getErrorCode());
+        assertEquals(PlanFeature.MULTIPLE_VAULTS, ex.getFeature());
     }
 
     @Test
@@ -137,31 +143,58 @@ class EntitlementServiceImplTest {
 
     @Test
     void freePlan_blocksAdvancedAllocationTrustedConfirmersLegacyMessagesAndThirdBeneficiary() {
-        UUID vaultId = UUID.randomUUID();
-        Vault vault = Vault.builder()
-                .id(vaultId)
-                .owner(owner)
-                .beneficiaryEmail("first@example.com")
-                .build();
-
         when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
                 .thenReturn(Optional.empty());
         when(subscriptionPlanRepository.findByCode("FREE")).thenReturn(Optional.of(freePlan));
-        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
 
-        assertThrows(PlanLimitReachedException.class,
+        PlanLimitReachedException advEx = assertThrows(PlanLimitReachedException.class,
                 () -> entitlementService.assertCanUseAdvancedAllocation(owner.getId()));
-        assertThrows(PlanLimitReachedException.class,
-                () -> entitlementService.assertCanUseTrustedConfirmers(owner.getId()));
-        assertThrows(PlanLimitReachedException.class,
-                () -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, advEx.getErrorCode());
+        assertEquals(PlanFeature.ADVANCED_ALLOCATION, advEx.getFeature());
 
-        // Free cho phép tối đa 2 người thụ hưởng (current = 1 -> được thêm người thứ 2; current = 2 -> chặn người thứ 3)
-        assertDoesNotThrow(() -> entitlementService.assertCanAddBeneficiary(vaultId, 1));
+        PlanLimitReachedException tcEx = assertThrows(PlanLimitReachedException.class,
+                () -> entitlementService.assertCanUseTrustedConfirmers(owner.getId()));
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, tcEx.getErrorCode());
+        assertEquals(PlanFeature.TRUSTED_CONFIRMERS, tcEx.getFeature());
+
+        PlanLimitReachedException lmEx = assertThrows(PlanLimitReachedException.class,
+                () -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, lmEx.getErrorCode());
+        assertEquals(PlanFeature.LEGACY_MESSAGES, lmEx.getFeature());
+
+        // Free cho phép tối đa 2 người thụ hưởng (resulting = 1, 2 -> ok; resulting = 3 -> ném lỗi)
+        assertDoesNotThrow(() -> entitlementService.assertCanAddBeneficiaries(owner.getId(), 1));
+        assertDoesNotThrow(() -> entitlementService.assertCanAddBeneficiaries(owner.getId(), 2));
         PlanLimitReachedException benEx = assertThrows(
                 PlanLimitReachedException.class,
-                () -> entitlementService.assertCanAddBeneficiary(vaultId, 2)
+                () -> entitlementService.assertCanAddBeneficiaries(owner.getId(), 3)
         );
-        assertEquals("PLAN_LIMIT_REACHED", benEx.getErrorCode());
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, benEx.getErrorCode());
+        assertEquals(PlanFeature.BENEFICIARY_LIMIT, benEx.getFeature());
+
+        // Free tối đa 50MB (52_428_800 bytes)
+        assertDoesNotThrow(() -> entitlementService.assertStorageQuota(owner.getId(), 50_000_000L));
+        PlanLimitReachedException storageEx = assertThrows(
+                PlanLimitReachedException.class,
+                () -> entitlementService.assertStorageQuota(owner.getId(), 60_000_000L)
+        );
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, storageEx.getErrorCode());
+        assertEquals(PlanFeature.STORAGE, storageEx.getFeature());
+    }
+
+    @Test
+    void planLimitReachedException_hasForbiddenStatusAndErrorCodeAndFeature() {
+        PlanLimitReachedException ex = new PlanLimitReachedException(PlanFeature.BENEFICIARY_LIMIT, "Plan limit reached");
+        assertThat(ex.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.PLAN_LIMIT_REACHED);
+        assertThat(ex.getFeature()).isEqualTo(PlanFeature.BENEFICIARY_LIMIT);
+        assertThat(ex.getMessage()).isEqualTo("Plan limit reached");
+    }
+
+    @Test
+    void planLimitReachedException_nullFeature_throwsNullPointerException() {
+        assertThatThrownBy(() -> new PlanLimitReachedException(null, "Plan limit reached"))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("feature");
     }
 }

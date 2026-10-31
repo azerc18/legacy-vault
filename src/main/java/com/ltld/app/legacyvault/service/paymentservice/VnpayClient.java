@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.paymentservice;
 
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -33,19 +35,29 @@ public class VnpayClient {
 
     @Autowired
     public VnpayClient(
-            @Value("${VNPAY_TMN_CODE:DEMO_TMN}") String tmnCode,
-            @Value("${VNPAY_HASH_SECRET:DEMO_HASH_SECRET_KEY_1234567890}") String hashSecret,
+            @Value("${VNPAY_TMN_CODE:}") String tmnCode,
+            @Value("${VNPAY_HASH_SECRET:}") String hashSecret,
             @Value("${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}") String payUrl,
             @Value("${VNPAY_RETURN_URL:}") String returnUrl,
             @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:http://localhost:5173}}") String frontendBaseUrl) {
-        this.tmnCode = tmnCode;
-        this.hashSecret = hashSecret;
-        this.payUrl = payUrl;
+        this.tmnCode = tmnCode != null ? tmnCode.trim() : "";
+        this.hashSecret = hashSecret != null ? hashSecret.trim() : "";
+        this.payUrl = (payUrl != null && !payUrl.isBlank()) ? payUrl.trim() : "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
         this.returnUrl = resolveReturnUrl(returnUrl, frontendBaseUrl);
     }
 
     public VnpayClient(String tmnCode, String hashSecret, String payUrl, String returnUrl) {
         this(tmnCode, hashSecret, payUrl, returnUrl, "http://localhost:5173");
+    }
+
+    public boolean isConfigured() {
+        return !tmnCode.isBlank() && !hashSecret.isBlank();
+    }
+
+    public void ensureConfigured() {
+        if (!isConfigured()) {
+            throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "VNPay payment gateway is not configured.");
+        }
     }
 
     static String resolveReturnUrl(String explicitReturnUrl, String frontendBaseUrl) {
@@ -65,6 +77,8 @@ public class VnpayClient {
     }
 
     public String buildPaymentUrl(UUID txnId, long amountVnd, String orderInfo, String ipAddress) {
+        ensureConfigured();
+
         ZonedDateTime now = ZonedDateTime.now(VN_ZONE);
         ZonedDateTime expire = now.plusMinutes(15);
 
@@ -89,7 +103,7 @@ public class VnpayClient {
     }
 
     public boolean verify(Map<String, String> rawParams) {
-        if (rawParams == null || rawParams.isEmpty()) {
+        if (!isConfigured() || rawParams == null || rawParams.isEmpty()) {
             return false;
         }
         String receivedHash = rawParams.get("vnp_SecureHash");
@@ -104,6 +118,7 @@ public class VnpayClient {
     }
 
     public String signParams(Map<String, String> rawParams) {
+        ensureConfigured();
         Map<String, String> sorted = new TreeMap<>();
         for (Map.Entry<String, String> entry : rawParams.entrySet()) {
             String key = entry.getKey();

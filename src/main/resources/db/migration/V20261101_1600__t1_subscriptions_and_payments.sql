@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
     max_vaults INT NOT NULL DEFAULT 1,
     max_beneficiaries INT NOT NULL DEFAULT 2,
     storage_quota_bytes BIGINT NOT NULL DEFAULT 52428800,
-    legacy_messages_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    legacy_messages_enabled BIT(1) NOT NULL DEFAULT b'0',
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
 );
 
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
     started_at DATETIME(6) NOT NULL,
     expires_at DATETIME(6) NULL,
-    reminder_sent BOOLEAN NOT NULL DEFAULT FALSE,
+    reminder_sent BIT(1) NOT NULL DEFAULT b'0',
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NULL,
     CONSTRAINT fk_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id),
@@ -45,9 +45,14 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
     INDEX idx_payment_tx_user_created (user_id, created_at)
 );
 
+-- Mở rộng cột action của bảng audit_logs để hỗ trợ các action mới của T1 (PAYMENT_SUCCEEDED, PAYMENT_FAILED)
+ALTER TABLE audit_logs MODIFY COLUMN action VARCHAR(100) NOT NULL;
+
 -- Seed 3 gói chuẩn: FREE (0đ, 1 Master Vault, 2 người thụ hưởng, 50MB), VIP_MONTH (99.000đ, 5 Vaults, 10 người thụ hưởng, 5GB), VIP_YEAR (990.000đ)
-INSERT IGNORE INTO subscription_plans (id, code, name, price_vnd, duration_days, max_vaults, max_beneficiaries, storage_quota_bytes, legacy_messages_enabled)
+INSERT INTO subscription_plans (id, code, name, price_vnd, duration_days, max_vaults, max_beneficiaries, storage_quota_bytes, legacy_messages_enabled, created_at)
 VALUES
-    (UNHEX(REPLACE(UUID(), '-', '')), 'FREE', 'Free Plan', 0, NULL, 1, 2, 52428800, FALSE),
-    (UNHEX(REPLACE(UUID(), '-', '')), 'VIP_MONTH', 'VIP Monthly', 99000, 30, 5, 10, 5368709120, TRUE),
-    (UNHEX(REPLACE(UUID(), '-', '')), 'VIP_YEAR', 'VIP Yearly', 990000, 365, 5, 10, 5368709120, TRUE);
+    (UNHEX(REPLACE(UUID(), '-', '')), 'FREE', 'Free Plan', 0, NULL, 1, 2, 52428800, b'0', CURRENT_TIMESTAMP(6)),
+    (UNHEX(REPLACE(UUID(), '-', '')), 'VIP_MONTH', 'VIP Monthly', 99000, 30, 5, 10, 5368709120, b'1', CURRENT_TIMESTAMP(6)),
+    (UNHEX(REPLACE(UUID(), '-', '')), 'VIP_YEAR', 'VIP Yearly', 990000, 365, 5, 10, 5368709120, b'1', CURRENT_TIMESTAMP(6))
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+

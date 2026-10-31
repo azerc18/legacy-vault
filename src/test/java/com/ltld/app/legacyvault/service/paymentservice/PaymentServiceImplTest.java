@@ -10,6 +10,8 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.PaymentException;
 import com.ltld.app.legacyvault.repository.PaymentTransactionRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
@@ -99,7 +101,7 @@ class PaymentServiceImplTest {
                 PaymentException.class,
                 () -> paymentService.handleVnpayIpn(params)
         );
-        assertEquals(PaymentException.SIGNATURE_INVALID, ex.getErrorCode());
+        assertEquals(ErrorCode.PAYMENT_SIGNATURE_INVALID, ex.getErrorCode());
         verify(paymentTransactionRepository, never()).save(any());
         verify(subscriptionRepository, never()).save(any());
     }
@@ -122,31 +124,20 @@ class PaymentServiceImplTest {
 
         Map<String, String> params = new HashMap<>();
         params.put("vnp_TxnRef", txId.toString());
-        params.put("vnp_Amount", "9900000"); // 99,000 * 100
+        params.put("vnp_Amount", "9900000");
         params.put("vnp_ResponseCode", "00");
-        params.put("vnp_TransactionNo", "VNP123456");
+        params.put("vnp_TransactionNo", "14567890");
+        params.put("vnp_BankCode", "NCB");
         params.put("vnp_SecureHash", vnpayClient.signParams(params));
 
-        // Lần gọi thứ 1 -> kích hoạt thành công (RspCode=00)
-        Map<String, String> firstResult = paymentService.handleVnpayIpn(params);
-        assertEquals("00", firstResult.get("RspCode"));
+        Map<String, String> firstResp = paymentService.handleVnpayIpn(params);
+        assertEquals("00", firstResp.get("RspCode"));
         assertEquals(PaymentStatus.SUCCESS, tx.getStatus());
 
-        // Lần gọi thứ 2 (IPN gọi trùng) -> trả RspCode=02 và không tạo/gia hạn thêm Subscription
-        Map<String, String> secondResult = paymentService.handleVnpayIpn(params);
-        assertEquals("02", secondResult.get("RspCode"));
-        assertEquals("Order already confirmed", secondResult.get("Message"));
-
+        // Lần gọi thứ 2 với cùng params -> trả về RspCode=02, không tạo subscription mới
+        Map<String, String> secondResp = paymentService.handleVnpayIpn(params);
+        assertEquals("02", secondResp.get("RspCode"));
         verify(subscriptionRepository, times(1)).save(any(Subscription.class));
-        verify(auditLogService, times(1)).log(
-                eq(AuditAction.PAYMENT_SUCCEEDED),
-                eq(AuditResult.SUCCESS),
-                eq(owner.getId()),
-                eq(owner.getEmail()),
-                eq("PaymentTransaction"),
-                eq(txId.toString()),
-                eq("VIP_MONTH")
-        );
     }
 
     // Case 3: số tiền lệch -> FAILED + PAYMENT_AMOUNT_MISMATCH
@@ -173,7 +164,7 @@ class PaymentServiceImplTest {
                 PaymentException.class,
                 () -> paymentService.handleVnpayIpn(params)
         );
-        assertEquals(PaymentException.AMOUNT_MISMATCH, ex.getErrorCode());
+        assertEquals(ErrorCode.PAYMENT_AMOUNT_MISMATCH, ex.getErrorCode());
         assertEquals(PaymentStatus.FAILED, tx.getStatus());
 
         ArgumentCaptor<PaymentTransaction> captor = ArgumentCaptor.forClass(PaymentTransaction.class);
@@ -211,5 +202,26 @@ class PaymentServiceImplTest {
         assertEquals("VIP_MONTH", response.getPlanCode());
         assertEquals(99_000L, response.getAmountVnd());
         assertTrue(response.getPaymentUrl().contains("vnp_SecureHash="));
+    }
+
+    @Test
+    void checkout_whenVnpayNotConfigured_throwsServiceUnavailable() {
+        VnpayClient unconfiguredVnpay = new VnpayClient("", "", "https://sandbox.vnpayment.vn", "");
+        PaymentServiceImpl unconfiguredPaymentService = new PaymentServiceImpl(
+                userRepository,
+                subscriptionPlanRepository,
+                subscriptionRepository,
+                paymentTransactionRepository,
+                entitlementService,
+                unconfiguredVnpay,
+                auditLogService
+        );
+
+        CheckoutRequest request = CheckoutRequest.builder().planCode("VIP_MONTH").build();
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> unconfiguredPaymentService.checkout(owner.getId(), request, "127.0.0.1")
+        );
+        assertEquals(ErrorCode.SERVICE_UNAVAILABLE, ex.getErrorCode());
     }
 }

@@ -2,7 +2,7 @@ package com.ltld.app.legacyvault.service.paymentservice;
 
 import com.ltld.app.legacyvault.entity.Subscription;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
-import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
@@ -41,47 +41,29 @@ public class EntitlementServiceImpl implements EntitlementService {
     private final VaultRepository vaultRepository;
 
     @Override
-    public void assertCanCreateVault(UUID userId) {
-        if (userId == null) {
+    public void assertCanCreateVault(UUID ownerId) {
+        if (ownerId == null) {
             return;
         }
-        SubscriptionPlan plan = resolveEffectivePlan(userId);
-        int currentVaults = vaultRepository.findByOwnerIdOrderByCreatedAtDesc(userId).size();
+        SubscriptionPlan plan = resolveEffectivePlan(ownerId);
+        int currentVaults = vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId).size();
         if (currentVaults >= plan.getMaxVaults()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.MULTIPLE_VAULTS,
                     "Your current plan (" + plan.getCode() + ") allows at most " + plan.getMaxVaults()
                             + " vault(s). Upgrade to VIP to create multiple specialized vaults.");
         }
     }
 
     @Override
-    public void assertCanAddBeneficiary(UUID vaultId) {
-        if (vaultId == null) {
+    public void assertCanAddBeneficiaries(UUID ownerId, int resultingCount) {
+        if (ownerId == null || resultingCount <= 0) {
             return;
         }
-        Optional<Vault> vaultOpt = vaultRepository.findById(vaultId);
-        if (vaultOpt.isEmpty()) {
-            return;
-        }
-        Vault vault = vaultOpt.get();
-        int currentCount = (vault.getBeneficiary() != null
-                || (vault.getBeneficiaryEmail() != null && !vault.getBeneficiaryEmail().isBlank())) ? 1 : 0;
-        assertCanAddBeneficiary(vaultId, currentCount);
-    }
-
-    @Override
-    public void assertCanAddBeneficiary(UUID vaultId, int currentBeneficiaryCount) {
-        if (vaultId == null) {
-            return;
-        }
-        Optional<Vault> vaultOpt = vaultRepository.findById(vaultId);
-        if (vaultOpt.isEmpty() || vaultOpt.get().getOwner() == null) {
-            return;
-        }
-        UUID ownerId = vaultOpt.get().getOwner().getId();
         SubscriptionPlan plan = resolveEffectivePlan(ownerId);
-        if (currentBeneficiaryCount >= plan.getMaxBeneficiaries()) {
+        if (resultingCount > plan.getMaxBeneficiaries()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.BENEFICIARY_LIMIT,
                     "Your current plan (" + plan.getCode() + ") allows at most "
                             + plan.getMaxBeneficiaries()
                             + " beneficiaries per vault. Upgrade to VIP to add up to 10 beneficiaries.");
@@ -89,49 +71,53 @@ public class EntitlementServiceImpl implements EntitlementService {
     }
 
     @Override
-    public void assertCanUseAdvancedAllocation(UUID userId) {
-        if (userId == null) {
+    public void assertCanUseAdvancedAllocation(UUID ownerId) {
+        if (ownerId == null) {
             return;
         }
-        SubscriptionPlan plan = resolveEffectivePlan(userId);
+        SubscriptionPlan plan = resolveEffectivePlan(ownerId);
         if (!plan.isVip()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.ADVANCED_ALLOCATION,
                     "Proportional (%) allocation and contingent beneficiaries require a VIP subscription.");
         }
     }
 
     @Override
-    public void assertCanUseTrustedConfirmers(UUID userId) {
-        if (userId == null) {
+    public void assertCanUseTrustedConfirmers(UUID ownerId) {
+        if (ownerId == null) {
             return;
         }
-        SubscriptionPlan plan = resolveEffectivePlan(userId);
+        SubscriptionPlan plan = resolveEffectivePlan(ownerId);
         if (!plan.isVip()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.TRUSTED_CONFIRMERS,
                     "Trusted DMS confirmers require a VIP subscription.");
         }
     }
 
     @Override
-    public void assertCanUseLegacyMessages(UUID userId) {
-        if (userId == null) {
+    public void assertCanUseLegacyMessages(UUID ownerId) {
+        if (ownerId == null) {
             return;
         }
-        SubscriptionPlan plan = resolveEffectivePlan(userId);
+        SubscriptionPlan plan = resolveEffectivePlan(ownerId);
         if (!plan.isLegacyMessagesEnabled()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.LEGACY_MESSAGES,
                     "Legacy audio and video messages are only available on the VIP plan.");
         }
     }
 
     @Override
-    public void assertStorageQuota(UUID userId, long bytes) {
-        if (userId == null) {
+    public void assertStorageQuota(UUID ownerId, long additionalBytes) {
+        if (ownerId == null) {
             return;
         }
-        SubscriptionPlan plan = resolveEffectivePlan(userId);
-        if (bytes > plan.getStorageQuotaBytes()) {
+        SubscriptionPlan plan = resolveEffectivePlan(ownerId);
+        if (additionalBytes > plan.getStorageQuotaBytes()) {
             throw new PlanLimitReachedException(
+                    PlanFeature.STORAGE,
                     "Storage quota exceeded for plan " + plan.getCode()
                             + ". Upgrade to VIP for up to 5 GB of encrypted storage.");
         }

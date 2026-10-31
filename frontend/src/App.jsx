@@ -55,6 +55,7 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/payment/result" element={<PaymentResultPage />} />
 
                 {/* Đã đăng nhập */}
                 <Route path="/home" element={guard(null, <UserHome />)} />
@@ -68,7 +69,6 @@ function App() {
                 <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
                 <Route path="/pricing" element={guard(OWNER, <PricingPage />)} />
                 <Route path="/billing" element={guard(OWNER, <BillingPage />)} />
-                <Route path="/payment/result" element={guard(OWNER, <PaymentResultPage />)} />
 
                 {/* Beneficiary */}
                 <Route path="/beneficiary" element={guard(BENEFICIARY, <BeneficiaryVaults />)} />

@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.PaymentException;
 import com.ltld.app.legacyvault.repository.PaymentTransactionRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
@@ -22,7 +23,6 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,15 +53,17 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public CheckoutResponse checkout(UUID userId, CheckoutRequest request, String ipAddress) {
+        vnpayClient.ensureConfigured();
+
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException("User not found.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "User not found."));
 
         String code = request.getPlanCode().trim().toUpperCase();
         SubscriptionPlan plan = subscriptionPlanRepository.findByCode(code)
-                .orElseThrow(() -> new BusinessException("Subscription plan not found: " + code, HttpStatus.BAD_REQUEST));
+                .orElseThrow(() -> new BusinessException(ErrorCode.BAD_REQUEST, "Subscription plan not found: " + code));
 
         if (plan.getPriceVnd() <= 0) {
-            throw new BusinessException("Cannot checkout a free plan.", HttpStatus.BAD_REQUEST);
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "Cannot checkout a free plan.");
         }
 
         PaymentTransaction tx = PaymentTransaction.builder()
@@ -193,7 +195,8 @@ public class PaymentServiceImpl implements PaymentService {
         try {
             handleVnpayIpn(params);
         } catch (PaymentException ex) {
-            return buildFrontendResultUrl("failed", txnRef, ex.getErrorCode());
+            String err = ex.getErrorCode() != null ? ex.getErrorCode().name() : null;
+            return buildFrontendResultUrl("failed", txnRef, err);
         }
 
         String status = "00".equals(responseCode) ? "success" : "failed";
@@ -280,7 +283,7 @@ public class PaymentServiceImpl implements PaymentService {
             subscriptionRepository.save(existing);
         } else {
             Subscription created = Subscription.builder()
-                    .user(user)
+                .user(user)
                     .plan(plan)
                     .status(SubscriptionStatus.ACTIVE)
                     .startedAt(now)

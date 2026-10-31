@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.paymentservice;
 
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -51,5 +53,25 @@ class VnpayClientTest {
         params.put("vnp_Amount", "100000");
         assertFalse(vnpayClient.verify(params));
     }
-}
 
+    @Test
+    void unconfiguredClient_throwsServiceUnavailableOnCheckoutAndReturnsFalseOnVerify() {
+        VnpayClient emptyClient = new VnpayClient("", "", "https://sandbox.vnpayment.vn", "");
+        assertFalse(emptyClient.isConfigured());
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> emptyClient.buildPaymentUrl(UUID.randomUUID(), 100_000L, "Test", "127.0.0.1")
+        );
+        assertEquals(ErrorCode.SERVICE_UNAVAILABLE, ex.getErrorCode());
+
+        Map<String, String> params = Map.of("vnp_TxnRef", "abc", "vnp_SecureHash", "123");
+        assertFalse(emptyClient.verify(params));
+
+        BusinessException signEx = assertThrows(
+                BusinessException.class,
+                () -> emptyClient.signParams(params)
+        );
+        assertEquals(ErrorCode.SERVICE_UNAVAILABLE, signEx.getErrorCode());
+    }
+}
