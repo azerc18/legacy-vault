@@ -5,19 +5,24 @@ import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
@@ -44,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -61,6 +67,8 @@ public class VaultServiceImpl implements VaultService {
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final VaultModificationGuard vaultModificationGuard;
     private final DmsConfigService dmsConfigService;
+    private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    private final AssetAllocationRepository assetAllocationRepository;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -151,7 +159,9 @@ public class VaultServiceImpl implements VaultService {
         // Bulk DELETE theo vaultId: không nạp entity con vào persistence context,
         // nên khi xóa Vault không còn DigitalAsset/LegalDocument nào trỏ tới nó (tránh TransientPropertyValueException)
         legalDocumentRepository.deleteByVaultId(vaultId);
+        assetAllocationRepository.deleteByVaultId(vaultId);
         digitalAssetRepository.deleteByVaultId(vaultId);
+        vaultBeneficiaryRepository.deleteByVaultId(vaultId);
 
         // 5. Đập cái két (Vault)
         vaultRepository.delete(vault);
@@ -247,6 +257,17 @@ public class VaultServiceImpl implements VaultService {
         vault.setBeneficiary(beneficiary);
         vault.setBeneficiaryEmail(beneficiary == null ? email : null);
         vaultRepository.save(vault);
+        // N2a: giữ nguyên dòng cũ để phân bổ không bị mất (tạm thời một người/vault)
+        VaultBeneficiary row = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)
+                .stream().findFirst()
+                .orElseGet(() -> VaultBeneficiary.builder().vault(vault).build());
+        row.setUser(beneficiary);
+        row.setEmail(email);
+        row.setStatus(beneficiary == null
+                ? BeneficiaryInviteStatus.PENDING_REGISTRATION
+                : BeneficiaryInviteStatus.INVITED);
+        row.setRespondedAt(null);
+        vaultBeneficiaryRepository.save(row);
 
         boolean pending = beneficiary == null;
         // m5: audit nằm trong nhật ký Vault (FR-05) nên không ghi email bên thứ ba; chỉ ghi user id hoặc cờ chờ đăng ký
@@ -300,6 +321,12 @@ public class VaultServiceImpl implements VaultService {
                 .build();
     }
 
+    private static List<VaultBeneficiaryResponse> toBeneficiaryResponses(List<VaultBeneficiary> rows) {
+        return rows.stream()
+                .map(b -> new VaultBeneficiaryResponse(b.getId(), b.getEmail(), b.getStatus()))
+                .toList();
+    }
+
     // FR-02 (V8): Owner gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -334,6 +361,8 @@ public class VaultServiceImpl implements VaultService {
         vault.setBeneficiary(null);
         vault.setBeneficiaryEmail(null);
         vaultRepository.saveAndFlush(vault);
+        assetAllocationRepository.deleteByVaultId(vaultId);
+        vaultBeneficiaryRepository.deleteByVaultId(vaultId);
 
         auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
                 owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
@@ -347,6 +376,11 @@ public class VaultServiceImpl implements VaultService {
 
         // FR-27: tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
         Map<UUID, String> lockReasonMap = vaultModificationGuard.lockReasons(ownerId, vaults);
+        Map<UUID, List<VaultBeneficiary>> benByVault = vaults.isEmpty()
+                ? Map.of()
+                : vaultBeneficiaryRepository
+                .findByVaultIdInOrderByCreatedAtAsc(vaults.stream().map(Vault::getId).toList()).stream()
+                .collect(Collectors.groupingBy(b -> b.getVault().getId()));
 
         return vaults.stream()
                 .map(vault -> {
@@ -366,6 +400,7 @@ public class VaultServiceImpl implements VaultService {
                             .updatedAt(vault.getUpdatedAt())
                             .beneficiaryEmail(benEmail)
                             .pendingRegistration(pendingReg)
+                            .beneficiaries(toBeneficiaryResponses(benByVault.getOrDefault(vault.getId(), List.of())))
                             .totalAssets(assetCount)
                             .totalDocuments(docCount)
                             .modifiable(lockReason == null)
@@ -395,6 +430,7 @@ public class VaultServiceImpl implements VaultService {
                 .ownerEmail(vault.getOwner().getEmail())
                 .beneficiaryId(vault.getBeneficiary() != null ? vault.getBeneficiary().getId() : null)
                 .beneficiaryEmail(vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail())
+                .beneficiaries(toBeneficiaryResponses(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)))
                 .unlockedAt(vault.getUnlockedAt())
                 .claimDeadlineAt(vault.getClaimDeadlineAt())
                 .createdAt(vault.getCreatedAt())
@@ -438,6 +474,7 @@ public class VaultServiceImpl implements VaultService {
                 .updatedAt(updated.getUpdatedAt())
                 .beneficiaryEmail(updated.getBeneficiary() != null ? updated.getBeneficiary().getEmail() : updated.getBeneficiaryEmail())
                 .pendingRegistration(updated.getBeneficiary() == null && updated.getBeneficiaryEmail() != null)
+                .beneficiaries(toBeneficiaryResponses(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)))
                 .totalAssets(assetCount)
                 .totalDocuments(docCount)
                 .modifiable(true)

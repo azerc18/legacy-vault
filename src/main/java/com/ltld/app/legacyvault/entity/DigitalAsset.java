@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.entity;
 
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.TransferMechanism;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -52,6 +53,15 @@ public class DigitalAsset {
 
     @Column(name = "attachment_url", length = 500)
     private String attachmentUrl;
+
+    // N2a: cơ chế chuyển giao; N3 (Duy) sẽ gán theo loại tài sản
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_mechanism")
+    private TransferMechanism transferMechanism;
+
+    // N2a: nhóm tài liệu pháp lý làm căn cứ (X5 sẽ cấp document_group_id)
+    @Column(name = "linked_document_group_id")
+    private UUID linkedDocumentGroupId;
 
     // Trạng thái mặc định khi tạo mới là ACTIVE
     @Enumerated(EnumType.STRING)

@@ -122,6 +122,19 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-mysql</artifactId>
         </dependency>
+        <!-- H1: lưu file lên object storage tương thích S3 (MinIO khi phát triển, Cloudflare R2 / AWS S3 khi demo) -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.56.0</version>
+            <exclusions>
+                <!-- Chỉ dùng client đồng bộ (apache-client); client async không cần, bỏ cho image nhẹ hơn -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
 
     </dependencies>
 
