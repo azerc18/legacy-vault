@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.paymentservice;
 
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.exception.PlanFeature;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -16,23 +17,22 @@ class EntitlementServiceImplTest {
 
     @Test
     void stubMethods_neverThrow() {
-        UUID userId = UUID.randomUUID();
-        UUID vaultId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
 
-        assertThatCode(() -> entitlementService.assertCanCreateVault(userId)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertCanAddBeneficiary(vaultId)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertCanAddBeneficiary(vaultId, 3)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertCanUseAdvancedAllocation(userId)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertCanUseTrustedConfirmers(userId)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertCanUseLegacyMessages(userId)).doesNotThrowAnyException();
-        assertThatCode(() -> entitlementService.assertStorageQuota(userId, 1024L * 1024L)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertCanCreateVault(ownerId)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertCanAddBeneficiaries(ownerId, 2)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertCanUseAdvancedAllocation(ownerId)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertCanUseTrustedConfirmers(ownerId)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertCanUseLegacyMessages(ownerId)).doesNotThrowAnyException();
+        assertThatCode(() -> entitlementService.assertStorageQuota(ownerId, 1024L * 1024L)).doesNotThrowAnyException();
     }
 
     @Test
-    void planLimitReachedException_hasForbiddenStatusAndErrorCode() {
-        PlanLimitReachedException ex = new PlanLimitReachedException("Plan limit reached");
+    void planLimitReachedException_hasForbiddenStatusAndErrorCodeAndFeature() {
+        PlanLimitReachedException ex = new PlanLimitReachedException(PlanFeature.BENEFICIARY_LIMIT, "Plan limit reached");
         assertThat(ex.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.PLAN_LIMIT_REACHED);
+        assertThat(ex.getFeature()).isEqualTo(PlanFeature.BENEFICIARY_LIMIT);
         assertThat(ex.getMessage()).isEqualTo("Plan limit reached");
     }
 }
