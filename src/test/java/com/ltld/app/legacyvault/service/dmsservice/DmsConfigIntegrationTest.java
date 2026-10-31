@@ -1,6 +1,8 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
@@ -31,6 +33,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -57,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -172,7 +177,49 @@ class DmsConfigIntegrationTest {
         LocalDateTime start = config.getLastCheckinAt();
         assertThat(config.getNextCheckinDueAt()).isEqualTo(start.plusDays(INTERVAL_DAYS + GRACE_DAYS));
         assertThat(config.getNextReminderAt()).isEqualTo(start.plusDays(INTERVAL_DAYS));
-        assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId())).isEmpty();
+        // FR-03: lưu cấu hình bắt đầu chu kỳ như một lần check-in.
+        assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId()))
+                .singleElement()
+                .satisfies(c -> {
+                    assertThat(c.getCheckinType()).isEqualTo(DmsCheckinType.OWNER_RESPONDED);
+                    assertThat(c.getOccurredAt()).isEqualTo(start);
+                });
+    }
+
+    @Test
+    void upsertThenCheckIn_listsBothOwnerRespondedNewestFirst() {
+        Seed s = seed(true, true);
+        dmsConfigService.upsertConfig(s.ownerId, request());
+        LocalDateTime savedAt = config(s).getLastCheckinAt();
+        dmsConfigService.checkIn(s.ownerId);
+        LocalDateTime checkedInAt = config(s).getLastCheckinAt();
+        assertThat(checkedInAt).isAfter(savedAt);
+
+        Page<DmsCheckinResponse> first = dmsConfigService.getCheckins(s.ownerId, PageRequest.of(0, 1));
+
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(first.getTotalPages()).isEqualTo(2);
+        assertThat(first.getContent()).singleElement().satisfies(c -> {
+            assertThat(c.getCheckinType()).isEqualTo(DmsCheckinType.OWNER_RESPONDED);
+            assertThat(c.getOccurredAt()).isEqualTo(checkedInAt);
+        });
+        assertThat(dmsConfigService.getCheckins(s.ownerId, PageRequest.of(0, 20)).getContent())
+                .extracting(DmsCheckinResponse::getCheckinType, DmsCheckinResponse::getOccurredAt)
+                .containsExactly(tuple(DmsCheckinType.OWNER_RESPONDED, checkedInAt),
+                        tuple(DmsCheckinType.OWNER_RESPONDED, savedAt));
+    }
+
+    @Test
+    void notConfigured_getConfigReturnsConfiguredFalse_andCheckinsEmpty() {
+        Seed s = seed(true, true);
+
+        DmsConfigResponse response = dmsConfigService.getConfig(s.ownerId);
+
+        assertThat(response.getConfigured()).isFalse();
+        assertThat(response.getHasUsableExecutor()).isTrue();
+        assertThat(response.getStatus()).isNull();
+        assertThat(dmsConfigService.getCheckins(s.ownerId, PageRequest.of(0, 20))).isEmpty();
+        assertThat(dmsConfigRepository.findByOwnerId(s.ownerId)).isEmpty();
     }
 
     @Test
@@ -270,7 +317,8 @@ class DmsConfigIntegrationTest {
         assertThat(config.getNextReminderAt()).isEqualTo(config.getLastCheckinAt().plusDays(INTERVAL_DAYS));
         assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId()))
                 .extracting(DmsCheckin::getCheckinType)
-                .containsExactly(DmsCheckinType.OWNER_RESPONDED, DmsCheckinType.REMINDER_SENT);
+                .containsExactly(DmsCheckinType.OWNER_RESPONDED, DmsCheckinType.REMINDER_SENT,
+                        DmsCheckinType.OWNER_RESPONDED);   // check-in, nhắc, lưu cấu hình (FR-03)
 
         // FR-07 chạy tại hạn chót CŨ: không còn quá hạn.
         dmsAutomationService.processOverdueDms(oldDeadline.plusMinutes(1));
@@ -516,7 +564,10 @@ class DmsConfigIntegrationTest {
         assertThat(config.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
         assertThat(config.getRemindersSent()).isZero();
         assertThat(config.getTriggeredAt()).isNull();
-        assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId())).isEmpty();
+        // Chỉ còn dòng OWNER_RESPONDED của lần lưu cấu hình (FR-03): không REMINDER_SENT, không TIMEOUT.
+        assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(config.getId()))
+                .extracting(DmsCheckin::getCheckinType)
+                .containsExactly(DmsCheckinType.OWNER_RESPONDED);
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
         verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());

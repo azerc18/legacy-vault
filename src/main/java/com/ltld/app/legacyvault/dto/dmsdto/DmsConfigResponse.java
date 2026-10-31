@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DmsConfigResponse {
+    // FR-03: false = Owner chưa cấu hình DMS; khi đó chỉ có hasUsableExecutor, các trường khác null.
+    private Boolean configured;
     private DmsStatus status;
     private Integer checkinIntervalDays;
     private Integer gracePeriodDays;
@@ -30,5 +32,6 @@ public class DmsConfigResponse {
     private LocalDateTime triggeredAt;
     // FR-03: trigger lúc này có kích hoạt được Executor nào không (ExecutorActivationRule, cùng quy tắc với FR-07).
     // null khi DMS đã TRIGGERED: bàn giao đã bắt đầu nên câu hỏi này không còn ý nghĩa.
+    // Chưa cấu hình (configured = false): có Executor chính chưa REVOKED không, tức điều kiện bật DMS lần đầu.
     private Boolean hasUsableExecutor;
 }

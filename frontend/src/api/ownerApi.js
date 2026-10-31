@@ -101,11 +101,14 @@ export const ownerApi = {
     },
 
     /* ---------- Dead Man's Switch (FR-03) ---------- */
-    // 404 = chưa cấu hình
+    // configured=false = chưa cấu hình (chỉ có hasUsableExecutor, các trường khác null)
     getDms: () => http.get('/dms').then(unwrap),
     // { checkinIntervalDays 1-365, gracePeriodDays 1-90, reminderCount 1-10 }
     saveDms: (config) => http.put('/dms', config).then(unwrap).then(changed),
     checkIn: () => http.post('/dms/check-in').then(unwrap),
+    // Lịch sử check-in, mới nhất trước: Page { content[{ checkinType, channel, occurredAt }], totalPages, totalElements, number, size }
+    getDmsCheckins: ({ page = 0, size = 20 } = {}) =>
+        http.get('/dms/check-ins', { params: { page, size } }).then(unwrap),
 
     /* ---------- Executor (FR-06) ---------- */
     // Danh sách vị trí (gồm cả đã thu hồi)

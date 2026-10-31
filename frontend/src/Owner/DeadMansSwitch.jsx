@@ -20,7 +20,7 @@ const STATUS = {
 
 export default function DeadMansSwitch() {
     const user = getUser();
-    const [config, setConfig] = useState(null);       // DmsConfigResponse | null (chưa cấu hình)
+    const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
     const [saving, setSaving] = useState(false);
@@ -30,19 +30,22 @@ export default function DeadMansSwitch() {
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
     };
 
     useEffect(() => {
         ownerApi.getDms()
             .then(applyConfig)
-            .catch((err) => { if (err.response?.status !== 404) setError(getErrorMessage(err, 'Could not load settings.')); })
+            .catch((err) => setError(getErrorMessage(err, 'Could not load settings.')))
             .finally(() => setLoading(false));
     }, []);
 
     if (!user) return <Navigate to="/login" replace />;
 
-    const locked = config && config.status !== 'ACTIVE'; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    const configured = config?.configured === true;
+    const locked = configured && config.status !== 'ACTIVE'; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
+    const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
     const save = async (e) => {
         e.preventDefault();
@@ -78,8 +81,8 @@ export default function DeadMansSwitch() {
         }
     };
 
-    const s = config ? STATUS[config.status] || STATUS.ACTIVE : null;
-    const needVault = /Vault/i.test(error) && !config;
+    const s = configured ? STATUS[config.status] || STATUS.ACTIVE : null;
+    const needVault = /Vault/i.test(error) && !configured;
 
     return (
         <OwnerLayout title="Dead Man's Switch" subtitle="If you stop checking in, your vaults are handed over to your Executor.">
@@ -88,12 +91,20 @@ export default function DeadMansSwitch() {
             {needVault && (
                 <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">Create a vault first →</Link></p>
             )}
+            {noExecutor && (
+                <Alert type="warning">
+                    {configured
+                        ? 'No executor can receive the handover. Assign an executor.'
+                        : "Assign a primary executor before enabling the Dead Man's Switch."}{' '}
+                    <Link to="/owner/executors" className="font-semibold underline">Manage executors →</Link>
+                </Alert>
+            )}
 
             {loading ? <p className="text-on-surface-variant">Loading...</p> : (
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
                     {/* Trạng thái + check-in */}
                     <Card>
-                        {!config ? (
+                        {!configured ? (
                             <div className="text-center py-6">
                                 <Icon name="heart_minus" className="text-[40px] text-outline" />
                                 <p className="mt-3 font-semibold">Not set up yet</p>
@@ -149,7 +160,7 @@ export default function DeadMansSwitch() {
                                 </label>
                             ))}
                             <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
-                                {saving ? 'Saving...' : config ? 'Save changes' : 'Turn on'}
+                                {saving ? 'Saving...' : configured ? 'Save changes' : 'Turn on'}
                             </button>
                         </form>
                     </Card>
