@@ -1,10 +1,12 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -90,6 +92,31 @@ public class VaultController {
             @PathVariable UUID vaultId) {
         UUID ownerId = UUID.fromString(principal.getName());
         vaultService.removeBeneficiary(ownerId, vaultId);
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
+    }
+
+    // N2-owner: thêm một người thụ hưởng
+    @PostMapping("/{vaultId}/beneficiaries")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<VaultBeneficiaryResponse>> addBeneficiary(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @Valid @RequestBody AddBeneficiaryRequest request) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        VaultBeneficiaryResponse response = vaultService.addBeneficiary(ownerId, vaultId, request);
+        return ResponseEntity.status(org.springframework.http.HttpStatus.CREATED)
+                .body(ApiResponse.success("Beneficiary added successfully", response));
+    }
+
+    // N2-owner: xóa một người thụ hưởng
+    @DeleteMapping("/{vaultId}/beneficiaries/{beneficiaryId}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<Void>> removeBeneficiaryById(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID beneficiaryId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        vaultService.removeBeneficiary(ownerId, vaultId, beneficiaryId);
         return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
     }
 
