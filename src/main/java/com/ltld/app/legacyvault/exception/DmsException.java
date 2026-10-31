@@ -1,14 +1,36 @@
 package com.ltld.app.legacyvault.exception;
 
+import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-// FR-03: lỗi cấu hình / check-in Dead Man's Switch, mang theo HttpStatus chọn tại chỗ ném.
-public class DmsException extends BusinessException  {
-    public DmsException(String message) {
-        super(message, HttpStatus.BAD_REQUEST);      // giữ mặc định 400 như cũ
-    }
+@Getter
+public class DmsException extends RuntimeException {
+    public static final String BENEFICIARY_CONFLICT = "BENEFICIARY_CONFLICT";
+    public static final String CHECKIN_TOKEN_INVALID = "CHECKIN_TOKEN_INVALID";
+    public static final String CONFIRMER_TOKEN_INVALID = "CONFIRMER_TOKEN_INVALID";
+
+    private final HttpStatus status;
+    private final String errorCode;
 
     public DmsException(String message, HttpStatus status) {
-        super(message, status);
+        this(message, status, null);
+    }
+
+    public DmsException(String message, HttpStatus status, String errorCode) {
+        super(message);
+        this.status = status;
+        this.errorCode = errorCode;
+    }
+
+    public static DmsException beneficiaryConflict(String message) {
+        return new DmsException(message, HttpStatus.CONFLICT, BENEFICIARY_CONFLICT);
+    }
+
+    public static DmsException checkinTokenInvalid(String message) {
+        return new DmsException(message, HttpStatus.BAD_REQUEST, CHECKIN_TOKEN_INVALID);
+    }
+
+    public static DmsException confirmerTokenInvalid(String message) {
+        return new DmsException(message, HttpStatus.BAD_REQUEST, CONFIRMER_TOKEN_INVALID);
     }
 }

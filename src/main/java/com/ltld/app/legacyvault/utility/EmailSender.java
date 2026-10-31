@@ -161,6 +161,52 @@ public class EmailSender {
                         + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
     }
 
+    /**
+     * X2: gửi email khẩn cấp cho Trusted Social Confirmer khi Owner quá hạn check-in + gracePeriodDays.
+     */
+    public void sendDmsCrossConfirmationRequest(
+            String confirmerEmail,
+            String confirmerName,
+            String ownerName,
+            String ownerEmail,
+            LocalDateTime deadlineAt,
+            String aliveUrl,
+            String unreachableUrl
+    ) {
+        String ownerText = ownerLabel(ownerName, ownerEmail);
+        String body = "Hello " + (confirmerName == null ? "" : confirmerName) + ",\n\n"
+                + ownerText + " designated you as a Trusted Social Confirmer on LegacyVault.\n"
+                + "Their Dead Man's Switch check-in and grace period have expired without response.\n\n"
+                + "Before the system notifies their Digital Executor, please help confirm their status before "
+                + formatDeadline(deadlineAt) + " (Vietnam time):\n\n"
+                + "1. Owner is safe (Chủ sở hữu vẫn bình an - postpone 7 days):\n"
+                + aliveUrl + "\n\n"
+                + "2. Unreachable / Confirmed incident (Không liên lạc được / Đã có sự cố - start handover immediately):\n"
+                + unreachableUrl + "\n\n"
+                + "If no confirmer responds within 72 hours, the system will automatically proceed with the handover.";
+        sendWithoutOtpFooter(
+                confirmerEmail,
+                "URGENT: Please confirm safety status for " + ownerDisplayName(ownerName, ownerEmail) + " - LegacyVault",
+                body
+        );
+    }
+
+    /**
+     * X2: thông báo cho Owner biết người xác nhận chéo vừa báo "Owner vẫn bình an" và hoãn DMS 7 ngày.
+     */
+    public void sendOwnerConfirmedSafeNotice(String ownerEmail, String confirmerName, LocalDateTime postponedUntil) {
+        String body = "Your Trusted Social Confirmer (" + (confirmerName == null ? "Trusted Contact" : confirmerName)
+                + ") confirmed that you are safe.\n"
+                + "Your Dead Man's Switch activation has been postponed until "
+                + formatDeadline(postponedUntil) + " (Vietnam time).\n"
+                + "Please sign in to LegacyVault and check in as soon as possible.";
+        sendWithoutOtpFooter(
+                ownerEmail,
+                "Dead Man's Switch postponed by Trusted Confirmer - LegacyVault",
+                body
+        );
+    }
+
     public void sendVerificationMessageNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
                 "New message in a verification request - LegacyVault",

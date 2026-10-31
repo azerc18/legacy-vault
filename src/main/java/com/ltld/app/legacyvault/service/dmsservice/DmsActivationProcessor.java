@@ -26,7 +26,9 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -81,7 +83,17 @@ public class DmsActivationProcessor {
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
+    // [X2 / Sửa #5]: Tích hợp xác nhận chéo trước khi kích hoạt DMS (Trusted Social Confirmers).
+    // @Autowired(required = false) giữ nguyên constructor 9 tham số để toàn bộ DmsActivationProcessorTest cũ chạy xanh.
+    @Autowired(required = false)
+    @Lazy
+    private DmsConfirmerService dmsConfirmerService;
+
+    void setDmsConfirmerService(DmsConfirmerService dmsConfirmerService) {
+        this.dmsConfirmerService = dmsConfirmerService;
+    }
+
+    /** Bước 1-3 của FR-07: DMS quá hạn -> (nếu có X2 confirmer thì chuyển PENDING_CONFIRMATION 72h) -> TRIGGERED -> kích hoạt Executor. */
     @Transactional
     public void trigger(UUID configId, LocalDateTime now) {
         DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
@@ -91,12 +103,44 @@ public class DmsActivationProcessor {
             return;
         }
 
-        UUID ownerId = config.getOwner().getId();
         if (config.getRemindersSent() == 0 && config.getTriggerDeferrals() < MAX_TRIGGER_DEFERRALS
                 && hasReminderSchedule(config)) {
             defer(config, now);
             return;
         }
+
+        // [X2 / Sửa #5]: Nếu Owner đã cấu hình Trusted Social Confirmers, chuyển sang PENDING_CONFIRMATION 72h trước.
+        if (dmsConfirmerService != null && dmsConfirmerService.initiatePendingConfirmationIfConfigured(config, now)) {
+            return;
+        }
+
+        activateConfirmedDms(config, now);
+    }
+
+    /**
+     * [X2 / Sửa #5]: Quá 72 giờ kể từ khi chuyển sang PENDING_CONFIRMATION mà không có confirmer nào phản hồi
+     * -> tự động chuyển sang TRIGGERED và kích hoạt Executor như luồng chuẩn.
+     */
+    @Transactional
+    public void processExpiredConfirmation(UUID configId, LocalDateTime now) {
+        DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
+        if (config == null || config.getStatus() != DmsStatus.PENDING_CONFIRMATION
+                || config.getNextCheckinDueAt() == null || !config.getNextCheckinDueAt().isBefore(now)) {
+            return;
+        }
+        UUID ownerId = config.getOwner().getId();
+        audit(AuditAction.DMS_CONFIRMATION_TIMEOUT, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
+        activateConfirmedDms(config, now);
+    }
+
+    /**
+     * Thực thi kích hoạt DMS sang TRIGGERED và thông báo Primary/Backup Executor.
+     * Được gọi từ trigger() (khi không có confirmer), từ DmsConfirmerService (khi confirmer báo UNREACHABLE),
+     * hoặc từ processExpiredConfirmation() (khi quá 72 giờ không ai phản hồi).
+     */
+    @Transactional
+    public void activateConfirmedDms(DmsConfig config, LocalDateTime now) {
+        UUID ownerId = config.getOwner().getId();
         config.setStatus(DmsStatus.TRIGGERED);
         config.setTriggeredAt(now);
         dmsConfigRepository.save(config);
