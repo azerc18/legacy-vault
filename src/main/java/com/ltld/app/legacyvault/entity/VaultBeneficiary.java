@@ -17,7 +17,8 @@ import java.util.UUID;
 @Builder
 @Table(name = "vault_beneficiaries",
         uniqueConstraints = @UniqueConstraint(name = "uk_vault_beneficiary_email",
-                columnNames = {"vault_id", "email"}))
+                columnNames = {"vault_id", "email"}),
+        indexes = @Index(name = "idx_vault_beneficiary_email", columnList = "email"))
 public class VaultBeneficiary {
 
     @Id

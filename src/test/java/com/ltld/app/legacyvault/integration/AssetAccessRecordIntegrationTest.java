@@ -153,6 +153,7 @@ class AssetAccessRecordIntegrationTest {
 
         // Kiểm tra truy vấn TRƯỚC khi gây lỗi
         assertThat(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vault.getId())).hasSize(2);
+        // Khớp không phân biệt hoa thường nhờ collation của cột email (utf8mb4_unicode_ci), không phải do code chuẩn hoá
         assertThat(vaultBeneficiaryRepository.findPendingByEmail("BEN2@example.com")).hasSize(1);
         assertThat(vaultBeneficiaryRepository.existsByOwnerIdAndEmail(owner.getId(), "ben@example.com")).isTrue();
 

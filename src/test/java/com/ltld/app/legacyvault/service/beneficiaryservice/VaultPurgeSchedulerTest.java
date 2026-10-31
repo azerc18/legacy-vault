@@ -69,7 +69,7 @@ class VaultPurgeSchedulerTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         scheduler = new VaultPurgeScheduler(vaultRepository, accessRecordRepository,
                 identityVerificationRepository, requestVaultRepository, legalDocumentRepository,
-                digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,assetAllocationRepository,
+                digitalAssetRepository, claimRepository, vaultBeneficiaryRepository, assetAllocationRepository,
                 fileStorageService, auditLogService, transactionManager);
     }
 
