@@ -18,15 +18,15 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
 
     List<VaultBeneficiary> findByVaultIdInOrderByCreatedAtAsc(Collection<UUID> vaultIds);
 
-    // Owner đã mời email này ở bất kỳ vault nào của mình chưa (dùng cho N2-Q26, N2-verifier)
+    // existsByOwnerIdAndEmail
     @Query("""
-            SELECT COUNT(b) > 0 FROM VaultBeneficiary b
-            WHERE b.vault.owner.id = :ownerId AND LOWER(b.email) = LOWER(:email)
-            """)
+        SELECT COUNT(b) > 0 FROM VaultBeneficiary b
+        WHERE b.vault.owner.id = :ownerId AND b.email = :email
+        """)
     boolean existsByOwnerIdAndEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
 
-    // Người được mời khi chưa có tài khoản, dùng khi họ xác minh email xong
-    @Query("SELECT b FROM VaultBeneficiary b WHERE b.user IS NULL AND LOWER(b.email) = LOWER(:email)")
+    // findPendingByEmail
+    @Query("SELECT b FROM VaultBeneficiary b WHERE b.user IS NULL AND b.email = :email")
     List<VaultBeneficiary> findPendingByEmail(@Param("email") String email);
 
     @Modifying(flushAutomatically = true)

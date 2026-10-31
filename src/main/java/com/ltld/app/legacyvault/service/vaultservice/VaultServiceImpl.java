@@ -376,7 +376,9 @@ public class VaultServiceImpl implements VaultService {
 
         // FR-27: tính lockReason theo lô — 1 query DMS + 1 batch verification, tránh N+1
         Map<UUID, String> lockReasonMap = vaultModificationGuard.lockReasons(ownerId, vaults);
-        Map<UUID, List<VaultBeneficiary>> benByVault = vaultBeneficiaryRepository
+        Map<UUID, List<VaultBeneficiary>> benByVault = vaults.isEmpty()
+                ? Map.of()
+                : vaultBeneficiaryRepository
                 .findByVaultIdInOrderByCreatedAtAsc(vaults.stream().map(Vault::getId).toList()).stream()
                 .collect(Collectors.groupingBy(b -> b.getVault().getId()));
 
