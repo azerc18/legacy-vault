@@ -11,4 +11,8 @@ public class DmsException extends BusinessException  {
     public DmsException(String message, HttpStatus status) {
         super(message, status);
     }
+
+    public DmsException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }

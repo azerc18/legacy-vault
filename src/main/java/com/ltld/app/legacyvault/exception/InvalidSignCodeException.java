@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 public class InvalidSignCodeException extends BusinessException {
     public InvalidSignCodeException(String message) {
-        super(message, HttpStatus.BAD_REQUEST);
+        super(message, HttpStatus.BAD_REQUEST,ErrorCode.INVALID_SIGN_CODE
+        );
     }
 }
