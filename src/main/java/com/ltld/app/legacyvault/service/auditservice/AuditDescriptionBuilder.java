@@ -109,6 +109,7 @@ public class AuditDescriptionBuilder {
             // FR-03 / FR-06 / FR-07: nhật ký cấp Owner; detail chứa ownerId và id nội bộ nên không nối
             case DMS_CONFIGURED -> "Saved the Dead Man's Switch configuration.";
             case DMS_CHECKIN -> "Checked in to confirm still active.";
+            case DMS_CHECKIN_ONE_CLICK -> "Checked in via one-click email link.";
             case DMS_TRIGGERED -> "The Dead Man's Switch was triggered because the check-in deadline passed.";
             case DMS_TRIGGER_DEFERRED -> "Dead Man's Switch activation postponed 24 hours because the owner has not received any reminder.";
             case DMS_TRIGGERED_NO_EXECUTOR ->"The Dead Man's Switch was triggered but no executor is available.";
