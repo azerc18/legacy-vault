@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.paymentservice;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 /**
  * T1: Tích hợp VNPay Sandbox v2.1.0 (tạo URL thanh toán + xác thực chữ ký HMAC-SHA512).
+ * Hỗ trợ tự động suy ra vnp_ReturnUrl từ FRONTEND_BASE_URL khi deploy chung 1 container trên Azure (D8a/D8b).
  */
 @Component
 public class VnpayClient {
@@ -29,15 +31,37 @@ public class VnpayClient {
     private final String payUrl;
     private final String returnUrl;
 
+    @Autowired
     public VnpayClient(
             @Value("${VNPAY_TMN_CODE:DEMO_TMN}") String tmnCode,
             @Value("${VNPAY_HASH_SECRET:DEMO_HASH_SECRET_KEY_1234567890}") String hashSecret,
             @Value("${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}") String payUrl,
-            @Value("${VNPAY_RETURN_URL:http://localhost:8084/api/payments/vnpay-return}") String returnUrl) {
+            @Value("${VNPAY_RETURN_URL:}") String returnUrl,
+            @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:http://localhost:5173}}") String frontendBaseUrl) {
         this.tmnCode = tmnCode;
         this.hashSecret = hashSecret;
         this.payUrl = payUrl;
-        this.returnUrl = returnUrl;
+        this.returnUrl = resolveReturnUrl(returnUrl, frontendBaseUrl);
+    }
+
+    public VnpayClient(String tmnCode, String hashSecret, String payUrl, String returnUrl) {
+        this(tmnCode, hashSecret, payUrl, returnUrl, "http://localhost:5173");
+    }
+
+    static String resolveReturnUrl(String explicitReturnUrl, String frontendBaseUrl) {
+        if (explicitReturnUrl != null && !explicitReturnUrl.isBlank()) {
+            return explicitReturnUrl.trim();
+        }
+        if (frontendBaseUrl != null && !frontendBaseUrl.isBlank()) {
+            String trimmed = frontendBaseUrl.trim().replaceAll("/+$", "");
+            if (!trimmed.contains("localhost:5173")
+                    && !trimmed.contains("127.0.0.1:5173")
+                    && !trimmed.contains("localhost:3000")
+                    && !trimmed.contains("127.0.0.1:3000")) {
+                return trimmed + "/api/payments/vnpay-return";
+            }
+        }
+        return "http://localhost:8084/api/payments/vnpay-return";
     }
 
     public String buildPaymentUrl(UUID txnId, long amountVnd, String orderInfo, String ipAddress) {
@@ -130,4 +154,3 @@ public class VnpayClient {
         }
     }
 }
-

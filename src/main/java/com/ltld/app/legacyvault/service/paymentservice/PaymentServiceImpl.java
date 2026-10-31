@@ -47,7 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final VnpayClient vnpayClient;
     private final AuditLogService auditLogService;
 
-    @Value("${APP_FRONTEND_URL:http://localhost:5173}")
+    @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:${APP_FRONTEND_URL:http://localhost:5173}}}")
     private String frontendBaseUrl = "http://localhost:5173";
 
     @Override

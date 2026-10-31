@@ -14,7 +14,7 @@ public class SubscriptionPlanDto {
     private String code;
     private String name;
     private long priceVnd;
-    private int durationDays;
+    private Integer durationDays;
     private int maxVaults;
     private int maxBeneficiariesPerVault;
     private long maxStorageBytes;
@@ -27,9 +27,9 @@ public class SubscriptionPlanDto {
                 .priceVnd(plan.getPriceVnd())
                 .durationDays(plan.getDurationDays())
                 .maxVaults(plan.getMaxVaults())
-                .maxBeneficiariesPerVault(plan.getMaxBeneficiariesPerVault())
-                .maxStorageBytes(plan.getMaxStorageBytes())
-                .legacyMessageEnabled(plan.isLegacyMessageEnabled())
+                .maxBeneficiariesPerVault(plan.getMaxBeneficiaries())
+                .maxStorageBytes(plan.getStorageQuotaBytes())
+                .legacyMessageEnabled(plan.isLegacyMessagesEnabled())
                 .build();
     }
 }

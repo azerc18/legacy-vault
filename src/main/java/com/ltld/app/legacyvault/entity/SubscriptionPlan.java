@@ -44,7 +44,7 @@ public class SubscriptionPlan {
 
     @Column(name = "max_beneficiaries", nullable = false)
     @Builder.Default
-    private int maxBeneficiaries = 1;
+    private int maxBeneficiaries = 2;
 
     @Column(name = "storage_quota_bytes", nullable = false)
     @Builder.Default
@@ -61,5 +61,16 @@ public class SubscriptionPlan {
     public boolean isVip() {
         return !CODE_FREE.equalsIgnoreCase(code);
     }
-}
 
+    public int getMaxBeneficiariesPerVault() {
+        return maxBeneficiaries;
+    }
+
+    public long getMaxStorageBytes() {
+        return storageQuotaBytes;
+    }
+
+    public boolean isLegacyMessageEnabled() {
+        return legacyMessagesEnabled;
+    }
+}
