@@ -61,8 +61,8 @@ public class DmsOneClickCheckinServiceImpl implements DmsOneClickCheckinService 
             DmsCheckinRepository dmsCheckinRepository,
             ExecutorAssignmentRepository executorAssignmentRepository,
             AuditLogService auditLogService,
-            @Value("${app.backend.base-url:http://localhost:8084}") String backendBaseUrl,
-            @Value("${app.frontend.base-url:http://localhost:5173}") String frontendBaseUrl
+            @Value("${app.backend.base-url:${BACKEND_BASE_URL:}}") String backendBaseUrl,
+            @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:http://localhost:5173}}") String frontendBaseUrl
     ) {
         this.jwtEncoder = jwtEncoder;
         this.jwtDecoder = jwtDecoder;
@@ -70,8 +70,24 @@ public class DmsOneClickCheckinServiceImpl implements DmsOneClickCheckinService 
         this.dmsCheckinRepository = dmsCheckinRepository;
         this.executorAssignmentRepository = executorAssignmentRepository;
         this.auditLogService = auditLogService;
-        this.backendBaseUrl = backendBaseUrl;
-        this.frontendBaseUrl = frontendBaseUrl;
+        this.frontendBaseUrl = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
+        this.backendBaseUrl = resolveBackendBaseUrl(backendBaseUrl, this.frontendBaseUrl);
+    }
+
+    static String resolveBackendBaseUrl(String explicitBackendUrl, String frontendBaseUrl) {
+        if (explicitBackendUrl != null && !explicitBackendUrl.isBlank()) {
+            return normalizeBaseUrl(explicitBackendUrl, "http://localhost:8084");
+        }
+        if (frontendBaseUrl != null && !frontendBaseUrl.isBlank()) {
+            String trimmed = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
+            if (!trimmed.contains("localhost:5173")
+                    && !trimmed.contains("127.0.0.1:5173")
+                    && !trimmed.contains("localhost:3000")
+                    && !trimmed.contains("127.0.0.1:3000")) {
+                return trimmed;
+            }
+        }
+        return "http://localhost:8084";
     }
 
     @Override
