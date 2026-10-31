@@ -1,7 +1,7 @@
 package com.ltld.app.legacyvault.service.paymentservice;
 
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.exception.ErrorCode;
-import com.ltld.app.legacyvault.exception.PlanFeature;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EntitlementServiceImplTest {
 
@@ -34,5 +35,12 @@ class EntitlementServiceImplTest {
         assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.PLAN_LIMIT_REACHED);
         assertThat(ex.getFeature()).isEqualTo(PlanFeature.BENEFICIARY_LIMIT);
         assertThat(ex.getMessage()).isEqualTo("Plan limit reached");
+    }
+
+    @Test
+    void planLimitReachedException_nullFeature_throwsNullPointerException() {
+        assertThatThrownBy(() -> new PlanLimitReachedException(null, "Plan limit reached"))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("feature");
     }
 }

@@ -1,4 +1,4 @@
-package com.ltld.app.legacyvault.exception;
+package com.ltld.app.legacyvault.enums;
 
 public enum PlanFeature {
     MULTIPLE_VAULTS,

@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.exception;
 
+import com.ltld.app.legacyvault.enums.PlanFeature;
+
 // T1: ném khi người dùng gói FREE chạm giới hạn (số lượng vault, beneficiary, dung lượng, legacy messages).
 public class PlanLimitReachedException extends BusinessException {
 
@@ -7,11 +9,7 @@ public class PlanLimitReachedException extends BusinessException {
 
     public PlanLimitReachedException(PlanFeature feature, String message) {
         super(ErrorCode.PLAN_LIMIT_REACHED, message);
-        this.feature = feature;
-    }
-
-    public PlanLimitReachedException(String message) {
-        this(null, message);
+        this.feature = java.util.Objects.requireNonNull(feature, "feature");
     }
 
     public PlanFeature getFeature() {
