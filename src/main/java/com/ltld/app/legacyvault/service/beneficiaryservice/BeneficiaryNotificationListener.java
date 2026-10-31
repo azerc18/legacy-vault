@@ -4,8 +4,10 @@ import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
@@ -18,6 +20,7 @@ import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -34,6 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -86,9 +90,11 @@ public class BeneficiaryNotificationListener {
     private final NotificationRepository notificationRepository;
     private final AuditLogRepository auditLogRepository;
     private final TransactionTemplate requiresNewTx;
+    private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
 
     public BeneficiaryNotificationListener(VaultRepository vaultRepository,
                                            BeneficiaryClaimRepository claimRepository,
+                                           VaultBeneficiaryRepository vaultBeneficiaryRepository,
                                            ExecutorAssignmentRepository executorAssignmentRepository,
                                            EmailSender emailSender,
                                            ExecutorNotificationService executorNotificationService,
@@ -98,6 +104,7 @@ public class BeneficiaryNotificationListener {
                                            PlatformTransactionManager transactionManager) {
         this.vaultRepository = vaultRepository;
         this.claimRepository = claimRepository;
+        this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
         this.executorAssignmentRepository = executorAssignmentRepository;
         this.emailSender = emailSender;
         this.executorNotificationService = executorNotificationService;
@@ -131,10 +138,12 @@ public class BeneficiaryNotificationListener {
     }
 
     private void processVault(UUID vaultId, LocalDateTime now) {
-        final MailData mail = tryPrepare(vaultId, now);
-        if (mail == null) {
-            return;
+        for (MailData mail : tryPrepare(vaultId, now)) {
+            sendMail(vaultId, mail);
         }
+    }
+
+    private void sendMail(UUID vaultId, MailData mail) {
         if (mail.pendingRegistration()) {
             notifyPendingRegistration(mail);
             return;
@@ -234,56 +243,82 @@ public class BeneficiaryNotificationListener {
         return notified;
     }
 
-    // Pha 1 cho nhánh chờ đăng ký: không tạo claim, chỉ chặn phát lại sự kiện
-    private MailData preparePendingRegistration(Vault vault) {
-        UUID vaultId = vault.getId();
-        if (auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED)) {
-            log.info("FR-16: Vault {} already notified (pending registration), skip", vaultId);
-            return null;
-        }
+    // Pha 1 cho nhánh chờ đăng ký: không tạo claim. Chỉ người đầu tiên mang danh sách Executor
+    // để Executor không nhận trùng thông báo cho mỗi người chưa đăng ký.
+    private MailData preparePendingRegistration(Vault vault, VaultBeneficiary vb, boolean withExecutors) {
         User owner = vault.getOwner();
         String ownerName = owner != null && owner.getFullName() != null && !owner.getFullName().isBlank()
                 ? owner.getFullName() : OWNER_FALLBACK;
-        return new MailData(null, vaultId, vault.getBeneficiaryEmail(), null, ownerName, vault.getName(),
-                vault.getClaimDeadlineAt(), false, null, 0, activeExecutorEmails(owner), null, true);
+        return new MailData(null, vault.getId(), vb.getEmail(), null, ownerName, vault.getName(),
+                vault.getClaimDeadlineAt(), false, null, 0,
+                withExecutors ? activeExecutorEmails(owner) : List.of(), null, true);
     }
 
-    private MailData tryPrepare(UUID vaultId, LocalDateTime now) {
+    private List<MailData> tryPrepare(UUID vaultId, LocalDateTime now) {
         try {
-            return requiresNewTx.execute(status -> prepare(vaultId, now));
+            List<MailData> mails = requiresNewTx.execute(status -> prepare(vaultId, now));
+            return mails != null ? mails : List.of();
         } catch (RuntimeException e) {
             recordFailure(vaultId, "prepare failed: " + e.getClass().getSimpleName(), e);
-            return null;
+            return List.of();
         }
     }
 
-    // Pha 1: trả về null nếu không cần/không thể gửi
-    private MailData prepare(UUID vaultId, LocalDateTime now) {
+    // Pha 1: trả về danh sách thư cần gửi (mỗi người thụ hưởng một thư); rỗng nếu không cần/không thể gửi
+    private List<MailData> prepare(UUID vaultId, LocalDateTime now) {
         Vault vault = vaultRepository.findById(vaultId).orElse(null);
         if (vault == null || vault.getStatus() != VaultStatus.UNLOCKED) {
             log.warn("FR-16: Skip vault {} (not found or not UNLOCKED)", vaultId);
-            return null;
+            return List.of();
         }
 
-        // SRS FR-16 precondition: Vault phải có Beneficiary được gán, hoặc email đang chờ đăng ký (Q25)
-        User beneficiary = vault.getBeneficiary();
-        boolean pendingRegistration = beneficiary == null
-                && vault.getBeneficiaryEmail() != null && !vault.getBeneficiaryEmail().isBlank();
-        if (beneficiary == null && !pendingRegistration) {
+        // N2b: người nhận lấy từ vault_beneficiaries, bỏ người đã từ chối / từ bỏ
+        List<VaultBeneficiary> recipients = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)
+                .stream()
+                .filter(b -> b.getStatus() != BeneficiaryInviteStatus.DECLINED
+                        && b.getStatus() != BeneficiaryInviteStatus.WAIVED)
+                .toList();
+        if (recipients.isEmpty()) {
             auditFailure(vaultId, "no beneficiary assigned");
-            return null;
+            return List.of();
         }
         // FR-14 luôn set claimDeadlineAt khi mở khóa; thiếu nghĩa là dữ liệu lỗi, không tự đoán hạn
         if (vault.getClaimDeadlineAt() == null) {
             auditFailure(vaultId, "vault has no claimDeadlineAt");
-            return null;
-        }
-        if (pendingRegistration) {
-            return preparePendingRegistration(vault);
+            return List.of();
         }
 
-        // Tạo claim PENDING nếu chưa có; initializeClaim sẽ dùng lại claim này
-        BeneficiaryClaim claim = claimRepository.findByVaultId(vaultId)
+        List<MailData> mails = new ArrayList<>();
+
+        // Người chưa có tài khoản (Q25): mời một lần, chặn phát lại sự kiện bằng audit
+        List<VaultBeneficiary> pending = recipients.stream().filter(b -> b.getUser() == null).toList();
+        if (!pending.isEmpty()
+                && !auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED)) {
+            boolean first = true;
+            for (VaultBeneficiary vb : pending) {
+                mails.add(preparePendingRegistration(vault, vb, first));
+                first = false;
+            }
+        }
+
+        // Người đã có tài khoản: mỗi người một claim riêng
+        for (VaultBeneficiary vb : recipients) {
+            if (vb.getUser() != null) {
+                MailData mail = prepareRegistered(vault, vb.getUser(), now);
+                if (mail != null) {
+                    mails.add(mail);
+                }
+            }
+        }
+        return mails;
+    }
+
+    // Logic cũ của prepare, tách ra cho từng người. Trả về null nếu người này không cần gửi.
+    private MailData prepareRegistered(Vault vault, User beneficiary, LocalDateTime now) {
+        UUID vaultId = vault.getId();
+
+        // Tạo claim PENDING cho người này nếu chưa có; initializeClaim sẽ dùng lại claim này
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vaultId, beneficiary.getId())
                 .orElseGet(() -> claimRepository.save(BeneficiaryClaim.builder()
                         .vault(vault)
                         .beneficiary(beneficiary)
@@ -293,7 +328,8 @@ public class BeneficiaryNotificationListener {
 
         // Đã gửi rồi (hoặc claim không còn PENDING): không gửi lại
         if (claim.getStatus() != ClaimStatus.PENDING || claim.getNotifiedAt() != null) {
-            log.info("FR-16: Vault {} already notified or claim not pending, skip", vaultId);
+            log.info("FR-16: Vault {} beneficiary {} already notified or claim not pending, skip",
+                    vaultId, beneficiary.getId());
             return null;
         }
         // Hết lượt: đã audit GAVE_UP ở lần thử cuối, không lặp lại

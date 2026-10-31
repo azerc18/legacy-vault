@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.AcceptClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
@@ -8,6 +9,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryRespon
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
@@ -98,6 +100,18 @@ public interface BeneficiaryService {
      * 410 (quá hạn), 423 (đã bị khóa).
      */
     CloseVaultResponse closeVault(UUID vaultId, CloseVaultRequest request, UUID currentUserId);
+
+    /**
+     * N2b: Beneficiary xác nhận nhận phần được chia (sau khi xác minh danh tính). Idempotent.
+     * Lỗi: 404, 403 (hết phiên xác thực), 409/410 (vault hoặc claim không hợp lệ), 423 (bị khóa).
+     */
+    AcceptClaimResponse acceptClaim(UUID vaultId, UUID currentUserId);
+
+    /**
+     * N2b: Beneficiary từ chối phần được chia (reason tùy chọn). Tài sản người này đang giữ chuyển sang
+     * người dự phòng (nếu có). Lỗi: 404, 409 (đã nhận / đã từ chối), 410 (quá hạn), 400 (chưa mở khóa).
+     */
+    DeclineClaimResponse declineClaim(UUID vaultId, UUID currentUserId, String reason);
 
     /**
      * FR-19: Xem trước khi đóng hồ sơ: tổng số tài sản, số đã xem và danh sách tài sản chưa xem.
