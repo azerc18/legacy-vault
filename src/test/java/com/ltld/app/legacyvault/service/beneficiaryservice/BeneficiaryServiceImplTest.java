@@ -187,7 +187,7 @@ public class BeneficiaryServiceImplTest {
     // Vault UNLOCKED + claim còn hạn
     private void stubVaultAndClaim() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
                 claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5))));
     }
 
@@ -261,7 +261,7 @@ public class BeneficiaryServiceImplTest {
                 .status(ClaimStatus.PENDING)
                 .claimDeadlineAt(LocalDateTime.now().plusDays(5))
                 .build();
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(existingClaim));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(existingClaim));
 
         // Giả lập đã có sẵn 1 phiên xác thực PENDING
         IdentityVerification pendingVerification = IdentityVerification.builder()
@@ -302,7 +302,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void initializeClaim_alreadyClaimed_throws409() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId))
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId))
                 .thenReturn(Optional.of(claim(ClaimStatus.CLAIMED, LocalDateTime.now().plusDays(5))));
 
         BeneficiaryException ex = assertThrows(BeneficiaryException.class,
@@ -315,7 +315,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void initializeClaim_statusExpired_throws410() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId))
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId))
                 .thenReturn(Optional.of(claim(ClaimStatus.EXPIRED, LocalDateTime.now().plusDays(5))));
 
         BeneficiaryException ex = assertThrows(BeneficiaryException.class,
@@ -327,7 +327,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void initializeClaim_deadlinePassedButStatusPending_throws410() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId))
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId))
                 .thenReturn(Optional.of(claim(ClaimStatus.PENDING, LocalDateTime.now().minusMinutes(1))));
 
         BeneficiaryException ex = assertThrows(BeneficiaryException.class,
@@ -342,7 +342,7 @@ public class BeneficiaryServiceImplTest {
         unlockedVault.setClaimDeadlineAt(deadline);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.empty());
         when(claimRepository.save(any(BeneficiaryClaim.class))).thenAnswer(inv -> inv.getArgument(0));
         when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                 any(), any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -370,7 +370,7 @@ public class BeneficiaryServiceImplTest {
         unlockedVault.setClaimDeadlineAt(null);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.empty());
         when(claimRepository.save(any(BeneficiaryClaim.class))).thenAnswer(inv -> inv.getArgument(0));
         when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                 any(), any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -389,7 +389,7 @@ public class BeneficiaryServiceImplTest {
         unlockedVault.setClaimDeadlineAt(null);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.empty());
         when(claimRepository.save(any(BeneficiaryClaim.class))).thenAnswer(inv -> inv.getArgument(0));
 
         BeneficiaryException ex = assertThrows(BeneficiaryException.class,
@@ -429,7 +429,7 @@ public class BeneficiaryServiceImplTest {
         request.setVerificationMethod(VerificationMethod.EKYC_MOCK);
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
                 claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5))));
         when(verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
@@ -505,7 +505,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void sendIdentityOtp_noClaimYet_throws400() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.empty());
 
         expectError(HttpStatus.BAD_REQUEST,
                 () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
@@ -514,7 +514,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void sendIdentityOtp_claimPastDeadline_throws410() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
                 claim(ClaimStatus.PENDING, LocalDateTime.now().minusMinutes(1))));
 
         expectError(HttpStatus.GONE,
@@ -1219,7 +1219,7 @@ public class BeneficiaryServiceImplTest {
     private BeneficiaryClaim stubClaimForClose() {
         BeneficiaryClaim claim = claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5));
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(claim));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(claim));
         stubLocked(false);
         return claim;
     }
@@ -1485,7 +1485,7 @@ public class BeneficiaryServiceImplTest {
     @Test
     void closeVault_claimPastDeadline_throws410() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
                 claim(ClaimStatus.PENDING, LocalDateTime.now().minusMinutes(1))));
 
         expectError(HttpStatus.GONE,
@@ -1827,8 +1827,7 @@ public class BeneficiaryServiceImplTest {
         when(vaultRepository.findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(eq(currentUserId),
                 eq(List.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED, VaultStatus.ARCHIVED_LOCKED))))
                 .thenReturn(List.of(v1, v2));
-        when(claimRepository.findByVaultIdIn(List.of(id1, id2))).thenReturn(List.of(c1));
-
+        when(claimRepository.findByBeneficiaryIdAndVaultIdIn(eq(currentUserId), eq(List.of(id1, id2)))).thenReturn(List.of(c1));
         List<BeneficiaryVaultSummaryResponse> result = beneficiaryService.listMyVaults(currentUserId);
 
         assertEquals(2, result.size());
@@ -1854,7 +1853,7 @@ public class BeneficiaryServiceImplTest {
 
         assertThat(beneficiaryService.listMyVaults(currentUserId)).isEmpty();
 
-        verify(claimRepository, never()).findByVaultIdIn(any());
+        verify(claimRepository, never()).findByBeneficiaryIdAndVaultIdIn(any(), any());
     }
 
     @Test
@@ -1913,7 +1912,7 @@ public class BeneficiaryServiceImplTest {
                 .status(ClaimStatus.PENDING)
                 .claimDeadlineAt(LocalDateTime.now().plusDays(5))
                 .build();
-        when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(existingClaim));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(existingClaim));
         // Không có phiên nào trong cửa sổ 10 phút → phải tạo phiên mới
         when(verificationRepository.findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                 any(), any(), any(), any(), any())).thenReturn(Optional.empty());

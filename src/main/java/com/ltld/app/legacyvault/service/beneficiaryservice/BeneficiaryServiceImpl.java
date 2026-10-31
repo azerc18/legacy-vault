@@ -136,7 +136,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         Map<UUID, BeneficiaryClaim> claimsByVaultId = claimRepository
-                .findByVaultIdIn(vaults.stream().map(Vault::getId).toList()).stream()
+                .findByBeneficiaryIdAndVaultIdIn(currentUserId, vaults.stream().map(Vault::getId).toList()).stream()
                 .collect(Collectors.toMap(c -> c.getVault().getId(), c -> c));
 
         return vaults.stream().map(v -> {
@@ -211,7 +211,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         // 3. Khởi tạo hoặc lấy BeneficiaryClaim hiện tại
-        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId()).orElse(null);
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId).orElse(null);
 
         if (claim != null) {
             if (claim.getStatus() == ClaimStatus.CLAIMED) {
@@ -731,7 +731,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST);
         }
 
-        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId())
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId)
                 .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
 
         if (claim.getStatus() == ClaimStatus.CLAIMED) {

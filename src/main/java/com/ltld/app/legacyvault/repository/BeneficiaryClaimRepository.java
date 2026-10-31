@@ -21,6 +21,10 @@ public interface BeneficiaryClaimRepository extends JpaRepository<BeneficiaryCla
     // FR-16/FR-17: lấy claim của nhiều vault trong một truy vấn (cho danh sách vault của Beneficiary)
     List<BeneficiaryClaim> findByVaultIdIn(Collection<UUID> vaultIds);
 
+    Optional<BeneficiaryClaim> findByVaultIdAndBeneficiaryId(UUID vaultId, UUID beneficiaryId);
+
+    List<BeneficiaryClaim> findByBeneficiaryIdAndVaultIdIn(UUID beneficiaryId, Collection<UUID> vaultIds);
+
     // Chuyển PENDING -> CLAIMED nguyên tử: request thứ hai nhận 0 dòng bị ảnh hưởng nên bị từ chối
     @Modifying(flushAutomatically = true)
     @Query("""

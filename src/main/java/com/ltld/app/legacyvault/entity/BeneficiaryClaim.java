@@ -13,16 +13,18 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "beneficiary_claims")
+@Table(name = "beneficiary_claims",
+        uniqueConstraints = @UniqueConstraint(name = "uk_claim_vault_beneficiary",
+                columnNames = {"vault_id", "beneficiary_id"}))
 public class BeneficiaryClaim {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    // Thiết lập FK trỏ tới bảng vaults (1 Vault chỉ có 1 Claim)
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "vault_id", nullable = false, unique = true)
+    // 1 Vault có nhiều Claim (mỗi người thụ hưởng một claim)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vault_id", nullable = false)
     private Vault vault;
 
     // Thiết lập FK trỏ tới bảng users (1 User có thể là Beneficiary của nhiều Claim)
