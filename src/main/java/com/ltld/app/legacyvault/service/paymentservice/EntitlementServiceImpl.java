@@ -22,6 +22,16 @@ public class EntitlementServiceImpl implements EntitlementService {
     }
 
     @Override
+    public void assertCanUseAdvancedAllocation(UUID userId) {
+        // Stub: luôn cho phép
+    }
+
+    @Override
+    public void assertCanUseTrustedConfirmers(UUID userId) {
+        // Stub: luôn cho phép
+    }
+
+    @Override
     public void assertCanUseLegacyMessages(UUID userId) {
         // Stub: luôn cho phép
     }
