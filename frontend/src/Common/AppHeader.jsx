@@ -1,9 +1,10 @@
 // Header dùng chung cho mọi trang sau đăng nhập (Owner, Admin, Beneficiary, Executor, Verifier, /me, /home).
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
+import { paymentApi } from '../api/paymentApi.js';
 import UserAvatar from './UserAvatar.jsx';
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -22,6 +23,23 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
 export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
     const navigate = useNavigate();
     const user = getUser();
+    const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
+    const [vipStatus, setVipStatus] = useState(null);
+
+    useEffect(() => {
+        if (!isOwner) return;
+        let mounted = true;
+        paymentApi
+            .getMySubscription()
+            .then((data) => {
+                if (mounted && data) setVipStatus(data);
+            })
+            .catch(() => {});
+        return () => {
+            mounted = false;
+        };
+    }, [isOwner]);
+
     const handleLogout = () => { logout(); navigate('/login'); };
 
     return (
@@ -40,6 +58,20 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                 </Link>
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {isOwner && (
+                        <Link
+                            to={vipStatus?.vip ? '/billing' : '/pricing'}
+                            title={vipStatus?.vip ? 'VIP Subscription Active' : 'Upgrade to VIP'}
+                            className={`h-8 px-2.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
+                                vipStatus?.vip
+                                    ? 'bg-primary text-on-primary'
+                                    : 'bg-secondary-fixed text-on-secondary-fixed hover:bg-primary hover:text-on-primary'
+                            }`}
+                        >
+                            <Icon name="workspace_premium" className="text-[15px]" />
+                            <span>{vipStatus?.vip ? 'VIP' : 'Upgrade'}</span>
+                        </Link>
+                    )}
                     {userHome && (
                         <Link to="/home" title="User home"
                               className="h-10 px-2 sm:px-3 rounded-xl flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-low">

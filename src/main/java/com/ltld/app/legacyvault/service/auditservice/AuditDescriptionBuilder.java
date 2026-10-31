@@ -124,6 +124,8 @@ public class AuditDescriptionBuilder {
                     : "Revoked the executor.";
             case EXECUTOR_ACTIVATED -> "Activated the executor after the Dead Man's Switch was triggered.";
             case EXECUTOR_ACKNOWLEDGED -> "The executor acknowledged the activation notice.";
+            case PAYMENT_SUCCEEDED -> "Subscription payment succeeded.";
+            case PAYMENT_FAILED -> "Subscription payment failed.";
             default -> "Performed action: " + log.getAction();
         };
     }

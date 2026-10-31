@@ -211,6 +211,20 @@ public class EmailSender {
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 
+    // T1: Nhắc Owner trước 7 ngày khi gói VIP sắp hết hạn
+    public void sendSubscriptionExpiryReminder(String to, String ownerName, String planName, LocalDateTime expiresAt) {
+        String base = frontendBase();
+        String billingLink = base == null ? null : base + "/billing";
+        sendWithoutOtpFooter(to,
+                "Your VIP subscription is expiring soon - LegacyVault",
+                "Hello " + ownerDisplayName(ownerName, to) + ",\n\n"
+                        + "Your \"" + planName + "\" subscription on LegacyVault will expire on "
+                        + formatDeadline(expiresAt) + " (GMT+7).\n"
+                        + "Even if your subscription expires, your existing vaults, Dead Man's Switch, and handover process will continue to work normally.\n"
+                        + "Renew your plan to keep creating new vaults and adding more beneficiaries."
+                        + (billingLink != null ? "\nManage billing: " + billingLink : ""));
+    }
+
     // FR-06: Owner tạo trước khi có fullName (null/rỗng) thì hiển thị email, không in chữ "null".
     private static String ownerDisplayName(String ownerName, String ownerEmail) {
         return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName;

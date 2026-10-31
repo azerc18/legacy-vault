@@ -22,6 +22,9 @@ import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 import OwnerActivity from './Owner/OwnerActivity.jsx';
+import PricingPage from './Owner/PricingPage.jsx';
+import BillingPage from './Owner/BillingPage.jsx';
+import PaymentResultPage from './Owner/PaymentResultPage.jsx';
 import AdminUsers from './Admin/AdminUsers.jsx';
 import AdminVaults from './Admin/AdminVaults.jsx';
 import RequireRole from './Common/RequireRole.jsx';
@@ -63,6 +66,9 @@ function App() {
                 <Route path="/owner/dms" element={guard(OWNER, <DeadMansSwitch />)} />
                 <Route path="/owner/executors" element={guard(OWNER, <OwnerExecutors />)} />
                 <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
+                <Route path="/pricing" element={guard(OWNER, <PricingPage />)} />
+                <Route path="/billing" element={guard(OWNER, <BillingPage />)} />
+                <Route path="/payment/result" element={guard(OWNER, <PaymentResultPage />)} />
 
                 {/* Beneficiary */}
                 <Route path="/beneficiary" element={guard(BENEFICIARY, <BeneficiaryVaults />)} />

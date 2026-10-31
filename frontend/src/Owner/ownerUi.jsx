@@ -93,6 +93,7 @@ const NAV = [
     {to: '/owner/dms', label: "Dead Man's Switch", icon: 'favorite'},
     {to: '/owner/executors', label: 'Executors', icon: 'badge'},
     {to: '/owner/activity', label: 'Activity', icon: 'history'},
+    {to: '/billing', label: 'Billing & VIP', icon: 'workspace_premium'},
 ];
 
 export function OwnerLayout({title, subtitle, back, actions, children}) {
