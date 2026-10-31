@@ -37,14 +37,29 @@ http.interceptors.response.use(
 );
 
 // Lấy message lỗi từ ApiResponse của BE
-export function getErrorMessage(error, fallback = 'Something went wrong.') {
-    const body = error.response?.data;
-    // Lỗi validation: data = { field: message }
-    if (body?.data && typeof body.data === 'object') {
+// Mã lỗi BE trả về (VALIDATION_FAILED, LAST_BENEFICIARY, ...).
+// 'NETWORK_ERROR' khi không gọi được server; null nếu response không có mã.
+export function getErrorCode(error) {
+    if (!error?.response) return 'NETWORK_ERROR';
+    return error.response.data?.errorCode ?? null;
+}
+
+// translate (tuỳ chọn, dùng từ H2): (code) => chuỗi đã dịch hoặc undefined
+export function getErrorMessage(error, fallback = 'Something went wrong.', translate) {
+    const body = error?.response?.data;
+    const code = getErrorCode(error);
+
+    // Lỗi validation: data = { field: message } -> hiện lỗi của field đầu tiên
+    if (code === 'VALIDATION_FAILED' && body?.data && typeof body.data === 'object') {
         const first = Object.values(body.data)[0];
         if (typeof first === 'string') return first;
     }
-    return body?.message || fallback;
+
+    const translated = translate && code ? translate(code) : undefined;
+    if (translated) return translated;
+    if (body?.message) return body.message;
+    if (code === 'NETWORK_ERROR') return 'Cannot reach the server. Check your connection.';
+    return fallback;
 }
 
 export default http;
