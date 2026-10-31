@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
@@ -76,6 +76,9 @@ export default function BeneficiaryVaultDetail() {
             subtitle={vault ? `From ${vault.ownerName || 'Unknown owner'} · claim before ${formatDate(vault.claimDeadlineAt)}` : ''}
         >
             {vault && <div className="mb-6"><StatusBadge vaultStatus={vault.vaultStatus} claimStatus={vault.claimStatus} /></div>}
+            <Link to="/beneficiary/guide" className="inline-flex items-center gap-1 text-sm text-primary font-semibold mb-6">
+                <Icon name="menu_book" className="text-[18px]" /> Not sure what to do next? Read the guide
+            </Link>
 
             {stage === 'loading' && <p className="text-on-surface-variant">Loading...</p>}
             {stage === 'error' && <Alert>{message}</Alert>}
