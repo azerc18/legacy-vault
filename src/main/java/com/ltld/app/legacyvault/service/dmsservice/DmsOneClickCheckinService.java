@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 
 import java.util.UUID;
 
@@ -20,12 +21,15 @@ public interface DmsOneClickCheckinService {
 
     /**
      * Xác thực token check-in 1 chạm, kiểm tra jti chưa từng dùng, reset chu kỳ DMS,
-     * lưu DmsCheckin kèm tokenJti và ghi AuditLog DMS_CHECKIN_ONE_CLICK.
+     * lưu DmsCheckin kèm tokenJti và ghi AuditLog DMS_CHECKIN (detail ghi rõ "one-click email link").
      * Token sai/hết hạn/đã dùng -> ném DmsException 400 CHECKIN_TOKEN_INVALID.
      */
     DmsConfigResponse checkInWithToken(String rawToken);
 
     /** Thực hiện checkInWithToken và trả về URL chuyển hướng tới trang FE /checkin/done. */
     String checkInAndBuildRedirectUrl(String rawToken);
+
+    /** URL trang FE /checkin/done?status=error&errorCode=<tên ErrorCode> khi check-in một chạm thất bại. */
+    String buildErrorRedirectUrl(ErrorCode errorCode);
 }
 
