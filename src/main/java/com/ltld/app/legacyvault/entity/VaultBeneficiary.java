@@ -36,6 +36,12 @@ public class VaultBeneficiary {
     @Column(nullable = false)
     private String email;
 
+    @Column(name = "full_name")
+    private String fullName;
+
+    @Column(name = "relationship", length = 50)
+    private String relationship;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

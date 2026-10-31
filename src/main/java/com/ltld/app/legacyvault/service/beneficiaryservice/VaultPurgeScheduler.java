@@ -46,6 +46,7 @@ public class VaultPurgeScheduler {
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
     private final TransactionTemplate requiresNewTx;
+    private final AssetAllocationRepository assetAllocationRepository;
 
     public VaultPurgeScheduler(VaultRepository vaultRepository,
                                AssetAccessRecordRepository accessRecordRepository,
@@ -55,6 +56,7 @@ public class VaultPurgeScheduler {
                                DigitalAssetRepository digitalAssetRepository,
                                BeneficiaryClaimRepository claimRepository,
                                VaultBeneficiaryRepository vaultBeneficiaryRepository,
+                               AssetAllocationRepository assetAllocationRepository,
                                FileStorageService fileStorageService,
                                AuditLogService auditLogService,
                                PlatformTransactionManager transactionManager) {
@@ -66,6 +68,7 @@ public class VaultPurgeScheduler {
         this.digitalAssetRepository = digitalAssetRepository;
         this.claimRepository = claimRepository;
         this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
+        this.assetAllocationRepository = assetAllocationRepository;
         this.fileStorageService = fileStorageService;
         this.auditLogService = auditLogService;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
@@ -120,6 +123,7 @@ public class VaultPurgeScheduler {
         identityVerificationRepository.deleteByVaultId(vaultId);
         requestVaultRepository.deleteByVaultId(vaultId);
         legalDocumentRepository.deleteByVaultId(vaultId);
+        assetAllocationRepository.deleteByVaultId(vaultId);
         digitalAssetRepository.deleteByVaultId(vaultId);
         claimRepository.deleteByVaultId(vaultId);
         vaultBeneficiaryRepository.deleteByVaultId(vaultId);

@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
@@ -56,6 +57,7 @@ class VaultPurgeSchedulerTest {
     @Mock private FileStorageService fileStorageService;
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private AssetAllocationRepository assetAllocationRepository;
 
     private VaultPurgeScheduler scheduler;
 
@@ -67,7 +69,7 @@ class VaultPurgeSchedulerTest {
         lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         scheduler = new VaultPurgeScheduler(vaultRepository, accessRecordRepository,
                 identityVerificationRepository, requestVaultRepository, legalDocumentRepository,
-                digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,
+                digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,assetAllocationRepository,
                 fileStorageService, auditLogService, transactionManager);
     }
 
@@ -90,12 +92,13 @@ class VaultPurgeSchedulerTest {
         scheduler.purgeExpiredVaults(now);
 
         InOrder order = inOrder(accessRecordRepository, identityVerificationRepository, requestVaultRepository,
-                legalDocumentRepository, digitalAssetRepository, claimRepository, vaultBeneficiaryRepository,
+                legalDocumentRepository, digitalAssetRepository, claimRepository, vaultBeneficiaryRepository, assetAllocationRepository,
                 vaultRepository, transactionManager, fileStorageService);
         order.verify(accessRecordRepository).deleteByVaultId(vaultId);
         order.verify(identityVerificationRepository).deleteByVaultId(vaultId);
         order.verify(requestVaultRepository).deleteByVaultId(vaultId);
         order.verify(legalDocumentRepository).deleteByVaultId(vaultId);
+        order.verify(assetAllocationRepository).deleteByVaultId(vaultId);
         order.verify(digitalAssetRepository).deleteByVaultId(vaultId);
         order.verify(claimRepository).deleteByVaultId(vaultId);
         order.verify(vaultBeneficiaryRepository).deleteByVaultId(vaultId);

@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.integration;
 
+import com.ltld.app.legacyvault.entity.AssetAllocation;
 import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.User;
@@ -12,6 +13,7 @@ import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -66,6 +68,7 @@ class AssetAccessRecordIntegrationTest {
     @Autowired private BeneficiaryClaimRepository claimRepository;
     @Autowired private AssetAccessRecordRepository accessRepository;
     @Autowired private VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    @Autowired private AssetAllocationRepository allocationRepository;
 
     private User owner;
     private User beneficiary;
@@ -156,5 +159,35 @@ class AssetAccessRecordIntegrationTest {
         assertThrows(DataIntegrityViolationException.class,
                 () -> vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
                         .vault(vault).email("ben@example.com").build()));
+    }
+
+    // N2a: mỗi (tài sản, người nhận) một dòng; mặc định EXCLUSIVE 100%; trùng -> vi phạm unique
+    @Test
+    void assetAllocations_uniquePerAssetAndBeneficiary() {
+        DigitalAsset asset = newAsset(vault, "A", AssetStatus.ACTIVE);
+        VaultBeneficiary vb = vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
+                .vault(vault).user(beneficiary).email("ben@example.com").build());
+        AssetAllocation saved = allocationRepository.saveAndFlush(
+                AssetAllocation.builder().asset(asset).beneficiary(vb).build());
+
+        assertThat(allocationRepository.findById(saved.getId()).orElseThrow().getSharePercent())
+                .isEqualByComparingTo("100.00");
+        assertThat(allocationRepository.findByAssetId(asset.getId())).hasSize(1);
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> allocationRepository.saveAndFlush(
+                        AssetAllocation.builder().asset(asset).beneficiary(vb).build()));
+    }
+
+    // N2a: xoá phân bổ theo vault (con trước, cha sau)
+    @Test
+    void assetAllocations_deleteByVaultId_removesAllOfVault() {
+        DigitalAsset asset = newAsset(vault, "A", AssetStatus.ACTIVE);
+        VaultBeneficiary vb = vaultBeneficiaryRepository.saveAndFlush(VaultBeneficiary.builder()
+                .vault(vault).user(beneficiary).email("ben@example.com").build());
+        allocationRepository.saveAndFlush(AssetAllocation.builder().asset(asset).beneficiary(vb).build());
+
+        assertThat(allocationRepository.deleteByVaultId(vault.getId())).isEqualTo(1);
+        assertThat(allocationRepository.findByAssetId(asset.getId())).isEmpty();
     }
 }

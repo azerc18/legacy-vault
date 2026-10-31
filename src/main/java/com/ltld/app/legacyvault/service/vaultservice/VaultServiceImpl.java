@@ -17,6 +17,7 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
@@ -67,6 +68,7 @@ public class VaultServiceImpl implements VaultService {
     private final VaultModificationGuard vaultModificationGuard;
     private final DmsConfigService dmsConfigService;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    private final AssetAllocationRepository assetAllocationRepository;
 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -157,6 +159,7 @@ public class VaultServiceImpl implements VaultService {
         // Bulk DELETE theo vaultId: không nạp entity con vào persistence context,
         // nên khi xóa Vault không còn DigitalAsset/LegalDocument nào trỏ tới nó (tránh TransientPropertyValueException)
         legalDocumentRepository.deleteByVaultId(vaultId);
+        assetAllocationRepository.deleteByVaultId(vaultId);
         digitalAssetRepository.deleteByVaultId(vaultId);
         vaultBeneficiaryRepository.deleteByVaultId(vaultId);
 
@@ -254,14 +257,17 @@ public class VaultServiceImpl implements VaultService {
         vault.setBeneficiary(beneficiary);
         vault.setBeneficiaryEmail(beneficiary == null ? email : null);
         vaultRepository.save(vault);
-        // N2a: đồng bộ sang vault_beneficiaries (tạm thời một người; N1 và N2-owner sẽ chuyển sang ghi trực tiếp bảng này)
-        vaultBeneficiaryRepository.deleteByVaultId(vaultId);
-        vaultBeneficiaryRepository.save(VaultBeneficiary.builder()
-                .vault(vault).user(beneficiary).email(email)
-                .status(beneficiary == null
-                        ? BeneficiaryInviteStatus.PENDING_REGISTRATION
-                        : BeneficiaryInviteStatus.INVITED)
-                .build());
+        // N2a: giữ nguyên dòng cũ để phân bổ không bị mất (tạm thời một người/vault)
+        VaultBeneficiary row = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)
+                .stream().findFirst()
+                .orElseGet(() -> VaultBeneficiary.builder().vault(vault).build());
+        row.setUser(beneficiary);
+        row.setEmail(email);
+        row.setStatus(beneficiary == null
+                ? BeneficiaryInviteStatus.PENDING_REGISTRATION
+                : BeneficiaryInviteStatus.INVITED);
+        row.setRespondedAt(null);
+        vaultBeneficiaryRepository.save(row);
 
         boolean pending = beneficiary == null;
         // m5: audit nằm trong nhật ký Vault (FR-05) nên không ghi email bên thứ ba; chỉ ghi user id hoặc cờ chờ đăng ký
@@ -355,6 +361,7 @@ public class VaultServiceImpl implements VaultService {
         vault.setBeneficiary(null);
         vault.setBeneficiaryEmail(null);
         vaultRepository.saveAndFlush(vault);
+        assetAllocationRepository.deleteByVaultId(vaultId);
         vaultBeneficiaryRepository.deleteByVaultId(vaultId);
 
         auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
