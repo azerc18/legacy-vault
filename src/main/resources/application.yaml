@@ -11,9 +11,9 @@ spring:
     properties:
       logging.level.org.springframework.security=DEBUG
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:legacyvault}
-    username: ${DB_USERNAME:legacy_vault_user}
-    password: ${DB_PASSWORD:legacyvault_password}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${MYSQL_DATABASE:legacy_vault}
+    username: ${MYSQL_USER:legacy_vault_user}
+    password: ${MYSQL_PASSWORD:legacyvault_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     hibernate:
@@ -52,7 +52,7 @@ app:
   storage:
     # Thư mục lưu file upload. Khi deploy production, override bằng biến môi trường:
     # APP_STORAGE_UPLOAD_DIR=/data/legacyvault/uploads
-    upload-dir: uploads/
+    upload-dir: ${APP_STORAGE_UPLOAD_DIR:uploads/}
     # H1: local (mặc định, ghi vào upload-dir) | s3 (MinIO / Cloudflare R2 / AWS S3). File luôn được mã hóa trước khi lưu.
     provider: ${APP_STORAGE_PROVIDER:local}
     # Chạy một lần khi khởi động: đưa file cũ trong upload-dir lên bucket và đổi đường dẫn trong DB sang key.
