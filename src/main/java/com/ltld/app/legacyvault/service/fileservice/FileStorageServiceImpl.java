@@ -54,7 +54,7 @@ public class FileStorageServiceImpl implements FileStorageService {
             throw new IllegalArgumentException("File path is empty.");
         }
         Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        Path target = Paths.get(filePath).toAbsolutePath().normalize();
+        Path target = resolve(filePath, uploadPath);
 
         // Chỉ cho đọc file nằm trong thư mục upload, tránh đọc file hệ thống qua đường dẫn bị chỉnh sửa
         if (!target.startsWith(uploadPath)) {
@@ -74,10 +74,17 @@ public class FileStorageServiceImpl implements FileStorageService {
     public void deleteFile(String filePath) {
         if (filePath == null || filePath.trim().isEmpty()) return;
         try {
-            Path fileToDelete = Paths.get(filePath).toAbsolutePath().normalize();
+            Path fileToDelete = resolve(filePath, Paths.get(uploadDir).toAbsolutePath().normalize());
             Files.deleteIfExists(fileToDelete);
         } catch (Exception e) {
             System.err.println("Failed to delete file: " + filePath);
         }
+    }
+
+    // H1: sau khi chuyển sang S3, DB lưu key (tên file, không có dấu phân cách) thay vì đường dẫn tuyệt đối.
+    // Key thì tìm trong upload-dir, để quay lại provider=local vẫn đọc được (file gốc được migrator giữ lại).
+    private static Path resolve(String filePath, Path uploadPath) {
+        boolean isKey = filePath.indexOf('/') < 0 && filePath.indexOf('\\') < 0;
+        return isKey ? uploadPath.resolve(filePath).normalize() : Paths.get(filePath).toAbsolutePath().normalize();
     }
 }

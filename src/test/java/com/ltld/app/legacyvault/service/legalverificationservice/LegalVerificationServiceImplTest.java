@@ -31,6 +31,7 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.exception.VerificationStepRequiredException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -843,6 +844,18 @@ public class LegalVerificationServiceImplTest {
 
         assertThat(result.isValid()).isTrue();
         verify(progressRecorder).recordChecked(requestId, verifierId, true);
+    }
+
+    // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE đi ra ngoài, không bị đổi thành 500 như lỗi giải mã
+    @Test
+    void verifyDocument_storageUnavailable_propagates503() throws Exception {
+        guardAllowsReading();
+        when(fileStorageService.readFile("enc://test.pdf"))
+                .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
+
+        assertThatThrownBy(() -> service.verifyDocument(requestId, verifierId))
+                .isInstanceOf(StorageUnavailableException.class);
+        verify(progressRecorder, never()).recordChecked(any(), any(), anyBoolean());
     }
 
     // FR-13: kiểm tra theo nội dung, tên file .pdf nhưng nội dung không phải PDF/ảnh -> không hợp lệ

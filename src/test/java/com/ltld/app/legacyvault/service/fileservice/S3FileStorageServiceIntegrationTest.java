@@ -1,6 +1,8 @@
 package com.ltld.app.legacyvault.service.fileservice;
 
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
+import org.springframework.http.HttpStatus;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** H1: S3FileStorageService chạy với MinIO thật (Testcontainers). */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class S3FileStorageServiceIntegrationTest {
 
     @Container
@@ -119,13 +121,16 @@ class S3FileStorageServiceIntegrationTest {
     }
 
     @Test
-    @DisplayName("H1: không kết nối được storage -> StorageUnavailableException (503)")
+    @DisplayName("H1: không kết nối được storage -> StorageUnavailableException (503, STORAGE_UNAVAILABLE)")
     void unreachableStorage_throwsStorageUnavailable() {
         S3FileStorageService down = new S3FileStorageService("http://127.0.0.1:1", "us-east-1", "b",
                 "user", "password", true);
 
         assertThatThrownBy(() -> down.storeFile(file("a.pdf"), new byte[]{1}))
-                .isInstanceOf(StorageUnavailableException.class);
+                .isInstanceOfSatisfying(StorageUnavailableException.class, e -> {
+                    assertThat(e.getErrorCode()).isEqualTo(ErrorCode.STORAGE_UNAVAILABLE);
+                    assertThat(e.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+                });
         assertThatThrownBy(() -> down.readFile("a.pdf")).isInstanceOf(StorageUnavailableException.class);
         assertThatCode(() -> down.deleteFile("a.pdf")).doesNotThrowAnyException();
     }

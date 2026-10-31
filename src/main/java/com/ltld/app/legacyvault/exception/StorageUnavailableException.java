@@ -1,12 +1,10 @@
 package com.ltld.app.legacyvault.exception;
 
-import org.springframework.http.HttpStatus;
-
-/** H1: không kết nối được object storage (S3 / MinIO / R2). Trả 503 qua handler chung của BusinessException. */
+/** H1: không kết nối được object storage (S3 / MinIO / R2) -> 503 STORAGE_UNAVAILABLE. */
 public class StorageUnavailableException extends BusinessException {
 
     public StorageUnavailableException(String message, Throwable cause) {
-        super(message, HttpStatus.SERVICE_UNAVAILABLE);
+        super(ErrorCode.STORAGE_UNAVAILABLE, message);
         initCause(cause);
     }
 }

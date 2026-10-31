@@ -33,6 +33,7 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.exception.VerificationStepRequiredException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -152,6 +153,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         try {
             return cryptoService.decryptBytes(
                     fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
+        } catch (StorageUnavailableException e) {
+            throw e; // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE, không phải lỗi giải mã
         } catch (Exception e) {
             log.error("Death certificate read/decrypt failed for request {}", requestId, e);
             throw new IllegalStateException("Could not read the document. Please try again later.");

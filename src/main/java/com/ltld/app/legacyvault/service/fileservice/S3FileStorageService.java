@@ -24,6 +24,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -32,8 +33,8 @@ import java.util.regex.Pattern;
  * Bật bằng {@code app.storage.provider=s3}; mặc định vẫn là {@link FileStorageServiceImpl} (đĩa local).
  *
  * <p>Không mã hóa ở đây: mọi nơi gọi đã mã hóa AES-GCM trước {@code storeFile} và giải mã sau {@code readFile}
- * (tài liệu pháp lý, giấy chứng tử, tệp tin nhắn), nên object trên bucket luôn là bản mã. Mã hóa thêm ở đây sẽ
- * thành mã hóa hai lần.
+ * (tài liệu pháp lý, giấy chứng tử, tệp tin nhắn, avatar), nên object mới trên bucket luôn là bản mã. Mã hóa thêm
+ * ở đây sẽ thành mã hóa hai lần. Riêng avatar lưu trước H1 là ảnh gốc; khi đọc, giải mã không được thì dùng nguyên.
  */
 @Slf4j
 @Service
@@ -60,7 +61,11 @@ public class S3FileStorageService implements FileStorageService {
                 .forcePathStyle(pathStyle)
                 // MinIO / R2 chưa hỗ trợ đủ checksum mặc định mới của SDK: chỉ tính khi API bắt buộc
                 .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
-                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED);
+                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
+                // Endpoint treo không được giữ thread của request quá lâu (file tối đa 10MB nên 30 giây là dư)
+                .overrideConfiguration(c -> c
+                        .apiCallAttemptTimeout(Duration.ofSeconds(10))
+                        .apiCallTimeout(Duration.ofSeconds(30)));
         if (!endpoint.isBlank()) {
             builder.endpointOverride(URI.create(endpoint));
         }

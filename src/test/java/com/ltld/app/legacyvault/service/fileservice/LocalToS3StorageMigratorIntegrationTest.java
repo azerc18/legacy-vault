@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * H1: chuyển file cũ trên đĩa lên bucket và đổi đường dẫn trong DB. Bảng chỉ có đúng cột đường dẫn mà migrator đọc,
  * nên không cần dựng cả Spring context.
  */
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class LocalToS3StorageMigratorIntegrationTest {
 
     @Container

@@ -9,8 +9,10 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.exception.UserProfileException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
@@ -24,6 +26,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
@@ -40,6 +43,7 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final TokenService tokenService;
     private final AuditLogService auditLogService;
     private final FileStorageService fileStorageService;
+    private final CryptoService cryptoService;
 
     @Override
     @Transactional(readOnly = true)
@@ -93,7 +97,10 @@ public class UserProfileServiceImpl implements UserProfileService {
 
         String newPath;
         try {
-            newPath = fileStorageService.storeFile(file, bytes);
+            // H1: mã hóa như mọi file khác, để object trên bucket luôn là bản mã
+            newPath = fileStorageService.storeFile(file, cryptoService.encryptBytes(bytes));
+        } catch (StorageUnavailableException e) {
+            throw e; // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE
         } catch (Exception e) {
             throw new UserProfileException("Could not save the avatar", HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -120,10 +127,21 @@ public class UserProfileServiceImpl implements UserProfileService {
             throw new UserProfileException("No avatar yet", HttpStatus.NOT_FOUND);
         }
         try {
-            byte[] content = fileStorageService.readFile(user.getAvatarPath());
+            byte[] content = decryptAvatar(fileStorageService.readFile(user.getAvatarPath()));
             return new AvatarFile(content, UploadedDocumentValidator.detectContentType(content));
         } catch (IOException | SecurityException e) {
             throw new UserProfileException("Avatar not found", HttpStatus.NOT_FOUND);
+        }
+    }
+
+    // Avatar lưu trước H1 là ảnh gốc (chưa mã hóa): giải mã không được thì dùng nguyên bytes đã lưu
+    private byte[] decryptAvatar(byte[] stored) {
+        try {
+            return cryptoService.decryptBytes(stored);
+        } catch (GeneralSecurityException e) {
+            return stored;
+        } catch (Exception e) {
+            throw new UserProfileException("Could not read the avatar", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.VerificationRequestClosedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationExchangeMessageRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -363,5 +364,25 @@ public class VerifierMessageServiceImplTest {
                 .isInstanceOf(VerificationRequestNotFoundException.class);
 
         verify(fileStorageService, never()).readFile(any());
+    }
+
+    // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE, không bị gói thành lỗi giải mã 500
+    @Test
+    void getAttachment_storageUnavailable_propagates503() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        VerificationExchangeMessage m = VerificationExchangeMessage.builder()
+                .id(messageId).request(request).sender(verifier)
+                .senderRole(ExchangeSenderRole.EXECUTOR)
+                .attachmentPath("enc://att.pdf").attachmentName("bosung.pdf").build();
+
+        guardAllows(verifierId);
+        when(messageRepository.findByIdAndRequestId(messageId, requestId)).thenReturn(Optional.of(m));
+        when(fileStorageService.readFile("enc://att.pdf"))
+                .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
+
+        assertThatThrownBy(() -> service.getAttachment(requestId, messageId, verifierId))
+                .isInstanceOf(StorageUnavailableException.class);
+
+        verifyNoInteractions(cryptoService, auditLogService);
     }
 }

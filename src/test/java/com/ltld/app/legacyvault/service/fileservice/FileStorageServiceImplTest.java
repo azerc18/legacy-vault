@@ -35,6 +35,20 @@ class FileStorageServiceImplTest {
         assertThat(service.readFile(path)).isEqualTo(encrypted);
     }
 
+    // H1: sau khi chuyển sang S3, DB lưu key (tên file); quay lại provider=local vẫn đọc và xóa được trong upload-dir
+    @Test
+    void key_isResolvedInsideUploadDir() throws Exception {
+        String path = service.storeFile(
+                new MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1}), new byte[]{4, 2});
+        String key = Path.of(path).getFileName().toString();
+
+        assertThat(service.readFile(key)).containsExactly(4, 2);
+        assertThatThrownBy(() -> service.readFile("..")).isInstanceOf(SecurityException.class);
+
+        service.deleteFile(key);
+        assertThat(Path.of(path)).doesNotExist();
+    }
+
     @Test
     void readFile_pathOutsideUploadDir_isRejected(@TempDir Path elsewhere) throws Exception {
         Path outside = Files.writeString(elsewhere.resolve("secret.txt"), "x");
