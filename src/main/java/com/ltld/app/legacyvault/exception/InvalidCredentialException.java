@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class InvalidCredentialException extends BusinessException  {
     public InvalidCredentialException() {
-        super("Invalid email or password", HttpStatus.UNAUTHORIZED);
+        super("Invalid email or password", HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS);
     }
 }
