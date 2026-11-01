@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -36,6 +37,7 @@ class FlywayMigrationIntegrationTest {
 
     @MockitoBean private EmailSender emailSender;
     @MockitoBean private ExecutorNotificationService executorNotificationService;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @Autowired private Flyway flyway;
 
@@ -44,5 +46,25 @@ class FlywayMigrationIntegrationTest {
         // Context lên được nghĩa là validate đã qua
         assertThat(flyway.info().applied()).isNotEmpty();
         assertThat(flyway.info().pending()).isEmpty();
+    }
+
+    @Test
+    void auditLogsAction_isVarchar() {
+        String type = jdbcTemplate.queryForObject("""
+                SELECT DATA_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'audit_logs' AND COLUMN_NAME = 'action'
+                """, String.class);
+        assertThat(type).isEqualTo("varchar");
+    }
+
+    @Test
+    void auditLogsAction_acceptsAnyEnumName() {
+        jdbcTemplate.update("""
+                INSERT INTO audit_logs (id, action, created_at)
+                VALUES (UUID_TO_BIN(UUID()), ?, NOW(6))
+                """, "SOME_FUTURE_ACTION");
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_logs WHERE action = 'SOME_FUTURE_ACTION'", Integer.class);
+        assertThat(count).isEqualTo(1);
     }
 }
