@@ -25,6 +25,7 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  */
 export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
     const { t } = useTranslation();
+    const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
     const user = getUser();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
@@ -33,10 +34,32 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
     useEffect(() => {
         if (!isOwner) return;
         let mounted = true;
+
+        // n3: cache /subscriptions/me trong sessionStorage 5 phút (try/catch)
+        try {
+            const cached = sessionStorage.getItem('lv_sub_cache');
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < 5 * 60 * 1000) {
+                    setVipStatus(data);
+                    return;
+                }
+            }
+        } catch {
+            // ignore sessionStorage error
+        }
+
         paymentApi
             .getMySubscription()
             .then((data) => {
-                if (mounted && data) setVipStatus(data);
+                if (mounted && data) {
+                    setVipStatus(data);
+                    try {
+                        sessionStorage.setItem('lv_sub_cache', JSON.stringify({ data, timestamp: Date.now() }));
+                    } catch {
+                        // ignore
+                    }
+                }
             })
             .catch(() => {});
         return () => {
@@ -65,7 +88,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                     {isOwner && (
                         <Link
                             to={vipStatus?.vip ? '/billing' : '/pricing'}
-                            title={vipStatus?.vip ? 'VIP Subscription Active' : 'Upgrade to VIP'}
+                            title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
                             className={`h-8 px-2.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
                                 vipStatus?.vip
                                     ? 'bg-primary text-on-primary'
@@ -73,7 +96,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                             }`}
                         >
                             <Icon name="workspace_premium" className="text-[15px]" />
-                            <span>{vipStatus?.vip ? 'VIP' : 'Upgrade'}</span>
+                            <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
                         </Link>
                     )}
                     {userHome && (

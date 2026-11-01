@@ -39,7 +39,7 @@ public class VnpayClient {
             @Value("${VNPAY_HASH_SECRET:}") String hashSecret,
             @Value("${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}") String payUrl,
             @Value("${VNPAY_RETURN_URL:}") String returnUrl,
-            @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:http://localhost:5173}}") String frontendBaseUrl) {
+            @Value("${app.frontend.base-url}") String frontendBaseUrl) {
         this.tmnCode = tmnCode != null ? tmnCode.trim() : "";
         this.hashSecret = hashSecret != null ? hashSecret.trim() : "";
         this.payUrl = (payUrl != null && !payUrl.isBlank()) ? payUrl.trim() : "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";

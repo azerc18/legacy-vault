@@ -15,17 +15,19 @@ import com.ltld.app.legacyvault.enums.PaymentStatus;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
-import com.ltld.app.legacyvault.exception.PaymentException;
 import com.ltld.app.legacyvault.repository.PaymentTransactionRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -34,10 +36,18 @@ import java.util.UUID;
 
 /**
  * T1: Xử lý thanh toán VNPay, IPN idempotent, kích hoạt/gia hạn gói VIP.
+ *
+ * <p>Nguồn sự thật duy nhất để kích hoạt gói là IPN (server-to-server). Return URL chỉ kiểm chữ ký rồi chuyển
+ * người dùng về frontend; chỉ khi {@code app.vnpay.activate-on-return=true} (dev local, VNPay không gọi được IPN
+ * vào localhost) Return mới dùng chung logic kích hoạt với IPN.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final String RSP_CODE = "RspCode";
+    private static final String RSP_MESSAGE = "Message";
 
     private final UserRepository userRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
@@ -47,8 +57,12 @@ public class PaymentServiceImpl implements PaymentService {
     private final VnpayClient vnpayClient;
     private final AuditLogService auditLogService;
 
-    @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:${APP_FRONTEND_URL:http://localhost:5173}}}")
+    @Value("${app.frontend.base-url}")
     private String frontendBaseUrl = "http://localhost:5173";
+
+    // Dev local: cho phép Return URL kích hoạt gói (mặc định false: chỉ IPN được kích hoạt)
+    @Value("${app.vnpay.activate-on-return:false}")
+    private boolean activateOnReturn = false;
 
     @Override
     @Transactional
@@ -85,75 +99,80 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    /**
+     * IPN không bao giờ ném lỗi nghiệp vụ: luôn trả {RspCode, Message} (HTTP 200) theo đặc tả VNPay.
+     * Lỗi bất ngờ (vd. DB) làm transaction rollback và để controller trả RspCode 99.
+     */
     @Override
-    @Transactional(noRollbackFor = PaymentException.class)
+    @Transactional
     public Map<String, String> handleVnpayIpn(Map<String, String> params) {
+        return processPayment(params);
+    }
+
+    @Override
+    @Transactional
+    public String handleVnpayReturn(Map<String, String> params) {
+        String txnRef = params.getOrDefault("vnp_TxnRef", "");
         if (!vnpayClient.verify(params)) {
-            throw PaymentException.signatureInvalid();
+            return buildFrontendResultUrl("failed", txnRef, ErrorCode.PAYMENT_SIGNATURE_INVALID.name());
         }
 
-        String txnRef = params.get("vnp_TxnRef");
-        if (txnRef == null || txnRef.isBlank()) {
-            return Map.of("RspCode", "01", "Message", "Order not found");
+        boolean paidPerGateway = isPaid(params);
+        boolean success = paidPerGateway;
+        if (activateOnReturn) {
+            try {
+                String rspCode = processPayment(params).get(RSP_CODE);
+                success = paidPerGateway && ("00".equals(rspCode) || "02".equals(rspCode));
+            } catch (RuntimeException ex) {
+                log.warn("T1: activate-on-return failed for txnRef {}: {}", txnRef, ex.getMessage());
+                success = false;
+            }
+        }
+        return buildFrontendResultUrl(success ? "success" : "failed", txnRef, null);
+    }
+
+    /** Logic dùng chung cho IPN và (khi bật cờ dev) Return URL. */
+    private Map<String, String> processPayment(Map<String, String> params) {
+        if (!vnpayClient.verify(params)) {
+            return response("97", "Invalid Checksum");
         }
 
-        UUID txId;
-        try {
-            txId = UUID.fromString(txnRef.trim());
-        } catch (IllegalArgumentException e) {
-            return Map.of("RspCode", "01", "Message", "Order not found");
+        UUID txId = parseTxnRef(params.get("vnp_TxnRef"));
+        if (txId == null) {
+            return response("01", "Order not found");
+        }
+        PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(txId).orElse(null);
+        if (tx == null) {
+            return response("01", "Order not found");
         }
 
-        Optional<PaymentTransaction> txOpt = paymentTransactionRepository.findByIdForUpdate(txId);
-        if (txOpt.isEmpty()) {
-            txOpt = paymentTransactionRepository.findById(txId);
-        }
-        if (txOpt.isEmpty()) {
-            return Map.of("RspCode", "01", "Message", "Order not found");
+        // Idempotency: đơn đã xử lý (SUCCESS hoặc FAILED) thì không xử lý lại
+        if (tx.getStatus() != PaymentStatus.PENDING) {
+            return response("02", "Order already confirmed");
         }
 
-        PaymentTransaction tx = txOpt.get();
-
-        // Idempotency: nếu giao dịch đã xử lý thành công thì trả RspCode=02 và không kích hoạt lại
-        if (tx.getStatus() == PaymentStatus.SUCCESS) {
-            return Map.of("RspCode", "02", "Message", "Order already confirmed");
-        }
-
+        User user = tx.getUser();
         long vnpAmountVnd = parseVnpAmountVnd(params.get("vnp_Amount"));
         if (vnpAmountVnd != tx.getAmountVnd()) {
             tx.setStatus(PaymentStatus.FAILED);
             tx.setVnpResponseCode(params.getOrDefault("vnp_ResponseCode", "04"));
             paymentTransactionRepository.save(tx);
-
-            User user = tx.getUser();
-            auditLogService.log(
-                    AuditAction.PAYMENT_FAILED,
-                    AuditResult.FAILURE,
-                    user != null ? user.getId() : null,
-                    user != null ? user.getEmail() : null,
-                    "PaymentTransaction",
-                    tx.getId().toString(),
-                    "Amount mismatch: expected " + tx.getAmountVnd() + " VND, got " + vnpAmountVnd + " VND"
-            );
-            throw PaymentException.amountMismatch();
+            logFailure(tx, user, "Amount mismatch: expected " + tx.getAmountVnd() + " VND, got " + vnpAmountVnd + " VND");
+            return response("04", "Invalid amount");
         }
 
         String responseCode = params.getOrDefault("vnp_ResponseCode", "");
-        String transactionNo = params.get("vnp_TransactionNo");
-        String bankCode = params.get("vnp_BankCode");
         tx.setVnpResponseCode(responseCode);
-        tx.setVnpTransactionNo(transactionNo);
-        tx.setVnpBankCode(bankCode);
+        tx.setVnpTransactionNo(params.get("vnp_TransactionNo"));
+        tx.setVnpBankCode(params.get("vnp_BankCode"));
 
-        User user = tx.getUser();
-        SubscriptionPlan plan = tx.getPlan();
-
-        if ("00".equals(responseCode)) {
+        if (isPaid(params)) {
             LocalDateTime now = LocalDateTime.now();
             tx.setStatus(PaymentStatus.SUCCESS);
             tx.setPaidAt(now);
             paymentTransactionRepository.save(tx);
 
+            SubscriptionPlan plan = tx.getPlan();
             activateOrExtendSubscription(user, plan, now);
 
             auditLogService.log(
@@ -168,39 +187,11 @@ public class PaymentServiceImpl implements PaymentService {
         } else {
             tx.setStatus(PaymentStatus.FAILED);
             paymentTransactionRepository.save(tx);
-
-            auditLogService.log(
-                    AuditAction.PAYMENT_FAILED,
-                    AuditResult.FAILURE,
-                    user != null ? user.getId() : null,
-                    user != null ? user.getEmail() : null,
-                    "PaymentTransaction",
-                    tx.getId().toString(),
-                    "vnp_ResponseCode=" + responseCode
-            );
+            logFailure(tx, user, "vnp_ResponseCode=" + responseCode
+                    + ", vnp_TransactionStatus=" + params.getOrDefault("vnp_TransactionStatus", ""));
         }
-
-        return Map.of("RspCode", "00", "Message", "Confirm Success");
-    }
-
-    @Override
-    @Transactional(noRollbackFor = PaymentException.class)
-    public String handleVnpayReturn(Map<String, String> params) {
-        if (!vnpayClient.verify(params)) {
-            throw PaymentException.signatureInvalid();
-        }
-        String txnRef = params.getOrDefault("vnp_TxnRef", "");
-        String responseCode = params.getOrDefault("vnp_ResponseCode", "");
-
-        try {
-            handleVnpayIpn(params);
-        } catch (PaymentException ex) {
-            String err = ex.getErrorCode() != null ? ex.getErrorCode().name() : null;
-            return buildFrontendResultUrl("failed", txnRef, err);
-        }
-
-        String status = "00".equals(responseCode) ? "success" : "failed";
-        return buildFrontendResultUrl(status, txnRef, null);
+        // Đã ghi nhận kết quả từ VNPay (kể cả giao dịch thất bại): trả 00 để VNPay ngừng gọi lại
+        return response("00", "Confirm Success");
     }
 
     @Override
@@ -265,6 +256,10 @@ public class PaymentServiceImpl implements PaymentService {
         if (user == null || plan == null) {
             return;
         }
+        // m7: khóa dòng users của Owner trước khi đọc/ghi subscription, để hai IPN song song của cùng Owner
+        // không cùng tạo hai subscription ACTIVE hoặc ghi đè hạn của nhau
+        userRepository.findByIdForUpdate(user.getId());
+
         int durationDays = (plan.getDurationDays() != null && plan.getDurationDays() > 0)
                 ? plan.getDurationDays()
                 : 30;
@@ -283,7 +278,7 @@ public class PaymentServiceImpl implements PaymentService {
             subscriptionRepository.save(existing);
         } else {
             Subscription created = Subscription.builder()
-                .user(user)
+                    .user(user)
                     .plan(plan)
                     .status(SubscriptionStatus.ACTIVE)
                     .startedAt(now)
@@ -294,28 +289,61 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    private void logFailure(PaymentTransaction tx, User user, String detail) {
+        auditLogService.log(
+                AuditAction.PAYMENT_FAILED,
+                AuditResult.FAILURE,
+                user != null ? user.getId() : null,
+                user != null ? user.getEmail() : null,
+                "PaymentTransaction",
+                tx.getId().toString(),
+                detail
+        );
+    }
+
+    // VNPay chỉ coi giao dịch thành công khi CẢ HAI mã đều là "00"
+    private static boolean isPaid(Map<String, String> params) {
+        return "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
+    }
+
+    private static Map<String, String> response(String code, String message) {
+        return Map.of(RSP_CODE, code, RSP_MESSAGE, message);
+    }
+
+    private static UUID parseTxnRef(String txnRef) {
+        if (txnRef == null || txnRef.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(txnRef.trim());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private long parseVnpAmountVnd(String rawAmount) {
         if (rawAmount == null || rawAmount.isBlank()) {
             return -1L;
         }
         try {
-            return Long.parseLong(rawAmount.trim()) / 100L;
+            long raw = Long.parseLong(rawAmount.trim());
+            return raw % 100L == 0 ? raw / 100L : -1L;
         } catch (NumberFormatException e) {
             return -1L;
         }
     }
 
-    private String buildFrontendResultUrl(String status, String txId, String errorCode) {
+    private String buildFrontendResultUrl(String status, String txnRef, String errorCode) {
         String base = (frontendBaseUrl == null || frontendBaseUrl.isBlank())
                 ? ""
                 : frontendBaseUrl.replaceAll("/+$", "");
         StringBuilder sb = new StringBuilder(base)
                 .append("/payment/result?status=").append(status);
-        if (txId != null && !txId.isBlank()) {
-            sb.append("&txId=").append(txId);
+        if (txnRef != null && !txnRef.isBlank()) {
+            sb.append("&txnRef=").append(URLEncoder.encode(txnRef, StandardCharsets.UTF_8));
         }
         if (errorCode != null && !errorCode.isBlank()) {
-            sb.append("&error=").append(errorCode);
+            sb.append("&errorCode=").append(URLEncoder.encode(errorCode, StandardCharsets.UTF_8));
         }
         return sb.toString();
     }

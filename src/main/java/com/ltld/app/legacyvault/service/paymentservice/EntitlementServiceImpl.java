@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
+import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -22,6 +23,8 @@ import java.util.UUID;
  * - VIP: Đa Vault (tối đa 5 vault), tối đa 10 người thụ hưởng/vault, 5GB lưu trữ,
  *        hỗ trợ chia tỷ lệ % (PROPORTIONAL) + người nhận dự phòng (contingentBeneficiary),
  *        xác nhận chéo DMS (X2) và lời nhắn di nguyện (F4a).
+ *
+ * <p>Hạn mức của từng gói đọc từ bảng subscription_plans; migration Flyway là nguồn duy nhất của 3 gói chuẩn.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,16 +32,11 @@ import java.util.UUID;
 public class EntitlementServiceImpl implements EntitlementService {
 
     public static final String PLAN_FREE = SubscriptionPlan.CODE_FREE;
-    public static final int FREE_MAX_VAULTS = 1;
-    public static final int FREE_MAX_BENEFICIARIES = 2;
-    public static final long FREE_MAX_STORAGE_BYTES = 52_428_800L; // 50 MB
-    public static final int VIP_MAX_VAULTS = 5;
-    public static final int VIP_MAX_BENEFICIARIES = 10;
-    public static final long VIP_MAX_STORAGE_BYTES = 5_368_709_120L; // 5 GB
 
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final VaultRepository vaultRepository;
+    private final LegalDocumentRepository legalDocumentRepository;
 
     @Override
     public void assertCanCreateVault(UUID ownerId) {
@@ -46,7 +44,7 @@ public class EntitlementServiceImpl implements EntitlementService {
             return;
         }
         SubscriptionPlan plan = resolveEffectivePlan(ownerId);
-        int currentVaults = vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId).size();
+        long currentVaults = vaultRepository.countByOwnerId(ownerId);
         if (currentVaults >= plan.getMaxVaults()) {
             throw new PlanLimitReachedException(
                     PlanFeature.MULTIPLE_VAULTS,
@@ -115,7 +113,8 @@ public class EntitlementServiceImpl implements EntitlementService {
             return;
         }
         SubscriptionPlan plan = resolveEffectivePlan(ownerId);
-        if (additionalBytes > plan.getStorageQuotaBytes()) {
+        long usedBytes = legalDocumentRepository.sumSizeBytesByOwnerId(ownerId);
+        if (usedBytes + additionalBytes > plan.getStorageQuotaBytes()) {
             throw new PlanLimitReachedException(
                     PlanFeature.STORAGE,
                     "Storage quota exceeded for plan " + plan.getCode()
@@ -135,19 +134,7 @@ public class EntitlementServiceImpl implements EntitlementService {
             }
         }
         return subscriptionPlanRepository.findByCode(PLAN_FREE)
-                .orElseGet(EntitlementServiceImpl::defaultFreePlan);
-    }
-
-    public static SubscriptionPlan defaultFreePlan() {
-        return SubscriptionPlan.builder()
-                .code(PLAN_FREE)
-                .name("Free Plan")
-                .priceVnd(0L)
-                .durationDays(null)
-                .maxVaults(FREE_MAX_VAULTS)
-                .maxBeneficiaries(FREE_MAX_BENEFICIARIES)
-                .storageQuotaBytes(FREE_MAX_STORAGE_BYTES)
-                .legacyMessagesEnabled(false)
-                .build();
+                .orElseThrow(() -> new IllegalStateException(
+                        "Subscription plan " + PLAN_FREE + " is missing. Run the Flyway migration that seeds subscription_plans."));
     }
 }

@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import java.util.UUID;
 /**
  * T1: API thanh toán VNPay và lịch sử giao dịch.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -52,8 +54,13 @@ public class PaymentController {
 
     @GetMapping("/vnpay-ipn")
     public ResponseEntity<Map<String, String>> vnpayIpn(@RequestParam Map<String, String> params) {
-        Map<String, String> result = paymentService.handleVnpayIpn(params);
-        return ResponseEntity.ok(result);
+        // VNPay chỉ hiểu {RspCode, Message} với HTTP 200: lỗi bất ngờ trả 99 (service đã rollback), không để lỗi 4xx/5xx lọt ra
+        try {
+            return ResponseEntity.ok(paymentService.handleVnpayIpn(params));
+        } catch (Exception ex) {
+            log.error("T1: unexpected error while handling VNPay IPN", ex);
+            return ResponseEntity.ok(Map.of("RspCode", "99", "Message", "Unknown error"));
+        }
     }
 
     @GetMapping("/me")

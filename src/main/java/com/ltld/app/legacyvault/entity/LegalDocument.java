@@ -44,4 +44,8 @@ public class LegalDocument {
     @CreationTimestamp
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
+
+    // T1 (M3): kích thước file SAU mã hóa, để cộng dồn dung lượng đã dùng của Owner; NULL với tài liệu có từ trước
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
 }

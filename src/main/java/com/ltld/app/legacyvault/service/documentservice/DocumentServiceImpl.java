@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
     private final VaultModificationGuard vaultModificationGuard;
+    private final EntitlementService entitlementService;
 
     @Override
     @Transactional
@@ -93,6 +95,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         // 2. Ép file thành mảng byte gốc, rồi ném vào CryptoService để MÃ HÓA
         byte[] encryptedFileData = cryptoService.encryptBytes(file.getBytes());
+        long sizeBytes = encryptedFileData != null ? encryptedFileData.length : 0L;
+        entitlementService.assertStorageQuota(ownerId, sizeBytes);
 
         // 3. Đưa mảng byte đã mã hóa cho FileStorageService lưu xuống đĩa (lấy đường dẫn trả về)
         String fileUrl = fileStorageService.storeFile(file, encryptedFileData);
@@ -103,6 +107,7 @@ public class DocumentServiceImpl implements DocumentService {
                 .documentType(type)
                 .fileUrlEncrypted(fileUrl) // Đường dẫn trên ổ cứng
                 .fileName(file.getOriginalFilename()) // Tên file lúc khách hàng chọn upload
+                .sizeBytes(sizeBytes)
                 .build();
 
         LegalDocument saved = legalDocumentRepository.save(document);

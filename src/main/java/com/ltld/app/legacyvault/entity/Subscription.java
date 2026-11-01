@@ -4,7 +4,9 @@ import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -35,6 +37,7 @@ public class Subscription {
     private SubscriptionPlan plan;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private SubscriptionStatus status = SubscriptionStatus.ACTIVE;

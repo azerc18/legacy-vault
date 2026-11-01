@@ -4,6 +4,9 @@ import com.ltld.app.legacyvault.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -36,6 +39,7 @@ public class PaymentTransaction {
     private long amountVnd;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;

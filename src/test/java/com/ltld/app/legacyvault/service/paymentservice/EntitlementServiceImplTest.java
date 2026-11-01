@@ -3,11 +3,11 @@ package com.ltld.app.legacyvault.service.paymentservice;
 import com.ltld.app.legacyvault.entity.Subscription;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
+import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +36,7 @@ class EntitlementServiceImplTest {
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private SubscriptionPlanRepository subscriptionPlanRepository;
     @Mock private VaultRepository vaultRepository;
+    @Mock private LegalDocumentRepository legalDocumentRepository;
     @Mock private EmailSender emailSender;
 
     private EntitlementServiceImpl entitlementService;
@@ -49,9 +51,14 @@ class EntitlementServiceImplTest {
         entitlementService = new EntitlementServiceImpl(
                 subscriptionRepository,
                 subscriptionPlanRepository,
-                vaultRepository
+                vaultRepository,
+                legalDocumentRepository
         );
-        expiryScheduler = new SubscriptionExpiryScheduler(subscriptionRepository, emailSender);
+        expiryScheduler = new SubscriptionExpiryScheduler(
+                subscriptionRepository,
+                emailSender,
+                TransactionOperations.withoutTransaction()
+        );
 
         owner = User.builder()
                 .id(UUID.randomUUID())
@@ -107,8 +114,7 @@ class EntitlementServiceImplTest {
         when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
                 .thenReturn(Optional.empty());
         when(subscriptionPlanRepository.findByCode("FREE")).thenReturn(Optional.of(freePlan));
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(owner.getId()))
-                .thenReturn(List.of(Vault.builder().id(UUID.randomUUID()).owner(owner).build()));
+        when(vaultRepository.countByOwnerId(owner.getId())).thenReturn(1L);
 
         PlanLimitReachedException ex = assertThrows(
                 PlanLimitReachedException.class,
@@ -131,8 +137,8 @@ class EntitlementServiceImplTest {
 
         when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
                 .thenReturn(Optional.of(activeVip));
-        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(owner.getId()))
-                .thenReturn(List.of(Vault.builder().id(UUID.randomUUID()).owner(owner).build()));
+        when(vaultRepository.countByOwnerId(owner.getId())).thenReturn(1L);
+        when(legalDocumentRepository.sumSizeBytesByOwnerId(owner.getId())).thenReturn(100_000_000L);
 
         assertDoesNotThrow(() -> entitlementService.assertCanCreateVault(owner.getId()));
         assertDoesNotThrow(() -> entitlementService.assertCanUseAdvancedAllocation(owner.getId()));
@@ -173,10 +179,11 @@ class EntitlementServiceImplTest {
         assertEquals(PlanFeature.BENEFICIARY_LIMIT, benEx.getFeature());
 
         // Free tối đa 50MB (52_428_800 bytes)
-        assertDoesNotThrow(() -> entitlementService.assertStorageQuota(owner.getId(), 50_000_000L));
+        when(legalDocumentRepository.sumSizeBytesByOwnerId(owner.getId())).thenReturn(10_000_000L);
+        assertDoesNotThrow(() -> entitlementService.assertStorageQuota(owner.getId(), 40_000_000L)); // 10 + 40 = 50MB <= 52.4MB
         PlanLimitReachedException storageEx = assertThrows(
                 PlanLimitReachedException.class,
-                () -> entitlementService.assertStorageQuota(owner.getId(), 60_000_000L)
+                () -> entitlementService.assertStorageQuota(owner.getId(), 50_000_000L) // 10 + 50 = 60MB > 52.4MB
         );
         assertEquals(ErrorCode.PLAN_LIMIT_REACHED, storageEx.getErrorCode());
         assertEquals(PlanFeature.STORAGE, storageEx.getFeature());

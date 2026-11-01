@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
@@ -18,6 +19,7 @@ const formatStorage = (bytes) => {
 };
 
 export default function BillingPage() {
+    const { t } = useTranslation('payment');
     const [sub, setSub] = useState(null);
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -29,84 +31,101 @@ export default function BillingPage() {
                 setSub(subData);
                 setPayments(txList || []);
             })
-            .catch((e) => setError(getErrorMessage(e, 'Could not load billing information.')))
+            .catch((e) => setError(getErrorMessage(e, t('billing.errors.loadFailed'))))
             .finally(() => setLoading(false));
-    }, []);
+    }, [t]);
 
     return (
         <OwnerLayout
-            title="Billing & Subscription"
-            subtitle="Manage your LegacyVault plan, entitlements, and VNPay payment history."
+            title={t('billing.title')}
+            subtitle={t('billing.subtitle')}
             actions={
                 <Link to="/pricing" className={btnPrimary}>
                     <Icon name="workspace_premium" className="text-[18px]" />
-                    {sub?.vip ? 'Extend VIP' : 'Upgrade to VIP'}
+                    {sub?.vip ? t('billing.extendVip') : t('billing.upgradeToVip')}
                 </Link>
             }
         >
             <Alert>{error}</Alert>
 
             {loading ? (
-                <p className="text-on-surface-variant">Loading billing details...</p>
+                <p className="text-on-surface-variant">{t('billing.loading')}</p>
             ) : (
                 <div className="space-y-6">
                     {sub && (
-                        <Card title="Current Subscription" icon="workspace_premium">
+                        <Card title={t('billing.current.title')} icon="workspace_premium">
                             <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div className="p-4 rounded-xl bg-surface-container-low">
-                                    <div className="text-xs text-on-surface-variant">Plan</div>
+                                    <div className="text-xs text-on-surface-variant">
+                                        {t('billing.current.plan')}
+                                    </div>
                                     <div className="mt-1 font-bold text-base flex items-center gap-2">
                                         {sub.planName || sub.planCode}
                                         {sub.vip && (
                                             <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-on-primary">
-                                                VIP
+                                                {t('billing.current.vip')}
                                             </span>
                                         )}
                                     </div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-surface-container-low">
-                                    <div className="text-xs text-on-surface-variant">Status / Expiry</div>
+                                    <div className="text-xs text-on-surface-variant">
+                                        {t('billing.current.statusExpiry')}
+                                    </div>
                                     <div className="mt-1 font-bold text-base">
                                         {sub.status}
                                         {sub.expiresAt && (
                                             <span className="block text-xs font-normal text-on-surface-variant">
-                                                Expires {formatDate(sub.expiresAt)}
+                                                {t('billing.current.expires', {
+                                                    date: formatDate(sub.expiresAt),
+                                                })}
                                             </span>
                                         )}
                                     </div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-surface-container-low">
-                                    <div className="text-xs text-on-surface-variant">Vault &amp; Beneficiary Limit</div>
+                                    <div className="text-xs text-on-surface-variant">
+                                        {t('billing.current.limits')}
+                                    </div>
                                     <div className="mt-1 font-bold text-base">
-                                        {sub.maxVaults} vaults · {sub.maxBeneficiariesPerVault} beneficiaries/vault
+                                        {t('billing.current.vaultsAndBens', {
+                                            vaults: sub.maxVaults,
+                                            beneficiaries: sub.maxBeneficiariesPerVault,
+                                        })}
                                     </div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-surface-container-low">
-                                    <div className="text-xs text-on-surface-variant">Encrypted Storage &amp; Media</div>
+                                    <div className="text-xs text-on-surface-variant">
+                                        {t('billing.current.storage')}
+                                    </div>
                                     <div className="mt-1 font-bold text-base">
-                                        {formatStorage(sub.maxStorageBytes)} ·{' '}
-                                        {sub.legacyMessageEnabled ? 'Media enabled' : 'No legacy media'}
+                                        {t('billing.current.storageDetail', {
+                                            storage: formatStorage(sub.maxStorageBytes),
+                                            media: sub.legacyMessageEnabled
+                                                ? t('billing.current.mediaEnabled')
+                                                : t('billing.current.noMedia'),
+                                        })}
                                     </div>
                                 </div>
                             </div>
                         </Card>
                     )}
 
-                    <Card title="Payment History" icon="receipt_long">
+                    <Card title={t('billing.history.title')} icon="receipt_long">
                         {payments.length === 0 ? (
                             <p className="text-sm text-on-surface-variant">
-                                No payment transactions yet.
+                                {t('billing.history.empty')}
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
                                     <thead>
                                         <tr className="border-b border-outline-variant/40 text-on-surface-variant">
-                                            <th className="py-2.5 pr-4">Date</th>
-                                            <th className="py-2.5 pr-4">Plan</th>
-                                            <th className="py-2.5 pr-4">Amount</th>
-                                            <th className="py-2.5 pr-4">Status</th>
-                                            <th className="py-2.5 pr-4">VNPay Ref</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.date')}</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.plan')}</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.amount')}</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.status')}</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.ref')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -145,4 +164,3 @@ export default function BillingPage() {
         </OwnerLayout>
     );
 }
-

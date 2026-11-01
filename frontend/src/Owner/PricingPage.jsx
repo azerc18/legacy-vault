@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Alert, btnOutline, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
@@ -18,6 +19,7 @@ const formatStorage = (bytes) => {
 };
 
 export default function PricingPage() {
+    const { t } = useTranslation('payment');
     const [sub, setSub] = useState(null);
     const [loading, setLoading] = useState(true);
     const [busyCode, setBusyCode] = useState('');
@@ -27,9 +29,9 @@ export default function PricingPage() {
         paymentApi
             .getMySubscription()
             .then(setSub)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load subscription plans.')))
+            .catch((e) => setError(getErrorMessage(e, t('pricing.errors.loadFailed'))))
             .finally(() => setLoading(false));
-    }, []);
+    }, [t]);
 
     const handleCheckout = async (planCode) => {
         setError('');
@@ -40,7 +42,7 @@ export default function PricingPage() {
                 window.location.href = res.paymentUrl;
             }
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not initiate VNPay checkout.'));
+            setError(getErrorMessage(e, t('pricing.errors.checkoutFailed')));
             setBusyCode('');
         }
     };
@@ -82,9 +84,9 @@ export default function PricingPage() {
 
     return (
         <OwnerLayout
-            title="Plans & Pricing"
-            subtitle="Protect your digital estate with specialized vaults, contingent beneficiaries, proportional (%) allocation, and 5 GB encrypted storage."
-            back={{ to: '/billing', label: 'Billing & Subscription' }}
+            title={t('pricing.title')}
+            subtitle={t('pricing.subtitle')}
+            back={{ to: '/billing', label: t('pricing.back') }}
         >
             <Alert>{error}</Alert>
 
@@ -93,23 +95,24 @@ export default function PricingPage() {
                     <div className="flex items-center gap-2 text-sm">
                         <Icon name="workspace_premium" className="text-primary text-[20px]" />
                         <span>
-                            Current plan: <strong>{sub.planName || sub.planCode}</strong> ({sub.status})
+                            {t('pricing.currentPlan')}{' '}
+                            <strong>{sub.planName || sub.planCode}</strong> ({sub.status})
                             {sub.expiresAt && (
                                 <span className="text-on-surface-variant">
                                     {' '}
-                                    · Expires {formatDate(sub.expiresAt)}
+                                    · {t('pricing.expires', { date: formatDate(sub.expiresAt) })}
                                 </span>
                             )}
                         </span>
                     </div>
                     <Link to="/billing" className={btnOutline}>
-                        <Icon name="receipt_long" className="text-[18px]" /> View billing history
+                        <Icon name="receipt_long" className="text-[18px]" /> {t('pricing.viewBilling')}
                     </Link>
                 </div>
             )}
 
             {loading ? (
-                <p className="text-on-surface-variant">Loading plans...</p>
+                <p className="text-on-surface-variant">{t('pricing.loading')}</p>
             ) : (
                 <div className="grid md:grid-cols-3 gap-6">
                     {plans.map((p) => {
@@ -129,16 +132,16 @@ export default function PricingPage() {
                                         <h2 className="font-title-lg text-title-lg">{p.name}</h2>
                                         {isPopular && (
                                             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary text-on-primary">
-                                                Save 17%
+                                                {t('pricing.savePercent')}
                                             </span>
                                         )}
                                     </div>
                                     <p className="mt-3 text-2xl font-bold text-primary">
-                                        {isFree ? 'Free' : formatVnd(p.priceVnd)}
+                                        {isFree ? t('pricing.free') : formatVnd(p.priceVnd)}
                                         {!isFree && p.durationDays && (
                                             <span className="text-sm font-normal text-on-surface-variant">
                                                 {' '}
-                                                / {p.durationDays} days
+                                                {t('pricing.perDays', { days: p.durationDays })}
                                             </span>
                                         )}
                                     </p>
@@ -147,17 +150,17 @@ export default function PricingPage() {
                                         <li className="flex items-center gap-2">
                                             <Icon name="inventory_2" className="text-secondary text-[18px]" />
                                             <span>
-                                                {isFree ? (
-                                                    <><strong>1</strong> Master Estate Vault</>
-                                                ) : (
-                                                    <>Up to <strong>{p.maxVaults}</strong> specialized vaults</>
-                                                )}
+                                                {isFree
+                                                    ? t('pricing.features.oneMasterVault')
+                                                    : t('pricing.features.upToVaults', { count: p.maxVaults })}
                                             </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Icon name="group" className="text-secondary text-[18px]" />
                                             <span>
-                                                Up to <strong>{p.maxBeneficiariesPerVault}</strong> beneficiaries / vault
+                                                {t('pricing.features.upToBeneficiaries', {
+                                                    count: p.maxBeneficiariesPerVault,
+                                                })}
                                             </span>
                                         </li>
                                         <li className="flex items-center gap-2">
@@ -166,13 +169,18 @@ export default function PricingPage() {
                                                 className={`text-[18px] ${!isFree ? 'text-primary' : 'text-outline'}`}
                                             />
                                             <span>
-                                                Contingent beneficiaries &amp; Proportional (%) split{' '}
-                                                {!isFree ? '(Included)' : '(VIP only)'}
+                                                {!isFree
+                                                    ? t('pricing.features.advancedAllocationIncluded')
+                                                    : t('pricing.features.advancedAllocationVipOnly')}
                                             </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Icon name="cloud_upload" className="text-secondary text-[18px]" />
-                                            <strong>{formatStorage(p.maxStorageBytes)}</strong> encrypted storage
+                                            <span>
+                                                {t('pricing.features.storage', {
+                                                    size: formatStorage(p.maxStorageBytes),
+                                                })}
+                                            </span>
                                         </li>
                                     </ul>
                                 </div>
@@ -180,7 +188,9 @@ export default function PricingPage() {
                                 <div className="mt-8">
                                     {isFree ? (
                                         <button type="button" disabled className={`${btnOutline} w-full`}>
-                                            {isCurrent ? 'Current Plan' : 'Included by Default'}
+                                            {isCurrent
+                                                ? t('pricing.buttons.currentPlan')
+                                                : t('pricing.buttons.included')}
                                         </button>
                                     ) : (
                                         <button
@@ -191,10 +201,10 @@ export default function PricingPage() {
                                         >
                                             <Icon name="payments" className="text-[18px]" />
                                             {busyCode === p.code
-                                                ? 'Redirecting to VNPay...'
+                                                ? t('pricing.buttons.redirecting')
                                                 : isCurrent
-                                                ? 'Extend with VNPay'
-                                                : 'Upgrade with VNPay'}
+                                                ? t('pricing.buttons.extend')
+                                                : t('pricing.buttons.upgrade')}
                                         </button>
                                     )}
                                 </div>

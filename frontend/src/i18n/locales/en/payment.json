@@ -1,1 +1,102 @@
-{}
+{
+  "header": {
+    "vip": "VIP",
+    "upgrade": "Upgrade",
+    "vipActive": "VIP Subscription Active",
+    "upgradeToVip": "Upgrade to VIP"
+  },
+  "pricing": {
+    "title": "Plans & Pricing",
+    "subtitle": "Protect your digital estate with specialized vaults, contingent beneficiaries, proportional (%) allocation, and 5 GB encrypted storage.",
+    "back": "Billing & Subscription",
+    "currentPlan": "Current plan:",
+    "expires": "Expires {{date}}",
+    "viewBilling": "View billing history",
+    "loading": "Loading plans...",
+    "savePercent": "Save 17%",
+    "free": "Free",
+    "perDays": "/ {{days}} days",
+    "features": {
+      "oneMasterVault": "1 Master Estate Vault",
+      "upToVaults": "Up to {{count}} specialized vaults",
+      "upToBeneficiaries": "Up to {{count}} beneficiaries / vault",
+      "advancedAllocationIncluded": "Contingent beneficiaries & Proportional (%) split (Included)",
+      "advancedAllocationVipOnly": "Contingent beneficiaries & Proportional (%) split (VIP only)",
+      "storage": "{{size}} encrypted storage"
+    },
+    "buttons": {
+      "currentPlan": "Current Plan",
+      "included": "Included by Default",
+      "redirecting": "Redirecting to VNPay...",
+      "extend": "Extend with VNPay",
+      "upgrade": "Upgrade with VNPay"
+    },
+    "errors": {
+      "loadFailed": "Could not load subscription plans.",
+      "checkoutFailed": "Could not initiate VNPay checkout."
+    }
+  },
+  "billing": {
+    "title": "Billing & Subscription",
+    "subtitle": "Manage your LegacyVault plan, entitlements, and VNPay payment history.",
+    "extendVip": "Extend VIP",
+    "upgradeToVip": "Upgrade to VIP",
+    "loading": "Loading billing details...",
+    "current": {
+      "title": "Current Subscription",
+      "plan": "Plan",
+      "vip": "VIP",
+      "statusExpiry": "Status / Expiry",
+      "expires": "Expires {{date}}",
+      "limits": "Vault & Beneficiary Limit",
+      "vaultsAndBens": "{{vaults}} vaults · {{beneficiaries}} beneficiaries/vault",
+      "storage": "Encrypted Storage & Media",
+      "storageDetail": "{{storage}} · {{media}}",
+      "mediaEnabled": "Media enabled",
+      "noMedia": "No legacy media"
+    },
+    "history": {
+      "title": "Payment History",
+      "empty": "No payment transactions yet.",
+      "date": "Date",
+      "plan": "Plan",
+      "amount": "Amount",
+      "status": "Status",
+      "ref": "VNPay Ref"
+    },
+    "errors": {
+      "loadFailed": "Could not load billing information."
+    }
+  },
+  "result": {
+    "successTitle": "Payment Successful",
+    "failedTitle": "Payment Failed",
+    "confirmingTitle": "Confirming Payment",
+    "successSubtitle": "Your VIP subscription has been activated.",
+    "failedSubtitle": "Your VNPay transaction could not be completed.",
+    "confirmingSubtitle": "Please wait while we confirm your payment with VNPay.",
+    "welcomeVip": "Welcome to LegacyVault VIP!",
+    "confirmingHeading": "Confirming your VIP subscription...",
+    "failedHeading": "We could not confirm your payment",
+    "confirmingMessage": "We are checking with the payment gateway (attempt {{attempt}}/{{maxAttempts}}). Your privileges will be available in a few moments.",
+    "successDesc": "You now have access to up to {{vaults}} vaults, {{beneficiaries}} beneficiaries per vault, {{storage}} of encrypted storage{{media}}.",
+    "withMedia": ", and legacy audio/video messages",
+    "failedDefault": "The payment was cancelled or declined by the payment gateway.",
+    "reason": "Reason: {{code}}",
+    "txId": "Transaction ID: {{id}}",
+    "viewBilling": "View Billing",
+    "myVaults": "Go to My Vaults",
+    "tryAgain": "Try Again"
+  },
+  "upgradeDialog": {
+    "title": "Upgrade to VIP",
+    "defaultMessage": "You have reached the limit of the Free plan. Upgrade to VIP to unlock up to {{vaults}} vaults, {{beneficiaries}} beneficiaries per vault, {{storage}} of encrypted storage, and legacy audio/video messages.",
+    "features": {
+      "vaults": "Up to {{vaults}} vaults & {{beneficiaries}} beneficiaries per vault",
+      "storage": "{{storage}} encrypted cloud storage",
+      "media": "Legacy audio & video farewell messages"
+    },
+    "notNow": "Not now",
+    "viewPlans": "View VIP Plans"
+  }
+}
