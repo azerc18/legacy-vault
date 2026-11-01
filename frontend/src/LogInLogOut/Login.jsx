@@ -4,6 +4,7 @@ import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { saveSession, ROLES, getUser, updateStoredUser } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
+import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 
 // Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
 const homeFor = (u) =>
@@ -50,7 +51,8 @@ export default function Login() {
     };
 
     return (
-        <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4">
+        <div className="relative bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4">
+            <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
             <div className="mb-8 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
