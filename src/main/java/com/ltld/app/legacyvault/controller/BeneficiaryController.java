@@ -1,24 +1,9 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AcceptClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
+import com.ltld.app.legacyvault.service.beneficiaryservice.InheritanceDossierPdfService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +34,7 @@ import java.util.UUID;
 public class BeneficiaryController {
 
     private final BeneficiaryService beneficiaryService;
+    private final InheritanceDossierPdfService dossierPdfService;
 
     // FR-16: Khởi tạo yêu cầu nhận tài sản
     @PostMapping("/claim")
@@ -235,5 +221,20 @@ public class BeneficiaryController {
                 .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.noStore())
                 .body(file.getContent());
+    }
+
+    @GetMapping("/vaults/{vaultId}/dossier")
+    public ResponseEntity<byte[]> downloadDossier(Principal principal, @PathVariable UUID vaultId) {
+        InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId(principal));
+        byte[] pdf = dossierPdfService.render(data);
+        String fileName = "ho-so-khai-nhan-" + vaultId.toString().substring(0, 8) + ".pdf";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(fileName, StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(pdf);
     }
 }
