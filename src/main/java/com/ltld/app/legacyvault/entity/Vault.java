@@ -71,4 +71,9 @@ public class Vault {
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt; //[cite: 9]
+
+    // N2-admin: số lần Admin đã gia hạn claimDeadlineAt (tối đa 2)
+    @Builder.Default
+    @Column(name = "claim_extensions", nullable = false)
+    private int claimExtensions = 0;
 }
