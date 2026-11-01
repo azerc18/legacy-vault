@@ -10,4 +10,7 @@ export const authApi = {
     forgotPassword: (email) => http.post('/auth/forgot-password', { email }),
     resetPassword: (email, otp, newPassword, passwordConfirm) =>
         http.post('/auth/reset-password', { email, otp, newPassword, passwordConfirm }),
+    // H4: bước 2 khi login trả { mfaRequired: true, mfaToken }
+    loginMfa: (mfaToken, code) =>
+        http.post('/auth/login/2fa', { mfaToken, code }).then((r) => r.data.data),
 };

@@ -54,5 +54,6 @@
   "PLAN_LIMIT_REACHED": "Bạn đã dùng hết giới hạn gói Free. Nâng cấp VIP để tiếp tục.",
   "PAYMENT_SIGNATURE_INVALID": "Không xác thực được giao dịch thanh toán.",
   "PAYMENT_AMOUNT_MISMATCH": "Số tiền thanh toán không khớp.",
-  "STORAGE_UNAVAILABLE": "Kho lưu trữ file tạm thời không khả dụng. Vui lòng thử lại sau."
+  "STORAGE_UNAVAILABLE": "Kho lưu trữ file tạm thời không khả dụng. Vui lòng thử lại sau.",
+  "MFA_CHALLENGE_EXPIRED": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
 }
