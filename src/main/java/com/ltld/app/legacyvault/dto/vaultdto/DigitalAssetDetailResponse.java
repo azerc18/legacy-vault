@@ -2,10 +2,12 @@ package com.ltld.app.legacyvault.dto.vaultdto;
 
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.TransferMechanism;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -25,6 +27,9 @@ public class DigitalAssetDetailResponse {
      * FE cần xử lý an toàn, không log, không cache.
      */
     private final String secret;
+    private final TransferMechanism transferMechanism;
+    /** N3: toàn bộ trường (công khai + bí mật đã giải mã); null với tài sản kiểu cũ. */
+    private final Map<String, String> fields;
     /** Ghi chú đã giải mã (có thể null). */
     private final String notes;
     private final AssetStatus status;
