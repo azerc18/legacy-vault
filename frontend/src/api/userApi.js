@@ -19,6 +19,12 @@ export const userApi = {
         return http.put('/users/me/avatar', form).then((r) => r.data.data);
     },
     deleteAvatar: () => http.delete('/users/me/avatar').then((r) => r.data.data),
+    // ---- 2FA (H4) ----
+    // { secret, otpauthUri, qrDataUri }
+    setup2fa: () => http.post('/users/me/2fa/setup').then((r) => r.data.data),
+    // { backupCodes: [...] } — chỉ trả 1 lần
+    enable2fa: (code) => http.post('/users/me/2fa/enable', { code }).then((r) => r.data.data),
+    disable2fa: (code) => http.post('/users/me/2fa/disable', { code }),
 };
 
 // Phần thông tin hồ sơ lưu vào localStorage (lv_user) để header hiển thị
