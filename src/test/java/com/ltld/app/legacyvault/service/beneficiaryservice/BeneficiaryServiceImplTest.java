@@ -39,6 +39,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
@@ -2126,7 +2127,7 @@ public class BeneficiaryServiceImplTest {
         BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
                 () -> beneficiaryService.declineClaim(vaultId, currentUserId, null));
 
-        assertThat(ex.getErrorCode()).isEqualTo(com.ltld.app.legacyvault.exception.ErrorCode.IDENTITY_NOT_VERIFIED);
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.IDENTITY_NOT_VERIFIED);
         assertThat(beneficiaryRow.getStatus()).isEqualTo(BeneficiaryInviteStatus.INVITED);
         verify(claimRepository, never()).save(any());
         verifyNoInteractions(assetAllocationRepository);
@@ -2140,7 +2141,7 @@ public class BeneficiaryServiceImplTest {
         BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
                 () -> beneficiaryService.declineClaim(vaultId, currentUserId, null));
 
-        assertThat(ex.getErrorCode()).isEqualTo(com.ltld.app.legacyvault.exception.ErrorCode.CLAIM_ALREADY_RESPONDED);
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CLAIM_ALREADY_RESPONDED);
         assertThat(beneficiaryRow.getStatus()).isEqualTo(BeneficiaryInviteStatus.ACCEPTED);
         verify(claimRepository, never()).save(any());
     }
