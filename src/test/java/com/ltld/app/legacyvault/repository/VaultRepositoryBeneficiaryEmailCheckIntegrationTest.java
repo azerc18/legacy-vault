@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,12 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class VaultRepositoryBeneficiaryEmailCheckIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class VaultRepositoryBeneficiaryEmailCheckIntegrationTest extends MySqlTestContainer {
 
     @Autowired
     private VaultRepository vaultRepository;

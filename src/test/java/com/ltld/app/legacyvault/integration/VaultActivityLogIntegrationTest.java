@@ -15,14 +15,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,12 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class VaultActivityLogIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class VaultActivityLogIntegrationTest extends MySqlTestContainer{
 
     @MockitoBean
     private EmailSender emailSender;

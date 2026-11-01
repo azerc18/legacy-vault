@@ -1,36 +1,16 @@
 package com.ltld.app.legacyvault.integration;
 
-import com.ltld.app.legacyvault.entity.AssetAllocation;
-import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.entity.VaultBeneficiary;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AssetType;
-import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
-import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
-import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
-import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -51,13 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "app.beneficiary.notify-retry.enabled=false",
         "app.beneficiary.vault-purge.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
 @Transactional
-class AssetAccessRecordIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class AssetAccessRecordIntegrationTest extends MySqlTestContainer{
 
     @MockitoBean
     private EmailSender emailSender;

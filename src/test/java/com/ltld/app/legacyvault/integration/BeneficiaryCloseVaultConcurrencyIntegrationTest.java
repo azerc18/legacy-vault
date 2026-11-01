@@ -1,22 +1,9 @@
 package com.ltld.app.legacyvault.integration;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
-import com.ltld.app.legacyvault.entity.IdentityVerification;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.entity.VaultBeneficiary;
-import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
-import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.enums.VerificationMethod;
-import com.ltld.app.legacyvault.enums.VerificationStatus;
-import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
-import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
@@ -24,21 +11,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,12 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class BeneficiaryCloseVaultConcurrencyIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class BeneficiaryCloseVaultConcurrencyIntegrationTest extends MySqlTestContainer{
 
     @MockitoBean
     private EmailSender emailSender;
