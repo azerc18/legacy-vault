@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -32,4 +33,12 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM VaultBeneficiary b WHERE b.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
+    // N2b: tìm dòng thụ hưởng của một user trong một vault (cổng truy cập của luồng claim)
+    Optional<VaultBeneficiary> findByVaultIdAndUserId(UUID vaultId, UUID userId);
+
+    // N2b: trạng thái phản hồi của một user trong nhiều vault (một query, tránh N+1 ở listMyVaults)
+    @Query("SELECT b FROM VaultBeneficiary b WHERE b.user.id = :userId AND b.vault.id IN :vaultIds")
+    List<VaultBeneficiary> findByUserIdAndVaultIdIn(@Param("userId") UUID userId,
+                                                    @Param("vaultIds") Collection<UUID> vaultIds);
 }

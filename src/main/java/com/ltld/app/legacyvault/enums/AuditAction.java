@@ -50,4 +50,6 @@ public enum AuditAction {
     PROFILE_UPDATED, PASSWORD_CHANGED, PASSWORD_CHANGE_FAILED, AVATAR_DELETED, AVATAR_UPDATED,
     //Admin xác nhận đã xử lý cảnh báo bảo mật
     SECURITY_ALERT_ACKNOWLEDGED,    EXECUTOR_ASSIGNED_BY_ADMIN,
+    // N2b: người thụ hưởng từ chối, quyền nhận chuyển sang người dự phòng / không còn người nhận
+    ASSET_ALLOCATION_FALLBACK, CLAIM_DECLINED, CLAIM_STALLED, CLAIM_ACCEPTED,
 }

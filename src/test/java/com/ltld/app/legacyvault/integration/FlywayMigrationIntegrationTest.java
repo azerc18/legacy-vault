@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.integration;
 
+import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.flywaydb.core.Flyway;
@@ -66,5 +67,17 @@ class FlywayMigrationIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM audit_logs WHERE action = 'SOME_FUTURE_ACTION'", Integer.class);
         assertThat(count).isEqualTo(1);
+    }
+
+    // N2b: mọi ClaimStatus phải có trong cột DB, nếu không Decline sẽ lỗi "Data truncated"
+    @Test
+    void claimStatus_columnAcceptsEveryJavaEnumValue() {
+        String claimType = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'beneficiary_claims' AND COLUMN_NAME = 'status'
+                """, String.class);
+        for (ClaimStatus s : ClaimStatus.values()) {
+            assertThat(claimType).contains("'" + s.name() + "'");
+        }
     }
 }
