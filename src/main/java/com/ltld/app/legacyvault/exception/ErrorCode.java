@@ -38,6 +38,7 @@ public enum ErrorCode {
     TOO_MANY_OTP_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
     MFA_REQUIRED(HttpStatus.UNAUTHORIZED),
     MFA_INVALID_CODE(HttpStatus.BAD_REQUEST),
+    MFA_CHALLENGE_EXPIRED(HttpStatus.UNAUTHORIZED),
 
     // Executor / DMS / Vault
     DMS_NOT_TRIGGERED(HttpStatus.CONFLICT),

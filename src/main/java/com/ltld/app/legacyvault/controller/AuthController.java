@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
+import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
@@ -56,14 +57,24 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest) {
+            @Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        LoginResult result = authService.login(request,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        if (result.refreshToken() == null) {   // H4: cần bước 2, chưa set cookie
+            return ResponseEntity.ok(ApiResponse.success("Two-factor code required", result.response()));
+        }
+        return withRefreshCookie(result, "Login successfully");
+    }
 
-        LoginResult result = authService.login(
-                request,
-                httpRequest.getRemoteAddr(),
-                httpRequest.getHeader(HttpHeaders.USER_AGENT));
+    @PostMapping("/login/2fa")
+    public ResponseEntity<ApiResponse<LoginResponse>> loginWithMfa(
+            @Valid @RequestBody MfaLoginRequest request, HttpServletRequest httpRequest) {
+        LoginResult result = authService.loginWithMfa(request,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        return withRefreshCookie(result, "Login successfully");
+    }
 
+    private ResponseEntity<ApiResponse<LoginResponse>> withRefreshCookie(LoginResult result, String message) {
         ResponseCookie refreshCookie = ResponseCookie.from("refresh_token", result.refreshToken())
                 .httpOnly(true)
                 .secure(jwtProperties.isCookieSecure())
@@ -71,10 +82,9 @@ public class AuthController {
                 .path("/api/auth")
                 .maxAge(jwtProperties.getRefreshTokenTtlSeconds())
                 .build();
-
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
-                .body(ApiResponse.success("Login successfully", result.response()));
+                .body(ApiResponse.success(message, result.response()));
     }
 
     @PostMapping("/logout")
