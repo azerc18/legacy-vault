@@ -634,7 +634,9 @@ class VaultServiceImplTest {
         assertSame(ben, vault.getBeneficiary());
         verify(vaultRepository, never()).save(any());
         verifyNoInteractions(emailSender);
-        verifyNoInteractions(vaultBeneficiaryRepository);
+        verify(vaultBeneficiaryRepository, never()).save(any());
+        verify(vaultBeneficiaryRepository, never()).delete(any());
+        verify(vaultBeneficiaryRepository, never()).deleteByVaultId(any());
     }
 
     @Test
@@ -717,98 +719,49 @@ class VaultServiceImplTest {
         verify(vaultBeneficiaryRepository, never()).findByVaultIdInOrderByCreatedAtAsc(any());
     }
 
-    // ===== FR-02 (V8): removeBeneficiary tests =====
+    // ===== removeBeneficiary(ownerId, vaultId): endpoint cũ = xóa người thụ hưởng cũ nhất =====
 
     @Test
-    @DisplayName("removeBeneficiary (V8): Gỡ người thụ hưởng thành công")
-    void removeBeneficiary_Success() {
+    @DisplayName("removeBeneficiary (legacy): chỉ xóa người cũ nhất, không xóa sạch vault")
+    void removeBeneficiary_legacy_removesOldestOnly() {
         Vault vault = activeVault();
-        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
         UUID vId = vault.getId();
+        VaultBeneficiary oldest = VaultBeneficiary.builder()
+                .id(UUID.randomUUID()).vault(vault).email("a@example.com").build();
+        VaultBeneficiary newer = VaultBeneficiary.builder()
+                .id(UUID.randomUUID()).vault(vault).email("b@example.com").build();
         when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vId)).thenReturn(List.of(oldest, newer));
 
         vaultService.removeBeneficiary(ownerId, vId);
 
-        assertNull(vault.getBeneficiary());
-        assertNull(vault.getBeneficiaryEmail());
-        verify(vaultRepository).saveAndFlush(vault);
-        verify(assetAllocationRepository).deleteByVaultId(vId);
-        verify(vaultBeneficiaryRepository).deleteByVaultId(vId);
-        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
-                eq(ownerId), eq("owner@example.com"), eq(vId), eq("Vault"), eq(vId.toString()), any());
+        verify(vaultBeneficiaryRepository).delete(oldest);
+        verify(vaultBeneficiaryRepository, never()).delete(newer);
+        verify(vaultBeneficiaryRepository, never()).deleteByVaultId(any());
+        verify(assetAllocationRepository, never()).deleteByVaultId(any());
     }
 
     @Test
-    @DisplayName("removeBeneficiary (V8/V4): Không phải chủ két -> 404 Not Found")
-    void removeBeneficiary_NotOwner_ThrowsNotFound() {
+    @DisplayName("removeBeneficiary (legacy): vault chưa có người thụ hưởng → 404")
+    void removeBeneficiary_legacy_noBeneficiary_returns404() {
+        UUID vId = UUID.randomUUID();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vId)).thenReturn(List.of());
+
+        assertVaultError(HttpStatus.NOT_FOUND, () -> vaultService.removeBeneficiary(ownerId, vId));
+        verify(vaultBeneficiaryRepository, never()).delete(any(VaultBeneficiary.class));
+    }
+
+    @Test
+    @DisplayName("assignBeneficiary (N2-owner): vault có ≥ 2 người thụ hưởng → 409, không ghi đè dòng cũ nhất")
+    void assignBeneficiary_multipleBeneficiaries_returns409() {
         Vault vault = activeVault();
-        UUID otherId = UUID.randomUUID();
         when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
+        when(vaultBeneficiaryRepository.countByVaultId(vault.getId())).thenReturn(2L);
 
-        assertVaultError(HttpStatus.NOT_FOUND, () -> vaultService.removeBeneficiary(otherId, vault.getId()));
-        verify(vaultRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    @DisplayName("removeBeneficiary (m1): Không có người thụ hưởng -> return sớm, không lưu hay audit (idempotent)")
-    void removeBeneficiary_NoBeneficiary_ReturnsEarlyIdempotently() {
-        Vault vault = activeVault();
-        vault.setBeneficiary(null);
-        vault.setBeneficiaryEmail(null);
-        UUID vId = vault.getId();
-        when(vaultRepository.findByIdForUpdate(vId)).thenReturn(Optional.of(vault));
-
-        vaultService.removeBeneficiary(ownerId, vId);
-
-        verify(vaultRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(auditLogService);
-        verifyNoInteractions(vaultBeneficiaryRepository);
-    }
-
-    @Test
-    @DisplayName("removeBeneficiary (m2): Vault không ACTIVE -> 409 Conflict + audit BENEFICIARY_REMOVE_DENIED")
-    void removeBeneficiary_VaultNotActive_ThrowsConflictAndAudits() {
-        Vault vault = activeVault();
-        vault.setStatus(VaultStatus.UNLOCKED);
-        vault.setBeneficiary(userWith("ben@example.com", UserStatus.ACTIVE));
-        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
-
-        assertVaultError(HttpStatus.CONFLICT, () -> vaultService.removeBeneficiary(ownerId, vault.getId()));
-        verify(vaultRepository, never()).saveAndFlush(any());
-        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVE_DENIED), eq(AuditResult.FAILURE),
-                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()),
-                eq("vault status UNLOCKED"));
-    }
-
-    @Test
-    @DisplayName("removeBeneficiary (m2): DMS TRIGGERED -> 409 Conflict")
-    void removeBeneficiary_DmsTriggered_ThrowsConflict() {
-        UUID vaultId = UUID.randomUUID();
-        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
-                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
-
-        assertThrows(DmsException.class, () -> vaultService.removeBeneficiary(ownerId, vaultId));
-        verify(vaultRepository, never()).findByIdForUpdate(any());
-        verify(vaultRepository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    @DisplayName("removeBeneficiary (m2): Người thụ hưởng đang chờ đăng ký -> xóa email chờ và audit thành công")
-    void removeBeneficiary_PendingBeneficiaryEmail_Success() {
-        Vault vault = activeVault();
-        vault.setBeneficiary(null);
-        vault.setBeneficiaryEmail("pending@example.com");
-        when(vaultRepository.findByIdForUpdate(vault.getId())).thenReturn(Optional.of(vault));
-
-        vaultService.removeBeneficiary(ownerId, vault.getId());
-
-        assertNull(vault.getBeneficiary());
-        assertNull(vault.getBeneficiaryEmail());
-        verify(vaultRepository).saveAndFlush(vault);
-        verify(assetAllocationRepository).deleteByVaultId(vault.getId());
-        verify(vaultBeneficiaryRepository).deleteByVaultId(vault.getId());
-        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
-                eq(ownerId), eq("owner@example.com"), eq(vault.getId()), eq("Vault"), eq(vault.getId().toString()), any());
+        assertVaultError(HttpStatus.CONFLICT,
+                () -> vaultService.assignBeneficiary(ownerId, vault.getId(), assignRequest("new@example.com", true)));
+        verify(vaultRepository, never()).save(any());
+        verify(vaultBeneficiaryRepository, never()).save(any());
     }
 
     @Test

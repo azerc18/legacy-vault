@@ -34,6 +34,8 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Query("DELETE FROM VaultBeneficiary b WHERE b.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
 
+    boolean existsByVaultIdAndEmail(UUID vaultId, String email);
+
     // N2b: tìm dòng thụ hưởng của một user trong một vault (cổng truy cập của luồng claim)
     Optional<VaultBeneficiary> findByVaultIdAndUserId(UUID vaultId, UUID userId);
 
@@ -41,4 +43,6 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Query("SELECT b FROM VaultBeneficiary b WHERE b.user.id = :userId AND b.vault.id IN :vaultIds")
     List<VaultBeneficiary> findByUserIdAndVaultIdIn(@Param("userId") UUID userId,
                                                     @Param("vaultIds") Collection<UUID> vaultIds);
+
+    long countByVaultId(UUID vaultId);   // N2-owner: PUT cũ chỉ hợp lệ khi vault có ≤ 1 người
 }
