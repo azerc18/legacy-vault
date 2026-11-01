@@ -14,6 +14,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -43,6 +44,12 @@ public class DigitalAssetRequest {
      */
     @Size(max = 2000, message = "Note must be at most 2000 characters")
     private String notes;
+
+    /**
+     * N3: giá trị các trường theo schema của loại tài sản (GET /api/asset-types).
+     * Khi có fields thì không cần secret. Khi sửa: trường bí mật không gửi = giữ nguyên giá trị cũ.
+     */
+    private Map<String, String> fields;
 
     // N2-owner: null = giữ nguyên (sửa) / mặc định tất cả (tạo); recipients rỗng = xóa phân bổ riêng
     @Valid

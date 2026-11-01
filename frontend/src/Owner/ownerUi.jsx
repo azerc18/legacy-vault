@@ -16,6 +16,9 @@ export const ASSET_TYPES = [
     {value: 'CRYPTO_WALLET', label: 'Crypto wallet'},
     {value: 'SOCIAL_MEDIA', label: 'Social media'},
     {value: 'DOCUMENT', label: 'Document'},
+    {value: 'EXCHANGE_ACCOUNT', label: 'Exchange account'},
+    {value: 'E_WALLET', label: 'E-wallet'},
+    {value: 'EMAIL', label: 'Email account'},
     {value: 'OTHER', label: 'Other'},
 ];
 

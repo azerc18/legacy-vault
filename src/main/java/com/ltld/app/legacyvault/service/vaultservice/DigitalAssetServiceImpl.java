@@ -23,6 +23,10 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldsValidator;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -31,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,8 +87,13 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
         String secret;
         String notes;
+        Map<String, String> fields = null;
         try {
             secret = cryptoService.decrypt(asset.getEncryptedSecret());
+            if (asset.getPublicFieldsJson() != null) {
+                fields = new LinkedHashMap<>(FlatJson.decode(asset.getPublicFieldsJson()));
+                fields.putAll(FlatJson.decode(secret));
+            }
             notes = asset.getNotesEncrypted() != null
                     ? cryptoService.decrypt(asset.getNotesEncrypted())
                     : null;
@@ -100,7 +110,9 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                 .id(asset.getId())
                 .assetType(asset.getAssetType())
                 .assetName(asset.getAssetName())
-                .secret(secret)
+                .secret(fields != null ? null : secret)
+                .fields(fields)
+                .transferMechanism(asset.getTransferMechanism())
                 .notes(notes)
                 .status(asset.getStatus())
                 .createdAt(asset.getCreatedAt())
@@ -118,15 +130,26 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         // assertHandoverNotStarted gọi qua guard (bao gồm cả TRIGGERED và verification mở)
         vaultModificationGuard.ensureModifiable(vault);
 
-        if (request.getSecret() == null || request.getSecret().isBlank()) {
+        boolean useFields = request.getFields() != null;
+        if (!useFields && (request.getSecret() == null || request.getSecret().isBlank())) {
             throw new VaultException("Secret is required when adding a new asset", HttpStatus.BAD_REQUEST);
+        }
+        String secretPlain = request.getSecret();
+        String publicJson = null;
+        if (useFields) {
+            AssetFieldsValidator.validate(request.getAssetType(), request.getFields());
+            AssetSchemaRegistry.Split split = AssetSchemaRegistry.split(request.getAssetType(), request.getFields());
+            publicJson = FlatJson.encode(split.publicFields());
+            secretPlain = FlatJson.encode(split.secretFields());
         }
 
         DigitalAsset asset = DigitalAsset.builder()
                 .vault(vault)
                 .assetType(request.getAssetType())
                 .assetName(request.getAssetName())
-                .encryptedSecret(cryptoService.encrypt(request.getSecret()))
+                .transferMechanism(mechanismOf(request.getAssetType()))
+                .publicFieldsJson(publicJson)
+                .encryptedSecret(cryptoService.encrypt(secretPlain))
                 .encryptionKeyRef(CryptoService.CURRENT_KEY_REF)
                 .notesEncrypted(request.getNotes() != null && !request.getNotes().isBlank()
                         ? cryptoService.encrypt(request.getNotes()) : null)
@@ -155,11 +178,32 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
+        boolean typeChanged = asset.getAssetType() != request.getAssetType();
+        // N3 (M1): tài sản đã theo schema chỉ được sửa qua fields; secret thô hoặc đổi loại không có fields sẽ làm hỏng dữ liệu
+        if (request.getFields() == null && asset.getPublicFieldsJson() != null
+                && ((request.getSecret() != null && !request.getSecret().isBlank()) || typeChanged)) {
+            throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                    "This asset uses typed fields. Send 'fields' instead of 'secret'.");
+        }
         asset.setAssetType(request.getAssetType());
         asset.setAssetName(request.getAssetName());
+        asset.setTransferMechanism(mechanismOf(request.getAssetType()));
 
-        // Chỉ cập nhật secret nếu client gửi giá trị mới
-        if (request.getSecret() != null && !request.getSecret().isBlank()) {
+        if (request.getFields() != null) {
+            // N3: trường bí mật không gửi = giữ giá trị cũ (chỉ khi cùng loại và cùng kiểu có schema)
+            Map<String, String> oldSecrets = new LinkedHashMap<>();
+            if (!typeChanged && asset.getPublicFieldsJson() != null) {
+                oldSecrets.putAll(FlatJson.decode(cryptoService.decrypt(asset.getEncryptedSecret())));
+            }
+            Map<String, String> merged = new LinkedHashMap<>(request.getFields());
+            oldSecrets.forEach(merged::putIfAbsent);
+            AssetFieldsValidator.validate(request.getAssetType(), merged);
+            AssetSchemaRegistry.Split split = AssetSchemaRegistry.split(request.getAssetType(), merged);
+            asset.setPublicFieldsJson(FlatJson.encode(split.publicFields()));
+            asset.setEncryptedSecret(cryptoService.encrypt(FlatJson.encode(split.secretFields())));
+            asset.setEncryptionKeyRef(CryptoService.CURRENT_KEY_REF);
+        } else if (request.getSecret() != null && !request.getSecret().isBlank()) {
+            // Chỉ cập nhật secret nếu client gửi giá trị mới
             asset.setEncryptedSecret(cryptoService.encrypt(request.getSecret()));
             asset.setEncryptionKeyRef(CryptoService.CURRENT_KEY_REF);
         }
@@ -305,12 +349,27 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         }
     }
 
-    // Tạm: N3 (Duy) gán transferMechanism rồi thì bỏ nhánh fallback theo assetType
+    private static TransferMechanism mechanismOf(AssetType type) {
+        AssetSchema schema = AssetSchemaRegistry.schemaOf(type);
+        return schema == null ? null : schema.mechanism();
+    }
+
+    // N3 (m2): migration đã gán transfer_mechanism cho tài sản cũ nên không còn nhánh dự phòng theo assetType
     private static boolean allowsProportional(DigitalAsset asset) {
-        if (asset.getTransferMechanism() != null) {
-            return asset.getTransferMechanism() == TransferMechanism.LEGAL_CLAIM_DOSSIER;
+        return asset.getTransferMechanism() == TransferMechanism.LEGAL_CLAIM_DOSSIER;
+    }
+
+    // N3 (m4): danh sách che số tài khoản, chỉ chi tiết (có audit) mới trả đủ
+    private static final Set<String> MASKED_KEYS = Set.of("accountNumber", "accountId");
+
+    private static Map<String, String> maskPublicFields(String json) {
+        if (json == null) {
+            return null;
         }
-        return asset.getAssetType() == AssetType.BANK_ACCOUNT || asset.getAssetType() == AssetType.DOCUMENT;
+        Map<String, String> fields = FlatJson.decode(json);
+        fields.replaceAll((k, v) -> MASKED_KEYS.contains(k) && v != null && v.length() > 4
+                ? "****" + v.substring(v.length() - 4) : v);
+        return fields;
     }
 
     /**
@@ -336,6 +395,8 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                 .assetType(asset.getAssetType())
                 .assetName(asset.getAssetName())
                 .status(asset.getStatus())
+                .transferMechanism(asset.getTransferMechanism())
+                .publicFields(maskPublicFields(asset.getPublicFieldsJson()))
                 .createdAt(asset.getCreatedAt())
                 .updatedAt(asset.getUpdatedAt())
                 .allocations(rows.stream().map(al -> DigitalAssetResponse.Allocation.builder()

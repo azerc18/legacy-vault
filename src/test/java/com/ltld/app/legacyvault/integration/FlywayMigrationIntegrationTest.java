@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.integration;
 
+import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
@@ -69,6 +70,18 @@ class FlywayMigrationIntegrationTest {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM audit_logs WHERE action = 'SOME_FUTURE_ACTION'", Integer.class);
         assertThat(count).isEqualTo(1);
+    }
+
+    // N3: mọi AssetType phải có trong cột digital_assets.asset_type
+    @Test
+    void assetType_columnAcceptsEveryJavaEnumValue() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'digital_assets' AND COLUMN_NAME = 'asset_type'
+                """, String.class);
+        for (AssetType t : AssetType.values()) {
+            assertThat(col).contains("'" + t.name() + "'");
+        }
     }
 
     // N2b: mọi ClaimStatus phải có trong cột DB, nếu không Decline sẽ lỗi "Data truncated"

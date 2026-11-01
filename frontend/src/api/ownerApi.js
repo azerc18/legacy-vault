@@ -56,7 +56,9 @@ export const ownerApi = {
     listAssets: (vaultId) => http.get(`/vaults/${vaultId}/assets`).then((r) => unwrap(r) ?? []),
     // Chi tiết CÓ secret + notes đã giải mã (BE ghi audit ASSET_VIEWED mỗi lần xem)
     getAsset: (vaultId, assetId) => http.get(`/vaults/${vaultId}/assets/${assetId}`).then(unwrap),
-    // { assetType, assetName, secret (bắt buộc khi thêm), notes }
+    // N3: schema các loại tài sản -> [{ assetType, label, mechanism, fields: [{ key, label, type, required, sensitive, pattern, options }] }]
+    getAssetTypes: () => http.get('/asset-types').then((r) => unwrap(r) ?? []),
+    // { assetType, assetName, fields (theo schema) | secret (kiểu cũ), notes }
     addAsset: (vaultId, asset) => http.post(`/vaults/${vaultId}/assets`, asset).then(unwrap),
     // Cập nhật: secret null/rỗng = giữ nguyên; notes null = giữ nguyên, "" = xoá ghi chú
     updateAsset: (vaultId, assetId, asset) => http.put(`/vaults/${vaultId}/assets/${assetId}`, asset).then(unwrap),

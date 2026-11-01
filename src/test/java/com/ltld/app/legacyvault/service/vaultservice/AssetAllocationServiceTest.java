@@ -228,12 +228,13 @@ class AssetAllocationServiceTest {
     }
 
     @Test
-    @DisplayName("PROPORTIONAL: tài sản đã gán LEGAL_CLAIM_DOSSIER thì được phép dù assetType là gì")
+    @DisplayName("PROPORTIONAL: N3 – cơ chế chuyển giao lấy theo loại tài sản; loại LEGAL_CLAIM_DOSSIER (EXCHANGE_ACCOUNT) được phép")
     void proportional_legalClaimMechanism_allowed() throws Exception {
-        asset.setTransferMechanism(TransferMechanism.LEGAL_CLAIM_DOSSIER);
         var a = alloc(AllocationMode.PROPORTIONAL, recipient(bA, "50", null), recipient(bB, "50", null));
 
-        update(AssetType.CRYPTO_WALLET, a);
+        update(AssetType.EXCHANGE_ACCOUNT, a);
+
+        assertThat(asset.getTransferMechanism()).isEqualTo(TransferMechanism.LEGAL_CLAIM_DOSSIER);
 
         verify(assetAllocationRepository, times(2)).save(any(AssetAllocation.class));
     }
