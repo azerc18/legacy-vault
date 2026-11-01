@@ -50,6 +50,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -96,18 +97,19 @@ public class VaultServiceImpl implements VaultService {
         if (requested == null || requested.isEmpty()) {
             throw new VaultException(ErrorCode.BENEFICIARY_REQUIRED, "A vault must have at least one beneficiary");
         }
-        // m1: kiểm giới hạn gói bằng số lượng gửi lên TRƯỚC khi gọi DB cho từng email
-        entitlementService.assertCanAddBeneficiaries(ownerId, requested.size());
-
-        List<String> emails = new ArrayList<>();
-        Set<String> seen = new HashSet<>();   // n1: dò trùng O(1)
+        // N1 (n1): chuẩn hóa + dò trùng trước (không gọi DB), rồi mới kiểm gói theo số người thật
+        Set<String> seen = new LinkedHashSet<>();
         for (AddBeneficiaryRequest b : requested) {
-            String email = validateBeneficiaryEmail(ownerId, owner, b.getEmail());
-            if (!seen.add(email)) {
+            if (!seen.add(b.getEmail().trim().toLowerCase())) {
                 throw new VaultException(ErrorCode.BENEFICIARY_DUPLICATE,
                         "The same email appears more than once in the beneficiary list");
             }
-            emails.add(email);
+        }
+        entitlementService.assertCanAddBeneficiaries(ownerId, seen.size());
+
+        List<String> emails = new ArrayList<>();
+        for (AddBeneficiaryRequest b : requested) {
+            emails.add(validateBeneficiaryEmail(ownerId, owner, b.getEmail()));   // Owner / Executor
         }
 
         // 2. Tạo két sắt (Vault)

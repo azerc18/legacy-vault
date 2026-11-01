@@ -42,6 +42,7 @@
   "LAST_BENEFICIARY": "Không thể xoá người thụ hưởng cuối cùng.",
   "BENEFICIARY_IN_USE": "Người thụ hưởng này vẫn đang giữ tài sản. Hãy phân bổ lại trước.",
   "BENEFICIARY_CONFLICT": "Một người không thể vừa là người thụ hưởng vừa là người thi hành hoặc người xác minh.",
+  "BENEFICIARY_DUPLICATE": "Người này đã có trong danh sách người thụ hưởng.",
   "ALLOCATION_PERCENT_INVALID": "Tổng tỷ lệ phân bổ phải bằng 100%.",
   "ALLOCATION_MODE_NOT_ALLOWED": "Cách phân bổ này không áp dụng cho tài sản này.",
   "ASSET_FIELD_INVALID": "Một số thông tin tài sản không hợp lệ.",

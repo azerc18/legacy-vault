@@ -136,7 +136,7 @@ class VaultServiceImplTest {
         // Kịch bản giả lập (Khi code gọi hàm A thì trả về B)
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
         when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
-        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password");// Trọng tâm KT
+        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password"); // Trọng tâm KT
         when(vaultBeneficiaryRepository.save(any(VaultBeneficiary.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Gọi hàm thực tế (Act)

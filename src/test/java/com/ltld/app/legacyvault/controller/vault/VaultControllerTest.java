@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -125,7 +126,7 @@ public class VaultControllerTest {
         beneficiary.setEmail("ben@test.com");
         CreateVaultRequest request = new CreateVaultRequest();
         request.setName("Vault 1");
-        request.setBeneficiaries(java.util.Collections.nCopies(11, beneficiary));
+        request.setBeneficiaries(Collections.nCopies(11, beneficiary));
 
         mockMvc.perform(post("/api/vaults")
                         .principal(() -> ownerId.toString())
