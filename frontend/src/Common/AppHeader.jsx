@@ -5,6 +5,9 @@ import React from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import UserAvatar from './UserAvatar.jsx';
+import { useTranslation } from 'react-i18next';
+import LanguageSwitch from './LanguageSwitch.jsx';
+
 
 // Cùng một độ rộng cho header và nội dung mọi trang
 export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
@@ -20,6 +23,7 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
  */
 export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const user = getUser();
     const handleLogout = () => { logout(); navigate('/login'); };
@@ -41,20 +45,20 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                     {userHome && (
-                        <Link to="/home" title="User home"
+                        <Link to="/home" title={t('header.userHome')}
                               className="h-10 px-2 sm:px-3 rounded-xl flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-low">
-                            <Icon name="swap_horiz" className="text-[18px]" /><span className="hidden md:inline">User home</span>
-                        </Link>
+                            <Icon name="swap_horiz" className="text-[18px]" /><span className="hidden md:inline">{t('header.userHome')}</span>                        </Link>
                     )}
+                    <LanguageSwitch />
                     {extra}
                     <Link to="/me" title={user?.email}
                           className="flex items-center gap-2 h-10 pl-1 pr-1 md:pr-3 rounded-xl hover:bg-surface-container-low">
                         <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
                         <span className="hidden md:block text-sm font-semibold text-on-surface max-w-[160px] truncate">{user?.name}</span>
                     </Link>
-                    <button type="button" onClick={handleLogout} title="Log out"
+                    <button type="button" onClick={handleLogout} title={t('header.logout')}
                             className="h-10 px-3 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-1.5 hover:bg-surface-container-low">
-                        <Icon name="logout" className="text-[18px]" /><span className="hidden sm:inline">Log out</span>
+                        <Icon name="logout" className="text-[18px]" /><span className="hidden sm:inline">{t('header.logout')}</span>
                     </button>
                 </div>
             </div>
@@ -84,12 +88,13 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
  * Tiêu đề trang đặt trong <main>: link quay lại (tuỳ chọn) + h1 + mô tả + nút bên phải.
  * @param back { to, label }  vd. { to: '/executor/home', label: 'All estates' }
  */
-export function PageTitle({ back, title, subtitle, right, className = 'mb-8' }) {
+export function PageTitle({ back, title, subtitle, right, className = 'mb-8' ,}) {
+    const { t } = useTranslation();
     return (
         <div className={className}>
             {back && (
                 <Link to={back.to} className="inline-flex items-center gap-1 text-sm font-semibold text-secondary hover:text-primary mb-3">
-                    <Icon name="arrow_back" className="text-[18px]" /> {back.label || 'Back'}
+                    <Icon name="arrow_back" className="text-[18px]" /> {back.label || t('actions.back')}
                 </Link>
             )}
             <div className="flex flex-wrap items-start justify-between gap-4">
