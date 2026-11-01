@@ -48,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -84,6 +85,22 @@ public class VaultServiceImpl implements VaultService {
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new VaultException("Owner not found", HttpStatus.NOT_FOUND));
 
+        // N1: kiểm toàn bộ danh sách người thụ hưởng TRƯỚC khi ghi bất cứ thứ gì
+        List<AddBeneficiaryRequest> requested = request.getBeneficiaries();
+        if (requested == null || requested.isEmpty()) {
+            throw new VaultException(ErrorCode.BENEFICIARY_REQUIRED, "A vault must have at least one beneficiary");
+        }
+        List<String> emails = new ArrayList<>();
+        for (AddBeneficiaryRequest b : requested) {
+            String email = validateBeneficiaryEmail(ownerId, owner, b.getEmail());
+            if (emails.contains(email)) {
+                throw new VaultException(ErrorCode.BENEFICIARY_DUPLICATE,
+                        "The same email appears more than once in the beneficiary list");
+            }
+            emails.add(email);
+        }
+        entitlementService.assertCanAddBeneficiaries(ownerId, emails.size());
+
         // 2. Tạo két sắt (Vault)
         Vault vault = Vault.builder()
                 .owner(owner)
@@ -111,7 +128,17 @@ public class VaultServiceImpl implements VaultService {
             }
         }
 
-        auditLogService.log(AuditAction.VAULT_CREATED, AuditResult.SUCCESS, 
+        // 4. N1: tạo từng người thụ hưởng; người đầu tiên là người chính của cột cũ
+        for (int i = 0; i < requested.size(); i++) {
+            VaultBeneficiary row = saveBeneficiaryRow(vault, emails.get(i), requested.get(i));
+            if (i == 0) {
+                syncLegacyPrimary(vault, row);
+            }
+            auditBeneficiaryAssigned(ownerId, owner, vault.getId(), row);
+            notifyBeneficiaryAdded(vault, owner, emails.get(i), row.getUser() == null, false);
+        }
+
+        auditLogService.log(AuditAction.VAULT_CREATED, AuditResult.SUCCESS,
                 ownerId, owner.getEmail(), vault.getId(),
                 "Vault", vault.getId().toString(), null);
         return vault;
@@ -355,14 +382,7 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = lockActiveOwnedVault(ownerId, vaultId, AuditAction.BENEFICIARY_ASSIGN_DENIED);
         User owner = vault.getOwner();
 
-        String email = request.getEmail().trim().toLowerCase();
-        if (email.equals(owner.getEmail())) {
-            throw new VaultException(ErrorCode.BENEFICIARY_SELF, "You cannot assign yourself as a beneficiary");
-        }
-        if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, email)) {
-            throw new VaultException(ErrorCode.BENEFICIARY_CONFLICT,
-                    "This person is your Digital Executor and cannot also be your beneficiary.");
-        }
+        String email = validateBeneficiaryEmail(ownerId, owner, request.getEmail());
         if (vaultBeneficiaryRepository.existsByVaultIdAndEmail(vaultId, email)) {
             throw new VaultException(ErrorCode.BENEFICIARY_DUPLICATE,
                     "This person is already a beneficiary of this vault");
@@ -371,38 +391,13 @@ public class VaultServiceImpl implements VaultService {
         List<VaultBeneficiary> current = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId);
         entitlementService.assertCanAddBeneficiaries(ownerId, current.size() + 1);
 
-        User user = userRepository.findByEmail(email)
-                .filter(u -> u.getStatus() != UserStatus.PENDING)
-                .orElse(null);
-        VaultBeneficiary row = vaultBeneficiaryRepository.save(VaultBeneficiary.builder()
-                .vault(vault)
-                .user(user)
-                .email(email)
-                .fullName(request.getFullName())
-                .relationship(request.getRelationship())
-                .status(user == null ? BeneficiaryInviteStatus.PENDING_REGISTRATION : BeneficiaryInviteStatus.INVITED)
-                .build());
-
+        VaultBeneficiary row = saveBeneficiaryRow(vault, email, request);
         if (current.isEmpty()) {
             syncLegacyPrimary(vault, row);   // người đầu tiên = người chính của luồng cũ
         }
 
-        boolean pending = user == null;
-        auditLogService.log(AuditAction.BENEFICIARY_ASSIGNED, AuditResult.SUCCESS, ownerId, owner.getEmail(),
-                vaultId, "Vault", vaultId.toString(),
-                pending ? "pendingRegistration=true" : "beneficiaryUserId=" + user.getId());
-
-        String ownerName = owner.getFullName();
-        String ownerEmail = owner.getEmail();
-        String vaultName = vault.getName();
-        runAfterCommit(() -> {
-            if (pending) {
-                emailSender.sendBeneficiaryInvitation(email, ownerName, vaultName);
-            } else {
-                emailSender.sendBeneficiaryAssignedNotice(email, ownerName, vaultName);
-            }
-            emailSender.sendBeneficiaryAssignmentConfirmation(ownerEmail, vaultName, email, pending);
-        });
+        auditBeneficiaryAssigned(ownerId, owner, vaultId, row);
+        notifyBeneficiaryAdded(vault, owner, email, row.getUser() == null, true);
 
         return new VaultBeneficiaryResponse(row.getId(), row.getEmail(), row.getFullName(),
                 row.getRelationship(), row.getStatus());
@@ -447,6 +442,60 @@ public class VaultServiceImpl implements VaultService {
         String ownerName = vault.getOwner().getFullName();
         String vaultName = vault.getName();
         runAfterCommit(() -> emailSender.sendBeneficiaryRemovedNotice(removedEmail, ownerName, vaultName));
+    }
+
+    // N2-owner / N1: chuẩn hóa email rồi chặn tự gán và trùng Executor (thứ tự kiểm giữ nguyên như trước)
+    private String validateBeneficiaryEmail(UUID ownerId, User owner, String rawEmail) {
+        String email = rawEmail.trim().toLowerCase();
+        if (email.equals(owner.getEmail())) {
+            throw new VaultException(ErrorCode.BENEFICIARY_SELF, "You cannot assign yourself as a beneficiary");
+        }
+        if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, email)) {
+            throw new VaultException(ErrorCode.BENEFICIARY_CONFLICT,
+                    "This person is your Digital Executor and cannot also be your beneficiary.");
+        }
+        return email;
+    }
+
+    // N2-owner / N1: tạo dòng vault_beneficiaries; đã có tài khoản kích hoạt thì gắn user, chưa thì chờ đăng ký
+    private VaultBeneficiary saveBeneficiaryRow(Vault vault, String email, AddBeneficiaryRequest request) {
+        User user = userRepository.findByEmail(email)
+                .filter(u -> u.getStatus() != UserStatus.PENDING)
+                .orElse(null);
+        return vaultBeneficiaryRepository.save(VaultBeneficiary.builder()
+                .vault(vault)
+                .user(user)
+                .email(email)
+                .fullName(request.getFullName())
+                .relationship(request.getRelationship())
+                .status(user == null ? BeneficiaryInviteStatus.PENDING_REGISTRATION : BeneficiaryInviteStatus.INVITED)
+                .build());
+    }
+
+    // m5: audit không ghi email bên thứ ba, chỉ ghi id hoặc cờ chờ đăng ký
+    private void auditBeneficiaryAssigned(UUID ownerId, User owner, UUID vaultId, VaultBeneficiary row) {
+        String detail = row.getUser() == null
+                ? "pendingRegistration=true"
+                : "beneficiaryUserId=" + row.getUser().getId();
+        auditLogService.log(AuditAction.BENEFICIARY_ASSIGNED, AuditResult.SUCCESS, ownerId, owner.getEmail(),
+                vaultId, "Vault", vaultId.toString(), detail);
+    }
+
+    // Mail gửi sau commit. confirmToOwner = true khi thêm lẻ; false khi tạo vault (tránh N mail xác nhận cho Owner)
+    private void notifyBeneficiaryAdded(Vault vault, User owner, String email, boolean pending, boolean confirmToOwner) {
+        String ownerName = owner.getFullName();
+        String ownerEmail = owner.getEmail();
+        String vaultName = vault.getName();
+        runAfterCommit(() -> {
+            if (pending) {
+                emailSender.sendBeneficiaryInvitation(email, ownerName, vaultName);
+            } else {
+                emailSender.sendBeneficiaryAssignedNotice(email, ownerName, vaultName);
+            }
+            if (confirmToOwner) {
+                emailSender.sendBeneficiaryAssignmentConfirmation(ownerEmail, vaultName, email, pending);
+            }
+        });
     }
 
     private Vault lockActiveOwnedVault(UUID ownerId, UUID vaultId, AuditAction deniedAction) {

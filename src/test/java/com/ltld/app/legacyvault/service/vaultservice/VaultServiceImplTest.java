@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
@@ -11,9 +12,12 @@ import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -25,6 +29,7 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
@@ -91,6 +96,8 @@ class VaultServiceImplTest {
     private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock
     private AssetAllocationRepository assetAllocationRepository;
+    @Mock
+    private EntitlementService entitlementService;
 
     // 2. Bơm các class giả ở trên vào Class thật mà ta đang muốn test
     @InjectMocks
@@ -118,6 +125,7 @@ class VaultServiceImplTest {
         assetDto.setAssetType(AssetType.BANK_ACCOUNT);
         assetDto.setSecret("my-password");
         request.setAssets(List.of(assetDto));
+        request.setBeneficiaries(List.of(beneficiaryReq("ben@test.com")));
 
         Vault savedVault = new Vault();
         savedVault.setId(UUID.randomUUID());
@@ -128,7 +136,8 @@ class VaultServiceImplTest {
         // Kịch bản giả lập (Khi code gọi hàm A thì trả về B)
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
         when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
-        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password"); // Trọng tâm KT
+        when(cryptoService.encrypt("my-password")).thenReturn("encrypted-password");// Trọng tâm KT
+        when(vaultBeneficiaryRepository.save(any(VaultBeneficiary.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Gọi hàm thực tế (Act)
         Vault result = vaultService.createVault(ownerId, request);
@@ -139,7 +148,7 @@ class VaultServiceImplTest {
         assertEquals(VaultStatus.ACTIVE, result.getStatus());
 
         // Đảm bảo hàm save và hàm encrypt đã chạy ngầm đúng 1 lần
-        verify(vaultRepository, times(1)).save(any(Vault.class));
+        verify(vaultRepository, times(2)).save(any(Vault.class));   // 1: tạo vault, 2: syncLegacyPrimary (N1)
         verify(digitalAssetRepository, times(1)).save(any(DigitalAsset.class));
         verify(cryptoService, times(1)).encrypt("my-password");
         verify(dmsConfigService).assertHandoverNotStarted(ownerId);
@@ -155,6 +164,129 @@ class VaultServiceImplTest {
 
         assertThrows(DmsException.class, () -> vaultService.createVault(ownerId, request));
         verify(vaultRepository, never()).save(any());
+    }
+
+    // ===== N1: tạo vault kèm người thụ hưởng =====
+
+    private AddBeneficiaryRequest beneficiaryReq(String email) {
+        AddBeneficiaryRequest r = new AddBeneficiaryRequest();
+        r.setEmail(email);
+        return r;
+    }
+
+    private CreateVaultRequest createRequestWith(AddBeneficiaryRequest... beneficiaries) {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("My Vault");
+        request.setBeneficiaries(List.of(beneficiaries));
+        return request;
+    }
+
+    private Vault newSavedVault() {
+        Vault v = new Vault();
+        v.setId(UUID.randomUUID());
+        v.setName("My Vault");
+        v.setStatus(VaultStatus.ACTIVE);
+        v.setOwner(mockOwner);
+        return v;
+    }
+
+    @Test
+    @DisplayName("createVault (N1): không có người thụ hưởng (null hoặc rỗng) -> BENEFICIARY_REQUIRED, không lưu gì")
+    void createVault_noBeneficiaries_throwsRequired() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+
+        CreateVaultRequest nullList = new CreateVaultRequest();
+        nullList.setName("My Vault");
+        CreateVaultRequest emptyList = new CreateVaultRequest();
+        emptyList.setName("My Vault");
+        emptyList.setBeneficiaries(List.of());
+
+        for (CreateVaultRequest request : List.of(nullList, emptyList)) {
+            VaultException ex = assertThrows(VaultException.class, () -> vaultService.createVault(ownerId, request));
+            assertEquals(ErrorCode.BENEFICIARY_REQUIRED, ex.getErrorCode());
+        }
+        verify(vaultRepository, never()).save(any());
+        verifyNoInteractions(entitlementService);
+    }
+
+    @Test
+    @DisplayName("createVault (N1): tự gán chính mình -> BENEFICIARY_SELF, không lưu gì")
+    void createVault_selfAsBeneficiary_throws() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.createVault(ownerId, createRequestWith(beneficiaryReq("OWNER@test.com"))));
+
+        assertEquals(ErrorCode.BENEFICIARY_SELF, ex.getErrorCode());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): trùng Executor -> BENEFICIARY_CONFLICT, không lưu gì")
+    void createVault_executorAsBeneficiary_throws() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, "exec@test.com")).thenReturn(true);
+
+        VaultException ex = assertThrows(VaultException.class,
+                () -> vaultService.createVault(ownerId, createRequestWith(beneficiaryReq("exec@test.com"))));
+
+        assertEquals(ErrorCode.BENEFICIARY_CONFLICT, ex.getErrorCode());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): trùng email trong cùng request (không phân biệt hoa thường) -> BENEFICIARY_DUPLICATE")
+    void createVault_duplicateEmailInRequest_throws() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+
+        VaultException ex = assertThrows(VaultException.class, () -> vaultService.createVault(ownerId,
+                createRequestWith(beneficiaryReq("dup@test.com"), beneficiaryReq("  DUP@test.com "))));
+
+        assertEquals(ErrorCode.BENEFICIARY_DUPLICATE, ex.getErrorCode());
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): vượt giới hạn gói -> PlanLimitReachedException, không lưu gì")
+    void createVault_planLimit_savesNothing() {
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        doThrow(new PlanLimitReachedException(PlanFeature.BENEFICIARY_LIMIT, "Beneficiary limit reached"))
+                .when(entitlementService).assertCanAddBeneficiaries(ownerId, 2);
+
+        assertThrows(PlanLimitReachedException.class, () -> vaultService.createVault(ownerId,
+                createRequestWith(beneficiaryReq("a@test.com"), beneficiaryReq("b@test.com"))));
+
+        verify(vaultRepository, never()).save(any());
+        verify(vaultBeneficiaryRepository, never()).save(any());
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    @DisplayName("createVault (N1): lưu từng người thụ hưởng, người đầu là người chính của cột cũ, gửi mail đúng loại")
+    void createVault_withBeneficiaries_savesRowsAndNotifies() throws Exception {
+        Vault savedVault = newSavedVault();
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(vaultRepository.save(any(Vault.class))).thenReturn(savedVault);
+        when(userRepository.findByEmail("ben1@test.com")).thenReturn(Optional.empty());   // chưa có tài khoản
+        when(userRepository.findByEmail("ben2@test.com"))
+                .thenReturn(Optional.of(userWith("ben2@test.com", UserStatus.ACTIVE)));
+        when(vaultBeneficiaryRepository.save(any(VaultBeneficiary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        vaultService.createVault(ownerId,
+                createRequestWith(beneficiaryReq("  Ben1@Test.com "), beneficiaryReq("ben2@test.com")));
+
+        ArgumentCaptor<VaultBeneficiary> captor = ArgumentCaptor.forClass(VaultBeneficiary.class);
+        verify(vaultBeneficiaryRepository, times(2)).save(captor.capture());
+        List<VaultBeneficiary> rows = captor.getAllValues();
+        assertEquals("ben1@test.com", rows.get(0).getEmail());
+        assertEquals(BeneficiaryInviteStatus.PENDING_REGISTRATION, rows.get(0).getStatus());
+        assertEquals("ben2@test.com", rows.get(1).getEmail());
+        assertEquals(BeneficiaryInviteStatus.INVITED, rows.get(1).getStatus());
+
+        assertEquals("ben1@test.com", savedVault.getBeneficiaryEmail());   // cột cũ trỏ tới người đầu tiên
+        verify(emailSender).sendBeneficiaryInvitation(eq("ben1@test.com"), any(), any());
+        verify(emailSender).sendBeneficiaryAssignedNotice(eq("ben2@test.com"), any(), any());
+        verify(emailSender, never()).sendBeneficiaryAssignmentConfirmation(any(), any(), any(), anyBoolean());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)

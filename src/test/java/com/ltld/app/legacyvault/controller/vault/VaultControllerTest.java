@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.controller.vault;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ltld.app.legacyvault.controller.VaultController;
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
@@ -87,6 +88,25 @@ public class VaultControllerTest {
         CreateVaultRequest request = new CreateVaultRequest();
         request.setName("Vault 1");
         request.setDescription("a".repeat(501));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): email người thụ hưởng sai định dạng -> 400 Bad Request")
+    void createVault_invalidBeneficiaryEmail_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        AddBeneficiaryRequest beneficiary = new AddBeneficiaryRequest();
+        beneficiary.setEmail("not-an-email");
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        request.setBeneficiaries(List.of(beneficiary));
 
         mockMvc.perform(post("/api/vaults")
                         .principal(() -> ownerId.toString())

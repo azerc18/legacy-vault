@@ -21,6 +21,10 @@ public class CreateVaultRequest {
     @Size(max = 50, message = "At most 50 assets are allowed")
     private List<@Valid DigitalAssetDto> assets;
 
+    // N1: người thụ hưởng bắt buộc khi tạo vault. Việc "không được rỗng" kiểm ở service
+    // để trả mã BENEFICIARY_REQUIRED cho FE; ở đây chỉ validate từng phần tử.
+    private List<@NotNull @Valid AddBeneficiaryRequest> beneficiaries;
+
     @Data
     public static class DigitalAssetDto {
         @NotNull(message = "Asset type is required")
