@@ -56,7 +56,7 @@ export default function VerificationRequestDetail() {
         return getRequestById(requestId)
             .then(setReq)
             .catch((e) => setError(getErrorMessage(e, t('detail.notFound'))));
-    }, [requestId, t]);
+    }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
 
@@ -224,7 +224,7 @@ export default function VerificationRequestDetail() {
                 className="w-full h-12 px-3 rounded-lg border border-outline-variant bg-background focus:outline-none focus:border-error"
             >
                 <option value="">{t('detail.selectReason')}</option>
-                {rejectReasons.map((r) => <option key={r.code} value={r.code}>{r.label}</option>)}
+                {rejectReasons.map((r) => <option key={r.code} value={r.code}>{t(`rejectReason.${r.code}`, { defaultValue: r.label })}</option>)}
             </select>
             {reasonsError && (
                 <div role="alert" className="text-sm text-error flex items-center gap-2">

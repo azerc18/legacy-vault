@@ -21,7 +21,7 @@
     "awaiting": "Chờ bạn ký",
     "pending": "Chờ xem xét",
     "executor": "Người thi hành: {{name}}",
-    "meta": "#{{id}} · Gửi ngày {{date}} · {{count}} kho",
+    "meta": "#{{id}} · Gửi ngày {{date}} · {{count}} két",
     "loadError": "Không tải được danh sách yêu cầu."
   },
   "home": {
@@ -67,7 +67,7 @@
     "openPending": "Mở các yêu cầu đang chờ",
     "cols": {
       "decided": "Ngày quyết định",
-      "owner": "Chủ kho",
+      "owner": "Chủ két",
       "executor": "Người thi hành",
       "result": "Kết quả",
       "note": "Ghi chú"
@@ -103,7 +103,7 @@
     "processing": "Đang xử lý...",
     "approve": {
       "title": "Duyệt yêu cầu này?",
-      "message": "Bạn xác nhận tài liệu hợp lệ. Sau khi duyệt, bạn vẫn cần ký bằng mã dùng một lần để mở khoá kho.",
+      "message": "Bạn xác nhận tài liệu hợp lệ. Sau khi duyệt, bạn vẫn cần ký bằng mã dùng một lần để mở khoá két.",
       "button": "Duyệt"
     },
     "reject": {
@@ -112,8 +112,8 @@
       "button": "Từ chối"
     },
     "sign": {
-      "title": "Ký và mở khoá kho?",
-      "message": "Không thể hoàn tác. Tất cả kho trong yêu cầu này sẽ được mở khoá cho người thụ hưởng.",
+      "title": "Ký và mở khoá két?",
+      "message": "Không thể hoàn tác. Tất cả két trong yêu cầu này sẽ được mở khoá cho người thụ hưởng.",
       "button": "Ký và mở khoá"
     }
   },
@@ -121,15 +121,15 @@
     "notFound": "Không tìm thấy yêu cầu.",
     "backToList": "Về danh sách",
     "requestTitle": "Yêu cầu #{{id}}",
-    "ownerLine": "Chủ kho: {{name}}",
+    "ownerLine": "Chủ két: {{name}}",
     "caseInfo": "Thông tin hồ sơ",
-    "deceased": "Người đã mất (Chủ kho)",
+    "deceased": "Người đã mất (Chủ két)",
     "requester": "Người yêu cầu (Người thi hành)",
     "submitted": "Ngày gửi",
     "decided": "Ngày quyết định",
-    "vaultsTitle": "Kho sẽ mở khoá ({{count}})",
-    "vaultsHint": "Khi ký yêu cầu này, tất cả kho bên dưới sẽ được mở khoá cho người thụ hưởng.",
-    "unnamedVault": "Kho chưa đặt tên",
+    "vaultsTitle": "Két sẽ mở khoá ({{count}})",
+    "vaultsHint": "Khi ký yêu cầu này, tất cả két bên dưới sẽ được mở khoá cho người thụ hưởng.",
+    "unnamedVault": "Két chưa đặt tên",
     "certificate": "Giấy chứng tử",
     "docSubmitted": "Tài liệu do người thi hành nộp",
     "noCertificate": "Chưa đính kèm giấy chứng tử.",
@@ -156,16 +156,16 @@
     "noteLabel": "Ghi chú từ chối",
     "notePlaceholder": "Nhập ghi chú cho lý do này...",
     "rejectRequest": "Từ chối yêu cầu",
-    "approvedBanner": "Yêu cầu đã được duyệt. Hãy ký bằng mã dùng một lần để mở khoá kho.",
+    "approvedBanner": "Yêu cầu đã được duyệt. Hãy ký bằng mã dùng một lần để mở khoá két.",
     "sendCode": "Gửi mã ký đến email của tôi",
     "sendingCode": "Đang gửi...",
     "codeLabel": "Mã ký (6 chữ số)",
     "resendIn": "Gửi lại mã sau {{s}} giây",
     "resend": "Gửi lại mã",
-    "signUnlock": "Ký và mở khoá kho",
+    "signUnlock": "Ký và mở khoá két",
     "codeSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
     "signedTitle": "Đã ký thành công",
-    "signedText": "Kho đã được mở khoá cho người thụ hưởng.",
+    "signedText": "Két đã được mở khoá cho người thụ hưởng.",
     "rejectedTitle": "Yêu cầu này đã bị từ chối",
     "reason": "Lý do: {{reason}}",
     "recorded": "Quyết định của bạn sẽ được ghi vào lịch sử hệ thống.",
@@ -183,5 +183,13 @@
       "noResponse": "không có phản hồi",
       "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này."
     }
+  },
+  "rejectReason": {
+    "DOCUMENT_UNREADABLE": "Tài liệu bị mờ hoặc không đọc được",
+    "DOCUMENT_INVALID": "Tài liệu không phải giấy chứng tử hợp lệ",
+    "INFO_MISMATCH": "Thông tin không khớp với chủ tài khoản",
+    "SUSPECTED_FORGERY": "Tài liệu bị nghi là giả mạo",
+    "DOCUMENT_INCOMPLETE": "Tài liệu thiếu trang hoặc thiếu dấu chứng thực",
+    "OTHER": "Lý do khác"
   }
 }

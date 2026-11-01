@@ -35,7 +35,7 @@ export default function VerificationHistory() {
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [status, from, to, page, t]);
+    }, [status, from, to, page]); // eslint-disable-line react-hooks/exhaustive-deps -- t chỉ dùng cho thông báo lỗi
 
     // Đổi bộ lọc thì quay về trang đầu
     const onFilter = (setter) => (e) => { setter(e.target.value); setPage(0); };

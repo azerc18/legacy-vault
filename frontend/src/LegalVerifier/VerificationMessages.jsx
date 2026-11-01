@@ -27,7 +27,7 @@ export default function VerificationMessages({ requestId, status }) {
         } catch (e) {
             setError(getErrorMessage(e, t('messages.loadError')));
         }
-    }, [requestId, t]);
+    }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps -- t chỉ dùng cho thông báo lỗi
 
     useEffect(() => { load(); }, [load]);
 

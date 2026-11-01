@@ -21,8 +21,9 @@
     "awaiting": "Awaiting your signature",
     "pending": "Pending review",
     "executor": "Executor: {{name}}",
-    "meta": "#{{id}} · Submitted {{date}} · {{count}} vault(s)",
-    "loadError": "Could not load requests."
+    "loadError": "Could not load requests.",
+    "meta_one": "#{{id}} · Submitted {{date}} · {{count}} vault",
+    "meta_other": "#{{id}} · Submitted {{date}} · {{count}} vaults"
   },
   "home": {
     "welcome": "Welcome back, {{name}}",
@@ -127,7 +128,6 @@
     "requester": "Requester (Executor)",
     "submitted": "Submitted",
     "decided": "Decided",
-    "vaultsTitle": "Vaults to unlock ({{count}})",
     "vaultsHint": "Signing this request will unlock all vaults below for their beneficiaries.",
     "unnamedVault": "Unnamed vault",
     "certificate": "Death certificate",
@@ -182,6 +182,16 @@
       "openDocument": "Could not open the document (HTTP {{status}}).",
       "noResponse": "no response",
       "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site."
-    }
+    },
+    "vaultsTitle_one": "Vault to unlock ({{count}})",
+    "vaultsTitle_other": "Vaults to unlock ({{count}})"
+  },
+  "rejectReason": {
+    "DOCUMENT_UNREADABLE": "The document is blurry or unreadable",
+    "DOCUMENT_INVALID": "The document is not a valid death certificate",
+    "INFO_MISMATCH": "The information does not match the account holder",
+    "SUSPECTED_FORGERY": "The document is suspected to be forged",
+    "DOCUMENT_INCOMPLETE": "The document is missing pages or a certification stamp",
+    "OTHER": "Other reason"
   }
 }
