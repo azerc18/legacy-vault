@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.RejectionReason;
 import com.ltld.app.legacyvault.enums.SignatureMethod;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
@@ -510,6 +511,40 @@ public class LegalVerificationServiceImplTest {
         verify(auditLogService, times(1)).log(
                 eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
                 isNull(), eq("Vault"), eq(vault.getId().toString()), anyString());
+    }
+
+    // N2-unlock: một hồ sơ có nhiều vault -> mở khóa từng vault, cùng hạn nhận, và phát 1 sự kiện mang đủ vault
+    // để listener thông báo cho từng beneficiary (không còn phụ thuộc vault.getBeneficiary())
+    @Test
+    void sign_multipleVaults_unlocksEachAndPublishesEventWithAllVaults() {
+        approvedByVerifier();
+        handoverStillValid();
+        pendingRequest.setSignOtpHash("hashedOtp");
+        pendingRequest.setSignOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        Vault first = vaultOf(VaultStatus.ACTIVE);
+        Vault second = vaultOf(VaultStatus.ACTIVE);
+        List<VerificationRequestVault> links = List.of(
+                VerificationRequestVault.builder().request(pendingRequest).vault(first).build(),
+                VerificationRequestVault.builder().request(pendingRequest).vault(second).build());
+
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
+        when(otpHasher.matches(requestId, "000000", "hashedOtp")).thenReturn(true);
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(links);
+
+        service.sign(requestId, verifierId, signDto());
+
+        for (Vault vault : List.of(first, second)) {
+            assertThat(vault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+            assertThat(vault.getClaimDeadlineAt()).isEqualTo(vault.getUnlockedAt().plusDays(60));
+            verify(auditLogService).log(
+                    eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
+                    isNull(), eq("Vault"), eq(vault.getId().toString()), anyString());
+        }
+        assertThat(second.getUnlockedAt()).isEqualTo(first.getUnlockedAt()); // cùng một thời điểm mở khóa
+        verify(eventPublisher).publishEvent(
+                new VaultsUnlockedEvent(requestId, List.of(first.getId(), second.getId())));
     }
 
     @Test
