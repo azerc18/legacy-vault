@@ -15,12 +15,6 @@ import java.util.UUID;
 
 @Repository
 public interface BeneficiaryClaimRepository extends JpaRepository<BeneficiaryClaim, UUID> {
-    // Tìm kiếm hồ sơ claim dựa trên id của Vault
-    Optional<BeneficiaryClaim> findByVaultId(UUID vaultId);
-
-    // FR-16/FR-17: lấy claim của nhiều vault trong một truy vấn (cho danh sách vault của Beneficiary)
-    List<BeneficiaryClaim> findByVaultIdIn(Collection<UUID> vaultIds);
-
     // Chuyển PENDING -> CLAIMED nguyên tử: request thứ hai nhận 0 dòng bị ảnh hưởng nên bị từ chối
     @Modifying(flushAutomatically = true)
     @Query("""

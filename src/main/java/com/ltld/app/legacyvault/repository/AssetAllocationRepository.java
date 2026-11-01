@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.AssetAllocation;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -35,4 +36,17 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
                    OR al.effectiveBeneficiary.id = :holderId)
             """)
     List<AssetAllocation> findHeldBy(@Param("vaultId") UUID vaultId, @Param("holderId") UUID holderId);
+
+    // N2b (Q49): số phân bổ mà người đang giữ đã từ chối / từ bỏ, tức không còn ai nhận (stalled)
+    // LEFT JOIN tường minh: nếu dùng al.effectiveBeneficiary.status thì Hibernate tạo INNER JOIN và làm mất
+    // các dòng chưa fallback (effectiveBeneficiary IS NULL).
+    @Query("""
+            SELECT COUNT(al) FROM AssetAllocation al
+            JOIN al.beneficiary b
+            LEFT JOIN al.effectiveBeneficiary e
+            WHERE al.asset.vault.id = :vaultId
+              AND ((e IS NULL AND b.status IN :deadStatuses) OR e.status IN :deadStatuses)
+            """)
+    long countStalledInVault(@Param("vaultId") UUID vaultId,
+                             @Param("deadStatuses") Collection<BeneficiaryInviteStatus> deadStatuses);
 }

@@ -174,7 +174,6 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("Handover case closed.", response));
     }
 
-    // N2b: Beneficiary từ chối phần được chia; tài sản chuyển sang người dự phòng (nếu có)
     // N2b: Beneficiary đã xác minh danh tính xác nhận nhận phần được chia
     @PostMapping("/vaults/{vaultId}/accept")
     public ResponseEntity<ApiResponse<AcceptClaimResponse>> acceptClaim(

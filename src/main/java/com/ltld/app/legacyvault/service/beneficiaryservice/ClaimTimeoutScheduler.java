@@ -93,10 +93,11 @@ public class ClaimTimeoutScheduler {
         }
     }
 
-    // Thứ tự claim rồi vault giống closeVault để không bị deadlock.
+    // BR-04 / N2b: thứ tự khóa vault -> claim, cùng thứ tự với closeVault / declineClaim để không bị deadlock.
     // Trả về null nếu không lưu trữ (giao dịch bị rollback), nên phần xóa nội dung chỉ chạy sau nhánh archived == 0.
     private ArchiveResult archive(UUID vaultId, LocalDateTime now, TransactionStatus status) {
-        claimRepository.markExpiredByVaultId(vaultId); // N2b: khóa vault trước claim, cùng thứ tự với closeVault/declineClaim
+        vaultRepository.findByIdForUpdate(vaultId);
+        claimRepository.markExpiredByVaultId(vaultId);
         int archived = vaultRepository.archiveIfExpired(vaultId, now, now.plusYears(PURGE_RETENTION_YEARS));
         if (archived == 0) {
             status.setRollbackOnly(); // vault đã đổi trạng thái (vd. vừa CLAIMED): hoàn tác cả việc đổi claim

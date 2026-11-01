@@ -535,7 +535,7 @@ class BeneficiaryNotificationListenerTest {
         verify(executorNotificationService).send(eq("ex1@example.com"), contains("vault \"Hồ sơ A\""));
         verify(executorNotificationService, never()).send(eq("ex2@example.com"), anyString());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
-                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                isNull(), isNull(), eq(vaultId), eq("VaultBeneficiary"), anyString(),
                 contains("pendingRegistration=true"));
     }
 
@@ -567,15 +567,15 @@ class BeneficiaryNotificationListenerTest {
         verify(emailSender).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(executorNotificationService, never()).send(any(), any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
-                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                isNull(), isNull(), eq(vaultId), eq("VaultBeneficiary"), anyString(),
                 contains("executorsNotified=0/0"));
     }
 
     @Test
     void pendingRegistration_eventReplayed_skipsDuplicate() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
-        when(auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED))
-                .thenReturn(true);
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                eq(vaultId), eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), any())).thenReturn(true);
 
         listener.onVaultsUnlocked(event(vaultId));
 
@@ -594,5 +594,26 @@ class BeneficiaryNotificationListenerTest {
         verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
                 isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()), contains("claimDeadlineAt"));
+    }
+
+    @Test
+    void pendingRegistration_onlyUnnotifiedPersonGetsInvite() {
+        Vault vault = pendingVault("an@example.com");
+        VaultBeneficiary first = beneficiaryRows.get(vaultId).get(0);
+        VaultBeneficiary second = VaultBeneficiary.builder().id(UUID.randomUUID()).vault(vault).user(null)
+                .email("binh@example.com").status(BeneficiaryInviteStatus.PENDING_REGISTRATION).build();
+        beneficiaryRows.put(vaultId, List.of(first, second));
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED, first.getId())).thenReturn(true);
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED, second.getId())).thenReturn(false);
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender, never()).sendVaultUnlockedNotification(
+                eq("an@example.com"), any(), any(), any(), any(), anyBoolean(), any());
+        verify(emailSender).sendVaultUnlockedNotification(
+                eq("binh@example.com"), any(), any(), any(), any(), anyBoolean(), any());
     }
 }

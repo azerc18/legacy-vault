@@ -225,7 +225,7 @@ public class BeneficiaryNotificationListener {
 
         if (mailSent) {
             auditLogService.log(AuditAction.BENEFICIARY_PENDING_NOTIFIED, AuditResult.SUCCESS, null, null,
-                    vaultId, ENTITY_VAULT, vaultId.toString(),
+                    vaultId, "VaultBeneficiary", mail.rowId().toString(),
                     "pendingRegistration=true, executorsNotified=" + notified + "/" + mail.executorEmails().size());
         }
     }
@@ -251,7 +251,7 @@ public class BeneficiaryNotificationListener {
                 ? owner.getFullName() : OWNER_FALLBACK;
         return new MailData(null, vault.getId(), vb.getEmail(), null, ownerName, vault.getName(),
                 vault.getClaimDeadlineAt(), false, null, 0,
-                withExecutors ? activeExecutorEmails(owner) : List.of(), null, true);
+                withExecutors ? activeExecutorEmails(owner) : List.of(), null, true, vb.getId());
     }
 
     private List<MailData> tryPrepare(UUID vaultId, LocalDateTime now) {
@@ -291,14 +291,16 @@ public class BeneficiaryNotificationListener {
         List<MailData> mails = new ArrayList<>();
 
         // Người chưa có tài khoản (Q25): mời một lần, chặn phát lại sự kiện bằng audit
-        List<VaultBeneficiary> pending = recipients.stream().filter(b -> b.getUser() == null).toList();
-        if (!pending.isEmpty()
-                && !auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED)) {
-            boolean first = true;
-            for (VaultBeneficiary vb : pending) {
-                mails.add(preparePendingRegistration(vault, vb, first));
-                first = false;
-            }
+        // Chặn theo từng người: người đã mời xong thì bỏ qua, người còn lại (lỗi trước đó / mới thêm) vẫn được thử
+        List<VaultBeneficiary> pending = recipients.stream()
+                .filter(b -> b.getUser() == null)
+                .filter(b -> !auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                        vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED, b.getId()))
+                .toList();
+        boolean first = true;
+        for (VaultBeneficiary vb : pending) {
+            mails.add(preparePendingRegistration(vault, vb, first));
+            first = false;
         }
 
         // Người đã có tài khoản: mỗi người một claim riêng
@@ -361,7 +363,7 @@ public class BeneficiaryNotificationListener {
                 ownerName, vault.getName(), claim.getClaimDeadlineAt(),
                 beneficiary.getStatus() != UserStatus.PENDING,   // nhánh 2a: PENDING = chưa kích hoạt
                 beneficiary.getStatus(), claim.getNotifyAttempts(), executorEmails,
-                beneficiary, false);
+                beneficiary, false, null);
     }
 
     private List<String> activeExecutorEmails(User owner) {
@@ -419,6 +421,6 @@ public class BeneficiaryNotificationListener {
     private record MailData(UUID claimId, UUID vaultId, String email, String fullName, String ownerName,
                             String vaultName, LocalDateTime claimDeadlineAt, boolean accountActive,
                             UserStatus accountStatus, int attempt, List<String> executorEmails,
-                            User beneficiary, boolean pendingRegistration) {
+                            User beneficiary, boolean pendingRegistration, UUID rowId) {
     }
 }

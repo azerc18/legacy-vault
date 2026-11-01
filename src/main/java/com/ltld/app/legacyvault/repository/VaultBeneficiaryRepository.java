@@ -36,4 +36,9 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
 
     // N2b: tìm dòng thụ hưởng của một user trong một vault (cổng truy cập của luồng claim)
     Optional<VaultBeneficiary> findByVaultIdAndUserId(UUID vaultId, UUID userId);
+
+    // N2b: trạng thái phản hồi của một user trong nhiều vault (một query, tránh N+1 ở listMyVaults)
+    @Query("SELECT b FROM VaultBeneficiary b WHERE b.user.id = :userId AND b.vault.id IN :vaultIds")
+    List<VaultBeneficiary> findByUserIdAndVaultIdIn(@Param("userId") UUID userId,
+                                                    @Param("vaultIds") Collection<UUID> vaultIds);
 }

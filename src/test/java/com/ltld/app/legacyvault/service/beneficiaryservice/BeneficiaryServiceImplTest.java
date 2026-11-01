@@ -264,7 +264,8 @@ public class BeneficiaryServiceImplTest {
     // Vault UNLOCKED + claim PENDING còn hạn của currentUser; trả về claim để test kiểm tra thay đổi
     private BeneficiaryClaim stubDeclinable() {
         BeneficiaryClaim claim = claim(ClaimStatus.PENDING, LocalDateTime.now().plusDays(5));
-        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(vaultRepository.findByIdForUpdate(vaultId)).thenReturn(Optional.of(unlockedVault));
+        stubViewSession(true);
         when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(claim));
         return claim;
     }
@@ -2101,6 +2102,83 @@ public class BeneficiaryServiceImplTest {
         assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(response.getClaimStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        verify(vaultRepository, never()).save(any());
+    }
+
+    @Test
+    void listMyVaults_includesMyStatus_soDeclinedVaultCanBeShownAsDeclined() {
+        beneficiaryRow.setStatus(BeneficiaryInviteStatus.DECLINED);
+        when(vaultRepository.findVaultsOfBeneficiary(eq(currentUserId), any())).thenReturn(List.of(unlockedVault));
+        when(vaultBeneficiaryRepository.findByUserIdAndVaultIdIn(currentUserId, List.of(vaultId)))
+                .thenReturn(List.of(beneficiaryRow));
+
+        List<BeneficiaryVaultSummaryResponse> result = beneficiaryService.listMyVaults(currentUserId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMyStatus()).isEqualTo(BeneficiaryInviteStatus.DECLINED);
+    }
+
+    @Test
+    void declineClaim_noViewSession_throws403AndChangesNothing() {
+        when(vaultRepository.findByIdForUpdate(vaultId)).thenReturn(Optional.of(unlockedVault));
+        stubViewSession(false);
+
+        BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.declineClaim(vaultId, currentUserId, null));
+
+        assertThat(ex.getErrorCode()).isEqualTo(com.ltld.app.legacyvault.exception.ErrorCode.IDENTITY_NOT_VERIFIED);
+        assertThat(beneficiaryRow.getStatus()).isEqualTo(BeneficiaryInviteStatus.INVITED);
+        verify(claimRepository, never()).save(any());
+        verifyNoInteractions(assetAllocationRepository);
+    }
+
+    @Test
+    void declineClaim_afterAccept_throws409() {
+        beneficiaryRow.setStatus(BeneficiaryInviteStatus.ACCEPTED);
+        when(vaultRepository.findByIdForUpdate(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        BeneficiaryException ex = expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.declineClaim(vaultId, currentUserId, null));
+
+        assertThat(ex.getErrorCode()).isEqualTo(com.ltld.app.legacyvault.exception.ErrorCode.CLAIM_ALREADY_RESPONDED);
+        assertThat(beneficiaryRow.getStatus()).isEqualTo(BeneficiaryInviteStatus.ACCEPTED);
+        verify(claimRepository, never()).save(any());
+    }
+
+    // Phân bổ đã chuyển cho người này (effective), người này từ chối tiếp: không còn ai nữa nên stalled
+    @Test
+    void declineClaim_reassignedAllocation_holderDeclinesToo_isStalled() {
+        stubDeclinable();
+        VaultBeneficiary first = otherRow(BeneficiaryInviteStatus.DECLINED);
+        AssetAllocation al = allocation(first, beneficiaryRow);
+        al.setEffectiveBeneficiary(beneficiaryRow);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(first, beneficiaryRow));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getStalledAssets()).isEqualTo(1);
+        assertThat(response.getReassignedAssets()).isZero();
+        assertThat(al.getEffectiveBeneficiary()).isSameAs(beneficiaryRow);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_STALLED), eq(AuditResult.FAILURE), eq(currentUserId),
+                any(), eq("Vault"), eq(vaultId.toString()), any());
+    }
+
+    // Q49: còn phân bổ stalled thì người cuối đóng phần của mình vẫn không làm vault sang CLAIMED
+    @Test
+    void closeVault_stalledAllocationExists_vaultStaysUnlocked() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+        when(assetAllocationRepository.countStalledInVault(eq(vaultId), any())).thenReturn(1L);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
         verify(vaultRepository, never()).save(any());
     }
 }

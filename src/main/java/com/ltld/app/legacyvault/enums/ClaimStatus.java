@@ -4,6 +4,5 @@ public enum ClaimStatus {
     PENDING,
     CLAIMED,
     EXPIRED,
-    DECLINED,
-    STALLED
+    DECLINED
 }

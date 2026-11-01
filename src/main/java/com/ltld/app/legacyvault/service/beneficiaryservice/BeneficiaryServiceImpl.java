@@ -36,6 +36,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
@@ -149,6 +150,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .findByVaultIdInAndBeneficiaryId(vaults.stream().map(Vault::getId).toList(), currentUserId).stream()
                 .collect(Collectors.toMap(c -> c.getVault().getId(), c -> c));
 
+        Map<UUID, BeneficiaryInviteStatus> myStatusByVaultId = vaultBeneficiaryRepository
+                .findByUserIdAndVaultIdIn(currentUserId, vaults.stream().map(Vault::getId).toList()).stream()
+                .collect(Collectors.toMap(b -> b.getVault().getId(), VaultBeneficiary::getStatus, (a, b) -> a));
+
         return vaults.stream().map(v -> {
             BeneficiaryClaim claim = claimsByVaultId.get(v.getId());
             return BeneficiaryVaultSummaryResponse.builder()
@@ -157,6 +162,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     .ownerName(v.getOwner() != null ? v.getOwner().getFullName() : null)
                     .vaultStatus(v.getStatus())
                     .claimStatus(claim != null ? claim.getStatus() : null)
+                    .myStatus(myStatusByVaultId.get(v.getId()))
                     .unlockedAt(v.getUnlockedAt())
                     .claimDeadlineAt(v.getClaimDeadlineAt())
                     .claimedAt(claim != null ? claim.getClaimedAt() : null)
@@ -745,10 +751,15 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     @Transactional
     public DeclineClaimResponse declineClaim(UUID vaultId, UUID currentUserId, String reason) {
-        vaultRepository.findByIdForUpdate(vaultId); // N2b: khóa vault trước (vault -> claim) để không bỏ sót việc hoàn tất
-        Vault vault = vaultRepository.findById(vaultId)
+        // N2b: khóa vault trước (vault -> claim) để không bỏ sót việc hoàn tất
+        Vault vault = vaultRepository.findByIdForUpdate(vaultId)
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
         VaultBeneficiary me = requireBeneficiary(vaultId, currentUserId);
+        // Mỗi người chỉ phản hồi một lần: đã Accept thì không Decline được nữa
+        if (me.getStatus() == BeneficiaryInviteStatus.ACCEPTED) {
+            throw new BeneficiaryException(ErrorCode.CLAIM_ALREADY_RESPONDED,
+                    "You have already accepted this inheritance.");
+        }
 
         if (vault.getStatus() == VaultStatus.CLAIMED) {
             throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
@@ -760,15 +771,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST);
         }
 
+        // Từ chối không đảo ngược được: cùng cửa xác minh danh tính với Accept
+        assertNotLocked(vaultId, currentUserId);
+        assertViewSession(vaultId, currentUserId);
+
         LocalDateTime now = LocalDateTime.now();
-        // Chưa có claim (chưa kịp gửi thông báo) vẫn cho từ chối: tạo claim ở trạng thái DECLINED
+        // Đã qua xác minh thì claim chắc chắn tồn tại (initializeClaim tạo ra)
         BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)
-                .orElseGet(() -> BeneficiaryClaim.builder()
-                        .vault(vault)
-                        .beneficiary(me.getUser())
-                        .status(ClaimStatus.PENDING)
-                        .claimDeadlineAt(resolveDeadline(vault))
-                        .build());
+                .orElseThrow(() -> new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST));
         if (claim.getStatus() == ClaimStatus.CLAIMED) {
             throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
         }
@@ -813,9 +823,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         // Nếu mọi người còn lại đã đóng phần của mình thì vault hoàn tất (chỉ khi không còn tài sản stalled)
-        if (stalled == 0) {
-            completeVaultIfAllDone(vault);
-        }
+        completeVaultIfAllDone(vault);
 
         return DeclineClaimResponse.builder()
                 .vaultId(vaultId)
@@ -833,7 +841,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         VaultBeneficiary vb = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, currentUserId)
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
         if (vb.getStatus() == BeneficiaryInviteStatus.DECLINED || vb.getStatus() == BeneficiaryInviteStatus.WAIVED) {
-            throw new BeneficiaryException("You have declined this inheritance.", HttpStatus.CONFLICT);
+            throw new BeneficiaryException(ErrorCode.CLAIM_ALREADY_RESPONDED, "You have declined this inheritance.");
         }
         return vb;
     }
@@ -848,6 +856,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // N2b: vault chỉ sang CLAIMED khi mọi người thụ hưởng còn nhận được đều đã đóng phần của mình.
     // Nếu không ai đã đóng (vd. tất cả từ chối) thì giữ nguyên UNLOCKED đến hết hạn nhận.
     private void completeVaultIfAllDone(Vault vault) {
+        // Q49: còn phân bổ không có người nhận thì giữ UNLOCKED, chờ Admin xử lý hoặc hết hạn BR-04
+        if (assetAllocationRepository.countStalledInVault(vault.getId(),
+                List.of(BeneficiaryInviteStatus.DECLINED, BeneficiaryInviteStatus.WAIVED)) > 0) {
+            return;
+        }
         List<UUID> claimedUserIds = claimRepository.findAllByVaultId(vault.getId()).stream()
                 .filter(c -> c.getStatus() == ClaimStatus.CLAIMED)
                 .map(c -> c.getBeneficiary().getId())
@@ -933,8 +946,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 vaultId, currentUserId, VerificationStatus.SUCCESS,
                 LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
         if (!valid) {
-            throw new BeneficiaryException(
-                    "Identity verification is required before viewing assets.", HttpStatus.FORBIDDEN);
+            throw new BeneficiaryException(ErrorCode.IDENTITY_NOT_VERIFIED,
+                    "Identity verification is required before viewing assets.");
         }
     }
 
