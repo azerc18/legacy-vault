@@ -569,6 +569,8 @@ public class LegalVerificationServiceImplTest {
         assertThatThrownBy(() -> service.sign(requestId, verifierId, badDto))
                 .isInstanceOf(InvalidSignCodeException.class)
                 .satisfies(e -> assertThat(((InvalidSignCodeException) e).getErrorCode()).isEqualTo(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED));
+
+        assertThat(pendingRequest.getSignOtpHash()).isNull(); // mã bị huỷ, phải xin mã mới
     }
 
     // T2: sai quá 5 lần -> hủy mã + audit "Too many sign attempts"

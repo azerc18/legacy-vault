@@ -21,7 +21,7 @@ const otpKey = (id) => `lv_sign_otp_${id}`;
 const OTP_UNUSABLE_CODES = ['SIGN_CODE_EXPIRED', 'SIGN_CODE_ATTEMPTS_EXHAUSTED'];
 
 // Nhớ thời điểm đã gửi mã ký, để tải lại trang không phải gửi lại (chỉ là tiện lợi, lỗi thì bỏ qua)
-const rememberOtpSent = (id) => { try { sessionStorage.setItem(otpKey(id), String(Date.now())); } catch { /* ignore */ } };
+const rememberOtpSent = (id, at = Date.now()) => { try { sessionStorage.setItem(otpKey(id), String(at)); } catch { /* ignore */ } };
 const forgetOtpSent = (id) => { try { sessionStorage.removeItem(otpKey(id)); } catch { /* ignore */ } };
 const secondsSinceOtpSent = (id) => {
     try {
@@ -190,7 +190,12 @@ export default function VerificationRequestDetail() {
                 // V1: bị chặn gửi lại (429) -> đồng hồ chờ theo retryAfterSeconds của BE, đúng cả sau khi F5
                 if (errorCode === 'TOO_MANY_OTP_REQUESTS') {
                     const wait = Number(e?.response?.data?.data?.retryAfterSeconds);
-                    if (wait > 0) { setCooldown(wait); setCodeSent(true); }
+                    if (wait > 0) {
+                        setCooldown(wait);
+                        setCodeSent(true);
+                        // lưu mốc gửi ước tính để F5 vẫn giữ trạng thái "đã gửi mã" và đồng hồ chờ
+                        rememberOtpSent(req.id, Date.now() - (RESEND_SECONDS - wait) * 1000);
+                    }
                 }
             });
         if (ok) {
