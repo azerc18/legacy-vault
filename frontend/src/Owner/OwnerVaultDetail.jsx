@@ -9,6 +9,7 @@ import {
 } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
@@ -125,6 +126,7 @@ function DetailsSection({ vault, editable, onSaved }) {
 
 /* ---------- Tài sản số (FR-27) ---------- */
 function AssetSection({ vaultId, editable, onChanged }) {
+    const schemas = useAssetSchemas();
     const [assets, setAssets] = useState([]);
     const [error, setError] = useState('');
     const [viewing, setViewing] = useState(null);   // chi tiết đã giải mã
@@ -149,7 +151,13 @@ function AssetSection({ vaultId, editable, onChanged }) {
         setError('');
         try {
             const d = await ownerApi.getAsset(vaultId, a.id);
-            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '' });
+            // N3: tài sản theo schema -> bỏ giá trị trường bí mật (để trống = giữ nguyên)
+            let fields = null;
+            if (d.fields) {
+                const sec = new Set((schemaOf(schemas, d.assetType)?.fields || []).filter((x) => x.sensitive).map((x) => x.key));
+                fields = Object.fromEntries(Object.entries(d.fields).filter(([k]) => !sec.has(k)));
+            }
+            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '', fields });
         } catch (e) {
             setError(getErrorMessage(e, 'Could not open this asset.'));
         }
@@ -196,16 +204,17 @@ function AssetSection({ vaultId, editable, onChanged }) {
                 </ul>
             )}
             {editable && (
-                <button onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '' })} className={btnOutline}>
+                <button onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
                     <Icon name="add" className="text-[18px]" /> Add asset
                 </button>
             )}
 
-            {viewing && <AssetViewModal asset={viewing} onClose={() => setViewing(null)} />}
+            {viewing && <AssetViewModal asset={viewing} schemas={schemas} onClose={() => setViewing(null)} />}
             {form && (
                 <AssetFormModal
                     vaultId={vaultId}
                     initial={form}
+                    schemas={schemas}
                     onClose={() => setForm(null)}
                     onSaved={() => { setForm(null); load(); onChanged(); }}
                 />
@@ -234,8 +243,9 @@ function Modal({ children, onClose }) {
     );
 }
 
-function AssetViewModal({ asset, onClose }) {
+function AssetViewModal({ asset, schemas, onClose }) {
     const [reveal, setReveal] = useState(false);
+    const schema = asset.fields ? schemaOf(schemas, asset.assetType) : null;
     return (
         <Modal onClose={onClose}>
             <div className="flex justify-between items-start">
@@ -245,11 +255,15 @@ function AssetViewModal({ asset, onClose }) {
                 </div>
                 <button onClick={onClose}><Icon name="close" className="text-outline" /></button>
             </div>
-            <p className="mt-5 text-sm font-semibold text-on-surface-variant">Secret</p>
-            <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
-                <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
-            </div>
+            {schema ? <AssetFieldsView schema={schema} fields={asset.fields} /> : (
+                <>
+                    <p className="mt-5 text-sm font-semibold text-on-surface-variant">Secret</p>
+                    <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
+                        <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
+                        <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+                    </div>
+                </>
+            )}
             {asset.notes && (
                 <>
                     <p className="mt-4 text-sm font-semibold text-on-surface-variant">Notes</p>
@@ -261,27 +275,36 @@ function AssetViewModal({ asset, onClose }) {
     );
 }
 
-function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
+function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
     const isEdit = !!initial.id;
     const [f, setF] = useState(initial);
     const [show, setShow] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+    const schema = schemaOf(schemas, f.assetType);
+    // Tài sản cũ (không có fields) giữ form kiểu cũ khi sửa; tài sản mới / đã theo schema dùng form động
+    const dynamic = !!schema && (!isEdit || initial.fields != null);
+    const changeType = (e) => setF((x) => ({ ...x, assetType: e.target.value, fields: {} }));
+    const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
 
     const submit = async (e) => {
         e.preventDefault();
         setError('');
         if (!f.assetName.trim()) return setError('Asset name is required.');
-        if (!isEdit && !f.secret.trim()) return setError('Secret is required for a new asset.');
+        if (dynamic) {
+            const msg = validateFields(schema, f.fields || {}, isEdit);
+            if (msg) return setError(msg);
+        } else if (!isEdit && !f.secret.trim()) return setError('Secret is required for a new asset.');
         setLoading(true);
         try {
             const body = {
                 assetType: f.assetType,
                 assetName: f.assetName.trim(),
-                secret: f.secret ? f.secret : null,        // sửa: để trống = giữ nguyên secret cũ
                 notes: isEdit ? f.notes.trim() : (f.notes.trim() || null), // sửa: "" = xoá ghi chú
             };
+            if (dynamic) body.fields = cleanFields(f.fields || {});
+            else body.secret = f.secret ? f.secret : null;     // sửa: để trống = giữ nguyên secret cũ
             if (isEdit) await ownerApi.updateAsset(vaultId, f.id, body);
             else await ownerApi.addAsset(vaultId, body);
             onSaved();
@@ -297,19 +320,23 @@ function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
             <h3 className="font-title-lg text-title-lg mb-4">{isEdit ? 'Edit asset' : 'Add asset'}</h3>
             <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
-                <select value={f.assetType} onChange={set('assetType')} className={inputClass}>
+                <select value={f.assetType} onChange={changeType} className={inputClass}>
                     {ASSET_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder="Asset name" className={inputClass} />
-                <div className="relative">
-                    <input
-                        type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
-                        placeholder={isEdit ? 'New secret (leave empty to keep current)' : 'Secret'} className={`${inputClass} pr-12`}
-                    />
-                    <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
-                        <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
-                    </button>
-                </div>
+                {dynamic ? (
+                    <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
+                ) : (
+                    <div className="relative">
+                        <input
+                            type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
+                            placeholder={isEdit ? 'New secret (leave empty to keep current)' : 'Secret'} className={`${inputClass} pr-12`}
+                        />
+                        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
+                            <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                        </button>
+                    </div>
+                )}
                 <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder="Notes for the beneficiary (optional)" className={textareaCls} />
                 <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={onClose} className={btnOutline}>Cancel</button>
