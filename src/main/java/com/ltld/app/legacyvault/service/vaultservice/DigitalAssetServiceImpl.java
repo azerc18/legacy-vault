@@ -179,6 +179,12 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         DigitalAsset asset = findActiveAsset(assetId, vaultId);
 
         boolean typeChanged = asset.getAssetType() != request.getAssetType();
+        // N3 (M1): tài sản đã theo schema chỉ được sửa qua fields; secret thô hoặc đổi loại không có fields sẽ làm hỏng dữ liệu
+        if (request.getFields() == null && asset.getPublicFieldsJson() != null
+                && ((request.getSecret() != null && !request.getSecret().isBlank()) || typeChanged)) {
+            throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                    "This asset uses typed fields. Send 'fields' instead of 'secret'.");
+        }
         asset.setAssetType(request.getAssetType());
         asset.setAssetName(request.getAssetName());
         asset.setTransferMechanism(mechanismOf(request.getAssetType()));
@@ -348,11 +354,22 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         return schema == null ? null : schema.mechanism();
     }
 
+    // N3 (m2): migration đã gán transfer_mechanism cho tài sản cũ nên không còn nhánh dự phòng theo assetType
     private static boolean allowsProportional(DigitalAsset asset) {
-        if (asset.getTransferMechanism() != null) {
-            return asset.getTransferMechanism() == TransferMechanism.LEGAL_CLAIM_DOSSIER;
+        return asset.getTransferMechanism() == TransferMechanism.LEGAL_CLAIM_DOSSIER;
+    }
+
+    // N3 (m4): danh sách che số tài khoản, chỉ chi tiết (có audit) mới trả đủ
+    private static final Set<String> MASKED_KEYS = Set.of("accountNumber", "accountId");
+
+    private static Map<String, String> maskPublicFields(String json) {
+        if (json == null) {
+            return null;
         }
-        return asset.getAssetType() == AssetType.BANK_ACCOUNT || asset.getAssetType() == AssetType.DOCUMENT;
+        Map<String, String> fields = FlatJson.decode(json);
+        fields.replaceAll((k, v) -> MASKED_KEYS.contains(k) && v != null && v.length() > 4
+                ? "****" + v.substring(v.length() - 4) : v);
+        return fields;
     }
 
     /**
@@ -379,7 +396,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                 .assetName(asset.getAssetName())
                 .status(asset.getStatus())
                 .transferMechanism(asset.getTransferMechanism())
-                .publicFields(asset.getPublicFieldsJson() == null ? null : FlatJson.decode(asset.getPublicFieldsJson()))
+                .publicFields(maskPublicFields(asset.getPublicFieldsJson()))
                 .createdAt(asset.getCreatedAt())
                 .updatedAt(asset.getUpdatedAt())
                 .allocations(rows.stream().map(al -> DigitalAssetResponse.Allocation.builder()

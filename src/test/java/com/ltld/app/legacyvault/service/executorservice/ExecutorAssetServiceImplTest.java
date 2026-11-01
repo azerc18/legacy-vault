@@ -121,6 +121,32 @@ class ExecutorAssetServiceImplTest {
     }
 
     @Test
+    @DisplayName("N3 (m5): Executor không bao giờ nhận trường bí mật hay bản mã hóa của tài sản")
+    void getAssignedVaults_neverExposesSecretFields() throws Exception {
+        stubGuardAllows();
+        Vault vault = Vault.builder().id(UUID.randomUUID()).owner(owner).name("V").status(VaultStatus.ACTIVE).build();
+        when(vaultRepository.findByOwnerIdWithBeneficiary(ownerId)).thenReturn(List.of(vault));
+        DigitalAsset asset = DigitalAsset.builder().id(UUID.randomUUID()).vault(vault)
+                .assetType(AssetType.CRYPTO_WALLET).assetName("BTC Wallet").status(AssetStatus.ACTIVE)
+                .publicFieldsJson("{\"walletProvider\":\"Ledger\"}").encryptedSecret("ENC-SECRET-VALUE").build();
+        when(digitalAssetRepository.findByVaultIdInAndStatus(any(), eq(AssetStatus.ACTIVE))).thenReturn(List.of(asset));
+
+        ExecutorVaultAssetResponse r = executorAssetService.getAssignedVaults(assignmentId, LOGIN)
+                .getVaults().get(0).getAssets().get(0);
+
+        java.util.Set<String> sensitiveKeys = new java.util.HashSet<>();
+        for (var schema : com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry.all()) {
+            schema.fields().stream().filter(f -> f.sensitive()).forEach(f -> sensitiveKeys.add(f.key()));
+        }
+        for (Field f : ExecutorVaultAssetResponse.class.getDeclaredFields()) {
+            f.setAccessible(true);
+            assertFalse(sensitiveKeys.contains(f.getName()), "leaks sensitive field " + f.getName());
+            assertFalse(f.getName().toLowerCase(Locale.ROOT).contains("secret"), "leaks " + f.getName());
+            assertFalse(String.valueOf(f.get(r)).contains("ENC-SECRET-VALUE"));
+        }
+    }
+
+    @Test
     @DisplayName("Guard rejects with 404 -> no vault or asset query is made")
     void getAssignedVaults_guardNotFound_propagatesAndSkipsQueries() {
         when(executorAccessGuard.requireActiveAssignment(assignmentId, LOGIN))

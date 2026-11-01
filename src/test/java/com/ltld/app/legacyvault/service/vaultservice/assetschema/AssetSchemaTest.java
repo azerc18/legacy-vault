@@ -89,6 +89,35 @@ class AssetSchemaTest {
     }
 
     @Test
+    @DisplayName("m1: seed phrase phải đủ 12 hoặc 24 từ; ví cần seed phrase hoặc private key")
+    void walletSeedPhrase() {
+        Map<String, String> w = new LinkedHashMap<>();
+        w.put("walletProvider", "Ledger");
+        w.put("blockchainNetwork", "Bitcoin");
+        w.put("walletAddress", "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh");
+        assertThatThrownBy(() -> AssetFieldsValidator.validate(AssetType.CRYPTO_WALLET, w))
+                .isInstanceOf(VaultException.class);
+        w.put("seedPhrase", "only three words");
+        assertThatThrownBy(() -> AssetFieldsValidator.validate(AssetType.CRYPTO_WALLET, w))
+                .isInstanceOf(VaultException.class);
+        w.put("seedPhrase", "a b c d e f g h i j k l");
+        assertThatCode(() -> AssetFieldsValidator.validate(AssetType.CRYPTO_WALLET, w)).doesNotThrowAnyException();
+        w.put("seedPhrase", "a b c d e f g h i j k l m n o p q r s t u v w x");
+        assertThatCode(() -> AssetFieldsValidator.validate(AssetType.CRYPTO_WALLET, w)).doesNotThrowAnyException();
+        w.remove("seedPhrase");
+        w.put("privateKey", "0xabc");
+        assertThatCode(() -> AssetFieldsValidator.validate(AssetType.CRYPTO_WALLET, w)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("FlatJson: chuỗi hỏng ném IllegalArgumentException")
+    void flatJsonRejectsMalformed() {
+        for (String bad : new String[]{"{", "{\"a\":1}", "abc", "{\"a\":\"b\""}) {
+            assertThatThrownBy(() -> FlatJson.decode(bad)).isInstanceOf(RuntimeException.class);
+        }
+    }
+
+    @Test
     @DisplayName("split tách trường bí mật khỏi trường công khai")
     void splitSecrets() {
         Map<String, String> m = bank();

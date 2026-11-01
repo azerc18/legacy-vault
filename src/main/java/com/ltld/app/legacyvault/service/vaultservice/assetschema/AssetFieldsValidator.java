@@ -26,6 +26,10 @@ public final class AssetFieldsValidator {
                 throw invalid("Unknown field '" + key + "' for " + type);
             }
         }
+        // Ví crypto phải có seed phrase hoặc private key (tính cả giá trị cũ đã gộp khi sửa)
+        if (type == AssetType.CRYPTO_WALLET && isBlank(merged.get("seedPhrase")) && isBlank(merged.get("privateKey"))) {
+            throw invalid("Seed phrase or private key is required");
+        }
         for (AssetFieldSpec spec : schema.fields()) {
             String value = merged.get(spec.key());
             if (value == null || value.isBlank()) {
@@ -59,6 +63,10 @@ public final class AssetFieldsValidator {
                 }
             }
         }
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     private static VaultException invalid(String message) {

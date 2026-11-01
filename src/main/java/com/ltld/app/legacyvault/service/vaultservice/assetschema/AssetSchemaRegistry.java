@@ -24,6 +24,8 @@ import static com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFie
 public final class AssetSchemaRegistry {
 
     public static final List<String> WISHES = List.of("MEMORIALIZE", "DELETE", "TRANSFER_DATA");
+    // 12 hoặc 24 từ cách nhau bằng khoảng trắng (kiểm wordlist BIP-39 để phase sau)
+    static final String SEED_PHRASE_PATTERN = "^\\s*(\\S+\\s+){11}\\S+\\s*$|^\\s*(\\S+\\s+){23}\\S+\\s*$";
     private static final List<String> CURRENCIES = List.of("VND", "USD", "EUR");
 
     private static final Map<AssetType, AssetSchema> SCHEMAS = new EnumMap<>(AssetType.class);
@@ -57,7 +59,7 @@ public final class AssetSchemaRegistry {
                 select("blockchainNetwork", "Network", true,
                         List.of("Bitcoin", "Ethereum", "Solana", "BNB Chain", "Other")),
                 text("walletAddress", "Wallet address", true, "^[A-Za-z0-9]{20,100}$"),
-                secret("seedPhrase", "Seed phrase (12 or 24 words)", false),
+                secret("seedPhrase", "Seed phrase (12 or 24 words)", false, SEED_PHRASE_PATTERN),
                 secret("privateKey", "Private key", false),
                 secret("passphrase", "Passphrase", false)));
 

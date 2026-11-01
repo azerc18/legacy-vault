@@ -29,6 +29,10 @@ public record AssetFieldSpec(String key, String label, AssetFieldType type, bool
         return new AssetFieldSpec(key, label, AssetFieldType.SELECT, required, false, null, options);
     }
 
+    static AssetFieldSpec secret(String key, String label, boolean required, String pattern) {
+        return new AssetFieldSpec(key, label, AssetFieldType.SECRET, required, true, pattern, List.of());
+    }
+
     static AssetFieldSpec secret(String key, String label, boolean required) {
         return new AssetFieldSpec(key, label, AssetFieldType.SECRET, required, true, null, List.of());
     }

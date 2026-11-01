@@ -204,7 +204,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
                 </ul>
             )}
             {editable && (
-                <button onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
+                <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
                     <Icon name="add" className="text-[18px]" /> Add asset
                 </button>
             )}
@@ -285,6 +285,8 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
     const schema = schemaOf(schemas, f.assetType);
     // Tài sản cũ (không có fields) giữ form kiểu cũ khi sửa; tài sản mới / đã theo schema dùng form động
     const dynamic = !!schema && (!isEdit || initial.fields != null);
+    // Sửa tài sản đã theo schema mà không tải được schema -> báo lỗi, không rơi về form cũ (sẽ làm hỏng dữ liệu)
+    const schemaMissing = isEdit && initial.fields != null && !schema;
     const changeType = (e) => setF((x) => ({ ...x, assetType: e.target.value, fields: {} }));
     const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
 
@@ -292,6 +294,7 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
         e.preventDefault();
         setError('');
         if (!f.assetName.trim()) return setError('Asset name is required.');
+        if (schemaMissing) return setError('Could not load asset types. Reload the page and try again.');
         if (dynamic) {
             const msg = validateFields(schema, f.fields || {}, isEdit);
             if (msg) return setError(msg);

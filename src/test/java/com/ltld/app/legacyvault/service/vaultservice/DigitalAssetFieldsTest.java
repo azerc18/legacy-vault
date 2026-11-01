@@ -10,6 +10,8 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.TransferMechanism;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -31,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -61,12 +64,14 @@ class DigitalAssetFieldsTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
     }
 
+    private static final String SEED = "a b c d e f g h i j k l";
+
     private static Map<String, String> wallet() {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("walletProvider", "Ledger");
         m.put("blockchainNetwork", "Bitcoin");
         m.put("walletAddress", "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh");
-        m.put("seedPhrase", "alpha beta gamma");
+        m.put("seedPhrase", SEED);
         return m;
     }
 
@@ -92,7 +97,7 @@ class DigitalAssetFieldsTest {
         verify(digitalAssetRepository).saveAndFlush(cap.capture());
         DigitalAsset saved = cap.getValue();
         assertThat(saved.getTransferMechanism()).isEqualTo(TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY);
-        assertThat(saved.getPublicFieldsJson()).contains("walletAddress").doesNotContain("alpha beta gamma");
+        assertThat(saved.getPublicFieldsJson()).contains("walletAddress").doesNotContain(SEED);
         assertThat(saved.getEncryptedSecret()).startsWith("ENC:").contains("seedPhrase");
         assertThat(res.getPublicFields()).containsKey("walletAddress").doesNotContainKey("seedPhrase");
         assertThat(res.getTransferMechanism()).isEqualTo(TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY);
@@ -117,6 +122,76 @@ class DigitalAssetFieldsTest {
     }
 
     @Test
+    @DisplayName("M1: tài sản theo schema + secret thô -> ASSET_FIELD_INVALID, dữ liệu không đổi")
+    void updateTypedAssetWithRawSecret_rejected() {
+        UUID assetId = UUID.randomUUID();
+        DigitalAsset asset = DigitalAsset.builder().id(assetId).vault(vault).assetType(AssetType.CRYPTO_WALLET)
+                .assetName("Ledger").status(AssetStatus.ACTIVE).encryptionKeyRef("v1")
+                .publicFieldsJson("{}").encryptedSecret("OLD").build();
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset));
+
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.CRYPTO_WALLET);
+        req.setAssetName("Ledger");
+        req.setSecret("abc");
+
+        assertThatThrownBy(() -> service.updateAsset(ownerId, vaultId, assetId, req))
+                .isInstanceOf(VaultException.class)
+                .extracting(e -> ((VaultException) e).getErrorCode()).isEqualTo(ErrorCode.ASSET_FIELD_INVALID);
+        assertThat(asset.getEncryptedSecret()).isEqualTo("OLD");
+    }
+
+    @Test
+    @DisplayName("M1: tài sản theo schema đổi loại mà không có fields -> ASSET_FIELD_INVALID")
+    void updateTypedAssetChangeTypeWithoutFields_rejected() {
+        UUID assetId = UUID.randomUUID();
+        DigitalAsset asset = DigitalAsset.builder().id(assetId).vault(vault).assetType(AssetType.CRYPTO_WALLET)
+                .assetName("Ledger").status(AssetStatus.ACTIVE).encryptionKeyRef("v1")
+                .publicFieldsJson("{}").encryptedSecret("OLD").build();
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset));
+
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.DOCUMENT);
+        req.setAssetName("Ledger");
+
+        assertThatThrownBy(() -> service.updateAsset(ownerId, vaultId, assetId, req))
+                .isInstanceOf(VaultException.class);
+        assertThat(asset.getAssetType()).isEqualTo(AssetType.CRYPTO_WALLET);
+    }
+
+    @Test
+    @DisplayName("m4: danh sách che số tài khoản, còn 4 số cuối")
+    void listMasksAccountNumber() {
+        UUID assetId = UUID.randomUUID();
+        DigitalAsset asset = DigitalAsset.builder().id(assetId).vault(vault).assetType(AssetType.BANK_ACCOUNT)
+                .assetName("VCB").status(AssetStatus.ACTIVE).encryptionKeyRef("v1")
+                .publicFieldsJson("{\"institutionName\":\"Vietcombank\",\"accountNumber\":\"0123456789\"}")
+                .encryptedSecret("ENC").build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(asset));
+        when(assetAllocationRepository.findByAssetIdIn(any())).thenReturn(List.of());
+
+        List<DigitalAssetResponse> list = service.listAssets(ownerId, vaultId);
+
+        assertThat(list.get(0).getPublicFields())
+                .containsEntry("accountNumber", "****6789").containsEntry("institutionName", "Vietcombank");
+    }
+
+    @Test
+    @DisplayName("m1: ví crypto không có seed phrase lẫn private key -> ASSET_FIELD_INVALID")
+    void addWalletWithoutSecret_rejected() {
+        Map<String, String> f = wallet();
+        f.remove("seedPhrase");
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(AssetType.CRYPTO_WALLET);
+        req.setAssetName("Ledger");
+        req.setFields(f);
+
+        assertThatThrownBy(() -> service.addAsset(ownerId, vaultId, req)).isInstanceOf(VaultException.class);
+    }
+
+    @Test
     @DisplayName("sửa tài sản: không gửi lại seed phrase thì giữ giá trị cũ")
     void updateKeepsOldSecret() throws Exception {
         UUID assetId = UUID.randomUUID();
@@ -125,7 +200,7 @@ class DigitalAssetFieldsTest {
                 .publicFieldsJson("{}").encryptedSecret("OLD").build();
         when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
                 .thenReturn(Optional.of(asset));
-        when(cryptoService.decrypt("OLD")).thenReturn("{\"seedPhrase\":\"alpha beta gamma\"}");
+        when(cryptoService.decrypt("OLD")).thenReturn("{\"seedPhrase\":\"" + SEED + "\"}");
         when(cryptoService.encrypt(anyString())).thenAnswer(i -> "ENC:" + i.getArgument(0));
         when(digitalAssetRepository.saveAndFlush(any(DigitalAsset.class))).thenAnswer(i -> i.getArgument(0));
         when(assetAllocationRepository.findByAssetId(any())).thenReturn(List.of());
@@ -139,7 +214,7 @@ class DigitalAssetFieldsTest {
 
         service.updateAsset(ownerId, vaultId, assetId, req);
 
-        assertThat(asset.getEncryptedSecret()).contains("seedPhrase").contains("alpha beta gamma");
+        assertThat(asset.getEncryptedSecret()).contains("seedPhrase").contains(SEED);
         assertThat(asset.getAssetName()).isEqualTo("Ledger 2");
     }
 }

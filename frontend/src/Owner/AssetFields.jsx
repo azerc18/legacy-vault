@@ -27,8 +27,20 @@ export const MECHANISM_TEXT = {
     EXECUTOR_DISPOSITION: 'The Executor handles it following your wish.',
 };
 
+// Nhãn dễ đọc cho giá trị SELECT (BE trả giá trị thô)
+export const OPTION_LABEL = {
+    MEMORIALIZE: 'Memorialize the account',
+    DELETE: 'Delete the account',
+    TRANSFER_DATA: 'Download data for the family',
+};
+
 // Trả về thông báo lỗi đầu tiên hoặc ''
 export function validateFields(schema, values, isEdit) {
+    // Ví crypto cần seed phrase hoặc private key (khi sửa, để trống = giữ nguyên bí mật cũ)
+    if (schema.assetType === 'CRYPTO_WALLET' && !isEdit
+        && !(values.seedPhrase || '').trim() && !(values.privateKey || '').trim()) {
+        return 'Seed phrase or private key is required.';
+    }
     for (const f of schema.fields) {
         const v = (values[f.key] || '').trim();
         if (!v && f.required && !(isEdit && f.sensitive)) return `${f.label} is required.`;
@@ -63,7 +75,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
                         {f.type === 'SELECT' && (
                             <select value={v} onChange={set} className={inputClass}>
                                 <option value="">Select...</option>
-                                {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                                {f.options.map((o) => <option key={o} value={o}>{OPTION_LABEL[o] || o}</option>)}
                             </select>
                         )}
                         {f.type === 'TEXTAREA' && (
@@ -107,7 +119,7 @@ export function AssetFieldsView({ schema, fields }) {
                             </button>
                         </div>
                     ) : (
-                        <p className="mt-1 text-sm whitespace-pre-wrap break-words">{fields[f.key]}</p>
+                        <p className="mt-1 text-sm whitespace-pre-wrap break-words">{OPTION_LABEL[fields[f.key]] || fields[f.key]}</p>
                     )}
                 </div>
             ))}
