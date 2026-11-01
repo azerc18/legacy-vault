@@ -8,13 +8,7 @@ export function Icon({ name, className = '' }) {
 }
 
 // BE trả LocalDateTime dạng "2026-10-16T10:30:00" (không có múi giờ)
-export function formatDate(value, withTime = false) {
-    if (!value) return '—';
-    const d = new Date(value);
-    return withTime
-        ? d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
-        : d.toLocaleDateString('en-GB', { dateStyle: 'medium' });
-}
+export { formatDate } from '../i18n/format.js';
 
 export const ASSET_TYPE = {
     BANK_ACCOUNT: { label: 'Bank account', icon: 'account_balance' },

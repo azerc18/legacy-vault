@@ -1,0 +1,5 @@
+{
+  "assetType": { "BANK_ACCOUNT": "Tài khoản ngân hàng", "CRYPTO_WALLET": "Ví tiền mã hoá", "SOCIAL_MEDIA": "Mạng xã hội", "DOCUMENT": "Tài liệu", "EXCHANGE_ACCOUNT": "Tài khoản sàn giao dịch", "E_WALLET": "Ví điện tử", "EMAIL": "Tài khoản email", "OTHER": "Khác" },
+  "documentType": { "WILL": "Di chúc", "OWNERSHIP_PAPER": "Giấy tờ sở hữu", "IDENTITY_CARD": "Giấy tờ tuỳ thân", "OTHER": "Khác" },
+  "audit": {}
+}

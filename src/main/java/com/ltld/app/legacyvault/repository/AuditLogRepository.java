@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface AuditLogRepository extends Repository<AuditLog, UUID> {
     AuditLog save(AuditLog log);
     boolean existsByVaultIdAndAction(UUID vaultId, AuditAction action);
+    boolean existsByVaultIdAndActionAndEntityId(UUID vaultId, AuditAction action, UUID entityId);
     Page<AuditLog> findByActor_IdOrderByCreatedAtDesc(UUID actorId, Pageable pageable);
 
     @org.springframework.data.jpa.repository.Query(

@@ -1,0 +1,12 @@
+{
+  "done": {
+    "successTitle": "Bạn đã check-in — Dead Man's Switch đã được đặt lại",
+    "successBody": "Chúng tôi đã xác nhận bạn vẫn an toàn. Bộ đếm Dead Man's Switch đã được đặt lại cho chu kỳ mới.",
+    "errorTitle": "Không thể xác minh liên kết check-in",
+    "errorGeneric": "Liên kết check-in này không còn hợp lệ.",
+    "errorHint": "Vui lòng đăng nhập LegacyVault để check-in thủ công.",
+    "nextDue": "Hạn check-in tiếp theo:",
+    "openDms": "Mở Dead Man's Switch",
+    "backHome": "Về trang chủ"
+  }
+}

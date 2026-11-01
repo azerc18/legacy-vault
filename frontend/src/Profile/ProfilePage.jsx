@@ -10,6 +10,7 @@ import PasswordStrengthMeter from "../Common/PasswordStrengthMeter.jsx";
 import {isPasswordValid} from "../Common/passwordPolicy.js";
 import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
+import TwoFactorCard from './TwoFactorCard.jsx';
 
 const ROLE_LABEL = {
     OWNER: 'Vault Owner',
@@ -330,6 +331,7 @@ export default function ProfilePage() {
                         <div className="lg:col-span-2 space-y-6">
                             <ProfileForm profile={profile} onSaved={handleSaved} />
                             <ChangePasswordForm />
+                            <TwoFactorCard profile={profile} onChanged={setProfile} />
                         </div>
                     </div>
                 )}

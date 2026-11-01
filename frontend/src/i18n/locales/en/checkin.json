@@ -1,0 +1,12 @@
+{
+  "done": {
+    "successTitle": "You're Checked In — Dead Man's Switch Reset",
+    "successBody": "We have confirmed that you are safe. Your Dead Man's Switch countdown has been reset for a new cycle.",
+    "errorTitle": "Check-In Link Could Not Be Verified",
+    "errorGeneric": "This check-in link is no longer valid.",
+    "errorHint": "Please sign in to LegacyVault to check in manually.",
+    "nextDue": "Next check-in due:",
+    "openDms": "Open Dead Man's Switch",
+    "backHome": "Back to Home"
+  }
+}

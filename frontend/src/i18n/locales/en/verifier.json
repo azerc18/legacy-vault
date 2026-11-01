@@ -1,0 +1,197 @@
+{
+  "portal": "Legal Verifier portal",
+  "role": "Legal Verifier",
+  "loading": "Loading...",
+  "back": {
+    "all": "All requests",
+    "home": "Verifier home"
+  },
+  "status": {
+    "PENDING": "Pending review",
+    "APPROVED": "Approved, awaiting signature",
+    "SIGNED": "Signed",
+    "REJECTED": "Rejected"
+  },
+  "dashboard": {
+    "title": "Verification Requests",
+    "subtitle": "Select a case to view details and process it.",
+    "viewHistory": "View verification history",
+    "emptyTitle": "You're all caught up",
+    "emptyText": "No requests are waiting for review. New requests from executors will appear here.",
+    "awaiting": "Awaiting your signature",
+    "pending": "Pending review",
+    "executor": "Executor: {{name}}",
+    "loadError": "Could not load requests.",
+    "meta_one": "#{{id}} · Submitted {{date}} · {{count}} vault",
+    "meta_other": "#{{id}} · Submitted {{date}} · {{count}} vaults"
+  },
+  "home": {
+    "welcome": "Welcome back, {{name}}",
+    "loadError": "Could not load requests.",
+    "statsError": "Could not load statistics.",
+    "stats": {
+      "pending": "Pending review",
+      "awaiting": "Awaiting signature",
+      "signed": "Signed",
+      "rejected": "Rejected"
+    },
+    "features": {
+      "requests": {
+        "title": "Verification requests",
+        "text": "Review, approve and sign pending requests."
+      },
+      "history": {
+        "title": "Verification history",
+        "text": "Requests you have already signed or rejected."
+      }
+    },
+    "comingSoon": "Coming soon",
+    "needsAction": "Needs your action",
+    "viewAll": "View all →",
+    "emptyTitle": "You're all caught up",
+    "emptyText": "No requests are waiting for review.",
+    "viewHistory": "View history",
+    "line": "Executor: {{executor}} · Submitted {{date}}"
+  },
+  "history": {
+    "title": "Verification History",
+    "result": "Result",
+    "all": "All",
+    "awaitingSignature": "Awaiting signature",
+    "from": "From",
+    "to": "To",
+    "clear": "Clear filters",
+    "noResultsTitle": "No results for these filters",
+    "noResultsText": "Try another result type or a wider date range.",
+    "emptyTitle": "No decisions yet",
+    "emptyText": "Requests you approve, sign or reject will appear here.",
+    "openPending": "Open pending requests",
+    "cols": {
+      "decided": "Decided",
+      "owner": "Vault Owner",
+      "executor": "Executor",
+      "result": "Result",
+      "note": "Note"
+    },
+    "prev": "← Previous",
+    "next": "Next →",
+    "page": "Page {{n}}",
+    "loadError": "Could not load history."
+  },
+  "messages": {
+    "title": "Messages with the Executor",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "emptyTitle": "No messages yet",
+    "emptyCanSend": "Ask the executor for a clearer copy or extra documents if needed.",
+    "emptyClosed": "No messages were exchanged for this request.",
+    "verifier": "Verifier",
+    "executor": "Executor",
+    "placeholder": "Write a reply to the Executor...",
+    "replyLabel": "Reply to the Executor",
+    "attach": "Attach file",
+    "attachHint": "PDF, PNG or JPG, up to 10MB",
+    "send": "Send reply",
+    "sending": "Sending...",
+    "closed": "This request is closed, so you can only read the messages.",
+    "loadError": "Could not load messages.",
+    "tooBig": "File exceeds the 10MB limit.",
+    "sendError": "Could not send the message.",
+    "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site.",
+    "openError": "Could not open the attachment."
+  },
+  "confirm": {
+    "processing": "Processing...",
+    "approve": {
+      "title": "Approve this request?",
+      "message": "You confirm the documents are valid. After approval you still need to sign with a one-time code to unlock the vault(s).",
+      "button": "Approve"
+    },
+    "reject": {
+      "title": "Reject this request?",
+      "message": "This cannot be undone. Your reason will be saved with the request and shown to the Executor on their request page.",
+      "button": "Reject"
+    },
+    "sign": {
+      "title": "Sign and unlock the vault(s)?",
+      "message": "This cannot be undone. All vaults of this request will be unlocked for their beneficiaries.",
+      "button": "Sign and unlock"
+    }
+  },
+  "detail": {
+    "notFound": "Request not found.",
+    "backToList": "Back to list",
+    "requestTitle": "Request #{{id}}",
+    "ownerLine": "Vault owner: {{name}}",
+    "caseInfo": "Case information",
+    "deceased": "Deceased (Vault Owner)",
+    "requester": "Requester (Executor)",
+    "submitted": "Submitted",
+    "decided": "Decided",
+    "vaultsHint": "Signing this request will unlock all vaults below for their beneficiaries.",
+    "unnamedVault": "Unnamed vault",
+    "certificate": "Death certificate",
+    "docSubmitted": "Document submitted by the Executor",
+    "noCertificate": "No death certificate attached.",
+    "checkDocument": "Check document",
+    "checking": "Checking...",
+    "viewDocument": "View document",
+    "opening": "Opening...",
+    "checkFirst": "Check the document first",
+    "viewFirst": "View the document first",
+    "valid": "Valid",
+    "invalid": "Invalid",
+    "steps": {
+      "check": "Check",
+      "view": "View",
+      "approve": "Approve"
+    },
+    "rejectNeeds": "Rejecting needs steps 1–2 (Check, View).",
+    "actions": "Legal Actions",
+    "approveRequest": "Approve request",
+    "rejectReason": "Rejection reason",
+    "selectReason": "Select a reason...",
+    "reasonsError": "Could not load the rejection reasons.",
+    "retry": "Retry",
+    "noteLabel": "Rejection note",
+    "notePlaceholder": "Enter a note for this reason...",
+    "rejectRequest": "Reject request",
+    "approvedBanner": "Request approved. Sign with a one-time code to unlock the vault(s).",
+    "sendCode": "Send signing code to my email",
+    "sendingCode": "Sending...",
+    "codeLabel": "Signing code (6 digits)",
+    "resendIn": "Resend code in {{s}}s",
+    "resend": "Resend code",
+    "signUnlock": "Sign and unlock vault(s)",
+    "codeSent": "A 6-digit code has been sent to your email. It expires in 5 minutes.",
+    "signedTitle": "Signed successfully",
+    "signedText": "The vault(s) have been unlocked for the beneficiaries.",
+    "rejectedTitle": "This request has been rejected",
+    "reason": "Reason: {{reason}}",
+    "recorded": "Your decision will be recorded in the system history.",
+    "err": {
+      "pickReason": "Please select a rejection reason.",
+      "needNote": "Please enter a note for the \"other\" reason.",
+      "noteTooLong": "Note must be at most 500 characters.",
+      "codeFormat": "The code must be exactly 6 digits.",
+      "approve": "Could not approve.",
+      "reject": "Could not reject.",
+      "sign": "Could not sign.",
+      "check": "Could not check the document.",
+      "sendCode": "Could not send the code.",
+      "openDocument": "Could not open the document (HTTP {{status}}).",
+      "noResponse": "no response",
+      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site."
+    },
+    "vaultsTitle_one": "Vault to unlock ({{count}})",
+    "vaultsTitle_other": "Vaults to unlock ({{count}})"
+  },
+  "rejectReason": {
+    "DOCUMENT_UNREADABLE": "The document is blurry or unreadable",
+    "DOCUMENT_INVALID": "The document is not a valid death certificate",
+    "INFO_MISMATCH": "The information does not match the account holder",
+    "SUSPECTED_FORGERY": "The document is suspected to be forged",
+    "DOCUMENT_INCOMPLETE": "The document is missing pages or a certification stamp",
+    "OTHER": "Other reason"
+  }
+}

@@ -59,6 +59,14 @@ public class EmailSender {
                         + "\nYou will be notified when the vault is unlocked for handover.");
     }
 
+    // N2-owner: báo cho người bị gỡ khỏi vault
+    @Async
+    public void sendBeneficiaryRemovedNotice(String email, String ownerName, String vaultName) {
+        sendWithoutOtpFooter(email,
+                "You are no longer a beneficiary - LegacyVault",
+                ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
+    }
+
     // FR-02 (bước 7): xác nhận cho Owner
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,

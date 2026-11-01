@@ -1,13 +1,20 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { btnOutline, btnPrimary, Card, formatDate, Icon } from './ownerUi.jsx';
 
 export default function CheckinDonePage() {
+    const { t, i18n } = useTranslation('checkin');
     const [searchParams] = useSearchParams();
     const status = searchParams.get('status') || 'success';
     const nextDue = searchParams.get('nextDue');
     const errorCode = searchParams.get('errorCode');
     const isSuccess = status.toLowerCase() === 'success';
+
+    // Mã lỗi BE gửi qua URL -> bản dịch trong namespace errors; mã chưa có bản dịch thì dùng câu chung.
+    const errorMessage = errorCode && i18n.exists(errorCode, { ns: 'errors' })
+        ? t(errorCode, { ns: 'errors' })
+        : t('done.errorGeneric');
 
     return (
         <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center px-5 py-12">
@@ -25,22 +32,16 @@ export default function CheckinDonePage() {
                 </div>
 
                 <h1 className="mt-4 font-headline-sm text-headline-sm">
-                    {isSuccess
-                        ? "You're Checked In — Dead Man's Switch Reset"
-                        : 'Check-In Link Could Not Be Verified'}
+                    {isSuccess ? t('done.successTitle') : t('done.errorTitle')}
                 </h1>
 
                 <p className="mt-2 text-sm text-on-surface-variant">
-                    {isSuccess
-                        ? "We have confirmed that you are safe. Your Dead Man's Switch countdown has been reset for a new cycle."
-                        : errorCode === 'CHECKIN_TOKEN_INVALID'
-                        ? 'This one-time check-in link has already been used or has expired. Please sign in to check in manually.'
-                        : 'This check-in link is no longer valid. Please sign in to LegacyVault to check in manually.'}
+                    {isSuccess ? t('done.successBody') : `${errorMessage} ${t('done.errorHint')}`}
                 </p>
 
                 {isSuccess && nextDue && (
                     <div className="mt-4 p-3 rounded-xl bg-surface-container-low border border-outline-variant/20 text-sm">
-                        <span className="text-on-surface-variant">Next check-in due: </span>
+                        <span className="text-on-surface-variant">{t('done.nextDue')} </span>
                         <span className="font-label-lg text-on-surface">{formatDate(nextDue, true)}</span>
                     </div>
                 )}
@@ -48,14 +49,13 @@ export default function CheckinDonePage() {
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
                     <Link to="/owner/dms" className={btnPrimary}>
                         <Icon name="timer" className="text-[18px]" />
-                        Open Dead Man&apos;s Switch
+                        {t('done.openDms')}
                     </Link>
                     <Link to="/" className={btnOutline}>
-                        Back to Home
+                        {t('done.backHome')}
                     </Link>
                 </div>
             </Card>
         </div>
     );
 }
-

@@ -5,17 +5,8 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
-import com.ltld.app.legacyvault.repository.DmsConfigRepository;
-import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
-import com.ltld.app.legacyvault.repository.RoleRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditDescriptionBuilder;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.auditservice.OwnerActivityLogService;
@@ -28,14 +19,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -63,12 +50,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class OwnerActivityLogIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class OwnerActivityLogIntegrationTest extends MySqlTestContainer{
 
     @MockitoBean
     private EmailSender emailSender;                                     // không gửi mail thật

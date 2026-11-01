@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.adminuserdto.*;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
+import com.ltld.app.legacyvault.service.adminuserservice.AdminClaimService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
 import com.ltld.app.legacyvault.service.dmsservice.AdminExecutorRescueService;
@@ -29,6 +30,7 @@ public class AdminController {
     private final DmsConfigService dmsConfigService;
     private final AdminRoleService adminRoleService;
     private final AdminExecutorRescueService adminExecutorRescueService;
+    private final AdminClaimService adminClaimService;
 
     @PostMapping("/users/{userId}/roles/{roleCode}")
     public ResponseEntity<ApiResponse<AdminUserResponse>> grantRole(
@@ -127,5 +129,13 @@ public class AdminController {
         UUID adminId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("Executor assigned and activated",
                 adminExecutorRescueService.rescue(adminId, ownerId, request.getEmail())));
+    }
+
+    @PutMapping("/vaults/{vaultId}/claim/extend")
+    public ResponseEntity<ApiResponse<ClaimExtensionResponse>> extendClaim(
+            Principal principal, @PathVariable UUID vaultId, @Valid @RequestBody ExtendClaimRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Claim period extended",
+                adminClaimService.extendClaim(UUID.fromString(principal.getName()), vaultId,
+                        request.days(), request.reason())));
     }
 }

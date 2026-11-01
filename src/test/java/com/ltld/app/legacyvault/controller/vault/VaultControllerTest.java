@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.controller.vault;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ltld.app.legacyvault.controller.VaultController;
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
@@ -20,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -87,6 +89,44 @@ public class VaultControllerTest {
         CreateVaultRequest request = new CreateVaultRequest();
         request.setName("Vault 1");
         request.setDescription("a".repeat(501));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): email người thụ hưởng sai định dạng -> 400 Bad Request")
+    void createVault_invalidBeneficiaryEmail_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        AddBeneficiaryRequest beneficiary = new AddBeneficiaryRequest();
+        beneficiary.setEmail("not-an-email");
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        request.setBeneficiaries(List.of(beneficiary));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
+    @DisplayName("createVault (N1): quá 10 người thụ hưởng -> 400 Bad Request")
+    void createVault_tooManyBeneficiaries_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        AddBeneficiaryRequest beneficiary = new AddBeneficiaryRequest();
+        beneficiary.setEmail("ben@test.com");
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        request.setBeneficiaries(Collections.nCopies(11, beneficiary));
 
         mockMvc.perform(post("/api/vaults")
                         .principal(() -> ownerId.toString())
