@@ -1,11 +1,9 @@
 // Nhãn/định dạng dùng chung cho các trang Legal Verifier (khớp enum LegalVerificationStatus của BE)
 
-export const STATUS_LABEL = {
-    PENDING: 'Pending review',
-    APPROVED: 'Approved, awaiting signature',
-    SIGNED: 'Signed',
-    REJECTED: 'Rejected',
-};
+import i18n from '../i18n/index.js';
+
+// Nhãn trạng thái đã dịch (namespace verifier). Gọi trong component có useTranslation để đổi ngôn ngữ thì render lại.
+export const statusLabel = (status) => i18n.t(`status.${status}`, { ns: 'verifier', defaultValue: status });
 
 export const STATUS_CLASS = {
     PENDING: 'bg-warning-container text-on-warning-container',

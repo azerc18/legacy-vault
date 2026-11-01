@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
 import { getRequests } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
-import { STATUS_LABEL, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
+import { statusLabel, STATUS_CLASS, formatDate, shortId } from './verifierUi.js';
 import VerifierHeader from './VerifierHeader.jsx';
 import {PAGE_WIDTH} from "../Common/AppHeader.jsx";
 import EmptyState from '../Common/EmptyState.jsx';
 
 export default function LegalVerifierDashboard() {
+    const { t } = useTranslation('verifier');
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -17,7 +19,7 @@ export default function LegalVerifierDashboard() {
     useEffect(() => {
         getRequests()
             .then(setRequests)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load requests.')))
+            .catch((e) => setError(getErrorMessage(e, t('dashboard.loadError'))))
             .finally(() => setLoading(false));
     }, []);
 
@@ -28,29 +30,30 @@ export default function LegalVerifierDashboard() {
 
     return (
         <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col">
-            <VerifierHeader title="Verification Requests" subtitle="Select a case to view details and process it." />
+            <VerifierHeader title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
             <main className={`${PAGE_WIDTH} w-full pt-6 pb-12 flex-1`}>
                 <Link to="/verifier/history" className="inline-flex items-center gap-1.5 mb-8 text-secondary font-semibold hover:text-primary">
                     <span className="material-symbols-outlined text-[20px]">history</span>
-                    View verification history
+                    {t('dashboard.viewHistory')}
                 </Link>
 
-                {loading && <p>Loading...</p>}
+                {loading && <p>{t('loading')}</p>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
                 {!loading && !error && requests.length === 0 && (
-                    <EmptyState bordered icon="task_alt" title="You're all caught up"
-                                text="No requests are waiting for review. New requests from executors will appear here." />
+                    <EmptyState bordered icon="task_alt" title={t('dashboard.emptyTitle')}
+                                text={t('dashboard.emptyText')} />
                 )}
 
-                <RequestGroup title="Awaiting your signature" items={awaitingSign} />
-                <RequestGroup title="Pending review" items={pending} />
+                <RequestGroup title={t('dashboard.awaiting')} items={awaitingSign} />
+                <RequestGroup title={t('dashboard.pending')} items={pending} />
             </main>
         </div>
     );
 }
 
 function RequestGroup({ title, items }) {
+    const { t } = useTranslation('verifier');
     if (items.length === 0) return null;
     return (
         <section className="mb-10">
@@ -65,12 +68,12 @@ function RequestGroup({ title, items }) {
                         <div className="flex justify-between items-start gap-3 mb-2">
                             <span className="font-label-md font-bold text-on-surface">{req.ownerName}</span>
                             <span className={`shrink-0 text-[11px] px-2.5 py-0.5 rounded-full font-semibold ${STATUS_CLASS[req.status]}`}>
-                                {STATUS_LABEL[req.status]}
+                                {statusLabel(req.status)}
                             </span>
                         </div>
-                        <p className="text-sm text-on-surface-variant">Executor: {req.executorName}</p>
+                        <p className="text-sm text-on-surface-variant">{t('dashboard.executor', { name: req.executorName })}</p>
                         <p className="text-xs text-outline mt-1">
-                            #{shortId(req.id)} · Submitted {formatDate(req.createdAt)} · {req.vaultIds?.length ?? 0} vault(s)
+                            {t('dashboard.meta', { id: shortId(req.id), date: formatDate(req.createdAt), count: req.vaultIds?.length ?? 0 })}
                         </p>
                     </Link>
                 ))}
