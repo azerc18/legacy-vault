@@ -39,6 +39,7 @@ public class AuditLog {
     private User actor;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 100)
     private AuditAction action;
 
