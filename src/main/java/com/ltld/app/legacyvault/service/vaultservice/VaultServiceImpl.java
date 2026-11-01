@@ -223,6 +223,12 @@ public class VaultServiceImpl implements VaultService {
                     HttpStatus.CONFLICT);
         }
 
+        // N2-owner: vault đã có nhiều người thụ hưởng thì không được "gán / thay thế" (sẽ ghi đè dòng cũ nhất)
+        if (vaultBeneficiaryRepository.countByVaultId(vaultId) > 1) {
+            throw new VaultException("This vault has multiple beneficiaries. Use POST /api/vaults/{id}/beneficiaries "
+                    + "and DELETE /api/vaults/{id}/beneficiaries/{beneficiaryId} instead.", HttpStatus.CONFLICT);
+        }
+
         String email = request.getEmail().trim().toLowerCase();
         if (email.equals(owner.getEmail())) {
             throw new VaultException("You cannot assign yourself as the beneficiary", HttpStatus.BAD_REQUEST);
@@ -331,45 +337,14 @@ public class VaultServiceImpl implements VaultService {
                 .toList();
     }
 
-    // FR-02 (V8): Owner gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký
+    // N2-owner: endpoint cũ = xoá người thụ hưởng cũ nhất (để FE cũ không xoá sạch cả vault)
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public void removeBeneficiary(UUID ownerId, UUID vaultId) {
-        // Khóa DmsConfig TRƯỚC Vault — cùng thứ tự với assignBeneficiary để tránh deadlock
-        dmsConfigService.assertHandoverNotStarted(ownerId);
-
-        Vault vault = vaultRepository.findByIdForUpdate(vaultId)
-                .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
-
-        User owner = vault.getOwner();
-        if (!owner.getId().equals(ownerId)) {
-            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, null, vaultId,
-                    "Vault", vaultId.toString(), "not owner");
-            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
-        }
-
-        if (vault.getStatus() != VaultStatus.ACTIVE) {
-            auditLogService.log(AuditAction.BENEFICIARY_REMOVE_DENIED, AuditResult.FAILURE, ownerId, owner.getEmail(), vaultId,
-                    "Vault", vaultId.toString(), "vault status " + vault.getStatus());
-            throw new VaultException("A beneficiary can only be removed while the vault is ACTIVE", HttpStatus.CONFLICT);
-        }
-
-        // FR-02 (idempotent): chưa có người thụ hưởng → không đổi gì, không audit
-        String currentEmail = vault.getBeneficiary() != null
-                ? vault.getBeneficiary().getEmail()
-                : vault.getBeneficiaryEmail();
-        if (currentEmail == null) {
-            return;
-        }
-
-        vault.setBeneficiary(null);
-        vault.setBeneficiaryEmail(null);
-        vaultRepository.saveAndFlush(vault);
-        assetAllocationRepository.deleteByVaultId(vaultId);
-        vaultBeneficiaryRepository.deleteByVaultId(vaultId);
-
-        auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
-                owner.getEmail(), vaultId, "Vault", vaultId.toString(), "Beneficiary removed by owner");
+        UUID oldest = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId).stream()
+                .findFirst().map(VaultBeneficiary::getId)
+                .orElseThrow(() -> new VaultException("Beneficiary not found", HttpStatus.NOT_FOUND));
+        removeBeneficiary(ownerId, vaultId, oldest);
     }
 
     // N2-owner: thêm một người thụ hưởng vào Vault
@@ -389,7 +364,8 @@ public class VaultServiceImpl implements VaultService {
                     "This person is your Digital Executor and cannot also be your beneficiary.");
         }
         if (vaultBeneficiaryRepository.existsByVaultIdAndEmail(vaultId, email)) {
-            throw new VaultException("This person is already a beneficiary of this vault", HttpStatus.CONFLICT);
+            throw new VaultException(ErrorCode.BENEFICIARY_DUPLICATE,
+                    "This person is already a beneficiary of this vault");
         }
 
         List<VaultBeneficiary> current = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId);
@@ -453,8 +429,9 @@ public class VaultServiceImpl implements VaultService {
                     "This beneficiary is allocated assets. Reassign those assets first.");
         }
 
-        assetAllocationRepository.clearContingentByBeneficiaryId(beneficiaryId);
+        int contingentCleared = assetAllocationRepository.clearContingentByBeneficiaryId(beneficiaryId);   // m5
         boolean wasPrimary = rows.get(0).getId().equals(beneficiaryId);
+        String removedEmail = target.getEmail();   // m1: lấy trước khi xóa
         vaultBeneficiaryRepository.delete(target);
         vaultBeneficiaryRepository.flush();
         if (wasPrimary) {
@@ -463,7 +440,13 @@ public class VaultServiceImpl implements VaultService {
 
         auditLogService.log(AuditAction.BENEFICIARY_REMOVED, AuditResult.SUCCESS, ownerId,
                 vault.getOwner().getEmail(), vaultId, "Vault", vaultId.toString(),
-                "beneficiaryRowId=" + beneficiaryId);
+                "beneficiaryRowId=" + beneficiaryId
+                        + (contingentCleared > 0 ? ", contingentCleared=" + contingentCleared : ""));
+
+        // m1: báo cho người bị gỡ, gửi sau commit
+        String ownerName = vault.getOwner().getFullName();
+        String vaultName = vault.getName();
+        runAfterCommit(() -> emailSender.sendBeneficiaryRemovedNotice(removedEmail, ownerName, vaultName));
     }
 
     private Vault lockActiveOwnedVault(UUID ownerId, UUID vaultId, AuditAction deniedAction) {
@@ -474,9 +457,7 @@ public class VaultServiceImpl implements VaultService {
                     "Vault", vaultId.toString(), "not owner");
             throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
-        if (vault.getStatus() != VaultStatus.ACTIVE) {
-            throw new VaultException("Beneficiaries can only be changed while the vault is ACTIVE", HttpStatus.CONFLICT);
-        }
+        vaultModificationGuard.ensureModifiable(vault);   // gom đủ lý do khóa: không ACTIVE, DMS, hồ sơ xác minh đang mở
         return vault;
     }
 

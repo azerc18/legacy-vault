@@ -3,6 +3,9 @@ package com.ltld.app.legacyvault.dto.vaultdto;
 import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -58,6 +61,9 @@ public class DigitalAssetRequest {
     public static class Recipient {
         @NotNull(message = "beneficiaryId is required")
         private UUID beneficiaryId;
+        @DecimalMin(value = "0.01", message = "Share must be at least 0.01")
+        @DecimalMax(value = "100.00", message = "Share must be at most 100")
+        @Digits(integer = 3, fraction = 2, message = "Share must have at most 2 decimals")
         private BigDecimal sharePercent;          // bắt buộc với PROPORTIONAL
         private UUID contingentBeneficiaryId;     // chỉ dùng với EXCLUSIVE
     }

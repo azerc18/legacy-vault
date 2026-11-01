@@ -140,6 +140,22 @@ class AssetAllocationServiceTest {
         return assetService.updateAsset(ownerId, vaultId, assetId, req);
     }
 
+    private DigitalAssetResponse updateWithNotes(AssetType type, String notes,
+                                                 DigitalAssetRequest.AllocationRequest allocation) throws Exception {
+        DigitalAssetRequest req = new DigitalAssetRequest();
+        req.setAssetType(type);
+        req.setAssetName("MB Bank");
+        req.setNotes(notes);
+        req.setAllocation(allocation);
+        return assetService.updateAsset(ownerId, vaultId, assetId, req);
+    }
+
+    private AssetAllocation oldProportionalRow() {
+        return AssetAllocation.builder()
+                .asset(asset).beneficiary(bA)
+                .mode(AllocationMode.PROPORTIONAL).sharePercent(new BigDecimal("60")).build();
+    }
+
     private static void assertCode(ThrowingCallable call, ErrorCode code) {
         assertThatThrownBy(call).isInstanceOfSatisfying(VaultException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(code));
@@ -160,6 +176,28 @@ class AssetAllocationServiceTest {
         assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ALLOCATION_PERCENT_INVALID);
         verify(assetAllocationRepository, never()).deleteByAssetId(any());
         verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
+    }
+
+    @Test
+    @DisplayName("PROPORTIONAL: quá 2 chữ số thập phân → ALLOCATION_PERCENT_INVALID, không ghi gì (m2)")
+    void proportional_tooManyDecimals_throws() {
+        var a = alloc(AllocationMode.PROPORTIONAL,
+                recipient(bA, "33.333", null), recipient(bB, "33.333", null), recipient(bC, "33.334", null));
+
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ALLOCATION_PERCENT_INVALID);
+        verify(assetAllocationRepository, never()).deleteByAssetId(any());
+        verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
+    }
+
+    @Test
+    @DisplayName("PROPORTIONAL: 33.33 + 33.33 + 33.34 = 100 → hợp lệ (m2)")
+    void proportional_twoDecimals_ok() throws Exception {
+        var a = alloc(AllocationMode.PROPORTIONAL,
+                recipient(bA, "33.33", null), recipient(bB, "33.33", null), recipient(bC, "33.34", null));
+
+        update(AssetType.BANK_ACCOUNT, a);
+
+        verify(assetAllocationRepository, times(3)).save(any(AssetAllocation.class));
     }
 
     @Test
@@ -347,6 +385,27 @@ class AssetAllocationServiceTest {
         when(assetAllocationRepository.findByAssetId(assetId)).thenReturn(List.of(old));
 
         assertCode(() -> update(AssetType.CRYPTO_WALLET, null), ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
+    }
+
+    @Test
+    @DisplayName("updateAsset: đổi sang CRYPTO_WALLET KÈM notes, còn dòng PROPORTIONAL → vẫn bị chặn (M1)")
+    void update_typeChange_withNotes_stillThrows() {
+        when(assetAllocationRepository.findByAssetId(assetId)).thenReturn(List.of(oldProportionalRow()));
+
+        assertCode(() -> updateWithNotes(AssetType.CRYPTO_WALLET, "ghi chú mới", null),
+                ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
+    }
+
+    @Test
+    @DisplayName("updateAsset: đổi sang CRYPTO_WALLET + gửi allocation EXCLUSIVE mới trong cùng request → thành công (M1)")
+    void update_typeChange_withNewAllocation_ok() throws Exception {
+        when(assetAllocationRepository.findByAssetId(assetId)).thenReturn(List.of(oldProportionalRow()));
+
+        updateWithNotes(AssetType.CRYPTO_WALLET, null,
+                alloc(AllocationMode.EXCLUSIVE, recipient(bA, null, null)));
+
+        verify(assetAllocationRepository).deleteByAssetId(assetId);
+        verify(assetAllocationRepository).save(any(AssetAllocation.class));
     }
 
     @Test

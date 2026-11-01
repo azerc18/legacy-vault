@@ -167,14 +167,17 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         // FR-27: null = giữ nguyên, "" = xóa ghi chú cũ
         if (request.getNotes() != null) {
             asset.setNotesEncrypted(request.getNotes().isBlank() ? null : cryptoService.encrypt(request.getNotes()));
+        }
+        asset = digitalAssetRepository.saveAndFlush(asset);
+
+        if (request.getAllocation() != null) {
+            applyAllocation(vault, asset, ownerId, request.getAllocation());   // đã kiểm theo loại mới
         } else if (!allowsProportional(asset) && assetAllocationRepository.findByAssetId(assetId).stream()
                 .anyMatch(al -> al.getMode() == AllocationMode.PROPORTIONAL)) {
+            // N2-owner (Sửa #1): đổi sang loại không cho chia % mà vẫn giữ phân bổ % cũ
             throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                    "This asset type no longer allows PROPORTIONAL. Reassign it first.");
+                    "This asset type no longer allows PROPORTIONAL. Send a new allocation in the same request.");
         }
-
-        asset = digitalAssetRepository.saveAndFlush(asset);
-        if (request.getAllocation() != null) applyAllocation(vault, asset, ownerId, request.getAllocation());
 
         String ownerEmail = vault.getOwner() != null ? vault.getOwner().getEmail() : null;
         auditLogService.log(AuditAction.ASSET_UPDATED, AuditResult.SUCCESS,
@@ -263,10 +266,15 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                         throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
                                 "Contingent beneficiary is only for EXCLUSIVE");
                     }
-                    if (r.getSharePercent() == null || r.getSharePercent().signum() <= 0) {
+                    BigDecimal share = r.getSharePercent();
+                    if (share == null || share.signum() <= 0) {
                         throw new VaultException(ErrorCode.ALLOCATION_PERCENT_INVALID, "Each share must be > 0");
                     }
-                    total = total.add(r.getSharePercent());
+                    if (share.scale() > 2) {   // cột decimal(5,2): 33.333 sẽ bị MySQL làm tròn → tổng lưu ≠ 100
+                        throw new VaultException(ErrorCode.ALLOCATION_PERCENT_INVALID,
+                                "Each share must have at most 2 decimals");
+                    }
+                    total = total.add(share);
                 }
                 if (recipients.size() < 2 || total.compareTo(new BigDecimal("100")) != 0) {
                     throw new VaultException(ErrorCode.ALLOCATION_PERCENT_INVALID,

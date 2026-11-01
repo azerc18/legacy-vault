@@ -8,9 +8,13 @@ import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -43,6 +47,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -118,7 +123,7 @@ class VaultBeneficiaryManagementTest {
     }
 
     private static void assertCode(ThrowingCallable call, ErrorCode code) {
-        assertThatThrownBy(call).isInstanceOfSatisfying(VaultException.class,
+        assertThatThrownBy(call).isInstanceOfSatisfying(BusinessException.class,
                 e -> assertThat(e.getErrorCode()).isEqualTo(code));
     }
 
@@ -151,24 +156,25 @@ class VaultBeneficiaryManagementTest {
     }
 
     @Test
-    @DisplayName("add: email đã là người thụ hưởng của vault → 409")
-    void addBeneficiary_duplicateEmail_throws409() {
+    @DisplayName("add: email đã là người thụ hưởng của vault → BENEFICIARY_DUPLICATE")
+    void addBeneficiary_duplicateEmail_throwsDuplicate() {
         lockVault();
         when(vaultBeneficiaryRepository.existsByVaultIdAndEmail(vaultId, "dup@test.com")).thenReturn(true);
 
-        assertStatus(() -> vaultService.addBeneficiary(ownerId, vaultId, addRequest("dup@test.com")),
-                HttpStatus.CONFLICT);
+        assertCode(() -> vaultService.addBeneficiary(ownerId, vaultId, addRequest("dup@test.com")),
+                ErrorCode.BENEFICIARY_DUPLICATE);
         verify(vaultBeneficiaryRepository, never()).save(any(VaultBeneficiary.class));
     }
 
     @Test
-    @DisplayName("add: vault không ACTIVE → 409")
-    void addBeneficiary_vaultNotActive_throws409() {
-        vault.setStatus(VaultStatus.CLAIMED);
+    @DisplayName("add: guard từ chối (vault không ACTIVE / đang khóa) → lỗi của guard, không lưu gì")
+    void addBeneficiary_guardRejects_throws() {
         lockVault();
+        doThrow(new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST))
+                .when(vaultModificationGuard).ensureModifiable(vault);
 
         assertStatus(() -> vaultService.addBeneficiary(ownerId, vaultId, addRequest("a@test.com")),
-                HttpStatus.CONFLICT);
+                HttpStatus.BAD_REQUEST);
         verify(vaultBeneficiaryRepository, never()).save(any(VaultBeneficiary.class));
     }
 
@@ -281,13 +287,15 @@ class VaultBeneficiaryManagementTest {
     }
 
     @Test
-    @DisplayName("remove: vault không ACTIVE → 409")
-    void removeBeneficiary_vaultNotActive_throws409() {
-        vault.setStatus(VaultStatus.UNLOCKED);
+    @DisplayName("remove: guard từ chối (vault không ACTIVE / đang khóa) → lỗi của guard, không xóa gì")
+    void removeBeneficiary_guardRejects_throws() {
         lockVault();
+        doThrow(new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST))
+                .when(vaultModificationGuard).ensureModifiable(vault);
 
         assertStatus(() -> vaultService.removeBeneficiary(ownerId, vaultId, UUID.randomUUID()),
-                HttpStatus.CONFLICT);
+                HttpStatus.BAD_REQUEST);
+        verify(vaultBeneficiaryRepository, never()).delete(any(VaultBeneficiary.class));
     }
 
     @Test
@@ -340,5 +348,89 @@ class VaultBeneficiaryManagementTest {
         verify(vaultBeneficiaryRepository).delete(b);
         assertThat(vault.getBeneficiaryEmail()).isEqualTo("a@test.com");
         verify(vaultRepository, never()).save(any(Vault.class));
+    }
+
+    @Test
+    @DisplayName("add: vượt giới hạn gói → PLAN_LIMIT_REACHED, không lưu, không audit, không gửi mail")
+    void addBeneficiary_planLimit_throwsAndSavesNothing() {
+        VaultBeneficiary first = row("first@test.com", null);
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(first));
+        doThrow(new PlanLimitReachedException(PlanFeature.BENEFICIARY_LIMIT, "Beneficiary limit reached"))
+                .when(entitlementService).assertCanAddBeneficiaries(ownerId, 2);
+
+        assertCode(() -> vaultService.addBeneficiary(ownerId, vaultId, addRequest("second@test.com")),
+                ErrorCode.PLAN_LIMIT_REACHED);
+        verify(vaultBeneficiaryRepository, never()).save(any(VaultBeneficiary.class));
+        verify(vaultRepository, never()).save(any(Vault.class));
+        verify(auditLogService, never()).log(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(emailSender, never()).sendBeneficiaryInvitation(any(), any(), any());
+        verify(emailSender, never()).sendBeneficiaryAssignedNotice(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("remove: gửi mail cho người bị xóa (sau commit)")
+    void removeBeneficiary_sendsRemovedNotice() {
+        VaultBeneficiary a = row("a@test.com", null);
+        VaultBeneficiary b = row("b@test.com", null);
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(a, b));
+
+        vaultService.removeBeneficiary(ownerId, vaultId, b.getId());
+
+        verify(emailSender).sendBeneficiaryRemovedNotice("b@test.com", "Owner", "My Vault");
+    }
+
+    @Test
+    @DisplayName("remove: bị chặn (đang được phân bổ) → không gửi mail")
+    void removeBeneficiary_blocked_noMail() {
+        VaultBeneficiary a = row("a@test.com", null);
+        VaultBeneficiary b = row("b@test.com", null);
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(a, b));
+        when(assetAllocationRepository.existsByBeneficiaryId(b.getId())).thenReturn(true);
+
+        assertCode(() -> vaultService.removeBeneficiary(ownerId, vaultId, b.getId()),
+                ErrorCode.BENEFICIARY_IN_USE);
+        verify(emailSender, never()).sendBeneficiaryRemovedNotice(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("remove: audit ghi số tài sản bị bỏ vai trò dự phòng (contingentCleared)")
+    void removeBeneficiary_auditsContingentCleared() {
+        VaultBeneficiary a = row("a@test.com", null);
+        VaultBeneficiary b = row("b@test.com", null);
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(a, b));
+        when(assetAllocationRepository.clearContingentByBeneficiaryId(b.getId())).thenReturn(2);
+
+        vaultService.removeBeneficiary(ownerId, vaultId, b.getId());
+
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVED), eq(AuditResult.SUCCESS),
+                any(), any(), any(), any(), any(),
+                eq("beneficiaryRowId=" + b.getId() + ", contingentCleared=2"));
+    }
+
+    @Test
+    @DisplayName("remove: không phải chủ vault → 404 và ghi audit từ chối")
+    void removeBeneficiary_notOwner_throws404() {
+        vault.setOwner(User.builder().id(UUID.randomUUID()).email("other@test.com").build());
+        lockVault();
+
+        assertStatus(() -> vaultService.removeBeneficiary(ownerId, vaultId, UUID.randomUUID()),
+                HttpStatus.NOT_FOUND);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_REMOVE_DENIED), eq(AuditResult.FAILURE),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("remove: DMS đã kích hoạt → DmsException, chưa khóa vault")
+    void removeBeneficiary_dmsTriggered_propagates() {
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThatThrownBy(() -> vaultService.removeBeneficiary(ownerId, vaultId, UUID.randomUUID()))
+                .isInstanceOf(DmsException.class);
+        verify(vaultRepository, never()).findByIdForUpdate(any());
     }
 }
