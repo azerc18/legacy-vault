@@ -21,8 +21,9 @@ public class CreateVaultRequest {
     @Size(max = 50, message = "At most 50 assets are allowed")
     private List<@Valid DigitalAssetDto> assets;
 
-    // N1: người thụ hưởng bắt buộc khi tạo vault. Việc "không được rỗng" kiểm ở service
-    // để trả mã BENEFICIARY_REQUIRED cho FE; ở đây chỉ validate từng phần tử.
+    // N1: người thụ hưởng bắt buộc khi tạo vault. "Không được rỗng" kiểm ở service để trả BENEFICIARY_REQUIRED;
+    // ở đây chỉ chặn danh sách quá lớn (tối đa 10 theo gói VIP, service vẫn kiểm theo gói thật của Owner).
+    @Size(max = 10, message = "At most 10 beneficiaries are allowed")
     private List<@NotNull @Valid AddBeneficiaryRequest> beneficiaries;
 
     @Data

@@ -206,7 +206,7 @@ class VaultServiceImplTest {
             assertEquals(ErrorCode.BENEFICIARY_REQUIRED, ex.getErrorCode());
         }
         verify(vaultRepository, never()).save(any());
-        verifyNoInteractions(entitlementService);
+        verify(entitlementService, never()).assertCanAddBeneficiaries(any(), anyInt());
     }
 
     @Test
@@ -262,6 +262,20 @@ class VaultServiceImplTest {
     }
 
     @Test
+    @DisplayName("createVault (N1/M1): gói FREE đã đủ vault -> PlanLimitReachedException, không lưu gì")
+    void createVault_planLimitVaults_savesNothing() {
+        doThrow(new PlanLimitReachedException(PlanFeature.MULTIPLE_VAULTS, "Vault limit reached"))
+                .when(entitlementService).assertCanCreateVault(ownerId);
+
+        assertThrows(PlanLimitReachedException.class,
+                () -> vaultService.createVault(ownerId, createRequestWith(beneficiaryReq("a@test.com"))));
+
+        verify(vaultRepository, never()).save(any());
+        verify(vaultBeneficiaryRepository, never()).save(any());
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
     @DisplayName("createVault (N1): lưu từng người thụ hưởng, người đầu là người chính của cột cũ, gửi mail đúng loại")
     void createVault_withBeneficiaries_savesRowsAndNotifies() throws Exception {
         Vault savedVault = newSavedVault();
@@ -287,6 +301,11 @@ class VaultServiceImplTest {
         verify(emailSender).sendBeneficiaryInvitation(eq("ben1@test.com"), any(), any());
         verify(emailSender).sendBeneficiaryAssignedNotice(eq("ben2@test.com"), any(), any());
         verify(emailSender, never()).sendBeneficiaryAssignmentConfirmation(any(), any(), any(), anyBoolean());
+        // m3: VAULT_CREATED phải được ghi trước các BENEFICIARY_ASSIGNED
+        InOrder order = inOrder(auditLogService);
+        order.verify(auditLogService).log(eq(AuditAction.VAULT_CREATED), any(), any(), any(), any(), any(), any(), any());
+        order.verify(auditLogService, times(2))
+                .log(eq(AuditAction.BENEFICIARY_ASSIGNED), any(), any(), any(), any(), any(), any(), any());
     }
 
     // Kịch bản 2: Xóa Vault thành công (Mô phỏng FR-27)

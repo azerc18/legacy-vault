@@ -118,6 +118,25 @@ public class VaultControllerTest {
     }
 
     @Test
+    @DisplayName("createVault (N1): quá 10 người thụ hưởng -> 400 Bad Request")
+    void createVault_tooManyBeneficiaries_returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        AddBeneficiaryRequest beneficiary = new AddBeneficiaryRequest();
+        beneficiary.setEmail("ben@test.com");
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 1");
+        request.setBeneficiaries(java.util.Collections.nCopies(11, beneficiary));
+
+        mockMvc.perform(post("/api/vaults")
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+
+        verify(vaultService, never()).createVault(any(), any());
+    }
+
+    @Test
     @DisplayName("createVault: Asset con thiếu tên/loại -> 400 Bad Request")
     void createVault_invalidNestedAsset_returns400() throws Exception {
         UUID ownerId = UUID.randomUUID();

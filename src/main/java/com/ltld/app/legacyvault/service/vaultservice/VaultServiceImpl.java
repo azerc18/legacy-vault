@@ -49,9 +49,11 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -81,6 +83,10 @@ public class VaultServiceImpl implements VaultService {
         // FR-01: Chặn tạo két nếu quy trình bàn giao DMS đã bắt đầu
         dmsConfigService.assertHandoverNotStarted(ownerId);
 
+        // N1 (M1): gói FREE chỉ có 1 Master Vault, VIP nhiều vault; kiểm trước khi ghi.
+        // EntitlementServiceImpl (T1) hiện còn là stub; khi T1 cài đặt xong thì tự có hiệu lực, không phải sửa lại đây.
+        entitlementService.assertCanCreateVault(ownerId);
+
         // 1. Tìm thông tin chủ sở hữu (Owner)
         User owner = userRepository.findById(ownerId)
                 .orElseThrow(() -> new VaultException("Owner not found", HttpStatus.NOT_FOUND));
@@ -90,16 +96,19 @@ public class VaultServiceImpl implements VaultService {
         if (requested == null || requested.isEmpty()) {
             throw new VaultException(ErrorCode.BENEFICIARY_REQUIRED, "A vault must have at least one beneficiary");
         }
+        // m1: kiểm giới hạn gói bằng số lượng gửi lên TRƯỚC khi gọi DB cho từng email
+        entitlementService.assertCanAddBeneficiaries(ownerId, requested.size());
+
         List<String> emails = new ArrayList<>();
+        Set<String> seen = new HashSet<>();   // n1: dò trùng O(1)
         for (AddBeneficiaryRequest b : requested) {
             String email = validateBeneficiaryEmail(ownerId, owner, b.getEmail());
-            if (emails.contains(email)) {
+            if (!seen.add(email)) {
                 throw new VaultException(ErrorCode.BENEFICIARY_DUPLICATE,
                         "The same email appears more than once in the beneficiary list");
             }
             emails.add(email);
         }
-        entitlementService.assertCanAddBeneficiaries(ownerId, emails.size());
 
         // 2. Tạo két sắt (Vault)
         Vault vault = Vault.builder()
@@ -128,6 +137,11 @@ public class VaultServiceImpl implements VaultService {
             }
         }
 
+        // m3: ghi VAULT_CREATED trước, để nhật ký vault hiện "tạo vault" rồi mới tới "gán người thụ hưởng"
+        auditLogService.log(AuditAction.VAULT_CREATED, AuditResult.SUCCESS,
+                ownerId, owner.getEmail(), vault.getId(),
+                "Vault", vault.getId().toString(), null);
+
         // 4. N1: tạo từng người thụ hưởng; người đầu tiên là người chính của cột cũ
         for (int i = 0; i < requested.size(); i++) {
             VaultBeneficiary row = saveBeneficiaryRow(vault, emails.get(i), requested.get(i));
@@ -138,9 +152,6 @@ public class VaultServiceImpl implements VaultService {
             notifyBeneficiaryAdded(vault, owner, emails.get(i), row.getUser() == null, false);
         }
 
-        auditLogService.log(AuditAction.VAULT_CREATED, AuditResult.SUCCESS,
-                ownerId, owner.getEmail(), vault.getId(),
-                "Vault", vault.getId().toString(), null);
         return vault;
     }
 
