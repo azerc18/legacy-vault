@@ -1,21 +1,6 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AcceptClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -118,4 +103,6 @@ public interface BeneficiaryService {
      * Không giải mã gì. Yêu cầu phiên xác thực còn hiệu lực (403 nếu hết).
      */
     CloseVaultPreviewResponse previewClose(UUID vaultId, UUID currentUserId);
+
+    InheritanceDossierData getDossierData(UUID vaultId, UUID currentUserId);
 }

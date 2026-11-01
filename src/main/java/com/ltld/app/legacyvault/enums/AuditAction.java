@@ -53,5 +53,5 @@ public enum AuditAction {
     MFA_ENABLED, MFA_DISABLED, MFA_VERIFY_FAILED, MFA_BACKUP_CODE_USED,
     // N2b: người thụ hưởng từ chối, quyền nhận chuyển sang người dự phòng / không còn người nhận
     ASSET_ALLOCATION_FALLBACK, CLAIM_DECLINED, CLAIM_STALLED, CLAIM_ACCEPTED,
-    CLAIM_EXTENDED
+    CLAIM_EXTENDED,DOSSIER_DOWNLOADED
 }
