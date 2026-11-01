@@ -71,6 +71,22 @@ public class User {
     private Instant avatarUpdatedAt;
 
     @Builder.Default
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled = false;
+
+    @Column(name = "mfa_secret", length = 512)
+    private String mfaSecret;                 // đã mã hoá
+
+    @Column(name = "mfa_last_used_step")
+    private Long mfaLastUsedStep;
+
+    @Column(name = "mfa_challenge_hash", length = 64)
+    private String mfaChallengeHash;
+
+    @Column(name = "mfa_challenge_expires_at")
+    private Instant mfaChallengeExpiresAt;
+
+    @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",

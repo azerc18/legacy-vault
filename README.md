@@ -93,7 +93,7 @@ docker compose logs -f mysql   # xem log nếu MySQL chưa "healthy"
 
 ## 5. Chạy ứng dụng Spring Boot
 
-Dự án có 4 profile Spring: `default` (trong `application.yaml`), `local`, `docker`, `prod`. **Dùng profile `local` khi chạy trên máy cá nhân** - profile này đọc đúng theo bộ biến `MYSQL_*` trong `.env` ở bước 3.
+Dự án có 4 profile Spring: `default` (trong `application.properties`), `local`, `docker`, `prod`. **Dùng profile `local` khi chạy trên máy cá nhân** - profile này đọc đúng theo bộ biến `MYSQL_*` trong `.env` ở bước 3.
 
 ### Cách A - dùng Maven Wrapper (khuyến nghị)
 
@@ -123,7 +123,7 @@ java -jar target/legacy-vault-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
    - **Environment variables**: dán nội dung `.env` vào (hoặc cài plugin *EnvFile* và trỏ tới file `.env` để IDE tự load).
 4. Nhấn Run (▶) hoặc Debug (🐞) như trong ảnh cấu hình dự án.
 
-Ứng dụng mặc định chạy ở cổng **8084** (`server.port: 8084` trong `application.yaml`).
+Ứng dụng mặc định chạy ở cổng **8084** (`server.port: 8084` trong `application.properties`).
 
 ## 6. Kiểm tra ứng dụng đã chạy thành công
 
@@ -152,7 +152,7 @@ Log console sẽ hiển thị `Tomcat started on port 8084` và `Started LegacyV
 
 - **App không start, báo lỗi thiếu `JWT_SECRET`**: biến này không có giá trị mặc định trong bất kỳ profile nào - bắt buộc phải khai báo trong `.env`.
 - **App start nhưng không kết nối được DB / báo sai username-password**: kiểm tra bạn có đang chạy **đúng profile `local`** không. Profile `default` (không truyền `-Dspring-boot.run.profiles`) đọc các biến `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` - khác tên với `.env` hiện tại đang dùng `MYSQL_DATABASE` / `MYSQL_USER` / `MYSQL_PASSWORD`. Nếu không set profile, Spring sẽ rơi về giá trị mặc định cứng trong code, không đọc từ `.env`, dễ gây nhầm lẫn.
-- **Lỗi `Port 8084 already in use`**: đổi `server.port` trong `application.yaml` hoặc tắt tiến trình đang chiếm cổng.
+- **Lỗi `Port 8084 already in use`**: đổi `server.port` trong `application.properties` hoặc tắt tiến trình đang chiếm cổng.
 - **Lỗi `Port 3306 already in use` khi `docker compose up`**: xem mục 4 - đổi cổng map trong `docker-compose.yml`.
 - **Build lỗi vì sai version Java**: chạy `java -version` xác nhận đang dùng JDK 25, không phải JDK 17/21 (bản mặc định trên nhiều máy/IDE).
 - **`mvnw: command not found` (Linux/macOS)**: cấp quyền thực thi: `chmod +x mvnw`.

@@ -21,105 +21,112 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiResponse<Void>> handleTooLarge(MaxUploadSizeExceededException e) {
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+    // Mọi lỗi đều trả {success:false, errorCode, message}; status lấy theo ErrorCode
+    private static ResponseEntity<ApiResponse<Void>> fail(ErrorCode code, String message) {
+        return ResponseEntity.status(code.getStatus())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error("File exceeds the allowed size (10MB)."));
+                .body(ApiResponse.fail(code, message));
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException e) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+    // ---------- Lỗi nghiệp vụ ----------
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
+        // Dùng e.getStatus() (không phải code.getStatus()) để giữ status nơi ném chọn qua constructor cũ
+        return ResponseEntity.status(e.getStatus())
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error("Forbidden"));
+                .body(ApiResponse.fail(e.getErrorCode(), e.getMessage()));
     }
+
+    @ExceptionHandler(TooManyOtpRequestsException.class)
+    public ResponseEntity<ApiResponse<Map<String, Long>>> handleTooManyOtpRequest(TooManyOtpRequestsException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(ErrorCode.TOO_MANY_OTP_REQUESTS, e.getMessage(),
+                        Map.of("retryAfterSeconds", e.getRetryAfterSeconds())));
+    }
+
+    // ---------- Lỗi request ----------
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationErrors(MethodArgumentNotValidException e) {
-        Map<String, String> errors = new HashMap<>();
-
+        Map<String, String> errors = new LinkedHashMap<>();
         for (FieldError error : e.getBindingResult().getFieldErrors()) {
-            errors.put(error.getField(), error.getDefaultMessage());
+            errors.putIfAbsent(error.getField(), error.getDefaultMessage());   // giữ lỗi đầu tiên của mỗi field
         }
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Validation error", errors));
+        return ResponseEntity.badRequest()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(ErrorCode.VALIDATION_FAILED, "Validation error", errors));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException e) {
-        return ResponseEntity.badRequest().body(ApiResponse.error("Malformed request body"));
-    }
-
-    @ExceptionHandler(TooManyOtpRequestsException.class)
-    public ResponseEntity<?> handleTooManyOtpRequest(TooManyOtpRequestsException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
-                .body(Map.of("message", "Please try again later " + ex.getRetryAfterSeconds() + " seconds"));
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error("Resource not found"));
-    }
-
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
-                .body(ApiResponse.error("Method not allowed"));
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception ex) {
-        log.error("Unhandled exception", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("Internal server error"));
-    }
-
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("Request conflict. Please try again."));
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
-        log.warn("DataIntegrityViolation: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("The data has changed or is duplicated. Please reload."));
-    }
-
-    @ExceptionHandler(MissingServletRequestPartException.class)
-    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPart(MissingServletRequestPartException e) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Missing required request part: " + e.getRequestPartName()));
-    }
-
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<Void>> handleBusiness(BusinessException e) {
-        return ResponseEntity.status(e.getStatus())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(ApiResponse.error(e.getMessage()));
+        return fail(ErrorCode.MALFORMED_BODY, "Malformed request body");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Parameter '" + e.getName() + "' has an invalid format"));
+        return fail(ErrorCode.INVALID_PARAMETER, "Parameter '" + e.getName() + "' has an invalid format");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException e) {
-        return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Missing required parameter '" + e.getParameterName() + "'"))
-                ;}
+        return fail(ErrorCode.MISSING_PARAMETER, "Missing required parameter '" + e.getParameterName() + "'");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPart(MissingServletRequestPartException e) {
+        return fail(ErrorCode.MISSING_PARAMETER, "Missing required request part: " + e.getRequestPartName());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooLarge(MaxUploadSizeExceededException e) {
+        return fail(ErrorCode.FILE_TOO_LARGE, "File exceeds the allowed size (10MB).");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(NoResourceFoundException e) {
+        return fail(ErrorCode.NOT_FOUND, "Resource not found");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotAllowed(HttpRequestMethodNotSupportedException e) {
+        return fail(ErrorCode.METHOD_NOT_ALLOWED, "Method not allowed");
+    }
+
+    // ---------- Phân quyền ----------
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(AccessDeniedException e) {
+        return fail(ErrorCode.FORBIDDEN, "Forbidden");
+    }
+
+    // ---------- Dữ liệu / đồng thời ----------
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        return fail(ErrorCode.CONCURRENT_MODIFICATION, "Request conflict. Please try again.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolation: {}", e.getMostSpecificCause().getMessage());
+        return fail(ErrorCode.DATA_CONFLICT, "The data has changed or is duplicated. Please reload.");
+    }
+
+    // ---------- Còn lại ----------
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGlobalException(Exception e) {
+        log.error("Unhandled exception", e);
+        return fail(ErrorCode.INTERNAL_ERROR, "Internal server error");
+    }
 }

@@ -5,8 +5,10 @@ import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
@@ -19,6 +21,7 @@ import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -36,7 +39,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,6 +69,7 @@ class BeneficiaryNotificationListenerTest {
 
     @Mock private VaultRepository vaultRepository;
     @Mock private BeneficiaryClaimRepository claimRepository;
+    @Mock private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private EmailSender emailSender;
     @Mock private ExecutorNotificationService executorNotificationService;
@@ -82,12 +88,17 @@ class BeneficiaryNotificationListenerTest {
 
     // Claim "đã lưu" mà mock repository trả về, để test kiểm tra được notifiedAt / notifyAttempts
     private BeneficiaryClaim storedClaim;
+    // Người thụ hưởng theo vault, do hai helper bên dưới đăng ký; vaultBeneficiaryRepository đọc từ đây
+    private final Map<UUID, List<VaultBeneficiary>> beneficiaryRows = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         listener = new BeneficiaryNotificationListener(vaultRepository, claimRepository,
-                executorAssignmentRepository, emailSender, executorNotificationService,
-                auditLogService, notificationRepository, auditLogRepository, transactionManager);
+                vaultBeneficiaryRepository, executorAssignmentRepository, emailSender,
+                executorNotificationService, auditLogService, notificationRepository,
+                auditLogRepository, transactionManager);
+        lenient().when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(any()))
+                .thenAnswer(inv -> beneficiaryRows.getOrDefault(inv.getArgument(0), List.of()));
     }
 
     private User beneficiary(UserStatus status) {
@@ -95,13 +106,23 @@ class BeneficiaryNotificationListenerTest {
     }
 
     private Vault unlockedVault(UUID id, User beneficiary) {
-        return Vault.builder().id(id).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
+        Vault vault = Vault.builder().id(id).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
                 .beneficiary(beneficiary).claimDeadlineAt(deadline).build();
+        List<VaultBeneficiary> rows = beneficiary == null ? List.of() : List.of(VaultBeneficiary.builder()
+                .id(UUID.randomUUID()).vault(vault).user(beneficiary).email(beneficiary.getEmail())
+                .status(BeneficiaryInviteStatus.INVITED).build());
+        beneficiaryRows.put(id, rows);
+        return vault;
     }
 
     private Vault pendingVault(String beneficiaryEmail) {
-        return Vault.builder().id(vaultId).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
+        Vault vault = Vault.builder().id(vaultId).name("Hồ sơ A").owner(owner).status(VaultStatus.UNLOCKED)
                 .beneficiary(null).beneficiaryEmail(beneficiaryEmail).claimDeadlineAt(deadline).build();
+        List<VaultBeneficiary> rows = beneficiaryEmail == null || beneficiaryEmail.isBlank() ? List.of()
+                : List.of(VaultBeneficiary.builder().id(UUID.randomUUID()).vault(vault).user(null)
+                .email(beneficiaryEmail).status(BeneficiaryInviteStatus.PENDING_REGISTRATION).build());
+        beneficiaryRows.put(vaultId, rows);
+        return vault;
     }
 
     private VaultsUnlockedEvent event(UUID... ids) {
@@ -116,13 +137,13 @@ class BeneficiaryNotificationListenerTest {
 
     // Chưa có claim: save gán id và nhớ lại claim; findById trả đúng claim đó
     private void stubNewClaimPersistence() {
-        lenient().when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.empty());
+        lenient().when(claimRepository.findByVaultIdAndBeneficiaryId(any(), any())).thenReturn(Optional.empty());
         stubSaveAndFindById();
     }
 
     private void stubExistingClaim(BeneficiaryClaim claim) {
         storedClaim = claim;
-        lenient().when(claimRepository.findByVaultId(vaultId)).thenReturn(Optional.of(claim));
+        lenient().when(claimRepository.findByVaultIdAndBeneficiaryId(any(), any())).thenReturn(Optional.of(claim));
         stubSaveAndFindById();
     }
 
@@ -514,7 +535,7 @@ class BeneficiaryNotificationListenerTest {
         verify(executorNotificationService).send(eq("ex1@example.com"), contains("vault \"Hồ sơ A\""));
         verify(executorNotificationService, never()).send(eq("ex2@example.com"), anyString());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
-                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                isNull(), isNull(), eq(vaultId), eq("VaultBeneficiary"), anyString(),
                 contains("pendingRegistration=true"));
     }
 
@@ -546,15 +567,15 @@ class BeneficiaryNotificationListenerTest {
         verify(emailSender).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(executorNotificationService, never()).send(any(), any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), eq(AuditResult.SUCCESS),
-                isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()),
+                isNull(), isNull(), eq(vaultId), eq("VaultBeneficiary"), anyString(),
                 contains("executorsNotified=0/0"));
     }
 
     @Test
     void pendingRegistration_eventReplayed_skipsDuplicate() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(pendingVault("an@example.com")));
-        when(auditLogRepository.existsByVaultIdAndAction(vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED))
-                .thenReturn(true);
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                eq(vaultId), eq(AuditAction.BENEFICIARY_PENDING_NOTIFIED), any())).thenReturn(true);
 
         listener.onVaultsUnlocked(event(vaultId));
 
@@ -573,5 +594,26 @@ class BeneficiaryNotificationListenerTest {
         verify(emailSender, never()).sendVaultUnlockedNotification(any(), any(), any(), any(), any(), anyBoolean(), any());
         verify(auditLogService).log(eq(AuditAction.BENEFICIARY_NOTIFY_FAILED), eq(AuditResult.FAILURE),
                 isNull(), isNull(), eq(vaultId), eq("Vault"), eq(vaultId.toString()), contains("claimDeadlineAt"));
+    }
+
+    @Test
+    void pendingRegistration_onlyUnnotifiedPersonGetsInvite() {
+        Vault vault = pendingVault("an@example.com");
+        VaultBeneficiary first = beneficiaryRows.get(vaultId).get(0);
+        VaultBeneficiary second = VaultBeneficiary.builder().id(UUID.randomUUID()).vault(vault).user(null)
+                .email("binh@example.com").status(BeneficiaryInviteStatus.PENDING_REGISTRATION).build();
+        beneficiaryRows.put(vaultId, List.of(first, second));
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED, first.getId())).thenReturn(true);
+        when(auditLogRepository.existsByVaultIdAndActionAndEntityId(
+                vaultId, AuditAction.BENEFICIARY_PENDING_NOTIFIED, second.getId())).thenReturn(false);
+
+        listener.onVaultsUnlocked(event(vaultId));
+
+        verify(emailSender, never()).sendVaultUnlockedNotification(
+                eq("an@example.com"), any(), any(), any(), any(), anyBoolean(), any());
+        verify(emailSender).sendVaultUnlockedNotification(
+                eq("binh@example.com"), any(), any(), any(), any(), anyBoolean(), any());
     }
 }

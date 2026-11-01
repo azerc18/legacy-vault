@@ -23,6 +23,7 @@ import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
+import com.ltld.app.legacyvault.service.beneficiaryservice.InheritanceDossierPdfService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -58,6 +59,7 @@ public class BeneficiaryControllerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @MockitoBean private BeneficiaryService beneficiaryService;
+    @MockitoBean private InheritanceDossierPdfService dossierPdfService;
 
     private BeneficiaryClaimRequest validRequest() {
         BeneficiaryClaimRequest request = new BeneficiaryClaimRequest();
@@ -659,5 +661,7 @@ public class BeneficiaryControllerTest {
 
         verify(beneficiaryService).listMyVaults(eq(userId));
     }
+
+
 
 }

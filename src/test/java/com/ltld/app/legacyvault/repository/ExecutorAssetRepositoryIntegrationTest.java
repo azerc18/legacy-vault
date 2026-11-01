@@ -7,14 +7,11 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,12 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.beneficiary.notify-retry.enabled=false",
         "app.beneficiary.vault-purge.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class ExecutorAssetRepositoryIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class ExecutorAssetRepositoryIntegrationTest extends MySqlTestContainer {
 
     @Autowired private VaultRepository vaultRepository;
     @Autowired private DigitalAssetRepository digitalAssetRepository;

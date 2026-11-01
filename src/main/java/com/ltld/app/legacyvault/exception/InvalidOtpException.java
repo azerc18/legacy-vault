@@ -4,6 +4,6 @@ import org.springframework.http.HttpStatus;
 
 public class InvalidOtpException extends BusinessException {
     public InvalidOtpException(String message) {
-        super(message, HttpStatus.BAD_REQUEST);
+        super(message, HttpStatus.BAD_REQUEST, ErrorCode.OTP_INVALID);
     }
 }

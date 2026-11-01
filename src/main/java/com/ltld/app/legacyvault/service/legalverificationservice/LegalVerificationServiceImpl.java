@@ -24,6 +24,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
 import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
@@ -33,6 +34,7 @@ import com.ltld.app.legacyvault.exception.TooManyOtpRequestsException;
 import com.ltld.app.legacyvault.exception.VaultStateConflictException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
 import com.ltld.app.legacyvault.exception.VerificationStepRequiredException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -152,6 +154,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         try {
             return cryptoService.decryptBytes(
                     fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
+        } catch (StorageUnavailableException e) {
+            throw e; // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE, không phải lỗi giải mã
         } catch (Exception e) {
             log.error("Death certificate read/decrypt failed for request {}", requestId, e);
             throw new IllegalStateException("Could not read the document. Please try again later.");
@@ -366,7 +370,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         if (request.getSignOtpHash() == null
                 || request.getSignOtpExpiresAt() == null
                 || LocalDateTime.now().isAfter(request.getSignOtpExpiresAt())) {
-            throw new InvalidSignCodeException("The confirmation code has expired or was not generated. Please request a new code.");
+            throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_EXPIRED,
+                    "The confirmation code has expired or was not generated. Please request a new code.");
         }
 
         request.setSignAttempts(request.getSignAttempts() + 1);
@@ -376,18 +381,23 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
                     verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
-            throw new InvalidSignCodeException("Too many attempts. Please request a new code.");
+            throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
+                    "Too many attempts. Please request a new code.");
         }
 
         if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
+            int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
+            if (remaining <= 0) {
+                request.setSignOtpHash(null); // hết lượt: huỷ mã luôn, giống nhánh "quá lượt"
+            }
             requestRepository.save(request);
             auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
                     verifierId, emailOf(verifierId),
                     "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
-            int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
-            throw new InvalidSignCodeException(remaining > 0
-                    ? "Incorrect confirmation code. Attempts left: " + remaining + "."
-                    : "Incorrect confirmation code. No attempts left; please request a new code.");
+            throw remaining > 0
+                    ? new InvalidSignCodeException("Incorrect confirmation code. Attempts left: " + remaining + ".")
+                    : new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
+                            "Incorrect confirmation code. No attempts left; please request a new code.");
         }
 
         // Xác thực thành công: hủy mã OTP đã dùng
