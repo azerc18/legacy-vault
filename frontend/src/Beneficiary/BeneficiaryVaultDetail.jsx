@@ -106,6 +106,7 @@ export default function BeneficiaryVaultDetail() {
                     {message && <Alert>{message}</Alert>}
                     <AssetList vaultId={vaultId} assets={assets} onError={(e) => handleAccessError(e)} />
                     <DocumentList vaultId={vaultId} documents={documents} onError={(e) => handleAccessError(e)} />
+                    <DossierCard vaultId={vaultId} onError={(e) => handleAccessError(e)} />
                     <CloseVault
                         vaultId={vaultId}
                         onClosed={(res) => {
@@ -387,6 +388,37 @@ function DocumentList({ vaultId, documents, onError }) {
                     ))}
                 </ul>
             )}
+        </section>
+    );
+}
+
+// X4: tải hồ sơ khai nhận di sản (PDF) — chỉ phần tài sản của mình, không chứa thông tin bí mật
+function DossierCard({ vaultId, onError }) {
+    const [busy, setBusy] = useState(false);
+
+    const download = async () => {
+        setBusy(true);
+        try { await beneficiaryApi.downloadDossier(vaultId); }
+        catch (e) { onError(e); }
+        finally { setBusy(false); }
+    };
+
+    return (
+        <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 mt-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <h2 className="font-title-lg text-title-lg flex items-center gap-2">
+                        <Icon name="picture_as_pdf" className="text-secondary" /> Inheritance dossier
+                    </h2>
+                    <p className="mt-1 text-sm text-on-surface-variant max-w-xl">
+                        A PDF listing the assets allocated to you, the legal verifier's signature and the steps to claim each asset
+                        (e.g. at a notary or bank). It contains no passwords or keys.
+                    </p>
+                </div>
+                <button type="button" onClick={download} disabled={busy} className={btnPrimary}>
+                    <Icon name="download" className="text-[18px]" /> {busy ? 'Preparing...' : 'Download PDF'}
+                </button>
+            </div>
         </section>
     );
 }

@@ -213,6 +213,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .lastLoginAt(u.getLastLoginAt())
                 .hasAvatar(u.getAvatarPath() != null)
                 .avatarUpdatedAt(u.getAvatarUpdatedAt())
+                .mfaEnabled(u.isMfaEnabled())
                 .build();
     }
 }

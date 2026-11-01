@@ -54,5 +54,6 @@
   "PLAN_LIMIT_REACHED": "You have reached the Free plan limit. Upgrade to VIP to continue.",
   "PAYMENT_SIGNATURE_INVALID": "The payment could not be verified.",
   "PAYMENT_AMOUNT_MISMATCH": "The payment amount does not match.",
-  "STORAGE_UNAVAILABLE": "File storage is temporarily unavailable. Please try again later."
+  "STORAGE_UNAVAILABLE": "File storage is temporarily unavailable. Please try again later.",
+  "MFA_CHALLENGE_EXPIRED": "Your sign-in session expired. Please sign in again."
 }

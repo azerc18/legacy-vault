@@ -1,30 +1,7 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AcceptClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
-import com.ltld.app.legacyvault.entity.AssetAllocation;
-import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.IdentityVerification;
-import com.ltld.app.legacyvault.entity.LegalDocument;
-import com.ltld.app.legacyvault.entity.Notification;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.entity.VaultBeneficiary;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -38,25 +15,14 @@ import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
-import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
-import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
-import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
-import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
-import com.ltld.app.legacyvault.repository.NotificationRepository;
-import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
-import com.ltld.app.legacyvault.utility.EmailSender;
-import com.ltld.app.legacyvault.utility.AfterCommit;
-import com.ltld.app.legacyvault.utility.MockKycVerifier;
-import com.ltld.app.legacyvault.utility.OtpGenerator;
-import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.utility.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,10 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -127,6 +90,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final NotificationRepository notificationRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final AssetAllocationRepository assetAllocationRepository;
+    private final DigitalSignatureRepository digitalSignatureRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -918,6 +883,57 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
         }
         return new AccessContext(vault, claim);
+    }
+
+    @Override
+    @Transactional
+    public InheritanceDossierData getDossierData(UUID vaultId, UUID currentUserId) {
+        // Dùng lại đúng các bước kiểm tra của getInheritedAssets
+        Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+
+        // 2. Chỉ tài sản người này đang giữ (người chính, hoặc nhận thay do người chính từ chối)
+        List<InheritanceDossierData.AssetLine> assets = assetAllocationRepository.findHeldBy(vault.getId(), me.getId()).stream()
+                .filter(al -> al.getAsset().getStatus() == AssetStatus.ACTIVE)
+                .map(al -> new InheritanceDossierData.AssetLine(
+                        al.getAsset().getAssetName(),
+                        al.getAsset().getAssetType(),
+                        TransferMechanisms.resolve(al.getAsset().getTransferMechanism(), al.getAsset().getAssetType()),
+                        al.getMode(),
+                        al.getSharePercent(),
+                        al.getNote(),
+                        !al.getBeneficiary().getId().equals(me.getId())))
+                .toList();
+
+        // X5 chưa merge: lấy toàn bộ tài liệu. Sau X5: chỉ bản is_current
+        List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultId(vault.getId()).stream()
+                .map(d -> new InheritanceDossierData.DocumentLine(d.getFileName(), d.getDocumentType(), d.getUploadedAt()))
+                .toList();
+
+        // 1. Chữ ký Verifier + người thi hành của hồ sơ đã ký; chưa ký thì lấy Executor đang ACTIVE
+        Optional<DigitalSignature> sig = digitalSignatureRepository
+                .findSignedForVault(vault.getId(), PageRequest.of(0, 1)).stream().findFirst();
+        InheritanceDossierData.Signature signature = sig.map(s -> new InheritanceDossierData.Signature(
+                s.getVerifier().getFullName(), s.getVerifier().getEmail(),
+                String.valueOf(s.getSignatureMethod()), s.getSignatureHash(), s.getSignedAt(),
+                s.getRequest().getId())).orElse(null);
+        User executorUser = sig.map(s -> s.getRequest().getExecutor())
+                .or(() -> executorAssignmentRepository.findActiveWithUserByOwnerIdIn(List.of(vault.getOwner().getId()))
+                        .stream().findFirst().map(ExecutorAssignment::getExecutorUser))
+                .orElse(null);
+
+        User owner = vault.getOwner();
+        auditLogService.log(AuditAction.DOSSIER_DOWNLOADED, AuditResult.SUCCESS, currentUserId, null,
+                vault.getId(), "Vault", vault.getId().toString(), "assets=" + assets.size());
+
+        return new InheritanceDossierData(
+                vault.getId(), vault.getName(), vault.getUnlockedAt(), vault.getClaimDeadlineAt(),
+                new InheritanceDossierData.Person(owner.getFullName(), owner.getEmail()),
+                new InheritanceDossierData.Person(me.getFullName(), me.getEmail()),
+                executorUser == null ? null : new InheritanceDossierData.Person(executorUser.getFullName(), executorUser.getEmail()),
+                signature, assets, documents, LocalDateTime.now());
     }
 
     // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo

@@ -691,6 +691,7 @@ public class VaultServiceImpl implements VaultService {
                 .updatedAt(vault.getUpdatedAt())
                 .totalDocuments(docCount)
                 .totalAssets(assetCount)
+                .claimExtensions(vault.getClaimExtensions())
                 .build();
     }
 
