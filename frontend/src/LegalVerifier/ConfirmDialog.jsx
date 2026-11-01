@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Hộp xác nhận cho các thao tác không hoàn tác được (Approve / Reject / Sign).
 // open=false -> không hiện gì. Nhấn Esc hoặc bấm nền = huỷ.
 export default function ConfirmDialog({ open, title, message, confirmText, danger = false, busy = false, onConfirm, onCancel }) {
+    const { t } = useTranslation('verifier');
     useEffect(() => {
         if (!open) return;
         const onKey = (e) => { if (e.key === 'Escape' && !busy) onCancel(); };
@@ -34,7 +36,7 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
                         disabled={busy}
                         className="h-10 px-4 rounded-xl border border-outline-variant font-semibold text-on-surface hover:bg-surface-container-low disabled:opacity-50"
                     >
-                        Cancel
+                        {t('common:actions.cancel')}
                     </button>
                     <button
                         type="button"
@@ -44,7 +46,7 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
                             ? 'bg-error text-on-error hover:opacity-90'
                             : 'bg-primary text-on-primary hover:bg-primary-container'}`}
                     >
-                        {busy ? 'Processing...' : confirmText}
+                        {busy ? t('confirm.processing') : confirmText}
                     </button>
                 </div>
             </div>

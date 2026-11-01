@@ -5,14 +5,11 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,12 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class ExecutorAssignmentRepositoryBeneficiaryCheckIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class ExecutorAssignmentRepositoryBeneficiaryCheckIntegrationTest extends MySqlTestContainer {
 
     @Autowired
     private ExecutorAssignmentRepository executorAssignmentRepository;

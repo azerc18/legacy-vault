@@ -1,21 +1,9 @@
 package com.ltld.app.legacyvault.controller;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
+import com.ltld.app.legacyvault.service.beneficiaryservice.InheritanceDossierPdfService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +34,7 @@ import java.util.UUID;
 public class BeneficiaryController {
 
     private final BeneficiaryService beneficiaryService;
+    private final InheritanceDossierPdfService dossierPdfService;
 
     // FR-16: Khởi tạo yêu cầu nhận tài sản
     @PostMapping("/claim")
@@ -171,6 +160,28 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("Handover case closed.", response));
     }
 
+    // N2b: Beneficiary đã xác minh danh tính xác nhận nhận phần được chia
+    @PostMapping("/vaults/{vaultId}/accept")
+    public ResponseEntity<ApiResponse<AcceptClaimResponse>> acceptClaim(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+
+        AcceptClaimResponse response = beneficiaryService.acceptClaim(vaultId, currentUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("Inheritance accepted.", response));
+    }
+
+    // N2b: Beneficiary từ chối phần được chia; tài sản chuyển sang người dự phòng (nếu có)
+    @PostMapping("/vaults/{vaultId}/decline")
+    public ResponseEntity<ApiResponse<DeclineClaimResponse>> declineClaim(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @Valid @RequestBody(required = false) DeclineClaimRequest request) {
+
+        String reason = request != null ? request.getReason() : null;
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId(principal), reason);
+        return ResponseEntity.ok(ApiResponse.success("Inheritance declined.", response));
+    }
+
     // Lấy UUID người dùng từ JWT, cùng cách với VaultController
     private UUID currentUserId(Principal principal) {
         try {
@@ -210,5 +221,20 @@ public class BeneficiaryController {
                 .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.noStore())
                 .body(file.getContent());
+    }
+
+    @GetMapping("/vaults/{vaultId}/dossier")
+    public ResponseEntity<byte[]> downloadDossier(Principal principal, @PathVariable UUID vaultId) {
+        InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId(principal));
+        byte[] pdf = dossierPdfService.render(data);
+        String fileName = "ho-so-khai-nhan-" + vaultId.toString().substring(0, 8) + ".pdf";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(fileName, StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.noStore())
+                .body(pdf);
     }
 }

@@ -8,9 +8,12 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.dto.userdto.AvatarFile;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import org.junit.jupiter.api.Test;
@@ -19,8 +22,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -28,11 +33,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -47,6 +54,7 @@ class UserProfileServiceImplTest {
     @Mock private TokenService tokenService;
     @Mock private AuditLogService auditLogService;
     @Mock private FileStorageService fileStorageService;
+    @Mock private CryptoService cryptoService;
     @InjectMocks private UserProfileServiceImpl service;
 
     private final UUID userId = UUID.randomUUID();
@@ -247,5 +255,66 @@ class UserProfileServiceImplTest {
         service.changePassword(userId, changeRequest("old-pass", "new-pass"));
 
         verify(userRepository, never()).findById(any());
+    }
+
+    // ---------------- Avatar (H1) ----------------
+
+    private static final byte[] PNG = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0};
+
+    private static MockMultipartFile pngFile() {
+        return new MockMultipartFile("file", "a.png", "image/png", PNG);
+    }
+
+    @Test
+    void updateAvatar_storesEncryptedBytes() throws Exception {
+        User u = user();
+        byte[] cipher = {7, 7, 7};
+        MockMultipartFile file = pngFile();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        when(cryptoService.encryptBytes(PNG)).thenReturn(cipher);
+        when(fileStorageService.storeFile(file, cipher)).thenReturn("new-key.png");
+
+        service.updateAvatar(userId, file);
+
+        verify(fileStorageService).storeFile(eq(file), eq(cipher));
+        assertEquals("new-key.png", u.getAvatarPath());
+    }
+
+    @Test
+    void updateAvatar_storageUnavailable_propagates503AndSavesNothing() throws Exception {
+        MockMultipartFile file = pngFile();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
+        when(cryptoService.encryptBytes(PNG)).thenReturn(new byte[]{1});
+        when(fileStorageService.storeFile(any(), any()))
+                .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
+
+        assertThrows(StorageUnavailableException.class, () -> service.updateAvatar(userId, file));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getAvatar_decryptsStoredBytes() throws Exception {
+        User u = user();
+        u.setAvatarPath("key.png");
+        byte[] cipher = {9, 9};
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        when(fileStorageService.readFile("key.png")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(PNG);
+
+        AvatarFile avatar = service.getAvatar(userId);
+
+        assertArrayEquals(PNG, avatar.content());
+        assertEquals("image/png", avatar.contentType());
+    }
+
+    @Test
+    void getAvatar_legacyPlaintext_fallsBackToStoredBytes() throws Exception {
+        User u = user();
+        u.setAvatarPath("/old/uploads/key.png");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        when(fileStorageService.readFile("/old/uploads/key.png")).thenReturn(PNG);
+        when(cryptoService.decryptBytes(PNG)).thenThrow(new GeneralSecurityException("not ciphertext"));
+
+        assertArrayEquals(PNG, service.getAvatar(userId).content());
     }
 }

@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.event.VerifierReplyPostedEvent;
 import com.ltld.app.legacyvault.exception.InvalidVerificationDocumentException;
 import com.ltld.app.legacyvault.exception.VerificationRequestClosedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VerificationExchangeMessageRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -131,6 +132,8 @@ public class VerifierMessageServiceImpl implements VerifierMessageService {
         byte[] plain;
         try {
             plain = cryptoService.decryptBytes(fileStorageService.readFile(message.getAttachmentPath()));
+        } catch (StorageUnavailableException e) {
+            throw e; // H1: storage mất kết nối -> 503 STORAGE_UNAVAILABLE, không phải lỗi giải mã
         } catch (Exception e) {
             log.error("Attachment read/decrypt failed for message {}", messageId, e);
             throw new IllegalStateException("Could not read the attachment. Please try again later.");

@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.authservice.AuthServiceImpl;
+import com.ltld.app.legacyvault.service.mfaservice.MfaService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,9 @@ public class AuthServiceImplTest {
 
     @InjectMocks
     private AuthServiceImpl authService;
+
+    @Mock
+    MfaService mfaService;
 
 
     private Role ownerRole;

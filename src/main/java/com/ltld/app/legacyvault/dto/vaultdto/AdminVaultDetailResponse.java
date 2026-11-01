@@ -22,4 +22,5 @@ public class AdminVaultDetailResponse {
     private final LocalDateTime updatedAt;
     private final long totalDocuments;
     private final long totalAssets;
+    private final int claimExtensions;
 }
