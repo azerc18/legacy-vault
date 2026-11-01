@@ -23,4 +23,5 @@ public class UserProfileResponse {
     private boolean hasAvatar;
     // Thời điểm đổi ảnh gần nhất, FE dùng làm "version" để biết khi nào cần tải lại ảnh
     private Instant avatarUpdatedAt;
+    private boolean mfaEnabled;
 }
