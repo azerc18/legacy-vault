@@ -70,6 +70,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/error", "/api/auth/**").permitAll()
+                        // VNPay và link trong email không có JWT; xác thực bằng chữ ký / token riêng tại controller.
+                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-ipn", "/api/payments/vnpay-return",
+                                "/api/dms/checkin-link", "/api/dms/confirm").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .exceptionHandling(e -> e
