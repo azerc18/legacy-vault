@@ -34,6 +34,7 @@ import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
+import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -45,6 +46,7 @@ const VERIFIER = ['LEGAL_VERIFIER'];
 const ADMIN = ['ADMIN'];
 
 function App() {
+    useTranslation();
     return (
         <BrowserRouter>
             <Routes>

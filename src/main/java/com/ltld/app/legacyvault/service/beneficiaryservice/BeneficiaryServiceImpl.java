@@ -1,29 +1,11 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
-import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
-import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityResponse;
-import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.IdentityVerification;
-import com.ltld.app.legacyvault.entity.LegalDocument;
-import com.ltld.app.legacyvault.entity.Notification;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.dto.beneficiarydto.*;
+import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
@@ -31,24 +13,16 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
-import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
-import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
-import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
-import com.ltld.app.legacyvault.repository.NotificationRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
-import com.ltld.app.legacyvault.utility.EmailSender;
-import com.ltld.app.legacyvault.utility.AfterCommit;
-import com.ltld.app.legacyvault.utility.MockKycVerifier;
-import com.ltld.app.legacyvault.utility.OtpGenerator;
-import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.utility.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,10 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -117,6 +88,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final OtpHasher otpHasher;
     private final AuditLogService auditLogService;
     private final NotificationRepository notificationRepository;
+    private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    private final AssetAllocationRepository assetAllocationRepository;
+    private final DigitalSignatureRepository digitalSignatureRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -130,15 +105,19 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Transactional(readOnly = true)
     public List<BeneficiaryVaultSummaryResponse> listMyVaults(UUID currentUserId) {
         // Luôn lọc theo người đang đăng nhập, không nhận beneficiaryId từ client
-        List<Vault> vaults = vaultRepository.findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(
+        List<Vault> vaults = vaultRepository.findVaultsOfBeneficiary(
                 currentUserId, List.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED, VaultStatus.ARCHIVED_LOCKED));
         if (vaults.isEmpty()) {
             return List.of();
         }
 
         Map<UUID, BeneficiaryClaim> claimsByVaultId = claimRepository
-                .findByVaultIdIn(vaults.stream().map(Vault::getId).toList()).stream()
+                .findByVaultIdInAndBeneficiaryId(vaults.stream().map(Vault::getId).toList(), currentUserId).stream()
                 .collect(Collectors.toMap(c -> c.getVault().getId(), c -> c));
+
+        Map<UUID, BeneficiaryInviteStatus> myStatusByVaultId = vaultBeneficiaryRepository
+                .findByUserIdAndVaultIdIn(currentUserId, vaults.stream().map(Vault::getId).toList()).stream()
+                .collect(Collectors.toMap(b -> b.getVault().getId(), VaultBeneficiary::getStatus, (a, b) -> a));
 
         return vaults.stream().map(v -> {
             BeneficiaryClaim claim = claimsByVaultId.get(v.getId());
@@ -148,6 +127,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     .ownerName(v.getOwner() != null ? v.getOwner().getFullName() : null)
                     .vaultStatus(v.getStatus())
                     .claimStatus(claim != null ? claim.getStatus() : null)
+                    .myStatus(myStatusByVaultId.get(v.getId()))
                     .unlockedAt(v.getUnlockedAt())
                     .claimDeadlineAt(v.getClaimDeadlineAt())
                     .claimedAt(claim != null ? claim.getClaimedAt() : null)
@@ -195,10 +175,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Vault vault = vaultRepository.findById(request.getVaultId())
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
 
-        User beneficiary = vault.getBeneficiary();
-        if (beneficiary == null || !beneficiary.getId().equals(currentUserId)) {
-            throw new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND);
-        }
+        User beneficiary = requireBeneficiary(vault.getId(), currentUserId).getUser();
 
         // 2. Kiểm tra trạng thái Vault
         if (vault.getStatus() == VaultStatus.CLAIMED) {
@@ -212,7 +189,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
 
         // 3. Khởi tạo hoặc lấy BeneficiaryClaim hiện tại
-        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId()).orElse(null);
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId).orElse(null);
 
         if (claim != null) {
             if (claim.getStatus() == ClaimStatus.CLAIMED) {
@@ -304,7 +281,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log.
         // FR-17: send after commit so no code goes out for a rolled-back transaction.
         UUID vaultId = vault.getId();
-        String recipient = vault.getBeneficiary().getEmail();
+        String recipient = emailOf(vault, currentUserId);
         AfterCommit.run(() -> {
             try {
                 emailSender.sendEmail(recipient, otp);
@@ -316,7 +293,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             }
         });
         auditLogService.log(AuditAction.IDENTITY_OTP_SENT, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), null);
+                emailOf(vault, currentUserId), "Vault", vault.getId().toString(), null);
     }
 
     @Override
@@ -367,7 +344,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         if (totalAttempts > MAX_VERIFY_ATTEMPTS) {
             lockSession(verification);
             auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
-                    vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
+                    emailOf(vault, currentUserId), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }
 
@@ -378,12 +355,12 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         if (!passed) {
             auditLogService.log(AuditAction.IDENTITY_VERIFY_FAILED, AuditResult.FAILURE, currentUserId,
-                    vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(),
+                    emailOf(vault, currentUserId), "Vault", vault.getId().toString(),
                     "method=" + request.getVerificationMethod() + ", attempt=" + totalAttempts);
             if (totalAttempts >= MAX_VERIFY_ATTEMPTS) {
                 lockSession(verification);
                 auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
-                        vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
+                        emailOf(vault, currentUserId), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
                 throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
             }
             throw new BeneficiaryException(
@@ -398,7 +375,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verificationRepository.save(verification);
 
         auditLogService.log(AuditAction.IDENTITY_VERIFIED, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(),
+                emailOf(vault, currentUserId), "Vault", vault.getId().toString(),
                 "method=" + request.getVerificationMethod());
 
         return VerifyIdentityResponse.builder()
@@ -441,7 +418,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_VIEWED, AuditResult.SUCCESS, currentUserId,
-                decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
+                emailOf(decrypted.vault(), currentUserId), decrypted.vault().getId(),
                 "DigitalAsset", asset.getId().toString(), null);
         return response;
     }
@@ -458,7 +435,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // SRS FR-18 bước 5: ghi log tải xuống, chỉ sau khi giải mã thành công, không đưa dữ liệu rõ vào log
         auditLogService.log(AuditAction.ASSET_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
-                decrypted.vault().getBeneficiary().getEmail(), decrypted.vault().getId(),
+                emailOf(decrypted.vault(), currentUserId), decrypted.vault().getId(),
                 "DigitalAsset", asset.getId().toString(), null);
 
         return AssetDownloadResponse.builder()
@@ -509,7 +486,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             log.error("Document read/decrypt failed for document {}", document.getId(), e);
             // Giải mã thất bại có thể là dấu hiệu tệp bị sửa hoặc sai khóa, nên cần nằm trong audit
             auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.FAILURE, currentUserId,
-                    vault.getBeneficiary().getEmail(), vault.getId(),
+                    emailOf(vault, currentUserId), vault.getId(),
                     "LegalDocument", document.getId().toString(), "Read or decrypt failed");
             throw new BeneficiaryException(
                     "Could not decrypt the document. Please try again later.", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -518,7 +495,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         String fileName = toSafeDocumentFileName(document.getFileName());
 
         auditLogService.log(AuditAction.DOCUMENT_DOWNLOADED, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), vault.getId(),
+                emailOf(vault, currentUserId), vault.getId(),
                 "LegalDocument", document.getId().toString(), null);
 
         return DocumentDownloadResponse.builder()
@@ -559,6 +536,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     @Transactional
     public CloseVaultResponse closeVault(UUID vaultId, CloseVaultRequest request, UUID currentUserId) {
+        vaultRepository.findByIdForUpdate(vaultId); // N2b: khóa vault trước claim, cùng thứ tự với ClaimTimeoutScheduler
         AccessContext ctx = loadAccessibleVault(vaultId, currentUserId);
         Vault vault = ctx.vault();
         BeneficiaryClaim claim = ctx.claim();
@@ -594,14 +572,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
         claim.setStatus(ClaimStatus.CLAIMED);
         claim.setClaimedAt(now);
-        vault.setStatus(VaultStatus.CLAIMED);
-        vaultRepository.save(vault);
+        // N2b: chỉ đóng phần của người này; vault sang CLAIMED khi mọi phần đã xong
+        completeVaultIfAllDone(vault);
 
         // Ghi số lượng và id tài sản chưa xem để đối soát sau này, không có dữ liệu rõ
         String detail = "unviewedCount=" + unviewed.size()
                 + ", unviewedAssetIds=" + unviewed.stream().map(a -> a.getId().toString()).toList();
         auditLogService.log(AuditAction.CLAIM_COMPLETED, AuditResult.SUCCESS, currentUserId,
-                vault.getBeneficiary().getEmail(), "Vault", vault.getId().toString(), detail);
+                emailOf(vault, currentUserId), "Vault", vault.getId().toString(), detail);
 
         return CloseVaultResponse.builder()
                 .vaultId(vault.getId())
@@ -713,16 +691,39 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         String ext = dot >= 0 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
         return DOCUMENT_TYPES.getOrDefault(ext, "application/octet-stream");
     }
-    // ===================== Helper dùng chung cho FR-17 =====================
 
-    // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
-    private AccessContext loadAccessibleVault(UUID vaultId, UUID currentUserId) {
-        Vault vault = vaultRepository.findById(vaultId)
+    // ===================== N2b: Decline + auto-fallback =====================
+
+    @Override
+    @Transactional
+    public AcceptClaimResponse acceptClaim(UUID vaultId, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        // Chỉ nhận được khi đã xác minh danh tính (phiên xem còn hiệu lực)
+        assertViewSession(vault.getId(), currentUserId);
+
+        VaultBeneficiary me = requireBeneficiary(vaultId, currentUserId);
+        if (me.getStatus() != BeneficiaryInviteStatus.ACCEPTED) {
+            me.setStatus(BeneficiaryInviteStatus.ACCEPTED);
+            me.setRespondedAt(LocalDateTime.now());
+            vaultBeneficiaryRepository.save(me);
+            auditLogService.log(AuditAction.CLAIM_ACCEPTED, AuditResult.SUCCESS, currentUserId, me.getEmail(),
+                    "Vault", vaultId.toString(), null);
+        }
+        return AcceptClaimResponse.builder().vaultId(vaultId).status(me.getStatus()).build();
+    }
+
+    @Override
+    @Transactional
+    public DeclineClaimResponse declineClaim(UUID vaultId, UUID currentUserId, String reason) {
+        // N2b: khóa vault trước (vault -> claim) để không bỏ sót việc hoàn tất
+        Vault vault = vaultRepository.findByIdForUpdate(vaultId)
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
-
-        User beneficiary = vault.getBeneficiary();
-        if (beneficiary == null || !beneficiary.getId().equals(currentUserId)) {
-            throw new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND);
+        VaultBeneficiary me = requireBeneficiary(vaultId, currentUserId);
+        // Mỗi người chỉ phản hồi một lần: đã Accept thì không Decline được nữa
+        if (me.getStatus() == BeneficiaryInviteStatus.ACCEPTED) {
+            throw new BeneficiaryException(ErrorCode.CLAIM_ALREADY_RESPONDED,
+                    "You have already accepted this inheritance.");
         }
 
         if (vault.getStatus() == VaultStatus.CLAIMED) {
@@ -735,7 +736,144 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST);
         }
 
-        BeneficiaryClaim claim = claimRepository.findByVaultId(vault.getId())
+        // Từ chối không đảo ngược được: cùng cửa xác minh danh tính với Accept
+        assertNotLocked(vaultId, currentUserId);
+        assertViewSession(vaultId, currentUserId);
+
+        LocalDateTime now = LocalDateTime.now();
+        // Đã qua xác minh thì claim chắc chắn tồn tại (initializeClaim tạo ra)
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST));
+        if (claim.getStatus() == ClaimStatus.CLAIMED) {
+            throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
+        }
+        if (claim.getStatus() == ClaimStatus.EXPIRED || now.isAfter(claim.getClaimDeadlineAt())) {
+            throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
+        }
+        claim.setStatus(ClaimStatus.DECLINED);
+        claimRepository.save(claim);
+
+        me.setStatus(BeneficiaryInviteStatus.DECLINED);
+        me.setRespondedAt(now);
+        vaultBeneficiaryRepository.save(me);
+
+        // Auto-fallback: chuyển từng phân bổ đang giữ sang người dự phòng còn nhận được
+        int reassigned = 0;
+        int stalled = 0;
+        for (AssetAllocation allocation : assetAllocationRepository.findHeldBy(vaultId, me.getId())) {
+            VaultBeneficiary next = allocation.getContingentBeneficiary();
+            if (next != null && !next.getId().equals(me.getId()) && canReceive(vaultId, next)) {
+                allocation.setEffectiveBeneficiary(next);
+                assetAllocationRepository.save(allocation);
+                reassigned++;
+                auditLogService.log(AuditAction.ASSET_ALLOCATION_FALLBACK, AuditResult.SUCCESS, currentUserId,
+                        me.getEmail(), vaultId, "Asset", allocation.getAsset().getId().toString(),
+                        "from=" + me.getId() + ", to=" + next.getId());
+            } else {
+                stalled++;
+            }
+        }
+
+        auditLogService.log(AuditAction.CLAIM_DECLINED, AuditResult.SUCCESS, currentUserId, me.getEmail(),
+                "Vault", vaultId.toString(), "reassigned=" + reassigned + ", stalled=" + stalled
+                        + (reason != null && !reason.isBlank() ? ", reason=" + reason.trim() : ""));
+
+        // Không còn tài sản nào có người nhận, hoặc cả vault không còn ai nhận: báo để Admin/Executor xử lý
+        boolean anyoneLeft = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId).stream()
+                .anyMatch(b -> b.getStatus() != BeneficiaryInviteStatus.DECLINED
+                        && b.getStatus() != BeneficiaryInviteStatus.WAIVED);
+        if (stalled > 0 || !anyoneLeft) {
+            auditLogService.log(AuditAction.CLAIM_STALLED, AuditResult.FAILURE, currentUserId, me.getEmail(),
+                    "Vault", vaultId.toString(), "stalledAssets=" + stalled + ", anyoneLeft=" + anyoneLeft);
+        }
+
+        // Nếu mọi người còn lại đã đóng phần của mình thì vault hoàn tất (chỉ khi không còn tài sản stalled)
+        completeVaultIfAllDone(vault);
+
+        return DeclineClaimResponse.builder()
+                .vaultId(vaultId)
+                .claimStatus(claim.getStatus())
+                .reassignedAssets(reassigned)
+                .stalledAssets(stalled)
+                .build();
+    }
+
+    // ===================== Helper dùng chung cho FR-17 =====================
+
+    // N2b: cổng truy cập theo vault_beneficiaries. Người lạ trả 404 để không lộ vault;
+    // người đã từ chối / từ bỏ trả 409.
+    private VaultBeneficiary requireBeneficiary(UUID vaultId, UUID currentUserId) {
+        VaultBeneficiary vb = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, currentUserId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+        if (vb.getStatus() == BeneficiaryInviteStatus.DECLINED || vb.getStatus() == BeneficiaryInviteStatus.WAIVED) {
+            throw new BeneficiaryException(ErrorCode.CLAIM_ALREADY_RESPONDED, "You have declined this inheritance.");
+        }
+        return vb;
+    }
+
+    // Email dùng cho audit; thay cho vault.getBeneficiary().getEmail() vì giờ vault có nhiều người thụ hưởng
+    private String emailOf(Vault vault, UUID userId) {
+        return vaultBeneficiaryRepository.findByVaultIdAndUserId(vault.getId(), userId)
+                .map(VaultBeneficiary::getEmail)
+                .orElse(null);
+    }
+
+    // N2b: vault chỉ sang CLAIMED khi mọi người thụ hưởng còn nhận được đều đã đóng phần của mình.
+    // Nếu không ai đã đóng (vd. tất cả từ chối) thì giữ nguyên UNLOCKED đến hết hạn nhận.
+    private void completeVaultIfAllDone(Vault vault) {
+        // Q49: còn phân bổ không có người nhận thì giữ UNLOCKED, chờ Admin xử lý hoặc hết hạn BR-04
+        if (assetAllocationRepository.countStalledInVault(vault.getId(),
+                List.of(BeneficiaryInviteStatus.DECLINED, BeneficiaryInviteStatus.WAIVED)) > 0) {
+            return;
+        }
+        List<UUID> claimedUserIds = claimRepository.findAllByVaultId(vault.getId()).stream()
+                .filter(c -> c.getStatus() == ClaimStatus.CLAIMED)
+                .map(c -> c.getBeneficiary().getId())
+                .toList();
+        if (claimedUserIds.isEmpty()) {
+            return;
+        }
+        boolean allDone = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vault.getId()).stream()
+                .filter(b -> b.getStatus() != BeneficiaryInviteStatus.DECLINED
+                        && b.getStatus() != BeneficiaryInviteStatus.WAIVED)
+                .allMatch(b -> b.getUser() != null && claimedUserIds.contains(b.getUser().getId()));
+        if (allDone) {
+            vault.setStatus(VaultStatus.CLAIMED);
+            vaultRepository.save(vault);
+        }
+    }
+
+    // N2b: người dự phòng chỉ nhận được phần chuyển sang nếu chưa đóng / chưa hết hạn / chưa từ chối
+    private boolean canReceive(UUID vaultId, VaultBeneficiary vb) {
+        if (vb.getStatus() == BeneficiaryInviteStatus.DECLINED || vb.getStatus() == BeneficiaryInviteStatus.WAIVED) {
+            return false;
+        }
+        if (vb.getUser() == null) {
+            return true; // chưa đăng ký: sẽ có claim khi đăng ký xong
+        }
+        return claimRepository.findByVaultIdAndBeneficiaryId(vaultId, vb.getUser().getId())
+                .map(c -> c.getStatus() == ClaimStatus.PENDING)
+                .orElse(true);
+    }
+
+    // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
+    private AccessContext loadAccessibleVault(UUID vaultId, UUID currentUserId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+
+        requireBeneficiary(vault.getId(), currentUserId);
+
+        if (vault.getStatus() == VaultStatus.CLAIMED) {
+            throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
+        }
+        if (vault.getStatus() == VaultStatus.ARCHIVED_LOCKED) {
+            throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
+        }
+        if (vault.getStatus() != VaultStatus.UNLOCKED) {
+            throw new BeneficiaryException(NOT_READY_MSG, HttpStatus.BAD_REQUEST);
+        }
+
+        BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId)
                 .orElseThrow(() -> new BeneficiaryException(NO_SESSION_MSG, HttpStatus.BAD_REQUEST));
 
         if (claim.getStatus() == ClaimStatus.CLAIMED) {
@@ -745,6 +883,57 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
         }
         return new AccessContext(vault, claim);
+    }
+
+    @Override
+    @Transactional
+    public InheritanceDossierData getDossierData(UUID vaultId, UUID currentUserId) {
+        // Dùng lại đúng các bước kiểm tra của getInheritedAssets
+        Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+
+        // 2. Chỉ tài sản người này đang giữ (người chính, hoặc nhận thay do người chính từ chối)
+        List<InheritanceDossierData.AssetLine> assets = assetAllocationRepository.findHeldBy(vault.getId(), me.getId()).stream()
+                .filter(al -> al.getAsset().getStatus() == AssetStatus.ACTIVE)
+                .map(al -> new InheritanceDossierData.AssetLine(
+                        al.getAsset().getAssetName(),
+                        al.getAsset().getAssetType(),
+                        TransferMechanisms.resolve(al.getAsset().getTransferMechanism(), al.getAsset().getAssetType()),
+                        al.getMode(),
+                        al.getSharePercent(),
+                        al.getNote(),
+                        !al.getBeneficiary().getId().equals(me.getId())))
+                .toList();
+
+        // X5 chưa merge: lấy toàn bộ tài liệu. Sau X5: chỉ bản is_current
+        List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultId(vault.getId()).stream()
+                .map(d -> new InheritanceDossierData.DocumentLine(d.getFileName(), d.getDocumentType(), d.getUploadedAt()))
+                .toList();
+
+        // 1. Chữ ký Verifier + người thi hành của hồ sơ đã ký; chưa ký thì lấy Executor đang ACTIVE
+        Optional<DigitalSignature> sig = digitalSignatureRepository
+                .findSignedForVault(vault.getId(), PageRequest.of(0, 1)).stream().findFirst();
+        InheritanceDossierData.Signature signature = sig.map(s -> new InheritanceDossierData.Signature(
+                s.getVerifier().getFullName(), s.getVerifier().getEmail(),
+                String.valueOf(s.getSignatureMethod()), s.getSignatureHash(), s.getSignedAt(),
+                s.getRequest().getId())).orElse(null);
+        User executorUser = sig.map(s -> s.getRequest().getExecutor())
+                .or(() -> executorAssignmentRepository.findActiveWithUserByOwnerIdIn(List.of(vault.getOwner().getId()))
+                        .stream().findFirst().map(ExecutorAssignment::getExecutorUser))
+                .orElse(null);
+
+        User owner = vault.getOwner();
+        auditLogService.log(AuditAction.DOSSIER_DOWNLOADED, AuditResult.SUCCESS, currentUserId, null,
+                vault.getId(), "Vault", vault.getId().toString(), "assets=" + assets.size());
+
+        return new InheritanceDossierData(
+                vault.getId(), vault.getName(), vault.getUnlockedAt(), vault.getClaimDeadlineAt(),
+                new InheritanceDossierData.Person(owner.getFullName(), owner.getEmail()),
+                new InheritanceDossierData.Person(me.getFullName(), me.getEmail()),
+                executorUser == null ? null : new InheritanceDossierData.Person(executorUser.getFullName(), executorUser.getEmail()),
+                signature, assets, documents, LocalDateTime.now());
     }
 
     // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo
@@ -773,8 +962,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 vaultId, currentUserId, VerificationStatus.SUCCESS,
                 LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
         if (!valid) {
-            throw new BeneficiaryException(
-                    "Identity verification is required before viewing assets.", HttpStatus.FORBIDDEN);
+            throw new BeneficiaryException(ErrorCode.IDENTITY_NOT_VERIFIED,
+                    "Identity verification is required before viewing assets.");
         }
     }
 

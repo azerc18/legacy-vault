@@ -3,27 +3,22 @@ import React from 'react';
 import ProtectionBanner from './ProtectionBanner.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 
+
 export function Icon({name, className = ''}) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
-// LocalDateTime ("2026-10-16T10:30:00") hoặc Instant ("...Z")
-export function formatDate(value, withTime = false) {
-    if (!value) return '—';
-    const d = new Date(value);
-    return withTime
-        ? d.toLocaleString('en-GB', {dateStyle: 'medium', timeStyle: 'short'})
-        : d.toLocaleDateString('en-GB', {dateStyle: 'medium'});
-}
+export { formatDate, humanize } from '../i18n/format.js';
 
 // "VAULT_CREATED" -> "Vault created"
-export const humanize = (s) => (s ? s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ') : '—');
-
 export const ASSET_TYPES = [
     {value: 'BANK_ACCOUNT', label: 'Bank account'},
     {value: 'CRYPTO_WALLET', label: 'Crypto wallet'},
     {value: 'SOCIAL_MEDIA', label: 'Social media'},
     {value: 'DOCUMENT', label: 'Document'},
+    {value: 'EXCHANGE_ACCOUNT', label: 'Exchange account'},
+    {value: 'E_WALLET', label: 'E-wallet'},
+    {value: 'EMAIL', label: 'Email account'},
     {value: 'OTHER', label: 'Other'},
 ];
 

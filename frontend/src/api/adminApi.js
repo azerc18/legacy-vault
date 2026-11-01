@@ -51,6 +51,8 @@ export const adminApi = {
         if (status) params.status = status;
         return http.get('/vaults/admin/all', { params }).then(unwrap);
     },
+    extendClaim: (vaultId, days, reason) =>
+        http.put(`/admin/vaults/${vaultId}/claim/extend`, { days, reason }).then(unwrap),
     // -> { id, name, description, status, ownerId, ownerEmail, unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
     getVault: (vaultId) => http.get(`/vaults/admin/${vaultId}`).then(unwrap),
 

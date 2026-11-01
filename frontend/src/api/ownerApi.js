@@ -40,8 +40,10 @@ export const ownerApi = {
     //      unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets, modifiable, lockReason }
     getVault: (vaultId) => http.get(`/vaults/${vaultId}`).then(unwrap),
 
+    // N1: beneficiaries bắt buộc, 1–10 dòng [{ email, fullName?, relationship? }]
     // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
-    createVault: ({ name, description, assets }) => http.post('/vaults', { name, description, assets }).then(unwrap).then(changed),
+    createVault: ({ name, description, assets, beneficiaries }) =>
+        http.post('/vaults', { name, description, assets, beneficiaries }).then(unwrap).then(changed),
 
     // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
     updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
@@ -54,19 +56,21 @@ export const ownerApi = {
     listAssets: (vaultId) => http.get(`/vaults/${vaultId}/assets`).then((r) => unwrap(r) ?? []),
     // Chi tiết CÓ secret + notes đã giải mã (BE ghi audit ASSET_VIEWED mỗi lần xem)
     getAsset: (vaultId, assetId) => http.get(`/vaults/${vaultId}/assets/${assetId}`).then(unwrap),
-    // { assetType, assetName, secret (bắt buộc khi thêm), notes }
+    // N3: schema các loại tài sản -> [{ assetType, label, mechanism, fields: [{ key, label, type, required, sensitive, pattern, options }] }]
+    getAssetTypes: () => http.get('/asset-types').then((r) => unwrap(r) ?? []),
+    // { assetType, assetName, fields (theo schema) | secret (kiểu cũ), notes }
     addAsset: (vaultId, asset) => http.post(`/vaults/${vaultId}/assets`, asset).then(unwrap),
     // Cập nhật: secret null/rỗng = giữ nguyên; notes null = giữ nguyên, "" = xoá ghi chú
     updateAsset: (vaultId, assetId, asset) => http.put(`/vaults/${vaultId}/assets/${assetId}`, asset).then(unwrap),
     deleteAsset: (vaultId, assetId) => http.delete(`/vaults/${vaultId}/assets/${assetId}`),
 
-    // FR-02: chỉ định / thay người thụ hưởng. 409 + "confirmReplace" => gửi lại với confirmReplace=true
-    // -> { vaultId, beneficiaryEmail, beneficiaryName, pendingRegistration, replaced }
-    assignBeneficiary: (vaultId, email, confirmReplace = false) =>
-        http.put(`/vaults/${vaultId}/beneficiary`, { email, confirmReplace }).then(unwrap).then(changed),
+    // N2-owner: thêm 1 người thụ hưởng -> { id, email, fullName, relationship, status }
+    addBeneficiary: (vaultId, { email, fullName, relationship }) =>
+        http.post(`/vaults/${vaultId}/beneficiaries`, { email, fullName, relationship }).then(unwrap).then(changed),
 
-    // FR-02 (V8): gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký (idempotent)
-    removeBeneficiary: (vaultId) => http.delete(`/vaults/${vaultId}/beneficiary`).then(changed),
+    // N2-owner: xoá 1 người thụ hưởng theo id (BE chặn LAST_BENEFICIARY, BENEFICIARY_IN_USE)
+    removeBeneficiaryById: (vaultId, beneficiaryId) =>
+        http.delete(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`).then(changed),
 
     // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER

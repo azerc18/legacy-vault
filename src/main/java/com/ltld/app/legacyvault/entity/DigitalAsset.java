@@ -63,6 +63,10 @@ public class DigitalAsset {
     @Column(name = "linked_document_group_id")
     private UUID linkedDocumentGroupId;
 
+    // N3: các trường KHÔNG bí mật theo schema loại tài sản (JSON phẳng). null = tài sản kiểu cũ (chỉ có secret)
+    @Column(name = "public_fields_json", columnDefinition = "TEXT")
+    private String publicFieldsJson;
+
     // Trạng thái mặc định khi tạo mới là ACTIVE
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

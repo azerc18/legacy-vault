@@ -21,8 +21,9 @@ import java.util.UUID;
 
 @Repository
 public interface VaultRepository extends JpaRepository<Vault, UUID> {
+    // N2b: khóa dòng vault. Luôn khóa vault trước rồi mới đụng tới claim để mọi nơi cùng thứ tự khóa
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select v from Vault v where v.id = :id")
+    @Query("SELECT v FROM Vault v WHERE v.id = :id")
     Optional<Vault> findByIdForUpdate(@Param("id") UUID id);
 
     // FR-02: các Vault đang chờ người thụ hưởng (theo email) đăng ký/xác minh tài khoản
@@ -46,14 +47,20 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // lastAttemptBefore: lọc thô theo khoảng chờ nhỏ nhất; khoảng chờ chính xác kiểm ở listener.
     @Query("""
             SELECT v.id FROM Vault v
-            LEFT JOIN BeneficiaryClaim c ON c.vault = v
             WHERE v.status = com.ltld.app.legacyvault.enums.VaultStatus.UNLOCKED
-              AND v.beneficiary IS NOT NULL
               AND v.claimDeadlineAt > :now
               AND (v.unlockedAt IS NULL OR v.unlockedAt <= :unlockedBefore)
-              AND (c.id IS NULL OR (c.notifiedAt IS NULL
-                   AND c.notifyAttempts < :maxAttempts
-                   AND (c.lastNotifyAttemptAt IS NULL OR c.lastNotifyAttemptAt <= :lastAttemptBefore)))
+              AND EXISTS (
+                  SELECT 1 FROM VaultBeneficiary b
+                  LEFT JOIN BeneficiaryClaim c ON c.vault = v AND c.beneficiary = b.user
+                  WHERE b.vault = v
+                    AND b.user IS NOT NULL
+                    AND b.status NOT IN (com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.DECLINED,
+                                         com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.WAIVED)
+                    AND (c.id IS NULL OR (c.status = com.ltld.app.legacyvault.enums.ClaimStatus.PENDING
+                         AND c.notifiedAt IS NULL
+                         AND c.notifyAttempts < :maxAttempts
+                         AND (c.lastNotifyAttemptAt IS NULL OR c.lastNotifyAttemptAt <= :lastAttemptBefore))))
             ORDER BY v.unlockedAt ASC
             """)
     List<UUID> findVaultIdsToNotify(@Param("now") LocalDateTime now,
@@ -67,6 +74,17 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     @EntityGraph(attributePaths = {"owner"})
     List<Vault> findByBeneficiaryIdAndStatusInOrderByUnlockedAtDescNameAscIdAsc(UUID beneficiaryId,
                                                                     Collection<VaultStatus> statuses);
+
+    // N2b: vault được bàn giao cho một người dùng (qua vault_beneficiaries thay vì cột vaults.beneficiary_id)
+    @EntityGraph(attributePaths = {"owner"})
+    @Query("""
+            SELECT v FROM Vault v
+            WHERE v.status IN :statuses
+              AND EXISTS (SELECT 1 FROM VaultBeneficiary b WHERE b.vault = v AND b.user.id = :userId)
+            ORDER BY v.unlockedAt DESC, v.name ASC, v.id ASC
+            """)
+    List<Vault> findVaultsOfBeneficiary(@Param("userId") UUID userId,
+                                        @Param("statuses") Collection<VaultStatus> statuses);
 
     // BR-04: Vault UNLOCKED đã quá hạn nhận
     @Query("""

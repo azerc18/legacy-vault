@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
+import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
@@ -15,6 +16,7 @@ import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.mfaservice.MfaService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +25,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.Set;
 
 @Service
@@ -37,10 +45,13 @@ public class AuthServiceImpl implements AuthService{
     private final TokenService tokenService;
     private final VerificationTokenService verificationTokenService;
     private final AuditLogService auditLogService;
+    private final MfaService mfaService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
     private static final String DUMMY_HASH = new BCryptPasswordEncoder().encode("dummy-code");
+    private static final Duration MFA_CHALLENGE_TTL = Duration.ofMinutes(5);
+    private static final SecureRandom RANDOM = new SecureRandom();
 
 
     @Override
@@ -126,20 +137,18 @@ public class AuthServiceImpl implements AuthService{
         }
 
         user.setFailedLoginAttempts(0);
-        user.setLastLoginAt(Instant.now());
-        userRepository.save(user);
-        auditLogService.success(AuditAction.LOGIN, user.getId(), email);
 
-        String accessToken = tokenService.generateAccessToken(user);
-        String refreshToken = tokenService.generateRefreshToken(user, ipAddress, userAgent);
+        // H4: đã bật 2FA -> chưa cấp token, trả phiếu tạm để nhập mã
+        if (user.isMfaEnabled()) {
+            String rawToken = newChallengeToken();
+            user.setMfaChallengeHash(sha256Hex(rawToken));
+            user.setMfaChallengeExpiresAt(Instant.now().plus(MFA_CHALLENGE_TTL));
+            userRepository.save(user);
+            LoginResponse challenge = LoginResponse.builder().mfaRequired(true).mfaToken(rawToken).build();
+            return new LoginResult(challenge, null);
+        }
 
-        LoginResponse response = LoginResponse.builder()
-                .accessToken(accessToken)
-                .tokenType("Bearer")
-                .expiresAt(tokenService.getAccessTokenExpiry())
-                .build();
-
-        return new LoginResult(response, refreshToken);
+        return completeLogin(user, ipAddress, userAgent);
     }
 
     @Override
@@ -175,5 +184,80 @@ public class AuthServiceImpl implements AuthService{
 
         tokenService.revokeAllUserTokens(user.getId(), RevokedReason.PASSWORD_CHANGED);
         auditLogService.success(AuditAction.PASSWORD_RESET_SUCCESS, user.getId(), email);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = BusinessException.class)
+    public LoginResult loginWithMfa(MfaLoginRequest request, String ipAddress, String userAgent) {
+        User user = userRepository.findByMfaChallengeHashForUpdate(sha256Hex(request.mfaToken()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.MFA_CHALLENGE_EXPIRED, "Sign-in session expired"));
+
+        if (user.getMfaChallengeExpiresAt() == null || user.getMfaChallengeExpiresAt().isBefore(Instant.now())) {
+            clearChallenge(user);
+            throw new BusinessException(ErrorCode.MFA_CHALLENGE_EXPIRED, "Sign-in session expired");
+        }
+        if (user.getStatus() == UserStatus.LOCKED
+                || (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now()))) {
+            clearChallenge(user);
+            throw new LockedAccountException();
+        }
+
+        if (!mfaService.verifyCode(user, request.code())) {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            auditLogService.failure(AuditAction.MFA_VERIFY_FAILED, user.getId(), user.getEmail(),
+                    "login: wrong code, attempt " + attempts);
+            if (attempts >= MAX_FAILED_ATTEMPTS) {
+                Instant lockedUntil = Instant.now().plus(LOCK_DURATION);
+                user.setLockedUntil(lockedUntil);
+                clearChallenge(user);
+                auditLogService.failure(AuditAction.ACCOUNT_LOCKED, user.getId(), user.getEmail(),
+                        "locked until " + lockedUntil + " after " + attempts + " failed 2FA attempts");
+                throw new LockedAccountException();
+            }
+            userRepository.save(user);
+            throw new BusinessException(ErrorCode.MFA_INVALID_CODE, "Invalid verification code");
+        }
+
+        user.setMfaChallengeHash(null);       // dùng 1 lần
+        user.setMfaChallengeExpiresAt(null);
+        user.setFailedLoginAttempts(0);
+        return completeLogin(user, ipAddress, userAgent);
+    }
+
+    private LoginResult completeLogin(User user, String ipAddress, String userAgent) {
+        user.setLastLoginAt(Instant.now());
+        userRepository.save(user);
+        auditLogService.success(AuditAction.LOGIN, user.getId(), user.getEmail());
+
+        String accessToken = tokenService.generateAccessToken(user);
+        String refreshToken = tokenService.generateRefreshToken(user, ipAddress, userAgent);
+        LoginResponse response = LoginResponse.builder()
+                .accessToken(accessToken)
+                .tokenType("Bearer")
+                .expiresAt(tokenService.getAccessTokenExpiry())
+                .build();
+        return new LoginResult(response, refreshToken);
+    }
+
+    private void clearChallenge(User user) {
+        user.setMfaChallengeHash(null);
+        user.setMfaChallengeExpiresAt(null);
+        userRepository.save(user);
+    }
+
+    private static String newChallengeToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
