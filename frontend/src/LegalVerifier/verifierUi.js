@@ -1,11 +1,9 @@
 // Nhãn/định dạng dùng chung cho các trang Legal Verifier (khớp enum LegalVerificationStatus của BE)
 
-export const STATUS_LABEL = {
-    PENDING: 'Pending review',
-    APPROVED: 'Approved, awaiting signature',
-    SIGNED: 'Signed',
-    REJECTED: 'Rejected',
-};
+import i18n from '../i18n/index.js';
+
+// Nhãn trạng thái đã dịch (namespace verifier). Gọi trong component có useTranslation để đổi ngôn ngữ thì render lại.
+export const statusLabel = (status) => i18n.t(`status.${status}`, { ns: 'verifier', defaultValue: status });
 
 export const STATUS_CLASS = {
     PENDING: 'bg-warning-container text-on-warning-container',
@@ -18,13 +16,7 @@ export const STATUS_CLASS = {
 export const REJECT_REASON_OTHER = 'OTHER';
 
 // BE trả LocalDateTime "2026-10-16T10:30:00"
-export function formatDate(value, withTime = false) {
-    if (!value) return '—';
-    const d = new Date(value);
-    return withTime
-        ? d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
-        : d.toLocaleDateString('en-GB', { dateStyle: 'medium' });
-}
+export { formatDate } from '../i18n/format.js';
 
 // UUID dài -> hiển thị 8 ký tự đầu
 export const shortId = (id) => (id ? String(id).slice(0, 8).toUpperCase() : '—');

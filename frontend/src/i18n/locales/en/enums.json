@@ -1,0 +1,5 @@
+{
+  "assetType": { "BANK_ACCOUNT": "Bank account", "CRYPTO_WALLET": "Crypto wallet", "SOCIAL_MEDIA": "Social media", "DOCUMENT": "Document", "EXCHANGE_ACCOUNT": "Exchange account", "E_WALLET": "E-wallet", "EMAIL": "Email account", "OTHER": "Other" },
+  "documentType": { "WILL": "Will", "OWNERSHIP_PAPER": "Ownership paper", "IDENTITY_CARD": "Identity card", "OTHER": "Other" },
+  "audit": {}
+}

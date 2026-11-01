@@ -7,4 +7,8 @@ public class ExecutorManagementException extends BusinessException {
     public ExecutorManagementException(String message, HttpStatus status) {
         super(message,status);
     }
+
+    public ExecutorManagementException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }

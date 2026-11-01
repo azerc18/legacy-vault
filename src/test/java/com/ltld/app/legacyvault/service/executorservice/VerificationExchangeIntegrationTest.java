@@ -6,13 +6,10 @@ import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.VerificationExchangeMessage;
-import com.ltld.app.legacyvault.enums.ExchangeSenderRole;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
-import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.VerificationRequestClosedException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -25,13 +22,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -51,14 +44,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "app.beneficiary.vault-purge.enabled=false",
         "app.storage.upload-dir=target/it-uploads/"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class VerificationExchangeIntegrationTest {
+class VerificationExchangeIntegrationTest extends MySqlTestContainer {
 
     private static final byte[] PDF = "%PDF-1.4 integration extra".getBytes(StandardCharsets.US_ASCII);
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
 
     @MockitoBean private EmailSender emailSender;
 

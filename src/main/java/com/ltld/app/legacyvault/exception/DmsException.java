@@ -33,4 +33,8 @@ public class DmsException extends RuntimeException {
     public static DmsException confirmerTokenInvalid(String message) {
         return new DmsException(message, HttpStatus.BAD_REQUEST, CONFIRMER_TOKEN_INVALID);
     }
+
+    public DmsException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }

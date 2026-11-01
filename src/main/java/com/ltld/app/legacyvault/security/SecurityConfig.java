@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.security;
 
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -60,16 +61,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        AuthenticationEntryPoint entryPoint = (req, res, ex) -> writeJson(res, 401, "Unauthorized");
-        AccessDeniedHandler deniedHandler = (req, res, ex) -> writeJson(res, 403, "Forbidden");
+        AuthenticationEntryPoint entryPoint = (req, res, ex) -> writeJson(res, 401, ErrorCode.UNAUTHORIZED, "Unauthorized");
+        AccessDeniedHandler deniedHandler = (req, res, ex) -> writeJson(res, 403, ErrorCode.FORBIDDEN, "Forbidden");
 
         http.cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/error", "/api/auth/**").permitAll()
-                .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/error", "/api/auth/**").permitAll()
+                        .requestMatchers("/api/**").authenticated()
+                        .anyRequest().permitAll())
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(deniedHandler))
@@ -99,9 +101,9 @@ public class SecurityConfig {
         return converter;
     }
 
-    private static void writeJson(HttpServletResponse res, int status, String msg) throws IOException {
+    private static void writeJson(HttpServletResponse res, int status, ErrorCode code, String msg) throws IOException {
         res.setStatus(status);
         res.setContentType("application/json;charset=UTF-8");
-        res.getWriter().write("{\"success\":false,\"message\":\"" + msg + "\"}");
+        res.getWriter().write("{\"success\":false,\"errorCode\":\"" + code.name() + "\",\"message\":\"" + msg + "\"}");
     }
 }

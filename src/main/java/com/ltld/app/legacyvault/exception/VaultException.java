@@ -10,4 +10,8 @@ public class VaultException extends BusinessException {
     public VaultException(String message, HttpStatus status) {
         super(message, status);
     }
+
+    public VaultException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
+    }
 }

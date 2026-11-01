@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
+import com.ltld.app.legacyvault.service.beneficiaryservice.InheritanceDossierPdfService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -38,6 +39,7 @@ class BeneficiaryControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private BeneficiaryService beneficiaryService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
+    @MockitoBean private InheritanceDossierPdfService dossierPdfService;
 
     private static RequestPostProcessor token(String... authorities) {
         SimpleGrantedAuthority[] granted = java.util.Arrays.stream(authorities)
