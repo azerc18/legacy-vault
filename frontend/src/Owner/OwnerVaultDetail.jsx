@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
-import { ownerApi, needsReplaceConfirm } from '../api/ownerApi.js';
+import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
@@ -41,7 +41,7 @@ export default function OwnerVaultDetail() {
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">{vault.status}</span>
             )}
         >
-            {location.state?.created && <Alert type="success">Vault created. Now choose who will receive it.</Alert>}
+            {location.state?.created && <Alert type="success">Vault created.</Alert>}
             <Alert>{error}</Alert>
             {!vault && !error && <p className="text-on-surface-variant">Loading...</p>}
             {vault && !editable && (
@@ -52,7 +52,7 @@ export default function OwnerVaultDetail() {
                 <div className="space-y-6">
                     <DetailsSection vault={vault} editable={editable} onSaved={reload} />
                     <AssetSection vaultId={vaultId} editable={editable} onChanged={reload} />
-                    <BeneficiarySection vaultId={vaultId} current={vault.beneficiaryEmail} editable={editable} onSaved={reload} />
+                    <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
                     <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
                     <ActivitySection vaultId={vaultId} />
                     {editable && <DeleteSection vaultId={vaultId} />}
@@ -320,24 +320,35 @@ function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
     );
 }
 
-/* ---------- FR-02: người thụ hưởng ---------- */
-function BeneficiarySection({ vaultId, current, editable, onSaved }) {
-    const [email, setEmail] = useState('');
-    const [result, setResult] = useState(null);
+/* ---------- FR-02 / N2-owner: danh sách người thụ hưởng ---------- */
+const BENEFICIARY_STATUS = {
+    PENDING_REGISTRATION: 'Waiting for sign-up',
+    INVITED: 'Invited',
+};
+const emptyBeneficiaryForm = { email: '', fullName: '', relationship: '' };
+
+function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
+    const [form, setForm] = useState(emptyBeneficiaryForm);
     const [error, setError] = useState('');
-    const [confirm, setConfirm] = useState(null);
-    const [removeOpen, setRemoveOpen] = useState(false);
+    const [removing, setRemoving] = useState(null);   // beneficiary đang chờ xác nhận xoá
     const [loading, setLoading] = useState(false);
 
-    const submit = async (confirmReplace = false) => {
+    const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        if (!form.email.trim()) return;
         setError(''); setLoading(true);
         try {
-            setResult(await ownerApi.assignBeneficiary(vaultId, email.trim(), confirmReplace));
-            setConfirm(null); setEmail('');
+            await ownerApi.addBeneficiary(vaultId, {
+                email: form.email.trim(),
+                fullName: form.fullName.trim() || null,
+                relationship: form.relationship.trim() || null,
+            });
+            setForm(emptyBeneficiaryForm);
             onSaved();
         } catch (err) {
-            if (needsReplaceConfirm(err)) setConfirm(getErrorMessage(err));
-            else setError(getErrorMessage(err, 'Could not assign the beneficiary.'));
+            setError(getErrorMessage(err, 'Could not add the beneficiary.'));
         } finally {
             setLoading(false);
         }
@@ -346,66 +357,67 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
     const handleRemove = async () => {
         setLoading(true); setError('');
         try {
-            await ownerApi.removeBeneficiary(vaultId);
-            setRemoveOpen(false);
-            setResult(null);
+            await ownerApi.removeBeneficiaryById(vaultId, removing.id);
+            setRemoving(null);
             onSaved();
         } catch (err) {
+            // BENEFICIARY_IN_USE / LAST_BENEFICIARY đã có bản dịch trong errors.json
             setError(getErrorMessage(err, 'Could not remove the beneficiary.'));
-            setRemoveOpen(false);
+            setRemoving(null);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card title="Beneficiary" icon="family_restroom">
-            <p className="text-sm mb-4">
-                Current: <b>{current || 'Not assigned'}</b>
-            </p>
+        <Card title={`Beneficiaries (${beneficiaries.length})`} icon="family_restroom">
             <Alert>{error}</Alert>
-            {result && (
-                <Alert type="success">
-                    {result.replaced ? 'Beneficiary replaced: ' : 'Beneficiary set: '}
-                    <b>{result.beneficiaryName || result.beneficiaryEmail}</b>
-                    {result.pendingRegistration && ' — invitation sent, they will be linked after registering.'}
-                </Alert>
+            {beneficiaries.length === 0 ? (
+                <p className="text-sm mb-4">No beneficiaries yet.</p>
+            ) : (
+                <ul className="mb-4 space-y-2">
+                    {beneficiaries.map((b) => (
+                        <li key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-outline-variant/50">
+                            <div className="text-sm min-w-0">
+                                <b className="break-all">{b.email}</b>
+                                {b.fullName && <span> · {b.fullName}</span>}
+                                {b.relationship && <span className="text-on-surface-variant"> ({b.relationship})</span>}
+                                <div className="text-xs text-outline">{BENEFICIARY_STATUS[b.status] || humanize(b.status)}</div>
+                            </div>
+                            {editable && beneficiaries.length > 1 && (
+                                <button type="button" disabled={loading} onClick={() => setRemoving(b)}
+                                        className="text-sm text-error font-semibold shrink-0">
+                                    Remove
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
             )}
             {editable && (
-                <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) submit(false); }} className="flex flex-col sm:flex-row gap-3">
-                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                           placeholder={current ? 'New beneficiary email' : 'beneficiary@example.com'} className={inputClass} />
-                    <button type="submit" disabled={loading} className={`${btnPrimary} shrink-0`}>
-                        {loading ? 'Saving...' : current ? 'Replace' : 'Assign'}
+                <form onSubmit={handleAdd} className="space-y-3">
+                    <input type="email" required value={form.email} maxLength={255} onChange={(e) => setField('email', e.target.value)}
+                           placeholder="beneficiary@example.com" className={inputClass} />
+                    <div className="grid sm:grid-cols-2 gap-3">
+                        <input value={form.fullName} maxLength={255} onChange={(e) => setField('fullName', e.target.value)}
+                               placeholder="Full name (optional)" className={inputClass} />
+                        <input value={form.relationship} maxLength={50} onChange={(e) => setField('relationship', e.target.value)}
+                               placeholder="Relationship (optional)" className={inputClass} />
+                    </div>
+                    <button type="submit" disabled={loading || beneficiaries.length >= 10} className={btnPrimary}>
+                        {loading ? 'Saving...' : 'Add beneficiary'}
                     </button>
-                    {current && (
-                        <button type="button" disabled={loading} onClick={() => setRemoveOpen(true)}
-                                className={`${btnDanger} shrink-0`}>
-                            Remove
-                        </button>
-                    )}
                 </form>
             )}
-            {/* ConfirmDialog: thay thế người thụ hưởng */}
             <ConfirmDialog
-                open={!!confirm}
-                title="Replace beneficiary?"
-                message={confirm}
-                confirmLabel="Replace"
-                busy={loading}
-                onConfirm={() => submit(true)}
-                onCancel={() => setConfirm(null)}
-            />
-            {/* ConfirmDialog: gỡ người thụ hưởng (V8) */}
-            <ConfirmDialog
-                open={removeOpen}
+                open={!!removing}
                 danger
                 title="Remove beneficiary?"
-                message={`Remove ${current} as the beneficiary? Any pending invitation will also be cancelled.`}
+                message={`Remove ${removing?.email} from this vault? They will be notified.`}
                 confirmLabel="Remove"
                 busy={loading}
                 onConfirm={handleRemove}
-                onCancel={() => setRemoveOpen(false)}
+                onCancel={() => setRemoving(null)}
             />
         </Card>
     );

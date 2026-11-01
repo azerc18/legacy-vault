@@ -42,6 +42,7 @@
   "LAST_BENEFICIARY": "You cannot remove the last beneficiary.",
   "BENEFICIARY_IN_USE": "This beneficiary still holds assets. Reassign them first.",
   "BENEFICIARY_CONFLICT": "This person cannot be both a beneficiary and an executor or verifier.",
+  "BENEFICIARY_DUPLICATE": "This person is already in the beneficiary list.",
   "ALLOCATION_PERCENT_INVALID": "Allocation percentages must add up to 100%.",
   "ALLOCATION_MODE_NOT_ALLOWED": "This allocation mode is not allowed for this asset.",
   "ASSET_FIELD_INVALID": "Some asset details are invalid.",
