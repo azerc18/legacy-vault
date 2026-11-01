@@ -1,21 +1,8 @@
 package com.ltld.app.legacyvault.integration;
 
-import com.ltld.app.legacyvault.entity.AssetAllocation;
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.entity.VaultBeneficiary;
-import com.ltld.app.legacyvault.enums.AllocationMode;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AssetType;
-import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
-import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.*;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
@@ -23,12 +10,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.util.List;
 
@@ -47,12 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class BeneficiaryRemovalContingentIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class BeneficiaryRemovalContingentIntegrationTest extends MySqlTestContainer{
 
     @MockitoBean
     private EmailSender emailSender;            // không gửi mail thật

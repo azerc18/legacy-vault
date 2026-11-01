@@ -6,19 +6,11 @@ import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.DmsStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.UserStatus;
-import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.exception.VaultException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
-import com.ltld.app.legacyvault.repository.DmsConfigRepository;
-import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorManagementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.EmailSender;
@@ -27,22 +19,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,14 +45,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
         "app.beneficiary.vault-purge.enabled=false",
         "app.beneficiary.claim-expiry.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class BeneficiaryDmsGuardIntegrationTest {
+class BeneficiaryDmsGuardIntegrationTest extends MySqlTestContainer{
 
     private static final int ROUNDS = 20;
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
 
     @MockitoBean
     private EmailSender emailSender;            // không gửi mail thật
