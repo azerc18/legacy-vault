@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
@@ -14,14 +15,16 @@ const LIMITS = {
 
 const STATUS = {
     ACTIVE: { label: 'Active', cls: 'bg-success-container text-on-success-container', icon: 'favorite' },
-    PENDING_CONFIRMATION: { label: 'Awaiting Social Confirmation (72h)', cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
+    // X2: nhãn dịch qua namespace dmsConfirm (các nhãn cũ sẽ dịch cả trang sau)
+    PENDING_CONFIRMATION: { labelKey: 'status.pendingConfirmation', cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
     TRIGGERED: { label: 'Triggered', cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
     SUSPENDED: { label: 'Suspended', cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
 export default function DeadMansSwitch() {
     const user = getUser();
-    const [config, setConfig] = useState(null);       // DmsConfigResponse | null (chưa cấu hình)
+    const { t } = useTranslation('dmsConfirm'); // X2: chữ mới của Trusted Social Confirmers
+    const [config, setConfig] = useState(null);      // DmsConfigResponse | null (chưa cấu hình)
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
@@ -98,7 +101,7 @@ export default function DeadMansSwitch() {
         e.preventDefault();
         setError(''); setSuccess('');
         if (!confirmerForm.name.trim() || !confirmerForm.email.trim()) {
-            setError('Please enter both name and email for your trusted confirmer.');
+            setError(t('confirmers.missingFields'));
             return;
         }
         setAddingConfirmer(true);
@@ -110,9 +113,9 @@ export default function DeadMansSwitch() {
             });
             setConfirmers((prev) => [...prev, added]);
             setConfirmerForm({ name: '', email: '', relationship: '' });
-            setSuccess('Trusted social confirmer added.');
+            setSuccess(t('confirmers.added'));
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not add trusted confirmer.'));
+            setError(getErrorMessage(err, t('confirmers.addFailed')));
         } finally {
             setAddingConfirmer(false);
         }
@@ -124,9 +127,9 @@ export default function DeadMansSwitch() {
         try {
             await ownerApi.removeDmsConfirmer(id);
             setConfirmers((prev) => prev.filter((c) => c.id !== id));
-            setSuccess('Trusted confirmer removed.');
+            setSuccess(t('confirmers.removed'));
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not remove trusted confirmer.'));
+            setError(getErrorMessage(err, t('confirmers.removeFailed')));
         } finally {
             setRemovingId('');
         }
@@ -158,7 +161,7 @@ export default function DeadMansSwitch() {
                                 <>
                                     <div className="flex items-center justify-between gap-3">
                                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
-                                            <Icon name={s.icon} className="text-[18px]" /> {s.label}
+                                            <Icon name={s.icon} className="text-[18px]" /> {s.labelKey ? t(s.labelKey) : s.label}
                                         </span>
                                         {canCheckIn && (
                                             <button onClick={checkIn} disabled={checking} className={btnPrimary}>
@@ -169,7 +172,7 @@ export default function DeadMansSwitch() {
 
                                     {config.status === 'PENDING_CONFIRMATION' && (
                                         <p className="mt-4 text-sm text-on-surface-variant">
-                                            Your check-in and grace period expired. We have asked your Trusted Social Confirmers to verify your status before {formatDate(config.triggerAt, true)}. Click &quot;I&apos;m okay — check in&quot; to cancel immediately.
+                                            {t('pending.body', { deadline: formatDate(config.triggerAt, true), button: "I'm okay — check in" })}
                                         </p>
                                     )}
                                     {config.status === 'TRIGGERED' && (
@@ -195,15 +198,11 @@ export default function DeadMansSwitch() {
 
                         {/* X2: Trusted Social Confirmers */}
                         {config && (
-                            <Card
-                                title="Trusted Social Confirmers (Anti-False-Trigger)"
-                                subtitle="Up to 2 trusted relatives/friends who will receive an emergency confirmation email (72h window) before your Executor is activated."
-                                icon="verified_user"
-                            >
+                            <Card title={t('confirmers.title')} icon="verified_user">
+                                {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
+                                <p className="text-sm text-on-surface-variant mb-4">{t('confirmers.subtitle')}</p>
                                 {confirmers.length === 0 ? (
-                                    <p className="text-sm text-on-surface-variant">
-                                        No trusted confirmers configured yet. Add up to 2 contacts below so accidental missed check-ins (e.g., travel or hospital stay) can be postponed by 7 days.
-                                    </p>
+                                    <p className="text-sm text-on-surface-variant">{t('confirmers.empty')}</p>
                                 ) : (
                                     <div className="space-y-3 mb-5">
                                         {confirmers.map((c) => (
@@ -230,7 +229,7 @@ export default function DeadMansSwitch() {
                                                         className={btnOutline}
                                                     >
                                                         <Icon name="delete" className="text-[16px]" />
-                                                        Remove
+                                                        {t('confirmers.remove')}
                                                     </button>
                                                 )}
                                             </div>
@@ -242,14 +241,14 @@ export default function DeadMansSwitch() {
                                     <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
                                         <input
                                             type="text"
-                                            placeholder="Full name"
+                                            placeholder={t('confirmers.namePlaceholder')}
                                             value={confirmerForm.name}
                                             onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
                                             className={inputClass}
                                         />
                                         <input
                                             type="email"
-                                            placeholder="Email address"
+                                            placeholder={t('confirmers.emailPlaceholder')}
                                             value={confirmerForm.email}
                                             onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
                                             className={inputClass}
@@ -257,14 +256,14 @@ export default function DeadMansSwitch() {
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
-                                                placeholder="Relation (e.g. Spouse)"
+                                                placeholder={t('confirmers.relationshipPlaceholder')}
                                                 value={confirmerForm.relationship}
                                                 onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
                                                 className={inputClass}
                                             />
                                             <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
                                                 <Icon name="person_add" className="text-[18px]" />
-                                                Add
+                                                {t('confirmers.add')}
                                             </button>
                                         </div>
                                     </form>

@@ -1,0 +1,33 @@
+{
+  "status": {
+    "pendingConfirmation": "Awaiting Social Confirmation (72h)"
+  },
+  "pending": {
+    "body": "Your check-in and grace period expired. We have asked your Trusted Social Confirmers to verify your status before {{deadline}}. Click \"{{button}}\" to cancel immediately."
+  },
+  "confirmers": {
+    "title": "Trusted Social Confirmers (Anti-False-Trigger)",
+    "subtitle": "Up to 2 trusted relatives/friends who will receive an emergency confirmation email (72h window) before your Executor is activated.",
+    "empty": "No trusted confirmers configured yet. Add up to 2 contacts below so accidental missed check-ins (e.g., travel or hospital stay) can be postponed by 7 days.",
+    "remove": "Remove",
+    "namePlaceholder": "Full name",
+    "emailPlaceholder": "Email address",
+    "relationshipPlaceholder": "Relation (e.g. Spouse)",
+    "add": "Add",
+    "missingFields": "Please enter both name and email for your trusted confirmer.",
+    "added": "Trusted social confirmer added.",
+    "addFailed": "Could not add trusted confirmer.",
+    "removed": "Trusted confirmer removed.",
+    "removeFailed": "Could not remove trusted confirmer."
+  },
+  "done": {
+    "aliveTitle": "Thank You — Owner Marked as Safe",
+    "aliveBody": "We have postponed the owner's Dead Man's Switch activation by 7 days and sent them a reminder to check in.",
+    "unreachableTitle": "Thank You — Digital Executor Has Been Notified",
+    "unreachableBody": "We have recorded your confirmation and notified the owner's designated Digital Executor to begin the legal verification process.",
+    "errorTitle": "Confirmation Link Could Not Be Verified",
+    "errorGeneric": "This confirmation link is no longer valid.",
+    "errorHint": "If the owner still needs your confirmation, please use the most recent email from LegacyVault.",
+    "backHome": "Return to LegacyVault Home"
+  }
+}

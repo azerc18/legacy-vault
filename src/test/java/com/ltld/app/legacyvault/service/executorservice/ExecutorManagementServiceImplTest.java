@@ -465,6 +465,27 @@ class ExecutorManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("X2: DMS PENDING_CONFIRMATION (đang chờ xác nhận chéo), thu hồi Executor cuối cùng -> 409, giữ nguyên assignment")
+    void revoke_lastExecutorWhileDmsPendingConfirmation_conflict() {
+        candidate.getRoles().add(executorRole);
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId))
+                .thenReturn(Optional.of(dmsConfig(DmsStatus.PENDING_CONFIRMATION)));
+
+        assertThatThrownBy(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY))
+                .isInstanceOf(ExecutorManagementException.class)
+                .hasMessage(ExecutorManagementServiceImpl.LAST_EXECUTOR_MESSAGE)
+                .satisfies(e -> assertThat(((ExecutorManagementException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        assertThat(current.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(current.getRevokedAt()).isNull();
+        assertThat(candidate.getRoles()).containsExactly(executorRole);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
     @DisplayName("B-01a: DMS ACTIVE, thu hồi Backup khi Primary đã REVOKED -> vẫn là Executor cuối cùng chưa REVOKED: 409")
     void revoke_backupWhenPrimaryRevoked_dmsActive_conflict() {
         ExecutorAssignment primary = assignment(ExecutorType.PRIMARY,

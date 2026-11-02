@@ -2,6 +2,8 @@ package com.ltld.app.legacyvault.integration;
 
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
+import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
+import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.flywaydb.core.Flyway;
@@ -93,6 +95,30 @@ class FlywayMigrationIntegrationTest {
                 """, String.class);
         for (ClaimStatus s : ClaimStatus.values()) {
             assertThat(claimType).contains("'" + s.name() + "'");
+        }
+    }
+
+    // X2: mọi DmsStatus (kể cả PENDING_CONFIRMATION) phải có trong enum dms_configs.status; validate không kiểm giá trị enum
+    @Test
+    void dmsStatus_columnAcceptsEveryJavaEnumValue() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dms_configs' AND COLUMN_NAME = 'status'
+                """, String.class);
+        for (DmsStatus s : DmsStatus.values()) {
+            assertThat(col).contains("'" + s.name() + "'");
+        }
+    }
+
+    // X2: mọi DmsConfirmerStatus phải có trong enum dms_confirmers.status
+    @Test
+    void dmsConfirmerStatus_columnAcceptsEveryJavaEnumValue() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dms_confirmers' AND COLUMN_NAME = 'status'
+                """, String.class);
+        for (DmsConfirmerStatus s : DmsConfirmerStatus.values()) {
+            assertThat(col).contains("'" + s.name() + "'");
         }
     }
 }

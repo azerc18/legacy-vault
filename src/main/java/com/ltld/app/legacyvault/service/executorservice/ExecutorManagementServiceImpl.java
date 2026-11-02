@@ -247,7 +247,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                                                      Optional<DmsConfig> lockedDms) {
         List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
         boolean dmsActive = lockedDms.or(() -> dmsConfigRepository.findByOwnerId(ownerId))
-                .filter(c -> c.getStatus() == DmsStatus.ACTIVE)
+                .filter(c -> c.getStatus() == DmsStatus.ACTIVE || c.getStatus() == DmsStatus.PENDING_CONFIRMATION)
                 .isPresent();
         boolean othersLeft = executors.stream()
                 .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED);

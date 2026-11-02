@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerResponse;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.enums.DmsConfirmerDecision;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,5 +46,8 @@ public interface DmsConfirmerService {
 
     /** Xử lý phản hồi từ endpoint GET /api/dms/confirm và trả về URL chuyển hướng về FE. */
     String respondAndBuildRedirectUrl(String rawToken, String decisionParam);
+
+    /** URL trang FE /dms/confirm-done?status=error&errorCode=<tên ErrorCode> khi xác nhận từ email thất bại. */
+    String buildErrorRedirectUrl(ErrorCode errorCode);
 }
 

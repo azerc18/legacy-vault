@@ -2,10 +2,13 @@ package com.ltld.app.legacyvault.controller.dms;
 
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerResponse;
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,7 @@ import java.util.UUID;
 /**
  * X2: Quản lý người xác nhận chéo DMS của Owner và endpoint công khai (permitAll) để Confirmer xác nhận từ email.
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/dms")
 @RequiredArgsConstructor
@@ -71,12 +75,23 @@ public class DmsConfirmerController {
      * Endpoint công khai (permitAll): Confirmer bấm nút "Owner is safe" (decision=ALIVE)
      * hoặc "Unreachable / Confirmed" (decision=UNREACHABLE) trong email khẩn cấp.
      */
+    // Người xác nhận bấm từ email (trình duyệt), nên lỗi cũng redirect về trang FE thay vì trả JSON.
+    // Bắt lỗi ở đây, NGOÀI transaction của service: proxy đã rollback xong rồi mới chuyển hướng.
+    // required = false: thiếu token -> service ném CONFIRMER_TOKEN_INVALID -> cũng redirect.
     @GetMapping("/confirm")
     public ResponseEntity<Void> confirmFromEmail(
-            @RequestParam("token") String token,
+            @RequestParam(value = "token", required = false) String token,
             @RequestParam(value = "decision", required = false) String decision
     ) {
-        String redirectUrl = dmsConfirmerService.respondAndBuildRedirectUrl(token, decision);
+        String redirectUrl;
+        try {
+            redirectUrl = dmsConfirmerService.respondAndBuildRedirectUrl(token, decision);
+        } catch (BusinessException e) {
+            redirectUrl = dmsConfirmerService.buildErrorRedirectUrl(e.getErrorCode());
+        } catch (RuntimeException e) {
+            log.error("X2: DMS cross-confirmation from email failed unexpectedly", e);
+            redirectUrl = dmsConfirmerService.buildErrorRedirectUrl(ErrorCode.INTERNAL_ERROR);
+        }
         return ResponseEntity.status(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, URI.create(redirectUrl).toString())
                 .build();

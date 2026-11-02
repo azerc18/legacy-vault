@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
@@ -37,7 +38,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 
 import java.time.LocalDateTime;
@@ -83,7 +83,6 @@ class DmsConfirmerServiceImplTest {
         props.setSecret("0123456789abcdef0123456789abcdef0123456789abcdef");
         JwtConfig jwtConfig = new JwtConfig(props);
         JwtEncoder jwtEncoder = jwtConfig.jwtEncoder();
-        JwtDecoder jwtDecoder = jwtConfig.jwtDecoder();
 
         processor = new DmsActivationProcessor(
                 dmsConfigRepository,
@@ -102,7 +101,7 @@ class DmsConfirmerServiceImplTest {
                 dmsConfirmerRepository,
                 processor,
                 jwtEncoder,
-                jwtDecoder,
+                props,
                 emailSender,
                 auditLogService,
                 "http://localhost:8084",
@@ -291,7 +290,7 @@ class DmsConfirmerServiceImplTest {
                 () -> confirmerService.respondByToken(token, DmsConfirmerDecision.ALIVE, now));
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
-        assertEquals(DmsException.CONFIRMER_TOKEN_INVALID, ex.getErrorCode());
+        assertEquals(ErrorCode.CONFIRMER_TOKEN_INVALID, ex.getErrorCode());
     }
 }
 
