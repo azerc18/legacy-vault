@@ -4,8 +4,14 @@
     "subtitle": "Nếu bạn ngừng check-in, các két của bạn sẽ được bàn giao cho người thi hành.",
     "loading": "Đang tải...",
     "createVaultFirst": "Tạo két trước →",
+    "noExecutor": {
+      "configured": "Không có người thi hành nào nhận được việc bàn giao. Hãy chỉ định người thi hành.",
+      "notConfigured": "Hãy chỉ định người thi hành chính trước khi bật Dead Man's Switch."
+    },
+    "manageExecutors": "Quản lý người thi hành →",
     "status": {
       "ACTIVE": "Đang bật",
+      "PENDING_CONFIRMATION": "Đang chờ người xác nhận",
       "TRIGGERED": "Đã kích hoạt",
       "SUSPENDED": "Tạm dừng"
     },

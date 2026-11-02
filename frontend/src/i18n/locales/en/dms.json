@@ -4,8 +4,14 @@
     "subtitle": "If you stop checking in, your vaults are handed over to your Executor.",
     "loading": "Loading...",
     "createVaultFirst": "Create a vault first →",
+    "noExecutor": {
+      "configured": "No executor can receive the handover. Assign an executor.",
+      "notConfigured": "Assign a primary executor before enabling the Dead Man's Switch."
+    },
+    "manageExecutors": "Manage executors →",
     "status": {
       "ACTIVE": "Active",
+      "PENDING_CONFIRMATION": "Waiting for confirmers",
       "TRIGGERED": "Triggered",
       "SUSPENDED": "Suspended"
     },
