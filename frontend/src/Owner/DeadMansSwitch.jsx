@@ -15,7 +15,7 @@ const LIMITS = {
 
 const STATUS = {
     ACTIVE: { label: 'Active', cls: 'bg-success-container text-on-success-container', icon: 'favorite' },
-    // X2: nhãn dịch qua namespace dmsConfirm (các nhãn cũ sẽ dịch cả trang sau)
+    // X2: nhãn dịch qua namespace dmsConfirm (chuyển sang dms.status.PENDING_CONFIRMATION khi #150 merge)
     PENDING_CONFIRMATION: { labelKey: 'status.pendingConfirmation', cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
     TRIGGERED: { label: 'Triggered', cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
     SUSPENDED: { label: 'Suspended', cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
@@ -24,7 +24,7 @@ const STATUS = {
 export default function DeadMansSwitch() {
     const user = getUser();
     const { t } = useTranslation('dmsConfirm'); // X2: chữ mới của Trusted Social Confirmers
-    const [config, setConfig] = useState(null);      // DmsConfigResponse | null (chưa cấu hình)
+    const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
@@ -38,10 +38,12 @@ export default function DeadMansSwitch() {
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
     };
 
-    const loadConfirmers = () => {
+    // X2: chỉ tải danh sách confirmer khi DMS đã cấu hình (chưa cấu hình thì BE không có DmsConfig để gắn)
+    const loadConfirmers = (c) => {
+        if (!c?.configured) return;
         ownerApi.listDmsConfirmers()
             .then(setConfirmers)
             .catch(() => {});
@@ -51,16 +53,20 @@ export default function DeadMansSwitch() {
         ownerApi.getDms()
             .then((c) => {
                 applyConfig(c);
-                loadConfirmers();
+                loadConfirmers(c);
             })
-            .catch((err) => { if (err.response?.status !== 404) setError(getErrorMessage(err, 'Could not load settings.')); })
+            .catch((err) => setError(getErrorMessage(err, 'Could not load settings.')))
             .finally(() => setLoading(false));
     }, []);
 
     if (!user) return <Navigate to="/login" replace />;
 
-    const canCheckIn = config && (config.status === 'ACTIVE' || config.status === 'PENDING_CONFIRMATION');
-    const locked = config && !canCheckIn; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    const configured = config?.configured === true;
+    // X2: đang chờ xác nhận vẫn check-in / sửa cấu hình được (cả hai đều huỷ quy trình xác nhận)
+    const canCheckIn = configured && (config.status === 'ACTIVE' || config.status === 'PENDING_CONFIRMATION');
+    const locked = configured && !canCheckIn; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
+    const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
     const save = async (e) => {
         e.preventDefault();
@@ -71,12 +77,13 @@ export default function DeadMansSwitch() {
         }
         setSaving(true);
         try {
-            applyConfig(await ownerApi.saveDms({
+            const saved = await ownerApi.saveDms({
                 checkinIntervalDays: Number(form.checkinIntervalDays),
                 gracePeriodDays: Number(form.gracePeriodDays),
                 reminderCount: Number(form.reminderCount),
-            }));
-            loadConfirmers();
+            });
+            applyConfig(saved);
+            loadConfirmers(saved);
             setSuccess('Settings saved.');
         } catch (err) {
             setError(getErrorMessage(err, 'Could not save settings.'));
@@ -115,6 +122,8 @@ export default function DeadMansSwitch() {
             setConfirmerForm({ name: '', email: '', relationship: '' });
             setSuccess(t('confirmers.added'));
         } catch (err) {
+            // PLAN_LIMIT_REACHED (gói FREE) đã có bản dịch trong errors.json nên getErrorMessage hiện đúng câu.
+            // TODO(n4): mở UpgradeDialog khi T1 (#132) merge, UpgradeDialog chưa có trên main.
             setError(getErrorMessage(err, t('confirmers.addFailed')));
         } finally {
             setAddingConfirmer(false);
@@ -135,8 +144,8 @@ export default function DeadMansSwitch() {
         }
     };
 
-    const s = config ? STATUS[config.status] || STATUS.ACTIVE : null;
-    const needVault = /Vault/i.test(error) && !config;
+    const s = configured ? STATUS[config.status] || STATUS.ACTIVE : null;
+    const needVault = /Vault/i.test(error) && !configured;
 
     return (
         <OwnerLayout title="Dead Man's Switch" subtitle="If you stop checking in, your vaults are handed over to your Executor.">
@@ -145,131 +154,139 @@ export default function DeadMansSwitch() {
             {needVault && (
                 <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">Create a vault first →</Link></p>
             )}
+            {noExecutor && (
+                <Alert type="warning">
+                    {configured
+                        ? 'No executor can receive the handover. Assign an executor.'
+                        : "Assign a primary executor before enabling the Dead Man's Switch."}{' '}
+                    <Link to="/owner/executors" className="font-semibold underline">Manage executors →</Link>
+                </Alert>
+            )}
 
             {loading ? <p className="text-on-surface-variant">Loading...</p> : (
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
                     <div className="space-y-6">
-                        {/* Trạng thái + check-in */}
-                        <Card>
-                            {!config ? (
-                                <div className="text-center py-6">
-                                    <Icon name="heart_minus" className="text-[40px] text-outline" />
-                                    <p className="mt-3 font-semibold">Not set up yet</p>
-                                    <p className="text-sm text-on-surface-variant mt-1">Choose your schedule on the right and save to turn it on.</p>
+                    {/* Trạng thái + check-in */}
+                    <Card>
+                        {!configured ? (
+                            <div className="text-center py-6">
+                                <Icon name="heart_minus" className="text-[40px] text-outline" />
+                                <p className="mt-3 font-semibold">Not set up yet</p>
+                                <p className="text-sm text-on-surface-variant mt-1">Choose your schedule on the right and save to turn it on.</p>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
+                                        <Icon name={s.icon} className="text-[18px]" /> {s.labelKey ? t(s.labelKey) : s.label}
+                                    </span>
+                                    {canCheckIn && (
+                                        <button onClick={checkIn} disabled={checking} className={btnPrimary}>
+                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? 'Checking in...' : "I'm okay — check in"}
+                                        </button>
+                                    )}
                                 </div>
-                            ) : (
-                                <>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
-                                            <Icon name={s.icon} className="text-[18px]" /> {s.labelKey ? t(s.labelKey) : s.label}
-                                        </span>
-                                        {canCheckIn && (
-                                            <button onClick={checkIn} disabled={checking} className={btnPrimary}>
-                                                <Icon name="how_to_reg" className="text-[18px]" /> {checking ? 'Checking in...' : "I'm okay — check in"}
-                                            </button>
-                                        )}
-                                    </div>
 
-                                    {config.status === 'PENDING_CONFIRMATION' && (
-                                        <p className="mt-4 text-sm text-on-surface-variant">
-                                            {t('pending.body', { deadline: formatDate(config.triggerAt, true), button: "I'm okay — check in" })}
-                                        </p>
-                                    )}
-                                    {config.status === 'TRIGGERED' && (
-                                        <p className="mt-4 text-sm text-on-surface-variant">
-                                            The hand-over was triggered on {formatDate(config.triggeredAt, true)}. Settings can no longer be changed.
-                                        </p>
-                                    )}
-                                    {config.status === 'SUSPENDED' && (
-                                        <p className="mt-4 text-sm text-on-surface-variant">Suspended by an administrator. Please contact support.</p>
-                                    )}
-
-                                    <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
-                                        <Info label="Last check-in" value={formatDate(config.lastCheckinAt, true)} />
-                                        <Info label="Next check-in due" value={formatDate(config.checkinDueAt, true)} highlight />
-                                        <Info label="Hand-over starts if no check-in" value={formatDate(config.triggerAt, true)} />
-                                        <Info label="Next reminder" value={formatDate(config.nextReminderAt, true)} />
-                                        <Info label="Reminders sent" value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
-                                        <Info label="Notified by" value={config.notificationChannel || 'EMAIL'} />
-                                    </dl>
-                                </>
-                            )}
-                        </Card>
-
-                        {/* X2: Trusted Social Confirmers */}
-                        {config && (
-                            <Card title={t('confirmers.title')} icon="verified_user">
-                                {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
-                                <p className="text-sm text-on-surface-variant mb-4">{t('confirmers.subtitle')}</p>
-                                {confirmers.length === 0 ? (
-                                    <p className="text-sm text-on-surface-variant">{t('confirmers.empty')}</p>
-                                ) : (
-                                    <div className="space-y-3 mb-5">
-                                        {confirmers.map((c) => (
-                                            <div
-                                                key={c.id}
-                                                className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between gap-3"
-                                            >
-                                                <div>
-                                                    <p className="font-semibold text-sm text-on-surface">
-                                                        {c.name}{' '}
-                                                        {c.relationship && (
-                                                            <span className="text-xs font-normal text-on-surface-variant">
-                                                                ({c.relationship})
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                    <p className="text-xs text-on-surface-variant">{c.email}</p>
-                                                </div>
-                                                {!locked && (
-                                                    <button
-                                                        type="button"
-                                                        disabled={removingId === c.id}
-                                                        onClick={() => handleRemoveConfirmer(c.id)}
-                                                        className={btnOutline}
-                                                    >
-                                                        <Icon name="delete" className="text-[16px]" />
-                                                        {t('confirmers.remove')}
-                                                    </button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                {config.status === 'PENDING_CONFIRMATION' && (
+                                    <p className="mt-4 text-sm text-on-surface-variant">
+                                        {t('pending.body', { deadline: formatDate(config.triggerAt, true), button: "I'm okay — check in" })}
+                                    </p>
+                                )}
+                                {config.status === 'TRIGGERED' && (
+                                    <p className="mt-4 text-sm text-on-surface-variant">
+                                        The hand-over was triggered on {formatDate(config.triggeredAt, true)}. Settings can no longer be changed.
+                                    </p>
+                                )}
+                                {config.status === 'SUSPENDED' && (
+                                    <p className="mt-4 text-sm text-on-surface-variant">Suspended by an administrator. Please contact support.</p>
                                 )}
 
-                                {!locked && confirmers.length < 2 && (
-                                    <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
+                                <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
+                                    <Info label="Last check-in" value={formatDate(config.lastCheckinAt, true)} />
+                                    <Info label="Next check-in due" value={formatDate(config.checkinDueAt, true)} highlight />
+                                    <Info label="Hand-over starts if no check-in" value={formatDate(config.triggerAt, true)} />
+                                    <Info label="Next reminder" value={formatDate(config.nextReminderAt, true)} />
+                                    <Info label="Reminders sent" value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
+                                    <Info label="Notified by" value={config.notificationChannel || 'EMAIL'} />
+                                </dl>
+                            </>
+                        )}
+                    </Card>
+
+                    {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
+                    {configured && (
+                        <Card title={t('confirmers.title')} icon="verified_user">
+                            {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
+                            <p className="text-sm text-on-surface-variant mb-4">{t('confirmers.subtitle')}</p>
+                            {confirmers.length === 0 ? (
+                                <p className="text-sm text-on-surface-variant">{t('confirmers.empty')}</p>
+                            ) : (
+                                <div className="space-y-3 mb-5">
+                                    {confirmers.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p className="font-semibold text-sm text-on-surface">
+                                                    {c.name}{' '}
+                                                    {c.relationship && (
+                                                        <span className="text-xs font-normal text-on-surface-variant">
+                                                            ({c.relationship})
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                <p className="text-xs text-on-surface-variant">{c.email}</p>
+                                            </div>
+                                            {!locked && (
+                                                <button
+                                                    type="button"
+                                                    disabled={removingId === c.id}
+                                                    onClick={() => handleRemoveConfirmer(c.id)}
+                                                    className={btnOutline}
+                                                >
+                                                    <Icon name="delete" className="text-[16px]" />
+                                                    {t('confirmers.remove')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {!locked && confirmers.length < 2 && (
+                                <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
+                                    <input
+                                        type="text"
+                                        placeholder={t('confirmers.namePlaceholder')}
+                                        value={confirmerForm.name}
+                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
+                                        className={inputClass}
+                                    />
+                                    <input
+                                        type="email"
+                                        placeholder={t('confirmers.emailPlaceholder')}
+                                        value={confirmerForm.email}
+                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
+                                        className={inputClass}
+                                    />
+                                    <div className="flex gap-2">
                                         <input
                                             type="text"
-                                            placeholder={t('confirmers.namePlaceholder')}
-                                            value={confirmerForm.name}
-                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
+                                            placeholder={t('confirmers.relationshipPlaceholder')}
+                                            value={confirmerForm.relationship}
+                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
                                             className={inputClass}
                                         />
-                                        <input
-                                            type="email"
-                                            placeholder={t('confirmers.emailPlaceholder')}
-                                            value={confirmerForm.email}
-                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
-                                            className={inputClass}
-                                        />
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder={t('confirmers.relationshipPlaceholder')}
-                                                value={confirmerForm.relationship}
-                                                onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
-                                                className={inputClass}
-                                            />
-                                            <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
-                                                <Icon name="person_add" className="text-[18px]" />
-                                                {t('confirmers.add')}
-                                            </button>
-                                        </div>
-                                    </form>
-                                )}
-                            </Card>
-                        )}
+                                        <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
+                                            <Icon name="person_add" className="text-[18px]" />
+                                            {t('confirmers.add')}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </Card>
+                    )}
                     </div>
 
                     {/* Cấu hình */}
@@ -288,7 +305,7 @@ export default function DeadMansSwitch() {
                                 </label>
                             ))}
                             <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
-                                {saving ? 'Saving...' : config ? 'Save changes' : 'Turn on'}
+                                {saving ? 'Saving...' : configured ? 'Save changes' : 'Turn on'}
                             </button>
                         </form>
                     </Card>

@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -89,10 +90,10 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
 
         // Q26: người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Owner không được đồng thời là Executor.
         // Đặt trước nhánh "cùng người" để cả trường hợp Executor hiện tại vừa trở thành người thụ hưởng cũng bị chặn.
+        // existsBeneficiaryWithEmail xét mọi vault của Owner: vault_beneficiaries (đã liên kết / đang chờ theo email) và cột beneficiary cũ.
         if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
-            throw new ExecutorManagementException(
-                    "This person is your beneficiary and cannot also be your Digital Executor.",
-                    HttpStatus.CONFLICT);
+            throw new ExecutorManagementException(ErrorCode.BENEFICIARY_CONFLICT,
+                    "This person is your beneficiary and cannot also be your Digital Executor.");
         }
 
         ExecutorAssignment current = executorAssignmentRepository

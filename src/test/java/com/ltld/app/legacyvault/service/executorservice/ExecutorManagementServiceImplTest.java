@@ -13,6 +13,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -767,6 +768,23 @@ class ExecutorManagementServiceImplTest {
 
         assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true)),
                 HttpStatus.CONFLICT);
+
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("N2-Q26: email nằm trong danh sách nhiều người thụ hưởng (vault_beneficiaries) -> 409 BENEFICIARY_CONFLICT")
+    void assign_candidateInVaultBeneficiaries_conflictWithErrorCode() {
+        when(vaultRepository.existsBeneficiaryWithEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, false)))
+                .isInstanceOf(ExecutorManagementException.class)
+                .satisfies(e -> {
+                    ExecutorManagementException ex = (ExecutorManagementException) e;
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BENEFICIARY_CONFLICT);
+                });
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
         verifyNoInteractions(auditLogService, eventPublisher);
