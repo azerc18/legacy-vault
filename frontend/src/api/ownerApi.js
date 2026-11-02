@@ -84,6 +84,14 @@ export const ownerApi = {
     // -> [{ id, vaultId, documentType, fileName, uploadedAt }]
     listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
     downloadDocument: (docId, fileName) => saveBlob(`/documents/${docId}/download`, fileName || 'document'),
+    // F4a: Lời nhắn di nguyện & Hẹn giờ tương lai
+    listLegacyMessages: (vaultId) => http.get(`/vaults/${vaultId}/messages`).then((r) => unwrap(r) ?? []),
+    getLegacyMessage: (vaultId, messageId) => http.get(`/vaults/${vaultId}/messages/${messageId}`).then(unwrap),
+    createLegacyMessage: (vaultId, formData) => http.post(`/vaults/${vaultId}/messages`, formData).then(unwrap),
+    updateLegacyMessage: (vaultId, messageId, formData) => http.put(`/vaults/${vaultId}/messages/${messageId}`, formData).then(unwrap),
+    deleteLegacyMessage: (vaultId, messageId) => http.delete(`/vaults/${vaultId}/messages/${messageId}`),
+    downloadLegacyMessageAttachment: (vaultId, messageId, fileName) =>
+        saveBlob(`/vaults/${vaultId}/messages/${messageId}/attachment`, fileName || 'attachment'),
     // 409 nếu tài liệu đang nằm trong hồ sơ xác minh
     deleteDocument: (docId) => http.delete(`/documents/${docId}`),
 
