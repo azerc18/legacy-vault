@@ -19,11 +19,11 @@
     "fixNow": "Khắc phục ngay",
     "items": {
         "masterVaultAndAsset": "Tạo két di sản chính và thêm ít nhất 1 tài sản số",
-        "assetBeneficiaryAllocated": "Phân bổ mọi tài sản số đang hoạt động cho ít nhất một người thụ hưởng",
+        "assetBeneficiaryAllocated": "Chọn người nhận cụ thể cho từng tài sản số",
         "legalWillDocument": "Tải lên Di chúc cho các tài sản ngân hàng và tài sản cần hồ sơ pháp lý",
         "executorsAssigned": "Chỉ định cả người thi hành chính và người thi hành dự phòng",
         "dmsActive": "Bật Dead Man's Switch",
-        "safetyNetConfigured": "Cấu hình thời gian ân hạn nhắc nhiều lần cho DMS và lớp bảo vệ dự phòng",
+        "safetyNetConfigured": "Chỉ định người thụ hưởng dự phòng hoặc người xác nhận chéo DMS",
         "recentReview": "Rà soát hoặc check-in hồ sơ di sản trong 6 tháng gần nhất"
     }
 }

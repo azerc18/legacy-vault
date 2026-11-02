@@ -19,11 +19,11 @@
     "fixNow": "Fix now",
     "items": {
         "masterVaultAndAsset": "Create Master Estate Vault and add at least 1 digital asset",
-        "assetBeneficiaryAllocated": "Allocate every active digital asset to at least one beneficiary",
+        "assetBeneficiaryAllocated": "Choose who receives each digital asset",
         "legalWillDocument": "Upload a Legal Will for banking & legal claim assets",
         "executorsAssigned": "Assign both a Primary Executor and a Backup Executor",
         "dmsActive": "Activate your Dead Man's Switch",
-        "safetyNetConfigured": "Configure DMS multi-reminder grace period and backup protection",
+        "safetyNetConfigured": "Add a contingent beneficiary or DMS trusted confirmers",
         "recentReview": "Review or check in on your estate within the last 6 months"
     }
 }

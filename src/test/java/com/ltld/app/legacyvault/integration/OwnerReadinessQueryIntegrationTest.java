@@ -154,6 +154,38 @@ class OwnerReadinessQueryIntegrationTest extends MySqlTestContainer {
                 DocumentType.OWNERSHIP_PAPER)).containsExactly(emptyVault.getId());
     }
 
+    @Test
+    @DisplayName("F1 M1: chưa có contingentBeneficiary -> false")
+    void existsContingentForOwner_withoutContingent_isFalse() {
+        assertThat(assetAllocationRepository.existsContingentForOwner(owner.getId())).isFalse();
+    }
+
+    @Test
+    @DisplayName("F1 M1: tài sản ACTIVE có contingentBeneficiary -> true; REVOKED hoặc của Owner khác không tính")
+    void existsContingentForOwner_activeAssetWithContingent_isTrue() {
+        // REVOKED có người dự phòng: không tính
+        DigitalAsset revoked = asset(twoBeneficiaryVault, AssetType.EMAIL, AssetStatus.REVOKED);
+        assetAllocationRepository.save(AssetAllocation.builder()
+                .asset(revoked).beneficiary(ben1).contingentBeneficiary(ben2).mode(AllocationMode.EXCLUSIVE).build());
+        // Owner khác có người dự phòng: không tính
+        User other = user("other2@example.com");
+        Vault otherVault = vault(other, "Other 2");
+        VaultBeneficiary o1 = beneficiary(otherVault, "o1@example.com");
+        VaultBeneficiary o2 = beneficiary(otherVault, "o2@example.com");
+        assetAllocationRepository.save(AssetAllocation.builder()
+                .asset(asset(otherVault, AssetType.EMAIL, AssetStatus.ACTIVE)).beneficiary(o1).contingentBeneficiary(o2)
+                .mode(AllocationMode.EXCLUSIVE).build());
+        assertThat(assetAllocationRepository.existsContingentForOwner(owner.getId())).isFalse();
+
+        // Tài sản ACTIVE của Owner có người dự phòng
+        assetAllocationRepository.save(AssetAllocation.builder()
+                .asset(activeUnallocated).beneficiary(ben1).contingentBeneficiary(ben2).mode(AllocationMode.EXCLUSIVE).build());
+        assertThat(assetAllocationRepository.existsContingentForOwner(owner.getId())).isTrue();
+
+        ReadinessResponse res = ownerReadinessService.evaluateReadiness(owner.getId());
+        assertThat(item(res, "SAFETY_NET_CONFIGURED").isDone()).isTrue();
+    }
+
     // ---------- service trên dữ liệu thật ----------
 
     @Test
@@ -162,7 +194,8 @@ class OwnerReadinessQueryIntegrationTest extends MySqlTestContainer {
         ReadinessResponse before = ownerReadinessService.evaluateReadiness(owner.getId());
         ReadinessItemResponse allocBefore = item(before, "ASSET_BENEFICIARY_ALLOCATED");
         assertThat(allocBefore.isDone()).isFalse();
-        assertThat(allocBefore.getFixUrl()).isEqualTo("/owner/vaults/" + twoBeneficiaryVault.getId());
+        assertThat(allocBefore.getFixUrl()).isNull();   // m1: FE chưa có giao diện phân bổ
+        assertThat(item(before, "SAFETY_NET_CONFIGURED").isDone()).isFalse();   // chưa có người dự phòng
         assertThat(item(before, "MASTER_VAULT_AND_ASSET").isDone()).isTrue();
         assertThat(item(before, "LEGAL_WILL_DOCUMENT").isDone()).isTrue();
 

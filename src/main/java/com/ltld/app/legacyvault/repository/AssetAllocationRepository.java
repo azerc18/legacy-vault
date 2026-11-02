@@ -37,6 +37,15 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
             """)
     List<UUID> findAllocatedActiveAssetIdsByOwnerId(@Param("ownerId") UUID ownerId);
 
+    // F1 (tiêu chí 6): Owner có ít nhất 1 tài sản ACTIVE đã chỉ định người thụ hưởng dự phòng không (1 query)
+    @Query("""
+            SELECT COUNT(al) > 0 FROM AssetAllocation al
+            WHERE al.contingentBeneficiary IS NOT NULL
+              AND al.asset.status = com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE
+              AND al.asset.vault.owner.id = :ownerId
+            """)
+    boolean existsContingentForOwner(@Param("ownerId") UUID ownerId);
+
     @Modifying(flushAutomatically = true)
     @Query("UPDATE AssetAllocation al SET al.contingentBeneficiary = NULL WHERE al.contingentBeneficiary.id = :bid")
     int clearContingentByBeneficiaryId(@Param("bid") UUID bid);

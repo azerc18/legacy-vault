@@ -102,15 +102,21 @@ class OwnerReadinessServiceImplTest {
         return res.getItems().stream().filter(i -> i.getKey().equals(key)).findFirst().orElseThrow();
     }
 
-    /** Stub đủ 7 truy vấn theo lô của một Owner có vault. */
+    /** Stub đủ các truy vấn theo lô của một Owner có vault (mặc định đã có người thụ hưởng dự phòng). */
     private void stubEstate(List<Vault> vaults, List<DigitalAsset> activeAssets, List<UUID> vaultsWithBeneficiary,
                             List<UUID> allocatedAssetIds, List<UUID> vaultsWithWill) {
+        stubEstate(vaults, activeAssets, vaultsWithBeneficiary, allocatedAssetIds, vaultsWithWill, true);
+    }
+
+    private void stubEstate(List<Vault> vaults, List<DigitalAsset> activeAssets, List<UUID> vaultsWithBeneficiary,
+                            List<UUID> allocatedAssetIds, List<UUID> vaultsWithWill, boolean hasContingent) {
         when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)).thenReturn(vaults);
         when(digitalAssetRepository.findByVaultIdInAndStatus(vaults.stream().map(Vault::getId).toList(),
                 AssetStatus.ACTIVE)).thenReturn(activeAssets);
         when(vaultBeneficiaryRepository.findVaultIdsWithBeneficiaryByOwnerId(ownerId)).thenReturn(vaultsWithBeneficiary);
         if (!activeAssets.isEmpty()) {
             when(assetAllocationRepository.findAllocatedActiveAssetIdsByOwnerId(ownerId)).thenReturn(allocatedAssetIds);
+            when(assetAllocationRepository.existsContingentForOwner(ownerId)).thenReturn(hasContingent);
         }
         when(legalDocumentRepository.findVaultIdsWithDocumentTypeByOwnerId(ownerId, DocumentType.WILL))
                 .thenReturn(vaultsWithWill);
@@ -172,7 +178,7 @@ class OwnerReadinessServiceImplTest {
 
         ReadinessItemResponse alloc = item(res, "ASSET_BENEFICIARY_ALLOCATED");
         assertFalse(alloc.isDone());
-        assertEquals("/owner/vaults/" + missing.getId(), alloc.getFixUrl());
+        assertNull(alloc.getFixUrl());   // m1: FE chưa có giao diện phân bổ
         assertEquals(85, res.getScore());
     }
 
@@ -190,7 +196,7 @@ class OwnerReadinessServiceImplTest {
 
         ReadinessItemResponse alloc = item(res, "ASSET_BENEFICIARY_ALLOCATED");
         assertFalse(alloc.isDone());
-        assertEquals("/owner/vaults/" + older.getId(), alloc.getFixUrl());
+        assertNull(alloc.getFixUrl());   // m1: FE chưa có giao diện phân bổ
     }
 
     @Test
@@ -205,9 +211,11 @@ class OwnerReadinessServiceImplTest {
         assertFalse(item(res, "MASTER_VAULT_AND_ASSET").isDone());
         assertFalse(item(res, "ASSET_BENEFICIARY_ALLOCATED").isDone());
         assertTrue(item(res, "LEGAL_WILL_DOCUMENT").isDone());   // không có tài sản pháp lý, đã có 1 bản WILL
-        assertEquals(65, res.getScore());
+        assertFalse(item(res, "SAFETY_NET_CONFIGURED").isDone());
+        assertEquals(55, res.getScore());
         verify(digitalAssetRepository).findByVaultIdInAndStatus(List.of(v.getId()), AssetStatus.ACTIVE);
         verify(assetAllocationRepository, never()).findAllocatedActiveAssetIdsByOwnerId(any());
+        verify(assetAllocationRepository, never()).existsContingentForOwner(any());
     }
 
     @Test
@@ -229,6 +237,84 @@ class OwnerReadinessServiceImplTest {
     }
 
     @Test
+    @DisplayName("F1 M1: chưa có người thụ hưởng dự phòng -> tiêu chí 6 chưa đạt dù DMS/Backup Executor đã cấu hình")
+    void evaluateReadiness_noContingent_safetyNetNotDone() {
+        Vault v = vault(1);
+        DigitalAsset a = asset(v, AssetType.EMAIL);
+        stubEstate(List.of(v), List.of(a), List.of(v.getId()), List.of(a.getId()), List.of(v.getId()), false);
+
+        ReadinessResponse res = readinessService.evaluateReadiness(ownerId);
+
+        ReadinessItemResponse safety = item(res, "SAFETY_NET_CONFIGURED");
+        assertFalse(safety.isDone());
+        assertNull(safety.getFixUrl());
+        assertEquals("items.safetyNetConfigured", safety.getTitleKey());
+        assertEquals("Add a contingent beneficiary or DMS trusted confirmers", safety.getTitle());
+        assertTrue(item(res, "PRIMARY_AND_BACKUP_EXECUTOR").isDone());
+        assertEquals(90, res.getScore());
+    }
+
+    @Test
+    @DisplayName("F1 M1: có người thụ hưởng dự phòng -> tiêu chí 6 đạt, không phụ thuộc Backup Executor / cấu hình DMS")
+    void evaluateReadiness_contingent_safetyNetDone_withoutBackupOrDms() {
+        Vault v = vault(1);
+        DigitalAsset a = asset(v, AssetType.EMAIL);
+        when(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)).thenReturn(List.of(v));
+        when(digitalAssetRepository.findByVaultIdInAndStatus(List.of(v.getId()), AssetStatus.ACTIVE)).thenReturn(List.of(a));
+        when(vaultBeneficiaryRepository.findVaultIdsWithBeneficiaryByOwnerId(ownerId)).thenReturn(List.of(v.getId()));
+        when(assetAllocationRepository.findAllocatedActiveAssetIdsByOwnerId(ownerId)).thenReturn(List.of(a.getId()));
+        when(assetAllocationRepository.existsContingentForOwner(ownerId)).thenReturn(true);
+        when(legalDocumentRepository.findVaultIdsWithDocumentTypeByOwnerId(ownerId, DocumentType.WILL)).thenReturn(List.of());
+        when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of(executor(ExecutorType.PRIMARY)));
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+
+        ReadinessResponse res = readinessService.evaluateReadiness(ownerId);
+
+        assertTrue(item(res, "SAFETY_NET_CONFIGURED").isDone());
+        assertFalse(item(res, "PRIMARY_AND_BACKUP_EXECUTOR").isDone());   // thiếu Backup chỉ trừ ở tiêu chí 4
+    }
+
+    @Test
+    @DisplayName("F1 m3: cơ chế đã lưu được ưu tiên; NULL mới suy ra từ loại tài sản")
+    void isLegalDossierAsset_storedMechanismFirst_thenFallbackByType() {
+        Vault v = vault(1);
+        DigitalAsset bankStoredOther = asset(v, AssetType.BANK_ACCOUNT);
+        bankStoredOther.setTransferMechanism(TransferMechanism.EXECUTOR_DISPOSITION);
+        DigitalAsset otherStoredLegal = asset(v, AssetType.OTHER);
+        otherStoredLegal.setTransferMechanism(TransferMechanism.LEGAL_CLAIM_DOSSIER);
+        DigitalAsset bankLegacyNull = asset(v, AssetType.BANK_ACCOUNT);       // dữ liệu cũ: mechanism NULL
+        DigitalAsset socialLegacyNull = asset(v, AssetType.SOCIAL_MEDIA);
+
+        assertFalse(OwnerReadinessServiceImpl.isLegalDossierAsset(bankStoredOther));
+        assertTrue(OwnerReadinessServiceImpl.isLegalDossierAsset(otherStoredLegal));
+        assertTrue(OwnerReadinessServiceImpl.isLegalDossierAsset(bankLegacyNull));
+        assertFalse(OwnerReadinessServiceImpl.isLegalDossierAsset(socialLegacyNull));
+    }
+
+    @Test
+    @DisplayName("F1 m3: tài sản BANK_ACCOUNT nhưng lưu EXECUTOR_DISPOSITION thì không đòi Di chúc")
+    void evaluateReadiness_storedNonLegalMechanism_doesNotRequireWill() {
+        Vault withWill = vault(1);
+        Vault noWill = vault(2);
+        DigitalAsset bank = asset(noWill, AssetType.BANK_ACCOUNT);
+        bank.setTransferMechanism(TransferMechanism.EXECUTOR_DISPOSITION);
+        stubEstate(List.of(withWill, noWill), List.of(bank), List.of(withWill.getId(), noWill.getId()),
+                List.of(bank.getId()), List.of(withWill.getId()));
+
+        ReadinessResponse res = readinessService.evaluateReadiness(ownerId);
+
+        assertTrue(item(res, "LEGAL_WILL_DOCUMENT").isDone());
+    }
+
+    @Test
+    @DisplayName("F1 n3: ngưỡng hạng theo hằng số EXCELLENT_MIN / GOOD_MIN / FAIR_MIN")
+    void gradeThresholds_areNamedConstants() {
+        assertEquals(85, OwnerReadinessServiceImpl.EXCELLENT_MIN);
+        assertEquals(65, OwnerReadinessServiceImpl.GOOD_MIN);
+        assertEquals(40, OwnerReadinessServiceImpl.FAIR_MIN);
+    }
+
+    @Test
     @DisplayName("F1: nhiều vault vẫn chỉ gọi mỗi truy vấn theo lô 1 lần (không N+1)")
     void evaluateReadiness_manyVaults_batchedQueries() {
         Vault v1 = vault(1);
@@ -245,6 +331,7 @@ class OwnerReadinessServiceImplTest {
         verify(digitalAssetRepository, times(1)).findByVaultIdInAndStatus(any(), any());
         verify(vaultBeneficiaryRepository, times(1)).findVaultIdsWithBeneficiaryByOwnerId(ownerId);
         verify(assetAllocationRepository, times(1)).findAllocatedActiveAssetIdsByOwnerId(ownerId);
+        verify(assetAllocationRepository, times(1)).existsContingentForOwner(ownerId);
         verify(legalDocumentRepository, times(1)).findVaultIdsWithDocumentTypeByOwnerId(ownerId, DocumentType.WILL);
         verify(legalDocumentRepository, never()).findByVaultId(any());
     }

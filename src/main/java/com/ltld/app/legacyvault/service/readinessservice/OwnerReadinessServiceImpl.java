@@ -44,6 +44,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OwnerReadinessServiceImpl implements OwnerReadinessService {
 
+    // Ngưỡng điểm tối thiểu của từng hạng (dưới FAIR_MIN là AT_RISK)
+    static final int EXCELLENT_MIN = 85;
+    static final int GOOD_MIN = 65;
+    static final int FAIR_MIN = 40;
+
     private final VaultRepository vaultRepository;
     private final DigitalAssetRepository digitalAssetRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
@@ -62,11 +67,13 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
         Set<UUID> vaultsWithBeneficiary;
         Set<UUID> allocatedAssetIds;
         Set<UUID> vaultsWithWill;
+        boolean hasContingent;
         if (vaultIds.isEmpty()) {
             activeAssets = List.of();
             vaultsWithBeneficiary = Set.of();
             allocatedAssetIds = Set.of();
             vaultsWithWill = Set.of();
+            hasContingent = false;
         } else {
             activeAssets = digitalAssetRepository.findByVaultIdInAndStatus(vaultIds, AssetStatus.ACTIVE);
             vaultsWithBeneficiary = new HashSet<>(vaultBeneficiaryRepository.findVaultIdsWithBeneficiaryByOwnerId(ownerId));
@@ -75,6 +82,7 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                     : new HashSet<>(assetAllocationRepository.findAllocatedActiveAssetIdsByOwnerId(ownerId));
             vaultsWithWill = new HashSet<>(
                     legalDocumentRepository.findVaultIdsWithDocumentTypeByOwnerId(ownerId, DocumentType.WILL));
+            hasContingent = !activeAssets.isEmpty() && assetAllocationRepository.existsContingentForOwner(ownerId);
         }
 
         Map<UUID, List<DigitalAsset>> assetsByVault = activeAssets.stream()
@@ -96,6 +104,8 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 hasVaultAndAsset, 20, defaultVaultUrl));
 
         // 2. Mọi vault chứa tài sản đều có người thụ hưởng và mọi tài sản ACTIVE đều đã được phân bổ (+15đ)
+        // n1: phân bổ tường minh đã kéo theo vault có người thụ hưởng, nhưng vẫn tìm riêng vault thiếu người
+        // để khi bật lại fixUrl thì ưu tiên đưa Owner tới vault cần thêm người trước khi phân bổ.
         UUID vaultMissingBeneficiary = vaults.stream()
                 .map(Vault::getId)
                 .filter(id -> assetsByVault.containsKey(id) && !vaultsWithBeneficiary.contains(id))
@@ -110,12 +120,17 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
         boolean allAllocated = !activeAssets.isEmpty()
                 && vaultMissingBeneficiary == null
                 && vaultWithUnallocatedAsset == null;
-        UUID allocationFixVault = vaultMissingBeneficiary != null ? vaultMissingBeneficiary : vaultWithUnallocatedAsset;
+        // m1: FE chưa có giao diện phân bổ nên chưa có trang để sửa -> fixUrl = null (FE ẩn nút "Fix now").
+        // TODO(N2-owner-FE): bật lại fixUrl khi N2-owner-FE merge:
+        //   allocationFixVault != null ? vaultUrl(allocationFixVault) : defaultVaultUrl,
+        //   với allocationFixVault = vaultMissingBeneficiary != null ? vaultMissingBeneficiary : vaultWithUnallocatedAsset
         items.add(item("ASSET_BENEFICIARY_ALLOCATED", "assetBeneficiaryAllocated",
-                "Allocate every active digital asset to at least one beneficiary",
-                allAllocated, 15, allocationFixVault != null ? vaultUrl(allocationFixVault) : defaultVaultUrl));
+                "Choose who receives each digital asset",
+                allAllocated, 15, null));
 
         // 3. Vault có tài sản theo hồ sơ pháp lý (LEGAL_CLAIM_DOSSIER) đã đính kèm Di chúc (WILL) (+15đ)
+        // TODO(N3b): khi có UI linkedDocumentGroupId thì đổi thành "mọi tài sản LEGAL_CLAIM_DOSSIER có
+        //   linkedDocumentGroupId trỏ tới nhóm WILL còn hiệu lực" (hiện chấm theo "vault có tài liệu WILL").
         Set<UUID> vaultsWithLegalAssets = assetsByVault.entrySet().stream()
                 .filter(e -> e.getValue().stream().anyMatch(OwnerReadinessServiceImpl::isLegalDossierAsset))
                 .map(Map.Entry::getKey)
@@ -130,7 +145,7 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 ? !vaultsWithWill.isEmpty()
                 : vaultNeedingWill == null);
         items.add(item("LEGAL_WILL_DOCUMENT", "legalWillDocument",
-                "Upload a Legal Will (Di chúc) for banking & legal claim assets",
+                "Upload a Legal Will for banking & legal claim assets",
                 willSatisfied, 15, vaultNeedingWill != null ? vaultUrl(vaultNeedingWill) : defaultVaultUrl));
 
         // 4. Đã chỉ định đủ Primary Executor và Backup Executor (+15đ)
@@ -146,13 +161,15 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 "Activate your Dead Man's Switch",
                 dmsActive, 15, "/owner/dms"));
 
-        // 6. Đã cấu hình cơ chế bảo vệ chống kích hoạt nhầm / dự phòng (+10đ)
-        boolean safetyNet = dmsOpt.map(d -> d.getGracePeriodDays() != null && d.getGracePeriodDays() >= 3
-                        && d.getReminderCount() != null && d.getReminderCount() >= 2)
-                .orElse(false) && hasBackup;
+        // 6. Lưới an toàn theo đặc tả (+10đ): có ít nhất 1 tài sản ACTIVE được chỉ định người thụ hưởng dự phòng
+        // (asset_allocations.contingent_beneficiary_id khác null). Backup Executor đã chấm ở tiêu chí 4, không trừ hai lần.
+        // X2: thêm || có DMS confirmer khi X2 merge
+        boolean safetyNet = hasContingent;
+        // FE chưa có giao diện chọn người dự phòng / người xác nhận chéo -> fixUrl = null (FE ẩn nút "Fix now").
+        // TODO(N2-owner-FE / X2): đặt fixUrl khi có trang tương ứng.
         items.add(item("SAFETY_NET_CONFIGURED", "safetyNetConfigured",
-                "Configure DMS multi-reminder grace period and backup protection",
-                safetyNet, 10, "/owner/dms"));
+                "Add a contingent beneficiary or DMS trusted confirmers",
+                safetyNet, 10, null));
 
         // 7. Đã rà soát/cập nhật hồ sơ trong vòng 6 tháng gần nhất (+10đ)
         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
@@ -199,10 +216,13 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 .anyMatch(e -> e.getExecutorType() == type && e.getStatus() != ExecutorStatus.REVOKED);
     }
 
-    // N3: dùng cơ chế chuyển giao đã lưu, dữ liệu cũ (NULL) thì suy ra từ loại tài sản
-    private static boolean isLegalDossierAsset(DigitalAsset asset) {
-        return TransferMechanisms.resolve(asset.getTransferMechanism(), asset.getAssetType())
-                == TransferMechanism.LEGAL_CLAIM_DOSSIER;
+    // m3 (N3 đã merge): dùng cơ chế chuyển giao đã lưu trên tài sản; chỉ dữ liệu cũ (NULL) mới suy ra từ loại tài sản
+    static boolean isLegalDossierAsset(DigitalAsset asset) {
+        TransferMechanism stored = asset.getTransferMechanism();
+        TransferMechanism mechanism = stored != null
+                ? stored
+                : TransferMechanisms.resolve(null, asset.getAssetType());
+        return mechanism == TransferMechanism.LEGAL_CLAIM_DOSSIER;
     }
 
     private static boolean isReviewedSince(
@@ -231,9 +251,9 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
     }
 
     private static String computeGrade(int score) {
-        if (score >= 85) return "EXCELLENT";
-        if (score >= 65) return "GOOD";
-        if (score >= 40) return "FAIR";
+        if (score >= EXCELLENT_MIN) return "EXCELLENT";
+        if (score >= GOOD_MIN) return "GOOD";
+        if (score >= FAIR_MIN) return "FAIR";
         return "AT_RISK";
     }
 }
