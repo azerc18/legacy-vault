@@ -54,4 +54,8 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
             WHERE vb.id = :id AND (vb.lastReminderAt IS NULL OR vb.lastReminderAt <= :cutoff)
             """)
     int markReminded(@Param("id") UUID id, @Param("now") LocalDateTime now, @Param("cutoff") LocalDateTime cutoff);
+
+    // F1: id các vault của Owner có ít nhất 1 người thụ hưởng (một query cho cả Owner, tránh N+1)
+    @Query("SELECT DISTINCT b.vault.id FROM VaultBeneficiary b WHERE b.vault.owner.id = :ownerId")
+    List<UUID> findVaultIdsWithBeneficiaryByOwnerId(@Param("ownerId") UUID ownerId);
 }
