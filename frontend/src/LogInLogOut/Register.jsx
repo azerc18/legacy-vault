@@ -64,7 +64,7 @@ export default function Register() {
                     <span className="material-symbols-outlined text-[28px]">person_add</span>
                 </div>
                 <h1 className="font-headline-lg text-primary font-bold tracking-tight text-2xl">Create a LegacyVault account</h1>
-                <p className="font-body-sm text-on-surface-variant mt-1">Sign up for a new account with Owner permissions</p>
+                <p className="font-body-sm text-on-surface-variant mt-1">Start planning what happens to your digital assets</p>
             </div>
 
             {/* Register Card */}

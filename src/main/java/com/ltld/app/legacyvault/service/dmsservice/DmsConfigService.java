@@ -25,6 +25,11 @@ public interface DmsConfigService {
     void assertHandoverNotStarted(UUID ownerId);
 
     /**
+     * FR-27: kiểm tra đã bàn giao chưa (chỉ đọc, để hiển thị; KHÔNG dùng cho quyết định ghi).
+     */
+    boolean isHandoverStarted(UUID ownerId);
+
+    /**
      * Q28/O5: Admin tạm dừng DMS của Owner (ACTIVE -> SUSPENDED), dùng cho A5. Nơi gọi PHẢI kiểm quyền ADMIN.
      * Khóa DmsConfig (PESSIMISTIC_FORCE_INCREMENT) để không chạy đua với trigger FR-07 / nhắc check-in / leo thang;
      * các job đó chỉ quét DMS ACTIVE nên bỏ qua Owner bị tạm dừng.

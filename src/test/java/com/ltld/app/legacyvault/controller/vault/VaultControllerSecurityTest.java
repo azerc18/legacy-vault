@@ -28,6 +28,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -77,6 +78,20 @@ class VaultControllerSecurityTest {
                         .with(token("ROLE_OWNER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(BODY))
+                .andExpect(status().isOk());
+    }
+
+    // --- DELETE /api/vaults/{vaultId}/beneficiary ---
+    @Test
+    void removeBeneficiary_noToken_returns401() throws Exception {
+        mockMvc.perform(delete("/api/vaults/{v}/beneficiary", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void removeBeneficiary_owner_returns200() throws Exception {
+        mockMvc.perform(delete("/api/vaults/{v}/beneficiary", UUID.randomUUID())
+                        .with(token("ROLE_OWNER")))
                 .andExpect(status().isOk());
     }
 

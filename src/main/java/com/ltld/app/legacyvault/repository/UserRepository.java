@@ -50,4 +50,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
                               Pageable pageable);
 
     boolean existsByRoles_Code(String roleCode);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.mfaChallengeHash = :hash")
+    Optional<User> findByMfaChallengeHashForUpdate(@Param("hash") String hash);
 }

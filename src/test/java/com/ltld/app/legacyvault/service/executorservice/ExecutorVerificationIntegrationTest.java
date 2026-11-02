@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.DuplicateVerificationRequestException;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
@@ -31,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -64,7 +66,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
         "app.storage.upload-dir=target/it-uploads/"
 })
 @Testcontainers(disabledWithoutDocker = true)
-class ExecutorVerificationIntegrationTest {
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class ExecutorVerificationIntegrationTest extends MySqlTestContainer {
 
     @Container
     @ServiceConnection
@@ -147,11 +150,11 @@ class ExecutorVerificationIntegrationTest {
         LegalVerificationRequest stored = legalVerificationRequestRepository.findById(res.getId()).orElseThrow();
         assertThat(stored.getDeathCertificateFileUrlEncrypted()).endsWith(".pdf");
 
-        // FR-13: phải View trước khi Check
-        legalVerificationService.getDocument(res.getId(), verifier.getId());
+        // FR-13: Check trước, rồi mới View
         DocumentVerificationResponseDto verification =
                 legalVerificationService.verifyDocument(res.getId(), verifier.getId());
         assertThat(verification.isValid()).isTrue();
+        legalVerificationService.getDocument(res.getId(), verifier.getId());
     }
 
     @Test

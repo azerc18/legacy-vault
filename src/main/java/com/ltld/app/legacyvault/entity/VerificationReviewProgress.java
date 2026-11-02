@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * FR-13: tiến độ thẩm định của TỪNG Legal Verifier trên một hồ sơ (View → Check).
+ * FR-13: tiến độ thẩm định của TỪNG Legal Verifier trên một hồ sơ (Check → View).
  * Mỗi cặp (hồ sơ, verifier) một dòng nên nhiều verifier cùng xem hồ sơ PENDING không xóa tiến độ của nhau.
  */
 @Entity

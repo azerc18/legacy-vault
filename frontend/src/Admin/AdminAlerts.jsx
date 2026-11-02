@@ -4,6 +4,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager } from './adminUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 const SEVERITY_CLS = {
     HIGH: 'bg-error-container text-on-error-container',
@@ -70,7 +71,9 @@ export default function AdminAlerts() {
 
             {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
             {data && rows.length === 0 && (
-                <p className="text-on-surface-variant">{status === 'OPEN' ? 'No open alerts. All clear.' : 'No acknowledged alerts yet.'}</p>
+                <EmptyState bordered icon={status === 'OPEN' ? 'verified' : 'notifications_off'}
+                            title={status === 'OPEN' ? 'All clear' : 'No acknowledged alerts yet'}
+                            text={status === 'OPEN' ? 'Failed notifications and stuck hand-overs will show up here.' : 'Alerts you acknowledge will be listed here.'} />
             )}
 
             <div className="space-y-3">

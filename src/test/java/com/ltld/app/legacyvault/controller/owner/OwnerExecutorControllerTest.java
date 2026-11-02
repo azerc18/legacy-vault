@@ -17,10 +17,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -45,7 +47,8 @@ class OwnerExecutorControllerTest {
     void list_returns200WithAllPositions() throws Exception {
         when(executorManagementService.listExecutors(ownerId)).thenReturn(List.of(
                 ExecutorAssignmentResponse.builder().executorType(ExecutorType.PRIMARY)
-                        .status(ExecutorStatus.INACTIVE).email("p@example.test").build(),
+                        .status(ExecutorStatus.ACTIVE).email("p@example.test")
+                        .acknowledgedAt(LocalDateTime.of(2026, 10, 30, 9, 15)).build(),
                 ExecutorAssignmentResponse.builder().executorType(ExecutorType.BACKUP)
                         .status(ExecutorStatus.REVOKED).email("b@example.test").build()));
 
@@ -55,7 +58,10 @@ class OwnerExecutorControllerTest {
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].executorType").value("PRIMARY"))
                 .andExpect(jsonPath("$.data[1].executorType").value("BACKUP"))
-                .andExpect(jsonPath("$.data[1].status").value("REVOKED"));
+                .andExpect(jsonPath("$.data[1].status").value("REVOKED"))
+                // FR-06: chưa xác nhận bàn giao thì key vẫn có, giá trị null
+                .andExpect(jsonPath("$.data[0].acknowledgedAt").value("2026-10-30T09:15:00"))
+                .andExpect(jsonPath("$.data[1].acknowledgedAt").value(nullValue()));
     }
 
     @Test

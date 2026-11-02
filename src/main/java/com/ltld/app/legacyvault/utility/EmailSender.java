@@ -59,6 +59,14 @@ public class EmailSender {
                         + "\nYou will be notified when the vault is unlocked for handover.");
     }
 
+    // N2-owner: báo cho người bị gỡ khỏi vault
+    @Async
+    public void sendBeneficiaryRemovedNotice(String email, String ownerName, String vaultName) {
+        sendWithoutOtpFooter(email,
+                "You are no longer a beneficiary - LegacyVault",
+                ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
+    }
+
     // FR-02 (bước 7): xác nhận cho Owner
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
@@ -186,6 +194,28 @@ public class EmailSender {
                 "Your Digital Executor role has been revoked - LegacyVault",
                 ownerLabel(ownerName, ownerEmail) + " has revoked your " + role + " role on LegacyVault."
                         + "\nFrom now on you can no longer carry out the handover process for "
+                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+    }
+
+    // FR-07 / BR-03: hệ thống tự thu hồi vì Primary không xác nhận trong hạn, Owner không làm gì (thường đã mất)
+    public void sendExecutorTimeoutRevokedNotice(String to, String ownerName, String ownerEmail, int waitDays) {
+        sendWithoutOtpFooter(to,
+                "Your Digital Executor role has ended - LegacyVault",
+                "You did not confirm the handover for " + ownerLabel(ownerName, ownerEmail)
+                        + " within " + waitDays + " days, so the role was passed to the backup executor."
+                        + "\nYou can no longer carry out the handover process for "
+                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+    }
+
+    // FR-07: Admin chỉ định Executor mới để tiếp tục bàn giao (người cũ bỏ dở hoặc không còn dùng được)
+    public void sendExecutorReplacedByAdminNotice(String to, String ownerName, String ownerEmail,
+                                                  ExecutorType type) {
+        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
+        sendWithoutOtpFooter(to,
+                "Your Digital Executor role has ended - LegacyVault",
+                "An administrator has assigned a new " + role + " for " + ownerLabel(ownerName, ownerEmail)
+                        + " to continue the handover process."
+                        + "\nYou can no longer carry out the handover process for "
                         + ownerDisplayName(ownerName, ownerEmail) + ".");
     }
 

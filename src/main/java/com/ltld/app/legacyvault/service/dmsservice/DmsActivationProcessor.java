@@ -20,11 +20,15 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -52,8 +56,10 @@ public class DmsActivationProcessor {
     // Tham số: Owner (tên + email), loại Executor (Primary/Backup), mã ExecutorAssignment.
     private static final String MSG_EXECUTOR_ACTIVATED =
             "The Dead Man's Switch of %s has been triggered. You are the %s executor.%n"
-                    + "Please sign in to LegacyVault and acknowledge this notice (code: %s) within %d days; "
-                    + "otherwise the role may pass to the Backup executor.";
+                    + "Please sign in to LegacyVault and acknowledge this notice (code: %s).";
+    // BR-03 chỉ áp dụng cho Primary: không xác nhận đúng hạn thì quyền chuyển sang Backup
+    private static final String MSG_PRIMARY_DEADLINE =
+            "%nAcknowledge within %d days; otherwise the role may pass to the Backup executor.";
 
     // B6: báo Admin khi DMS kích hoạt mà Owner không có Executor khả dụng. Tham số: Owner, mã DmsConfig.
     private static final String MSG_ADMIN_NO_EXECUTOR =
@@ -76,6 +82,7 @@ public class DmsActivationProcessor {
     private final AuditLogService auditLogService;
     private final ExecutorNotificationService executorNotificationService;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
     @Transactional
@@ -162,8 +169,11 @@ public class DmsActivationProcessor {
     /**
      * Ngoại lệ 3a của FR-07: Primary không xác nhận sau N ngày (mặc định 14, BR-03)
      * -> thu hồi hoàn toàn Primary, kích hoạt Backup. Đồng thời gửi lại thông báo đã FAILED.
+     *
+     * <p>READ_COMMITTED (như FR-06): sau khi khóa User, câu kiểm tra của revokeIfUnused phải thấy assignment
+     * mà Owner khác vừa commit, nếu không sẽ gỡ nhầm role của người vẫn đang là Executor hợp lệ.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void escalateIfPrimaryUnresponsive(UUID configId, LocalDateTime now) {
         DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
         if (config == null || config.getStatus() != DmsStatus.TRIGGERED) {
@@ -207,12 +217,20 @@ public class DmsActivationProcessor {
         primary.setStatus(ExecutorStatus.REVOKED);
         primary.setRevokedAt(now);
         executorAssignmentRepository.save(primary);
+        // FR-07 / BR-03: khóa User trước khi quyết định gỡ role (cùng điều kiện với FR-06), rồi gỡ role
+        // EXECUTOR nếu Primary không còn làm Executor cho Owner nào khác.
+        userRepository.findByIdForUpdate(primary.getExecutorUser().getId());
+        executorRoleManager.revokeIfUnused(primary.getExecutorUser(), primary.getId());
         markActive(backup, now);
 
         flushBeforeSideEffects();
         audit(AuditAction.EXECUTOR_REVOKE, ENTITY_EXECUTOR_ASSIGNMENT, primary.getId(),
                 ownerDetail(ownerId) + ", executorType=PRIMARY, reason=BR03_TIMEOUT, activatedBackupId=" + backup.getId());
         notifyActivated(config, backup, now);
+        User owner = config.getOwner();
+        eventPublisher.publishEvent(new ExecutorAssignmentChangedEvent(List.of(ExecutorMail.revokedByTimeout(
+                primary.getExecutorUser().getEmail(), owner.getFullName(), owner.getEmail(),
+                config.getBackupActivationWaitDays()))));
     }
 
     /**
@@ -288,10 +306,12 @@ public class DmsActivationProcessor {
     }
 
     // Nội dung lưu vào Notification.content nên lần gửi lại dùng đúng nội dung này.
-    // B8: ghi rõ hạn xác nhận (BR-03, mặc định 14 ngày) để Executor biết thời hạn.
+    // FR-07/FR-14: Primary được ghi rõ hạn xác nhận (BR-03, mặc định 14 ngày); Backup không bị leo thang nên không có hạn.
     static String activationMessage(User owner, ExecutorAssignment assignment, int waitDays) {
-        String executorType = assignment.getExecutorType() == ExecutorType.PRIMARY ? "Primary" : "Backup";
-        return String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel(owner), executorType, assignment.getId(), waitDays);
+        boolean primary = assignment.getExecutorType() == ExecutorType.PRIMARY;
+        String message = String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel(owner), primary ? "Primary" : "Backup",
+                assignment.getId());
+        return primary ? message + String.format(MSG_PRIMARY_DEADLINE, waitDays) : message;
     }
 
     private static String ownerLabel(User owner) {

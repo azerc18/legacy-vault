@@ -40,6 +40,8 @@ export const adminApi = {
     // 409 nếu DMS đã TRIGGERED / đã SUSPENDED; 404 nếu Owner chưa cấu hình DMS
     suspendDms: (ownerId, reason) => http.put(`/admin/dms/${ownerId}/suspend`, { reason: reason || null }).then(unwrap),
     resumeDms: (ownerId) => http.put(`/admin/dms/${ownerId}/resume`).then(unwrap),
+    // B-01b: chỉ dùng khi user.executorRescueNeeded = true. 409 nếu Owner vẫn còn Executor dùng được.
+    rescueExecutor: (ownerId, email) => http.post(`/admin/dms/${ownerId}/executor`, { email }).then(unwrap),
 
     /* ---------- Vault ---------- */
     // status: ACTIVE | UNLOCKED | CLAIMED | ARCHIVED_LOCKED; mặc định sắp xếp mới nhất trước
@@ -49,6 +51,8 @@ export const adminApi = {
         if (status) params.status = status;
         return http.get('/vaults/admin/all', { params }).then(unwrap);
     },
+    extendClaim: (vaultId, days, reason) =>
+        http.put(`/admin/vaults/${vaultId}/claim/extend`, { days, reason }).then(unwrap),
     // -> { id, name, description, status, ownerId, ownerEmail, unlockedAt, claimDeadlineAt, createdAt, updatedAt, totalDocuments, totalAssets }
     getVault: (vaultId) => http.get(`/vaults/admin/${vaultId}`).then(unwrap),
 

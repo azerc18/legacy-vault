@@ -46,6 +46,31 @@ class EmailSenderExecutorNoticeTest {
                 .doesNotContain("OTP", "The code is valid for");
     }
 
+    // FR-07 / BR-03: hệ thống tự thu hồi, không được nói Owner đã thu hồi (Owner thường đã mất)
+    @Test
+    void timeoutRevokedNotice_saysSystemNotOwner_withWaitDays() {
+        emailSender.sendExecutorTimeoutRevokedNotice("old@example.test", "Owner A", "owner@example.test", 14);
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("old@example.test");
+        assertThat(message.getText())
+                .contains("Owner A", "owner@example.test", "14 days", "backup executor")
+                .doesNotContain("has revoked", "OTP", "The code is valid for");
+    }
+
+    @Test
+    void replacedByAdminNotice_saysAdministratorAssignedNewExecutor() {
+        emailSender.sendExecutorReplacedByAdminNotice("old@example.test", "Owner A", "owner@example.test",
+                ExecutorType.BACKUP);
+
+        SimpleMailMessage message = sentMessage();
+        assertThat(message.getTo()).containsExactly("old@example.test");
+        assertThat(message.getText())
+                .contains("Owner A", "owner@example.test", "BACKUP", "administrator",
+                        "assigned a new", "continue the handover process")
+                .doesNotContain("has revoked", "OTP", "The code is valid for", "not started", "days");
+    }
+
     // T5: Owner không có fullName -> dùng email làm tên hiển thị, không in chữ "null".
     @Test
     void assignedNotice_ownerWithoutName_usesEmailAndNeverPrintsNull() {

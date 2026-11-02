@@ -15,6 +15,7 @@ import ExecutorHome from './Executor/ExecutorHome.jsx';
 import ExecutorCase from './Executor/ExecutorCase.jsx';
 import BeneficiaryVaults from './Beneficiary/BeneficiaryVaults.jsx';
 import BeneficiaryVaultDetail from './Beneficiary/BeneficiaryVaultDetail.jsx';
+import BeneficiaryGuide from './Beneficiary/BeneficiaryGuide.jsx';
 import OwnerVaults from './Owner/OwnerVaults.jsx';
 import CreateVault from './Owner/CreateVault.jsx';
 import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
@@ -30,6 +31,7 @@ import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
+import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -41,6 +43,7 @@ const VERIFIER = ['LEGAL_VERIFIER'];
 const ADMIN = ['ADMIN'];
 
 function App() {
+    useTranslation();
     return (
         <BrowserRouter>
             <Routes>
@@ -66,6 +69,7 @@ function App() {
                 {/* Beneficiary */}
                 <Route path="/beneficiary" element={guard(BENEFICIARY, <BeneficiaryVaults />)} />
                 <Route path="/beneficiary/vaults/:vaultId" element={guard(BENEFICIARY, <BeneficiaryVaultDetail />)} />
+                <Route path="/beneficiary/guide" element={guard(BENEFICIARY, <BeneficiaryGuide />)} />
 
                 {/* Executor */}
                 <Route path="/executor/home" element={guard(EXECUTOR, <ExecutorHome />)} />
@@ -87,7 +91,6 @@ function App() {
                 <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
                 <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
 
-                <Route path="/home" element={guard(null, <UserHome />)} />
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
 
                 <Route path="*" element={<NotFound />} />

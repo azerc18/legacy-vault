@@ -1,10 +1,12 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AdminVaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -52,8 +55,9 @@ public class VaultController {
                 .createdAt(vault.getCreatedAt())
                 .updatedAt(vault.getUpdatedAt())
                 .build();
-                
-        return ResponseEntity.ok(ApiResponse.success("Vault created successfully", response));
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Vault created successfully", response));
     }
 
     // Khi Client gọi DELETE /api/vaults/abcd-1234, hàm này chạy
@@ -79,6 +83,42 @@ public class VaultController {
         UUID ownerId = UUID.fromString(principal.getName());
         AssignBeneficiaryResponse response = vaultService.assignBeneficiary(ownerId, vaultId, request);
         return ResponseEntity.ok(ApiResponse.success("Beneficiary assigned successfully", response));
+    }
+
+    // FR-02 (V8): Owner gỡ người thụ hưởng hoặc hủy lời mời đang chờ đăng ký
+    @DeleteMapping("/{vaultId}/beneficiary")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<Void>> removeBeneficiary(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        vaultService.removeBeneficiary(ownerId, vaultId);
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
+    }
+
+    // N2-owner: thêm một người thụ hưởng
+    @PostMapping("/{vaultId}/beneficiaries")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<VaultBeneficiaryResponse>> addBeneficiary(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @Valid @RequestBody AddBeneficiaryRequest request) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        VaultBeneficiaryResponse response = vaultService.addBeneficiary(ownerId, vaultId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Beneficiary added successfully", response));
+    }
+
+    // N2-owner: xóa một người thụ hưởng
+    @DeleteMapping("/{vaultId}/beneficiaries/{beneficiaryId}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<Void>> removeBeneficiaryById(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID beneficiaryId) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        vaultService.removeBeneficiary(ownerId, vaultId, beneficiaryId);
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
     }
 
     // FR-27: Owner xem danh sách Vault của mình

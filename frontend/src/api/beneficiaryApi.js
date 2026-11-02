@@ -39,6 +39,9 @@ export const beneficiaryApi = {
     initClaim: (vaultId, verificationMethod) =>
         http.post('/beneficiaries/claim', { vaultId, verificationMethod }).then(unwrap),
 
+    downloadDossier: (vaultId) =>
+        downloadBlob(`/beneficiaries/vaults/${vaultId}/dossier`, 'ho-so-khai-nhan.pdf'),
+
     // FR-17: gửi OTP (chỉ dùng cho method OTP, cách nhau tối thiểu 60s)
     sendOtp: (vaultId) =>
         http.post('/beneficiaries/verifications/otp', { vaultId, verificationMethod: 'OTP' }),

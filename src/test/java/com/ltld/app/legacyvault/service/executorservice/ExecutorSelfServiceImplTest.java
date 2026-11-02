@@ -96,10 +96,10 @@ class ExecutorSelfServiceImplTest {
         verifyNoInteractions(repository);
     }
 
-    // ---------- B8: số liệu dashboard ----------
+    // ---------- FR-07/FR-14: số liệu dashboard ----------
 
     @Test
-    void listMyAssignments_b8_fillsDashboardFieldsPerOwner() {
+    void listMyAssignments_dashboard_fillsDashboardFieldsPerOwner() {
         UUID userId = EXECUTOR.getId();
         ExecutorAssignment active = assignment("Owner A", ExecutorType.PRIMARY, ExecutorStatus.ACTIVE);
         active.setActivatedAt(LocalDateTime.of(2026, 10, 1, 8, 0));
@@ -140,7 +140,7 @@ class ExecutorSelfServiceImplTest {
     }
 
     @Test
-    void listMyAssignments_b8_acknowledged_hasNoDeadline_andNoRequestsSkipsUnreadQuery() {
+    void listMyAssignments_dashboard_acknowledged_hasNoDeadline_andNoRequestsSkipsUnreadQuery() {
         UUID userId = EXECUTOR.getId();
         ExecutorAssignment a = assignment("Owner A", ExecutorType.PRIMARY, ExecutorStatus.ACTIVE);
         a.setActivatedAt(LocalDateTime.of(2026, 10, 1, 8, 0));
@@ -153,5 +153,18 @@ class ExecutorSelfServiceImplTest {
 
         assertNull(result.getAcknowledgeDeadlineAt());
         verifyNoInteractions(verificationExchangeMessageRepository);
+    }
+
+    // BR-03 chỉ leo thang Primary: Backup đã kích hoạt mà chưa xác nhận cũng không có hạn
+    @Test
+    void listMyAssignments_dashboard_activeBackup_hasNoDeadline() {
+        UUID userId = EXECUTOR.getId();
+        ExecutorAssignment a = assignment("Owner A", ExecutorType.BACKUP, ExecutorStatus.ACTIVE);
+        a.setActivatedAt(LocalDateTime.of(2026, 10, 1, 8, 0));
+        when(repository.findLiveByExecutorUserId(userId)).thenReturn(List.of(a));
+        when(dmsConfigRepository.findAllByOwnerIdIn(any())).thenReturn(List.of(
+                DmsConfig.builder().owner(a.getOwner()).backupActivationWaitDays(14).build()));
+
+        assertNull(service.listMyAssignments(userId.toString()).get(0).getAcknowledgeDeadlineAt());
     }
 }

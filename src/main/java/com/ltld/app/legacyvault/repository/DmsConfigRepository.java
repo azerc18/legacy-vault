@@ -31,6 +31,6 @@ public interface DmsConfigRepository extends JpaRepository<DmsConfig, UUID> {
     @Query("select c.id from DmsConfig c where c.status = :status and c.nextReminderAt <= :now")
     List<UUID> findIdsDueForReminder(@Param("status") DmsStatus status, @Param("now") LocalDateTime now);
 
-    // B8: cấu hình DMS của nhiều Owner (số ngày chờ để tính hạn xác nhận)
+    // Admin: lấy DMS của nhiều Owner trong 1 query (danh sách user có phân trang; FR-07/FR-14 tính hạn xác nhận)
     List<DmsConfig> findAllByOwnerIdIn(Collection<UUID> ownerIds);
 }

@@ -1,22 +1,14 @@
 // Thành phần giao diện dùng chung cho các trang Beneficiary
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { getUser, logout } from '../auth/auth.js';
 import NotificationBell from './NotificationBell.jsx';
-import UserAvatar from '../Common/UserAvatar.jsx';
+import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 
 export function Icon({ name, className = '' }) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
 // BE trả LocalDateTime dạng "2026-10-16T10:30:00" (không có múi giờ)
-export function formatDate(value, withTime = false) {
-    if (!value) return '—';
-    const d = new Date(value);
-    return withTime
-        ? d.toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
-        : d.toLocaleDateString('en-GB', { dateStyle: 'medium' });
-}
+export { formatDate } from '../i18n/format.js';
 
 export const ASSET_TYPE = {
     BANK_ACCOUNT: { label: 'Bank account', icon: 'account_balance' },
@@ -65,40 +57,13 @@ export const btnPrimary =
 export const btnOutline =
     'h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 
-export function BeneficiaryLayout({ title, subtitle, back, children }) {
-    const navigate = useNavigate();
-    const user = getUser();
-    const handleLogout = () => { logout(); navigate('/login'); };
-
+export function BeneficiaryLayout({ title, subtitle, back, backLabel, children }) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-5xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/home" className="flex items-center gap-2">
-                        <span className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="shield_locked" className="text-[20px]" />
-                        </span>
-                        <span className="font-headline-sm text-primary font-bold text-xl">LegacyVault</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <NotificationBell />
-                        <Link to="/me" className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low" title={user?.email}>
-                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user?.name}</span>
-                        </Link>
-                        <button onClick={handleLogout} className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low">
-                            <Icon name="logout" className="text-[18px]" /> Log out
-                        </button>
-                    </div>
-                </div>
-            </header>
-            <main className="max-w-5xl mx-auto px-5 py-10">
-                <Link to={back || '/home'} className="inline-flex items-center gap-1 text-sm font-semibold text-secondary mb-4">
-                    <Icon name="arrow_back" className="text-[18px]" /> Back
-                </Link>
-                <h1 className="font-headline-md text-headline-md">{title}</h1>
-                {subtitle && <p className="mt-1 text-on-surface-variant">{subtitle}</p>}
-                <div className="mt-8">{children}</div>
+            <AppHeader extra={<NotificationBell />} />
+            <main className={`${PAGE_WIDTH} py-10`}>
+                <PageTitle back={{ to: back || '/home', label: backLabel || 'Back' }} title={title} subtitle={subtitle} />
+                {children}
             </main>
         </div>
     );

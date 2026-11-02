@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * FR-13: ghi nhận "đã xem" trong transaction riêng. Hai request song song của cùng một verifier cùng tạo dòng
- * thì một bên vi phạm unique; transaction riêng giúp bên đó bắt lỗi mà không làm hỏng transaction xem tài liệu.
+ * FR-13: ghi nhận kết quả Check đầu tiên trong transaction riêng. Hai request song song của cùng một verifier cùng tạo dòng
+ * thì một bên vi phạm unique; transaction riêng giúp bên đó bắt lỗi mà không làm hỏng transaction kiểm tra tài liệu.
  */
 @Component
 @RequiredArgsConstructor
@@ -23,11 +23,12 @@ public class ReviewProgressRecorder {
     private final LegalVerificationRequestRepository requestRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordViewed(UUID requestId, UUID verifierId) {
+    public void recordChecked(UUID requestId, UUID verifierId, boolean valid) {
         progressRepository.saveAndFlush(VerificationReviewProgress.builder()
                 .request(requestRepository.getReferenceById(requestId))
                 .verifierId(verifierId)
-                .viewedAt(LocalDateTime.now())
+                .checkedAt(LocalDateTime.now())
+                .documentValid(valid)
                 .build());
     }
 }

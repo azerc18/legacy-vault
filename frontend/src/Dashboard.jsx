@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from './auth/auth.js';
+import LanguageSwitch from './Common/LanguageSwitch.jsx';
 
 // ---------- Nội dung (sửa text ở đây, không cần đụng JSX) ----------
 const NAV = [
@@ -12,7 +13,7 @@ const NAV = [
 
 const BADGES = [
     { icon: 'lock', text: 'AES-256 encryption' },
-    { icon: 'key', text: 'JWT authentication' },
+    { icon: 'verified_user', text: 'Two-step verification' },
     { icon: 'gavel', text: 'Legal verification' },
     { icon: 'favorite', text: "Dead Man's Switch" },
 ];
@@ -104,6 +105,7 @@ export default function Dashboard() {
                         ))}
                     </nav>
                     <div className="flex items-center gap-3">
+                        <LanguageSwitch />
                         <Link to="/login" className="hidden sm:block text-sm font-semibold text-primary">Sign in</Link>
                         <Link to="/register" className="h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold flex items-center hover:bg-primary-container">
                             Get started

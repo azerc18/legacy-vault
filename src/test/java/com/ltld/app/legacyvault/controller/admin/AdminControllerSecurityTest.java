@@ -8,8 +8,10 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
+import com.ltld.app.legacyvault.service.adminuserservice.AdminClaimService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
+import com.ltld.app.legacyvault.service.dmsservice.AdminExecutorRescueService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +48,9 @@ class AdminControllerSecurityTest {
     @MockitoBean private AdminRoleService adminRoleService;
     @MockitoBean private AdminUserService adminUserService;
     @MockitoBean private DmsConfigService dmsConfigService;
+    @MockitoBean private AdminExecutorRescueService adminExecutorRescueService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
+    @MockitoBean private AdminClaimService adminClaimService;
 
     private static RequestPostProcessor token(UUID subject, String... authorities) {
         SimpleGrantedAuthority[] granted = Arrays.stream(authorities)

@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -47,7 +48,7 @@ public class ExecutorSelfServiceImpl implements ExecutorSelfService {
             return List.of();
         }
 
-        // B8: số liệu dashboard cho mọi Owner trong vài truy vấn gộp, để FE không phải gọi thêm từng Owner (N+1).
+        // FR-07/FR-14: số liệu dashboard cho mọi Owner trong vài truy vấn gộp, để FE không phải gọi thêm từng Owner (N+1).
         List<UUID> ownerIds = assignments.stream().map(a -> a.getOwner().getId()).distinct().toList();
         Map<UUID, Long> vaultCountByOwner = toCountMap(vaultRepository.countByOwnerIds(ownerIds));
         Map<UUID, Integer> waitDaysByOwner = new HashMap<>();
@@ -83,9 +84,12 @@ public class ExecutorSelfServiceImpl implements ExecutorSelfService {
         }).toList();
     }
 
-    // B8: hạn xác nhận chỉ có nghĩa khi đã kích hoạt mà chưa xác nhận; tính như BR-03 (kích hoạt + số ngày chờ).
+    // FR-07/FR-14: hạn xác nhận chỉ có với Primary (BR-03 chỉ leo thang Primary) đã kích hoạt mà chưa xác nhận.
+    // Leo thang thật tính từ sentAt của mail kích hoạt (DmsActivationProcessor.escalateIfPrimaryUnresponsive);
+    // ở đây tính từ activatedAt (luôn <= sentAt) nên hạn hiển thị có thể sớm hơn hạn thật, không bao giờ muộn hơn.
     private static LocalDateTime acknowledgeDeadline(ExecutorAssignment a, Integer waitDays) {
-        if (a.getStatus() != ExecutorStatus.ACTIVE || a.getAcknowledgedAt() != null
+        if (a.getExecutorType() != ExecutorType.PRIMARY
+                || a.getStatus() != ExecutorStatus.ACTIVE || a.getAcknowledgedAt() != null
                 || a.getActivatedAt() == null || waitDays == null) {
             return null;
         }

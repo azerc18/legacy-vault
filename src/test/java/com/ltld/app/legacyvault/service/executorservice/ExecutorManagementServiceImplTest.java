@@ -643,6 +643,27 @@ class ExecutorManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("FR-06: danh sách trả acknowledgedAt khi Executor đã xác nhận bàn giao, null khi chưa")
+    void list_returnsAcknowledgedAt() {
+        LocalDateTime acknowledgedAt = LocalDateTime.of(2026, 10, 30, 9, 15);
+        User backupUser = user(UUID.randomUUID(), "backup@example.test", UserStatus.ACTIVE);
+        ExecutorAssignment primary = ExecutorAssignment.builder().id(UUID.randomUUID()).owner(owner)
+                .executorUser(candidate).executorType(ExecutorType.PRIMARY).status(ExecutorStatus.ACTIVE)
+                .activatedAt(acknowledgedAt.minusHours(2)).acknowledgedAt(acknowledgedAt).build();
+        ExecutorAssignment backup = ExecutorAssignment.builder().id(UUID.randomUUID()).owner(owner)
+                .executorUser(backupUser).executorType(ExecutorType.BACKUP).status(ExecutorStatus.ACTIVE)
+                .activatedAt(acknowledgedAt.minusHours(1)).build();
+        when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of(primary, backup));
+
+        List<ExecutorAssignmentResponse> result = service.listExecutors(ownerId);
+
+        assertThat(result.get(0).getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
+        assertThat(result.get(0).getAcknowledgedAt()).isEqualTo(acknowledgedAt);
+        assertThat(result.get(1).getExecutorType()).isEqualTo(ExecutorType.BACKUP);
+        assertThat(result.get(1).getAcknowledgedAt()).isNull();
+    }
+
+    @Test
     @DisplayName("Danh sách: Owner chưa chỉ định ai thì trả danh sách rỗng")
     void list_noAssignments_empty() {
         when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of());

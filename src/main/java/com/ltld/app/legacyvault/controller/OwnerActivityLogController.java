@@ -36,7 +36,7 @@ public class OwnerActivityLogController {
 
         UUID ownerId = UUID.fromString(principal.getName());
 
-        // Khoảng ngày (mặc định 30 ngày, tối đa 1 năm) do service kiểm
+        // Khoảng ngày (mặc định từ đầu đến hiện tại, không giới hạn độ dài) do service kiểm
         if (page < 0) {
             throw new DmsException("Invalid page number (must be >= 0).", HttpStatus.BAD_REQUEST);
         }

@@ -4,8 +4,12 @@ import com.ltld.app.legacyvault.dto.auditdto.VaultActivityLogResponse;
 import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -14,6 +18,10 @@ import java.util.UUID;
  */
 @Component
 public class AuditDescriptionBuilder {
+
+    // FR-05 (Q42): hành động nội bộ của Admin, ẩn khỏi nhật ký Owner và nhật ký Vault
+    public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
+            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN));
 
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
     public VaultActivityLogResponse toResponse(AuditLog log, UUID ownerId) {
@@ -60,7 +68,10 @@ public class AuditDescriptionBuilder {
         return switch (log.getAction()) {
             case VAULT_CREATED -> "Created a new vault.";
             case VAULT_UPDATED -> "Updated vault details.";
-            case VAULT_DELETED -> "Deleted the vault.";
+            // FR-05: detail "name=<tên>" ghi từ deleteVault; log cũ detail null thì không có tên
+            case VAULT_DELETED -> detail != null && detail.startsWith("name=")
+                    ? "Deleted the vault \"" + detail.substring("name=".length()) + "\"."
+                    : "Deleted the vault.";
             case VAULT_DELETE_DENIED -> "Vault deletion denied: " + (detail != null ? detail : "");
             case DOCUMENT_UPLOADED -> "Uploaded a new document.";
             case DOCUMENT_DELETED -> "Deleted a document.";
@@ -68,7 +79,9 @@ public class AuditDescriptionBuilder {
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
             case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
             case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";
+            case BENEFICIARY_REMOVED -> "Removed the vault's beneficiary.";
             case BENEFICIARY_ASSIGN_DENIED -> "Beneficiary assignment denied.";
+            case BENEFICIARY_REMOVE_DENIED -> "Beneficiary removal denied.";
             case BENEFICIARY_LINKED -> "The beneficiary linked their account to the vault.";
             case VAULT_UNLOCK -> "The vault was unlocked after legal verification.";
             case VAULT_ARCHIVED -> "The vault was archived because the claim period expired.";
@@ -104,6 +117,7 @@ public class AuditDescriptionBuilder {
             case DMS_RESUMED -> "An administrator resumed the Dead Man's Switch and started a new check-in cycle.";
             case EXECUTOR_ASSIGNED -> "Assigned an executor.";
             case EXECUTOR_REPLACED -> "Changed the executor.";
+            case EXECUTOR_ASSIGNED_BY_ADMIN -> "An administrator assigned an executor because none was available.";
             // Owner thu hồi luôn ghi actor = Owner; BR-03 (FR-07 tự thu hồi Primary) ghi actor = null
             case EXECUTOR_REVOKE -> log.getActor() == null
                     ? "The system automatically revoked the primary executor for not acknowledging in time."

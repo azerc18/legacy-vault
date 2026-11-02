@@ -43,8 +43,10 @@ export function clearAuth() {
 }
 
 // Xoá local + báo BE thu hồi refresh token (không cần chờ)
+import { resetNamedBeneficiaryCache } from '../Common/useNamedBeneficiary.js';
 export function logout() {
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    resetNamedBeneficiaryCache();
     clearAuth();
 }
 

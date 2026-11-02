@@ -31,19 +31,18 @@ public class VaultActivityLogServiceImpl implements VaultActivityLogService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        // 2. Phân quyền: Chỉ chủ vault mới xem được
+        // 2. Phân quyền: Chỉ chủ vault mới xem được (chống lộ ID bằng 404)
         if (!vault.getOwner().getId().equals(requesterId)) {
-            throw new VaultException("Unauthorized: You don't have permission to view logs for this vault", HttpStatus.FORBIDDEN);
+            throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
-        // N6: Default dates and validation
+        // T-1 / V3: Default dates and validation (mặc định EPOCH, bỏ giới hạn 365 ngày)
         Instant to = endDate != null ? endDate : Instant.now();
-        Instant from = startDate != null ? startDate : to.minus(30, java.time.temporal.ChronoUnit.DAYS);
+        Instant from = startDate != null ? startDate : Instant.EPOCH;
         if (from.isAfter(to)) throw new VaultException("Start date must be before end date.", HttpStatus.BAD_REQUEST);
-        if (java.time.Duration.between(from, to).toDays() > 365) throw new VaultException("The date range must be at most 1 year.", HttpStatus.BAD_REQUEST);
 
-        // 3. Truy vấn logs từ AuditLog (không cần bảng thứ hai)
-        Page<AuditLog> logs = auditLogRepository.findVaultActivity(vaultId, from, to, pageable);
+        // 3. Truy vấn logs từ AuditLog (ẩn các thao tác nội bộ của Admin theo Q42)
+        Page<AuditLog> logs = auditLogRepository.findVaultActivity(vaultId, AuditDescriptionBuilder.OWNER_HIDDEN_ACTIONS, from, to, pageable);
 
         // 4. Map sang Response & Masking Identity (dùng chung với nhật ký cấp Owner)
         return logs.map(log -> descriptionBuilder.toResponse(log, vault.getOwner().getId()));

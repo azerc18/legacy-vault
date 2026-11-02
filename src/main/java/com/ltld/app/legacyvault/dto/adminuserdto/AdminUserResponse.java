@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.dto.adminuserdto;
 
+import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,4 +19,6 @@ public class AdminUserResponse {
     private List<String> roles;
     private Instant createdAt;
     private Instant lastLoginAt;
+    private DmsStatus dmsStatus;
+    private boolean executorRescueNeeded;
 }

@@ -4,6 +4,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import { AdminLayout, ReasonDialog, Pager, isAdmin } from './adminUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 
 const ROLE_LABEL = { OWNER: 'Owner', BENEFICIARY: 'Beneficiary', EXECUTOR: 'Executor', LEGAL_VERIFIER: 'Legal Verifier', ADMIN: 'Admin' };
@@ -12,8 +13,14 @@ const STATUS_CLS = {
     LOCKED: 'bg-error-container text-on-error-container',
     PENDING: 'bg-surface-container text-outline',
 };
+const DMS_BADGE = {
+    ACTIVE: { label: 'DMS active', cls: 'bg-success-container text-on-success-container' },
+    SUSPENDED: { label: 'DMS suspended', cls: 'bg-warning-container text-on-warning-container' },
+    TRIGGERED: { label: 'DMS triggered', cls: 'bg-error-container text-on-error-container' },
+};
 // Role admin được phép cấp/gỡ (khớp MANAGEABLE_ROLES của BE)
 const UNMANAGEABLE = ['OWNER', 'BENEFICIARY', 'EXECUTOR'];
+const HIDDEN_ROLES = ['BENEFICIARY'];
 
 export default function AdminUsers() {
     const me = getUser();
@@ -65,9 +72,12 @@ export default function AdminUsers() {
         if (kind === 'unlock') run(() => adminApi.updateStatus(user.id, 'ACTIVE'), `${user.email} has been unlocked.`);
         if (kind === 'grant') run(() => adminApi.grantRole(user.id, roleCode), `${labelOf(roleCode)} granted to ${user.email}. They need to sign in again.`);
         if (kind === 'revoke') run(() => adminApi.revokeRole(user.id, roleCode), `${labelOf(roleCode)} removed from ${user.email}.`);
-        if (kind === 'suspend') run(() => adminApi.suspendDms(user.id, reason), `Dead Man's Switch of ${user.email} suspended.`);
-        if (kind === 'resume') run(() => adminApi.resumeDms(user.id), `Dead Man's Switch of ${user.email} resumed.`);
-    };
+        if (kind === 'suspend') run(() => adminApi.suspendDms(user.id, reason).then(() => ({ ...user, dmsStatus: 'SUSPENDED' })),
+            `Dead Man's Switch of ${user.email} suspended.`);
+        if (kind === 'resume') run(() => adminApi.resumeDms(user.id).then(() => ({ ...user, dmsStatus: 'ACTIVE' })),
+            `Dead Man's Switch of ${user.email} resumed.`);
+        if (kind === 'rescue') run(() => adminApi.rescueExecutor(user.id, reason).then(() => ({ ...user, executorRescueNeeded: false })),
+            `${reason} is now the executor of ${user.email} and will receive an activation email within a few minutes.`);    };
 
     const search = (e) => { e.preventDefault(); setPage(0); setQuery(filters); };
     const rows = data?.content ?? [];
@@ -78,7 +88,7 @@ export default function AdminUsers() {
                 <input value={filters.q} onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))} placeholder="Search by email or name" className={inputClass} />
                 <select value={filters.role} onChange={(e) => setFilters((f) => ({ ...f, role: e.target.value }))} className={inputClass}>
                     <option value="">All roles</option>
-                    {roles.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+                    {roles.filter((r) => !HIDDEN_ROLES.includes(r.code)).map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
                 </select>
                 <select value={filters.status} onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))} className={inputClass}>
                     <option value="">All statuses</option>
@@ -95,7 +105,7 @@ export default function AdminUsers() {
             <Alert type="success">{success}</Alert>
 
             {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && <p className="text-on-surface-variant">No users found.</p>}
+            {data && rows.length === 0 && <EmptyState bordered icon="person_search" title="No users found" text="Check the spelling, or clear the role and status filters." />}
 
             {rows.length > 0 && (
                 <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
@@ -131,8 +141,9 @@ export default function AdminUsers() {
 }
 
 function UserRow({ u, isMe, manageable, labelOf, onAction }) {
-    const roles = u.roles || [];
-    const isOwner = roles.includes('OWNER');
+    const allRoles = u.roles || [];
+    const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
+    const isOwner = allRoles.includes('OWNER');
     const link = 'text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap';
 
     return (
@@ -177,11 +188,23 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
                         <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>Unlock account</button>
                     )}
                     {/* DMS của Owner: BE không trả trạng thái DMS nên hiện cả 2, BE báo lỗi nếu không hợp lệ */}
-                    {isOwner && (
-                        <span className="flex gap-3">
-                            <button onClick={() => onAction({ kind: 'suspend', user: u })} className={link}>Suspend DMS</button>
-                            <button onClick={() => onAction({ kind: 'resume', user: u })} className={link}>Resume DMS</button>
+                    {/* DMS của Owner: hiện đúng nút theo trạng thái */}
+                    {isOwner && u.dmsStatus && (
+                        <span className={`mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${DMS_BADGE[u.dmsStatus]?.cls || ''}`}>
+                            {DMS_BADGE[u.dmsStatus]?.label || u.dmsStatus}
                         </span>
+                    )}
+                    {isOwner && u.dmsStatus === 'ACTIVE' && (
+                        <button onClick={() => onAction({ kind: 'suspend', user: u })} className={link}>Suspend DMS</button>
+                    )}
+                    {isOwner && u.dmsStatus === 'SUSPENDED' && (
+                        <button onClick={() => onAction({ kind: 'resume', user: u })} className={link}>Resume DMS</button>
+                    )}
+                    {u.executorRescueNeeded && (
+                        <button onClick={() => onAction({ kind: 'rescue', user: u })}
+                                className={`${link} text-error inline-flex items-center gap-1`}>
+                            <Icon name="emergency" className="text-[14px]" /> Assign executor
+                        </button>
                     )}
                 </div>
             </td>
@@ -199,6 +222,11 @@ function dialogText(d, labelOf) {
         case 'revoke': return { title: `Remove ${labelOf(d.roleCode)}?`, message: `${who} will lose ${labelOf(d.roleCode)} access.`, confirmLabel: 'Remove', danger: true };
         case 'suspend': return { title: "Suspend Dead Man's Switch?", message: `The switch of ${who} will stop counting until resumed. The owner cannot resume it.`, confirmLabel: 'Suspend', danger: true, askReason: true };
         case 'resume': return { title: "Resume Dead Man's Switch?", message: `The switch of ${who} will start counting again.`, confirmLabel: 'Resume' };
+        case 'rescue': return {
+            title: 'Assign an emergency executor?',
+            message: `The Dead Man's Switch of ${who} has been triggered, but no executor can act. The person you enter becomes the primary executor immediately and must have a verified LegacyVault account.`,
+            confirmLabel: 'Assign & activate', askEmail: true, placeholder: 'executor@example.com',
+        };
         default: return {};
     }
 }

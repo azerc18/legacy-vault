@@ -2,26 +2,32 @@ import React, { useEffect, useState } from 'react';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
+import EmptyState from "../Common/EmptyState.jsx";
 
 // Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
-// BE mặc định 30 ngày gần nhất, tối đa 1 năm.
+// Không gửi startDate thì BE trả toàn bộ lịch sử, không giới hạn độ dài khoảng ngày. value 0 = "All time".
 const RANGES = [
+    { value: 0, label: 'All time' },
     { value: 30, label: 'Last 30 days' },
     { value: 90, label: 'Last 90 days' },
     { value: 365, label: 'Last 12 months' },
 ];
 
 export default function OwnerActivity() {
-    const [days, setDays] = useState(30);
+    const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
 
     useEffect(() => {
         setError('');
-        const end = new Date();
-        const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-        ownerApi.getOwnerActivityLogs({ startDate: start.toISOString(), endDate: end.toISOString(), page, size: 20 })
+        const range = {};
+        if (days > 0) {
+            const end = new Date();
+            range.startDate = new Date(end.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+            range.endDate = end.toISOString();
+        }
+        ownerApi.getOwnerActivityLogs({ ...range, page, size: 20 })
             .then(setData)
             .catch((e) => setError(getErrorMessage(e, 'Could not load activity.')));
     }, [days, page]);
@@ -42,7 +48,10 @@ export default function OwnerActivity() {
             <Alert>{error}</Alert>
             <Card>
                 {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
-                {data && rows.length === 0 && <p className="text-sm text-on-surface-variant">No activity in this period.</p>}
+                {data && rows.length === 0 && (
+                    <EmptyState compact icon="history" title={days > 0 ? 'No activity in this period' : 'No activity yet'}
+                                text={days > 0 ? 'Choose a longer range above to see older events.' : "Check-ins, Dead Man's Switch changes and executor events will appear here."} />
+                )}
                 {rows.length > 0 && (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">

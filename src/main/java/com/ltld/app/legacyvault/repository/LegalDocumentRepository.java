@@ -27,4 +27,8 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
     // FR-27/FR-20: Đếm số lượng tài liệu trong Vault
     long countByVaultId(UUID vaultId);
+
+    // Chỉ lấy đường dẫn file, không nạp entity (để bulk delete sau đó không để lại entity "mồ côi" trong persistence context)
+    @Query("SELECT d.fileUrlEncrypted FROM LegalDocument d WHERE d.vault.id = :vaultId")
+    List<String> findFileUrlsByVaultId(@Param("vaultId") UUID vaultId);
 }

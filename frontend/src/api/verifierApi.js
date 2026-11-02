@@ -21,7 +21,7 @@ export async function getRequests() {
 // UC12: chi tiết (404 nếu không tồn tại hoặc xung đột lợi ích)
 export const getRequestById = (id) => http.get(`${BASE}/${id}`).then(unwrap);
 
-// UC13 + FR-13: kiểm tra giấy chứng tử (POST, phải đã View trước, nếu không BE trả 409) -> { requestId, valid, message }
+// UC13 + FR-13: kiểm tra giấy chứng tử (POST, bước đầu tiên của hồ sơ PENDING, chưa cần View) -> { requestId, valid, message }
 export const verifyDocument = (id) => http.post(`${BASE}/${id}/document/verify`).then(unwrap);
 
 // D1: tải giấy chứng tử (trả về file, nên cần responseType blob)

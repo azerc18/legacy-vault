@@ -5,5 +5,8 @@ public enum AssetType {
     CRYPTO_WALLET,
     SOCIAL_MEDIA,
     DOCUMENT,
+    EXCHANGE_ACCOUNT,
+    E_WALLET,
+    EMAIL,
     OTHER
 }

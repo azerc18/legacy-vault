@@ -1,0 +1,10 @@
+{
+  "header": { "userHome": "User home", "logout": "Log out" },
+  "actions": { "back": "Back", "save": "Save", "cancel": "Cancel", "confirm": "Confirm", "retry": "Retry" },
+  "language": { "label": "Language", "en": "EN", "vi": "VI" },
+  "claim": {
+    "progress": "Claim progress",
+    "accepted": "{{accepted}}/{{required}} people accepted",
+    "status": { "UNLOCKED": "Waiting for beneficiaries", "CLAIM_STALLED": "Stalled", "CLAIMED": "Completed", "EXPIRED": "Expired" }
+  }
+}

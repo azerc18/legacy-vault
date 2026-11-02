@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 
 public class VerificationRequestClosedException extends BusinessException {
     public VerificationRequestClosedException(String message) {
-        super(message, HttpStatus.CONFLICT);
+        super(message, HttpStatus.CONFLICT, ErrorCode.REQUEST_CLOSED
+        );
     }
 }

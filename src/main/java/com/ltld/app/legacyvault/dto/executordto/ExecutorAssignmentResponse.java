@@ -19,5 +19,7 @@ public class ExecutorAssignmentResponse {
     private String fullName;
     private LocalDateTime assignedAt;
     private LocalDateTime activatedAt;
+    // FR-06: Owner thấy Executor đã xác nhận bàn giao hay chưa (null = chưa xác nhận)
+    private LocalDateTime acknowledgedAt;
     private LocalDateTime revokedAt;
 }

@@ -3,6 +3,8 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,12 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-class VaultRepositoryBeneficiaryEmailCheckIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+class VaultRepositoryBeneficiaryEmailCheckIntegrationTest extends MySqlTestContainer {
 
     @Autowired
     private VaultRepository vaultRepository;
@@ -99,6 +96,23 @@ class VaultRepositoryBeneficiaryEmailCheckIntegrationTest {
                 owner.getId(), "pending.case-" + tag + "@example.com")).isTrue();
     }
 
+    // FR-07/FR-14: dashboard Executor chỉ đếm Vault còn hiệu lực, bỏ Vault ARCHIVED_LOCKED
+    @Test
+    void countByOwnerIds_skipsArchivedLockedVaults() {
+        User owner = user("owner");
+        vault(owner, null, email("a"));
+        Vault archived = vault(owner, null, email("b"));
+        archived.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        vaultRepository.save(archived);
+
+        List<Object[]> rows = vaultRepository.countByOwnerIds(List.of(owner.getId()));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row[0]).isEqualTo(owner.getId());
+            assertThat(row[1]).isEqualTo(1L);
+        });
+    }
+
     // ---------- helpers ----------
 
     private static String email(String name) {
@@ -120,7 +134,7 @@ class VaultRepositoryBeneficiaryEmailCheckIntegrationTest {
         return u;
     }
 
-    private void vault(User owner, User beneficiary, String beneficiaryEmail) {
+    private Vault vault(User owner, User beneficiary, String beneficiaryEmail) {
         Vault v = vaultRepository.save(Vault.builder()
                 .owner(owner)
                 .beneficiary(beneficiary)
@@ -128,5 +142,6 @@ class VaultRepositoryBeneficiaryEmailCheckIntegrationTest {
                 .name("Vault " + UUID.randomUUID().toString().substring(0, 8))
                 .build());
         vaultIds.add(v.getId());
+        return v;
     }
 }

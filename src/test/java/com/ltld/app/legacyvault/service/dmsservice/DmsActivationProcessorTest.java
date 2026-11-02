@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -66,6 +68,7 @@ class DmsActivationProcessorTest {
     @Mock private AuditLogService auditLogService;
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private UserRepository userRepository;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private DmsActivationProcessor processor;
 
@@ -83,7 +86,7 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService, userRepository);
+                auditLogService, executorNotificationService, userRepository, eventPublisher);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -439,6 +442,50 @@ class DmsActivationProcessorTest {
     }
 
     @Test
+    @DisplayName("FR-07 / BR-03: leo thang -> khóa User, gỡ role EXECUTOR của Primary, mail REVOKED_TIMEOUT")
+    void escalate_revokesPrimaryRoleAndMailsPrimary() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
+        primary.getExecutorUser().getRoles().add(executorRole);
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).doesNotContain(executorRole);
+        // Khóa User phải đứng trước câu kiểm tra "còn assignment nào khác không" (cùng điều kiện với FR-06)
+        InOrder lockThenCheck = inOrder(userRepository, executorAssignmentRepository);
+        lockThenCheck.verify(userRepository).findByIdForUpdate(primaryUserId);
+        lockThenCheck.verify(executorAssignmentRepository).existsByExecutorUserIdAndStatusNotAndIdNot(
+                primaryUserId, ExecutorStatus.REVOKED, primary.getId());
+        ArgumentCaptor<ExecutorAssignmentChangedEvent> captor = ArgumentCaptor.forClass(ExecutorAssignmentChangedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().mails()).singleElement().satisfies(mail -> {
+            assertThat(mail.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REVOKED_TIMEOUT);
+            assertThat(mail.recipientEmail()).isEqualTo("primary@example.test");
+            assertThat(mail.waitDays()).isEqualTo(config.getBackupActivationWaitDays());
+        });
+    }
+
+    @Test
+    @DisplayName("FR-07 / BR-03: Primary còn làm Executor cho Owner khác -> giữ role EXECUTOR")
+    void escalate_keepsRoleWhenPrimaryStillAssignedElsewhere() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(14));
+        primary.getExecutorUser().getRoles().add(executorRole);
+        when(executorAssignmentRepository.existsByExecutorUserIdAndStatusNotAndIdNot(
+                primaryUserId, ExecutorStatus.REVOKED, primary.getId())).thenReturn(true);
+
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+
+        assertThat(primary.getExecutorUser().getRoles()).contains(executorRole);
+    }
+
+    @Test
+    @DisplayName("FR-07 / BR-03: chưa leo thang -> không phát mail thu hồi")
+    void escalate_noEscalationPublishesNothing() {
+        primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(13));
+        processor.escalateIfPrimaryUnresponsive(config.getId(), now);
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
     @DisplayName("Chưa đủ 14 ngày -> không leo thang")
     void escalate_doesNothingBeforeFourteenDays() {
         primaryActiveAndNotified(NotificationStatus.SENT, now.minusDays(13));
@@ -704,10 +751,23 @@ class DmsActivationProcessorTest {
         String content = DmsActivationProcessor.activationMessage(owner, backup, 14);
 
         assertThat(content)
-                .contains("within 14 days")
                 .contains("The Dead Man's Switch of owner@example.test has been triggered")
-                .contains("Backup executor")
+                .contains("You are the Backup executor")
                 .contains(backup.getId().toString())
                 .doesNotContain("null");
+    }
+
+    // BR-03 chỉ leo thang Primary: chỉ Primary thấy hạn và câu "chuyển sang Backup"
+    @Test
+    void activationMessage_onlyPrimaryGetsDeadline() {
+        User owner = User.builder().id(ownerId).email("owner@example.test").build();
+
+        assertThat(DmsActivationProcessor.activationMessage(owner, primary, 14))
+                .contains("You are the Primary executor")
+                .contains("within 14 days")
+                .contains("may pass to the Backup executor");
+        assertThat(DmsActivationProcessor.activationMessage(owner, backup, 14))
+                .doesNotContain("within")
+                .doesNotContain("may pass to");
     }
 }

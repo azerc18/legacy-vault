@@ -1,7 +1,8 @@
 import React from 'react';
-import {Link, Navigate, useNavigate} from 'react-router-dom';
-import {getUser, logout} from './auth/auth.js';
-import UserAvatar from './Common/UserAvatar.jsx';   // riêng UserHome.jsx dùng './Common/UserAvatar.jsx'
+import {Link, Navigate} from 'react-router-dom';
+import {getUser} from './auth/auth.js';
+import AppHeader, {PAGE_WIDTH} from './Common/AppHeader.jsx';
+import useNamedBeneficiary from './Common/useNamedBeneficiary.js';
 
 // Mỗi chức năng: role nào thấy, đi tới đâu. to = null => chưa làm, hiện "Coming soon".
 // Làm xong trang nào thì chỉ cần điền đường dẫn vào "to".
@@ -121,52 +122,24 @@ function FeatureCard({f}) {
 }
 
 export default function UserHome() {
-    const navigate = useNavigate();
     const user = getUser();
 
-    // Chưa đăng nhập -> về trang login
-    if (!user) return <Navigate to="/login" replace/>;
-
-    const roles = user.roles?.length ? user.roles : [user.role];
+    const allRoles = user?.roles?.length ? user.roles : [user?.role].filter(Boolean);
+    const namedBeneficiary = useNamedBeneficiary(allRoles.includes('BENEFICIARY'));
+    // Ẩn nhãn + nhóm Beneficiary khi chưa được ai chỉ định (role vẫn còn trong token)
+    const roles = allRoles.filter((r) => r !== 'BENEFICIARY' || namedBeneficiary);
     const groups = roles
         .map((role) => ({role, items: FEATURES.filter((f) => f.role === role)}))
         .filter((g) => g.items.length > 0);
 
-    const handleLogout = () => {
-        logout();
-        navigate('/login');
-    };
+    if (!user) return <Navigate to="/login" replace/>;
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             {/* Top bar */}
-            <header className="bg-surface-container-lowest border-b border-outline-variant/30">
-                <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/home" className="flex items-center gap-2">
-                        <span
-                            className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="shield_locked" className="text-[20px]"/>
-                        </span>
-                        <span className="font-headline-sm text-primary font-bold text-xl">LegacyVault</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <Link to="/me"
-                              className="flex items-center gap-2 h-10 pl-1 pr-3 rounded-xl hover:bg-surface-container-low"
-                              title={user.email}>
-                            <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion}/>
-                            <span className="hidden sm:block text-sm font-semibold text-on-surface">{user.name}</span>
-                        </Link>
-                        <button
-                            onClick={handleLogout}
-                            className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-2 hover:bg-surface-container-low"
-                        >
-                            <Icon name="logout" className="text-[18px]"/> Log out
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <AppHeader/>
 
-            <main className="max-w-6xl mx-auto px-5 py-10">
+            <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
                 <div className="mb-10">
                     <h1 className="font-headline-md text-headline-md">Welcome back, {user.name}</h1>
@@ -189,6 +162,13 @@ export default function UserHome() {
                         </div>
                     </section>
                 ))}
+
+                {allRoles.includes('BENEFICIARY') && namedBeneficiary === false && (
+                    <p className="mb-10 text-sm text-on-surface-variant flex items-center gap-2">
+                        <Icon name="redeem" className="text-[18px] text-outline"/>
+                        You'll see inherited vaults here if someone names you as a beneficiary.
+                    </p>
+                )}
 
                 {groups.length === 0 && (
                     <p className="text-on-surface-variant">No features are available for your account yet.</p>

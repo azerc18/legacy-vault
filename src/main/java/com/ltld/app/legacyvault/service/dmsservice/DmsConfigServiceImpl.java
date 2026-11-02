@@ -172,6 +172,14 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean isHandoverStarted(UUID ownerId) {
+        return dmsConfigRepository.findByOwnerId(ownerId)
+                .map(c -> c.getStatus() == DmsStatus.TRIGGERED)
+                .orElse(false);
+    }
+
+    @Override
     @Transactional
     public DmsConfigResponse suspendByAdmin(UUID ownerId, UUID adminId, String reason) {
         DmsConfig config = findConfigForUpdate(ownerId);

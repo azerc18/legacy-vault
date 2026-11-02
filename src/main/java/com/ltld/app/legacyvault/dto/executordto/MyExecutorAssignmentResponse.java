@@ -15,17 +15,17 @@ import java.util.UUID;
 public class MyExecutorAssignmentResponse {
     private UUID assignmentId;
     private String ownerFullName;
-    // B8: FE hiển thị thay cho ownerFullName khi Owner chưa có tên
+    // FR-07/FR-14: FE hiển thị thay cho ownerFullName khi Owner chưa có tên
     private String ownerEmail;
     private ExecutorType executorType;
     private ExecutorStatus status;
     private LocalDateTime assignedAt;
     private LocalDateTime activatedAt;
     private LocalDateTime acknowledgedAt;
-    // B8: số liệu dashboard, để FE không phải gọi /vaults và /handover-progress cho từng Owner
+    // FR-07/FR-14: số liệu dashboard, để FE không phải gọi /vaults và /handover-progress cho từng Owner
     private long vaultCount;
     private LegalVerificationStatus latestRequestStatus;
     private long unreadMessageCount;
-    // B8: activatedAt + backupActivationWaitDays; null khi chưa kích hoạt hoặc đã xác nhận
+    // FR-07/FR-14: activatedAt + backupActivationWaitDays; chỉ Primary, null khi chưa kích hoạt hoặc đã xác nhận
     private LocalDateTime acknowledgeDeadlineAt;
 }
