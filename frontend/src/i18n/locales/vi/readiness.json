@@ -1,0 +1,29 @@
+{
+    "title": "Điểm sẵn sàng thừa kế",
+    "outOf": "/ {{max}}",
+    "grade": {
+        "EXCELLENT": "Bảo vệ xuất sắc",
+        "GOOD": "Sẵn sàng tốt",
+        "FAIR": "Cần chú ý",
+        "AT_RISK": "Di sản đang gặp rủi ro"
+    },
+    "progress_one": "Đã hoàn thành {{completed}}/{{count}} mốc bảo vệ.",
+    "progress_other": "Đã hoàn thành {{completed}}/{{count}} mốc bảo vệ.",
+    "pendingHint": "Hoàn tất các bước còn lại bên dưới để gia đình bạn nhận di sản số thuận lợi.",
+    "doneHint": "Di sản số của bạn đã sẵn sàng để bàn giao trọn vẹn.",
+    "showFewer": "Thu gọn",
+    "viewAll_one": "Xem tất cả {{count}} tiêu chí",
+    "viewAll_other": "Xem tất cả {{count}} tiêu chí",
+    "points_one": "+{{count}} điểm",
+    "points_other": "+{{count}} điểm",
+    "fixNow": "Khắc phục ngay",
+    "items": {
+        "masterVaultAndAsset": "Tạo két di sản chính và thêm ít nhất 1 tài sản số",
+        "assetBeneficiaryAllocated": "Phân bổ mọi tài sản số đang hoạt động cho ít nhất một người thụ hưởng",
+        "legalWillDocument": "Tải lên Di chúc cho các tài sản ngân hàng và tài sản cần hồ sơ pháp lý",
+        "executorsAssigned": "Chỉ định cả người thi hành chính và người thi hành dự phòng",
+        "dmsActive": "Bật Dead Man's Switch",
+        "safetyNetConfigured": "Cấu hình thời gian ân hạn nhắc nhiều lần cho DMS và lớp bảo vệ dự phòng",
+        "recentReview": "Rà soát hoặc check-in hồ sơ di sản trong 6 tháng gần nhất"
+    }
+}

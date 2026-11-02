@@ -45,4 +45,8 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
                                                     @Param("vaultIds") Collection<UUID> vaultIds);
 
     long countByVaultId(UUID vaultId);   // N2-owner: PUT cũ chỉ hợp lệ khi vault có ≤ 1 người
+
+    // F1: id các vault của Owner có ít nhất 1 người thụ hưởng (một query cho cả Owner, tránh N+1)
+    @Query("SELECT DISTINCT b.vault.id FROM VaultBeneficiary b WHERE b.vault.owner.id = :ownerId")
+    List<UUID> findVaultIdsWithBeneficiaryByOwnerId(@Param("ownerId") UUID ownerId);
 }
