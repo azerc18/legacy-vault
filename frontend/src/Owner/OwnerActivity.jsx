@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
@@ -13,12 +14,8 @@ const RANGES = [
     { value: 365, label: 'Last 12 months' },
 ];
 
-const TABS = [
-    { id: 'dms', label: 'DMS & Executor Events' },
-    { id: 'access', label: 'Who Accessed My Estate' },
-];
-
 export default function OwnerActivity() {
+    const { t } = useTranslation('accessLog');
     const [tab, setTab] = useState('dms');
     const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
@@ -43,11 +40,16 @@ export default function OwnerActivity() {
     const rows = data?.content ?? [];
     const totalPages = data?.totalPages ?? 0;
 
+    const tabs = [
+        { id: 'dms', label: 'DMS & Executor Events' },
+        { id: 'access', label: t('tab', 'Who Accessed My Estate') },
+    ];
+
     return (
         <OwnerLayout
             title="Activity log"
             subtitle={tab === 'access'
-                ? 'Transparency log showing every time an Executor, Beneficiary, Admin, or Emergency Access viewed or downloaded your vaults, assets, or legal documents.'
+                ? t('subtitle', 'Transparency log showing every time an Executor, Beneficiary, Admin, or Emergency Access viewed or downloaded your vaults, assets, or legal documents.')
                 : "Dead Man's Switch and executor events. Vault-specific events are in each vault's page."}
             actions={
                 <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
@@ -56,18 +58,18 @@ export default function OwnerActivity() {
             }
         >
             <div className="flex gap-2 mb-4 border-b border-outline-variant/20 pb-2">
-                {TABS.map((t) => (
+                {tabs.map((tabItem) => (
                     <button
-                        key={t.id}
+                        key={tabItem.id}
                         type="button"
-                        onClick={() => { setTab(t.id); setPage(0); }}
+                        onClick={() => { setTab(tabItem.id); setPage(0); }}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                            tab === t.id
+                            tab === tabItem.id
                                 ? 'bg-secondary text-on-secondary'
                                 : 'text-on-surface-variant hover:bg-surface-container-high'
                         }`}
                     >
-                        {t.label}
+                        {tabItem.label}
                     </button>
                 ))}
             </div>
@@ -76,11 +78,11 @@ export default function OwnerActivity() {
                 {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
                 {data && rows.length === 0 && (
                     <EmptyState compact icon={tab === 'access' ? 'visibility' : 'history'}
-                                title={days > 0 ? 'No activity in this period' : (tab === 'access' ? 'No external access recorded yet' : 'No activity yet')}
+                                title={days > 0 ? 'No activity in this period' : (tab === 'access' ? t('emptyTitle', 'No external access recorded yet') : 'No activity yet')}
                                 text={days > 0
                                     ? 'Choose a longer range above to see older events.'
                                     : (tab === 'access'
-                                        ? 'When an Executor, Beneficiary, Admin, or Emergency Access views your vault, assets, or documents, it will be recorded here.'
+                                        ? t('emptyText', 'When an Executor, Beneficiary, Admin, or Emergency Access views your vault, assets, or documents, it will be recorded here.')
                                         : "Check-ins, Dead Man's Switch changes and executor events will appear here.")} />
                 )}
                 {rows.length > 0 && (

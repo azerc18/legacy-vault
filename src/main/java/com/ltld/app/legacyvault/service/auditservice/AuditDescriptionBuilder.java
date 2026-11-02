@@ -26,14 +26,11 @@ public class AuditDescriptionBuilder {
     // F6: Danh sách các hành động truy cập được hiển thị minh bạch trong tab "Who accessed" của Owner
     public static final Set<AuditAction> ESTATE_ACCESS_ACTIONS = Collections.unmodifiableSet(EnumSet.of(
             AuditAction.ADMIN_VAULT_VIEWED,
-            AuditAction.EXECUTOR_VAULT_VIEWED,
-            AuditAction.EMERGENCY_ACCESS_GRANTED,
-            AuditAction.ASSET_ACCESSED,
-            AuditAction.ASSET_SECRET_REVEALED,
             AuditAction.ASSET_VIEWED,
             AuditAction.ASSET_DOWNLOADED,
-            AuditAction.DOCUMENT_DOWNLOADED,
-            AuditAction.LEGAL_DOCUMENT_VIEWED
+            AuditAction.LEGAL_DOCUMENT_VIEWED,
+            AuditAction.VERIFICATION_ATTACHMENT_VIEWED,
+            AuditAction.DOSSIER_DOWNLOADED
     ));
 
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
@@ -89,10 +86,6 @@ public class AuditDescriptionBuilder {
             case DOCUMENT_UPLOADED -> "Uploaded a new document.";
             case DOCUMENT_DELETED -> "Deleted a document.";
             case ADMIN_VAULT_VIEWED -> "An administrator viewed the vault details.";
-            case EXECUTOR_VAULT_VIEWED -> "The executor viewed the vault overview.";
-            case EMERGENCY_ACCESS_GRANTED -> "Emergency time-lock access was granted to the executor.";
-            case ASSET_ACCESSED -> "Accessed a handed-over digital asset.";
-            case ASSET_SECRET_REVEALED -> "Revealed the encrypted secret of a digital asset.";
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
             case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
             case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";
@@ -111,6 +104,8 @@ public class AuditDescriptionBuilder {
             case ASSET_DELETED -> "Deleted a digital asset.";
             case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Document download failed." : "Downloaded a document.";
             case LEGAL_DOCUMENT_VIEWED -> "A legal verifier viewed the uploaded legal document.";
+            case VERIFICATION_ATTACHMENT_VIEWED -> "Viewed a verification message attachment.";
+            case DOSSIER_DOWNLOADED -> "The beneficiary downloaded the inheritance dossier.";
             case LEGAL_VERIFICATION_REQUESTED -> "Submitted a legal verification request.";
             case LEGAL_REQUEST_REOPENED -> "The verification request missed its signing deadline and was returned to the review queue.";
             // FR-16: detail chứa email người nhận, không được hiển thị

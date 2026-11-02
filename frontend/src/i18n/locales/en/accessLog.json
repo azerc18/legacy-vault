@@ -1,0 +1,10 @@
+{
+  "tab": "Who Accessed My Estate",
+  "tabLabel": "Who Accessed My Estate",
+  "title": "Who Accessed My Estate",
+  "subtitle": "Transparency log showing every time an Executor, Beneficiary, Admin, or Emergency Access viewed or downloaded your vaults, assets, or legal documents.",
+  "emptyTitle": "No external access recorded yet",
+  "emptyText": "When an Executor, Beneficiary, Admin, or Emergency Access views your vault, assets, or documents, it will be recorded here.",
+  "empty_title": "No external access recorded yet",
+  "empty_text": "When an Executor, Beneficiary, Admin, or Emergency Access views your vault, assets, or documents, it will be recorded here."
+}
