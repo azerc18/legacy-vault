@@ -68,11 +68,18 @@ class PublicCallbackSecurityTest {
                 .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"/api/dms/checkin-link", "/api/dms/confirm"})
-    void dmsEmailLink_postWithoutToken_isNotBlockedBySecurity(String path) throws Exception {
-        mockMvc.perform(post(path))
+    @Test
+    void dmsCheckinLink_postWithoutToken_isNotBlockedBySecurity() throws Exception {
+        mockMvc.perform(post("/api/dms/checkin-link"))
                 .andExpect(notBlockedBySecurity());
+    }
+
+    @Test
+    void dmsConfirm_postWithoutToken_returns401() throws Exception {
+        // m2: /api/dms/confirm chưa được mở; X2 sẽ tự thêm permitAll cùng controller của nó
+        mockMvc.perform(post("/api/dms/confirm"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
     }
 
     @Test
