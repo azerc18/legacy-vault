@@ -128,6 +128,26 @@ public class EmailSender {
         sendWithoutOtpFooter(email, "Digital assets handed over to you - LegacyVault", body.toString());
     }
 
+    // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi việc nhận tài sản
+    @Async
+    public void sendBeneficiaryClaimReminder(String email, String fullName, String ownerName, String vaultName,
+                                             LocalDateTime claimDeadlineAt, UUID vaultId) {
+        StringBuilder body = new StringBuilder()
+                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
+                .append("This is a reminder from the executor of ").append(ownerName)
+                .append(": the vault \"").append(vaultName)
+                .append("\" has been handed over to you and is still waiting for your response on LegacyVault.\n\n");
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            body.append("Open the vault: ").append(link).append("\n\n");
+        }
+        body.append("Please sign in, verify your identity, then accept or decline the assets allocated to you.\n")
+                .append("Claim deadline: ").append(formatDeadline(claimDeadlineAt)).append(" (GMT+7).\n\n")
+                .append("Please do not share this email with anyone.");
+
+        sendWithoutOtpFooter(email, "Reminder: assets waiting for you - LegacyVault", body.toString());
+    }
+
     public void sendVerificationRequestNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
                 "New verification request - LegacyVault",
