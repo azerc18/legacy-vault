@@ -84,6 +84,14 @@ export const executorApi = {
         downloadBlob(
             `${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
             fileName || 'attachment'),
+    // N2-exec: tiến độ nhận tài sản của từng người thụ hưởng trong một vault đã mở khoá
+    // -> [{ vaultBeneficiaryId, fullName, maskedEmail, relationship, status, respondedAt, claimedAt,
+    //       lastReminderAt, nextReminderAllowedAt, canRemind }]
+    getBeneficiaryProgress: (assignmentId, vaultId) =>
+        http.get(`${BASE}/${assignmentId}/vaults/${vaultId}/beneficiaries`).then((r) => unwrap(r) ?? []),
+    // N2-exec: nhắc một người chưa phản hồi (1 lần/24h, 429 REMINDER_TOO_SOON) -> dòng tiến độ mới
+    remindBeneficiary: (assignmentId, vaultId, vaultBeneficiaryId) =>
+        http.post(`${BASE}/${assignmentId}/vaults/${vaultId}/beneficiaries/${vaultBeneficiaryId}/reminders`).then(unwrap),
     // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
@@ -107,4 +115,12 @@ export const HANDOVER_LABEL = {
     UNLOCKED: { label: 'Unlocked for beneficiary', cls: 'bg-success-container text-on-success-container' },
     CLAIMED: { label: 'Received by beneficiary', cls: 'bg-success-container text-on-success-container' },
     ARCHIVED_LOCKED: { label: 'Expired', cls: 'bg-surface-container text-outline' },
+};
+
+// N2-exec: trạng thái nhận tài sản của từng người thụ hưởng
+export const CLAIM_PROGRESS_LABEL = {
+    PENDING: { label: 'Waiting for response', cls: 'bg-warning-container text-on-warning-container' },
+    ACCEPTED: { label: 'Accepted', cls: 'bg-success-container text-on-success-container' },
+    DECLINED: { label: 'Declined', cls: 'bg-error-container text-on-error-container' },
+    FALLBACK_APPLIED: { label: 'Declined - passed to backup', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
 };
