@@ -16,6 +16,9 @@ public interface DocumentService {
     // X5: Tải lên phiên bản mới cho nhóm tài liệu đã có (hoặc tài liệu mới nếu documentGroupId == null)
     LegalDocument uploadDocument(UUID ownerId, UUID vaultId, DocumentType type, MultipartFile file, UUID documentGroupId) throws Exception;
 
+    // X5 (m5): Dựng DocumentResponse từ entity với totalVersions thực tế trong DB
+    DocumentResponse toResponse(LegalDocument document);
+
     // Lấy danh sách tài liệu hiện hành của Vault (is_current = true)
     List<DocumentResponse> getDocumentsByVault(UUID vaultId, UUID ownerId);
 

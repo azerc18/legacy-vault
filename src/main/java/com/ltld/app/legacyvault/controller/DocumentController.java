@@ -48,17 +48,7 @@ public class DocumentController {
                 ? documentService.uploadDocument(ownerId, vaultId, type, file)
                 : documentService.uploadDocument(ownerId, vaultId, type, file, documentGroupId);
 
-        DocumentResponse response = DocumentResponse.builder()
-                .id(document.getId())
-                .vaultId(document.getVault() != null ? document.getVault().getId() : vaultId)
-                .documentGroupId(document.getDocumentGroupId())
-                .documentType(document.getDocumentType())
-                .fileName(document.getFileName())
-                .uploadedAt(document.getUploadedAt())
-                .version(document.getVersion() > 0 ? document.getVersion() : 1)
-                .isCurrent(document.isCurrent())
-                .totalVersions(document.getVersion() > 0 ? document.getVersion() : 1)
-                .build();
+        DocumentResponse response = documentService.toResponse(document);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Document uploaded and encrypted securely", response));

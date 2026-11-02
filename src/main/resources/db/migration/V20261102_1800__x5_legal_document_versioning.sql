@@ -2,7 +2,7 @@
 ALTER TABLE `legal_documents`
   ADD COLUMN `document_group_id` binary(16) DEFAULT NULL AFTER `id`,
   ADD COLUMN `version` int NOT NULL DEFAULT 1 AFTER `file_url_encrypted`,
-  ADD COLUMN `is_current` boolean NOT NULL DEFAULT TRUE AFTER `version`;
+  ADD COLUMN `is_current` bit(1) NOT NULL DEFAULT b'1' AFTER `version`;
 
 -- Backfill dữ liệu cũ: mỗi tài liệu đã có thành bản version 1 của chính nó
 UPDATE `legal_documents` SET `document_group_id` = `id` WHERE `document_group_id` IS NULL;

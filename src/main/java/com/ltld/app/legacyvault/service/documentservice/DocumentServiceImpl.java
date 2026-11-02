@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -99,9 +100,10 @@ public class DocumentServiceImpl implements DocumentService {
         // FR-04: Áp dụng quy tắc chặn sửa đổi Vault dùng chung (ACTIVE, DMS triggered, hồ sơ xác minh mở)
         vaultModificationGuard.ensureModifiable(vault);
 
-        // 2. Xác định document_group_id và version theo nghiệp vụ X5
+        // 2. Xác định document_group_id, version và loại tài liệu theo nghiệp vụ X5
         UUID targetGroupId;
         int targetVersion = 1;
+        DocumentType effectiveType = type;
 
         if (documentGroupId == null) {
             // Tài liệu mới hoàn toàn -> sinh group id mới, version = 1
@@ -111,8 +113,11 @@ public class DocumentServiceImpl implements DocumentService {
             // Bắt buộc nhóm này phải tồn tại trong đúng vault này
             List<LegalDocument> existingGroupDocs = legalDocumentRepository.findByDocumentGroupIdOrderByVersionDesc(documentGroupId);
             if (existingGroupDocs.isEmpty() || !existingGroupDocs.get(0).getVault().getId().equals(vaultId)) {
-                throw new VaultException("Nhóm tài liệu không tồn tại trong két này.", HttpStatus.NOT_FOUND);
+                throw new VaultException("Document group not found in this vault", HttpStatus.NOT_FOUND);
             }
+
+            // m2: Giữ nguyên loại tài liệu của nhóm (bỏ qua type gửi lên nếu khác)
+            effectiveType = existingGroupDocs.get(0).getDocumentType();
 
             // Tính version tiếp theo = max(version hiện có) + 1
             targetVersion = existingGroupDocs.get(0).getVersion() + 1;
@@ -137,7 +142,7 @@ public class DocumentServiceImpl implements DocumentService {
         LegalDocument document = LegalDocument.builder()
                 .documentGroupId(targetGroupId)
                 .vault(vault)
-                .documentType(type)
+                .documentType(effectiveType)
                 .fileUrlEncrypted(fileUrl) // Đường dẫn trên ổ cứng/cloud
                 .fileName(file.getOriginalFilename()) // Tên file lúc khách hàng chọn upload
                 .version(targetVersion)
@@ -150,8 +155,15 @@ public class DocumentServiceImpl implements DocumentService {
         auditLogService.log(AuditAction.DOCUMENT_UPLOADED, AuditResult.SUCCESS,
                 ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "Vault", vault.getId().toString(),
-                "Document ID: " + (saved.getId() != null ? saved.getId().toString() : "new") + " (v" + saved.getVersion() + ", group: " + targetGroupId + ")");
+                "Document ID: " + saved.getId() + " (v" + saved.getVersion() + ", group: " + targetGroupId + ")");
         return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentResponse toResponse(LegalDocument document) {
+        long totalVersions = Math.max(1L, legalDocumentRepository.countByDocumentGroupId(document.getDocumentGroupId()));
+        return toResponse(document, totalVersions);
     }
 
     @Override
@@ -163,29 +175,19 @@ public class DocumentServiceImpl implements DocumentService {
             throw new VaultException("Vault not found", HttpStatus.NOT_FOUND);
         }
 
-        // X5: Danh sách tài liệu hiện hành của Vault (lọc is_current = true)
-        return legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)
-                .stream()
-                .filter(LegalDocument::isCurrent)
+        // X5 (m3): Chỉ đọc các bản hiện hành + đếm số phiên bản của từng nhóm trong 1 query
+        List<LegalDocument> currentDocs = legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vaultId);
+        Map<UUID, Long> countByGroup = new HashMap<>();
+        for (Object[] row : legalDocumentRepository.countVersionsByGroup(vaultId)) {
+            if (row != null && row.length >= 2 && row[0] instanceof UUID groupId && row[1] instanceof Number cnt) {
+                countByGroup.put(groupId, cnt.longValue());
+            }
+        }
+
+        return currentDocs.stream()
                 .map(doc -> {
-                    long totalVersions = doc.getDocumentGroupId() != null
-                            ? legalDocumentRepository.countByDocumentGroupId(doc.getDocumentGroupId())
-                            : 1L;
-                    if (totalVersions <= 0) {
-                        totalVersions = 1L;
-                    }
-                    return DocumentResponse.builder()
-                            .id(doc.getId())
-                            .vaultId(vaultId)
-                            .documentGroupId(doc.getDocumentGroupId())
-                            .documentType(doc.getDocumentType())
-                            .fileName(doc.getFileName())
-                            .uploadedAt(doc.getUploadedAt())
-                            .version(doc.getVersion() > 0 ? doc.getVersion() : 1)
-                            .isCurrent(doc.isCurrent())
-                            .totalVersions(totalVersions)
-                            .archived(vault.getStatus() == VaultStatus.ARCHIVED_LOCKED)
-                            .build();
+                    long totalVersions = Math.max(1L, countByGroup.getOrDefault(doc.getDocumentGroupId(), 1L));
+                    return toResponse(doc, totalVersions);
                 })
                 .toList();
     }
@@ -201,23 +203,12 @@ public class DocumentServiceImpl implements DocumentService {
 
         List<LegalDocument> versions = legalDocumentRepository.findByDocumentGroupIdOrderByVersionDesc(documentGroupId);
         if (versions.isEmpty() || !versions.get(0).getVault().getId().equals(vaultId)) {
-            throw new VaultException("Nhóm tài liệu không tồn tại trong két này.", HttpStatus.NOT_FOUND);
+            throw new VaultException("Document group not found in this vault", HttpStatus.NOT_FOUND);
         }
 
         long totalVersions = versions.size();
         return versions.stream()
-                .map(doc -> DocumentResponse.builder()
-                        .id(doc.getId())
-                        .vaultId(vaultId)
-                        .documentGroupId(doc.getDocumentGroupId())
-                        .documentType(doc.getDocumentType())
-                        .fileName(doc.getFileName())
-                        .uploadedAt(doc.getUploadedAt())
-                        .version(doc.getVersion())
-                        .isCurrent(doc.isCurrent())
-                        .totalVersions(totalVersions)
-                        .archived(vault.getStatus() == VaultStatus.ARCHIVED_LOCKED)
-                        .build())
+                .map(doc -> toResponse(doc, totalVersions))
                 .toList();
     }
 
@@ -295,28 +286,37 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         // M2a & M2b: Xóa file vật lý SAU KHI transaction commit thành công
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    try {
-                        fileStorageService.deleteFile(fileUrl);
-                    } catch (RuntimeException e) {
-                        log.warn("FR-04: document {} deleted but file not removed: {}", documentId, e.getMessage());
-                    }
+        // Nếu lỗi xóa file vật lý -> chỉ log warning, không để ném exception làm request trả 500
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    fileStorageService.deleteFile(fileUrl);
+                } catch (RuntimeException e) {
+                    log.warn("FR-04: document {} deleted but file not removed: {}", documentId, e.getMessage());
                 }
-            });
-        } else {
-            try {
-                fileStorageService.deleteFile(fileUrl);
-            } catch (RuntimeException e) {
-                log.warn("FR-04: document {} deleted but file not removed: {}", documentId, e.getMessage());
             }
-        }
+        });
 
         auditLogService.log(AuditAction.DOCUMENT_DELETED, AuditResult.SUCCESS,
                 ownerId, vault.getOwner().getEmail(), vault.getId(),
                 "LegalDocument", documentId.toString(), null);
+    }
+
+    private DocumentResponse toResponse(LegalDocument doc, long totalVersions) {
+        Vault vault = doc.getVault();
+        return DocumentResponse.builder()
+                .id(doc.getId())
+                .vaultId(vault.getId())
+                .documentGroupId(doc.getDocumentGroupId())
+                .documentType(doc.getDocumentType())
+                .fileName(doc.getFileName())
+                .uploadedAt(doc.getUploadedAt())
+                .version(doc.getVersion())
+                .current(doc.isCurrent())
+                .totalVersions(totalVersions)
+                .archived(vault.getStatus() == VaultStatus.ARCHIVED_LOCKED)
+                .build();
     }
 
     private String resolveContentType(String fileName) {

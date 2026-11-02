@@ -59,4 +59,15 @@ public class LegalDocument {
     @CreationTimestamp
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private LocalDateTime uploadedAt;
+
+    // X5 (M1): Tài liệu tạo không qua DocumentService (dữ liệu test, import) vẫn có nhóm riêng của nó
+    @PrePersist
+    void defaultDocumentGroup() {
+        if (documentGroupId == null) {
+            documentGroupId = UUID.randomUUID();
+        }
+        if (version <= 0) {
+            version = 1;
+        }
+    }
 }

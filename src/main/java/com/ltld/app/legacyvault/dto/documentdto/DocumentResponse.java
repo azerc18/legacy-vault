@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.dto.documentdto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ltld.app.legacyvault.enums.DocumentType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,7 +22,9 @@ public class DocumentResponse {
     private String fileName;
     private LocalDateTime uploadedAt;
     private int version;
-    private boolean isCurrent;
+    /** X5 (m1): Xuất JSON là "isCurrent" (khớp cột DB is_current và FE v.isCurrent). */
+    @JsonProperty("isCurrent")
+    private boolean current;
     private long totalVersions;
     /** true khi Vault ở trạng thái ARCHIVED_LOCKED — FE dùng để ẩn nút tải tài liệu. */
     private boolean archived;
