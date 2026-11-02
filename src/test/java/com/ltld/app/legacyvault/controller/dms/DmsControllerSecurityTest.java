@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -118,6 +119,29 @@ class DmsControllerSecurityTest {
         when(dmsConfigService.checkIn(any())).thenReturn(DmsConfigResponse.builder().build());
 
         mockMvc.perform(post("/api/dms/check-in").with(token("ROLE_OWNER")))
+                .andExpect(status().isOk());
+    }
+
+    // ---------- GET /api/dms/check-ins ----------
+
+    @Test
+    void getCheckins_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/dms/check-ins"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void getCheckins_beneficiaryOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/dms/check-ins").with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isForbidden());
+        verify(dmsConfigService, never()).getCheckins(any(), any());
+    }
+
+    @Test
+    void getCheckins_owner_returns200() throws Exception {
+        when(dmsConfigService.getCheckins(any(), any())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/dms/check-ins").with(token("ROLE_OWNER")))
                 .andExpect(status().isOk());
     }
 }
