@@ -9,6 +9,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
@@ -25,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -122,5 +125,29 @@ class AdminExecutorRescueServiceImplTest {
             assertThat(m.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REPLACED_BY_ADMIN);
             assertThat(m.recipientEmail()).isEqualTo("backup@example.test");
         });
+    }
+
+    // N2-Q26: email là một trong các beneficiary trong vault_beneficiaries -> 409 BENEFICIARY_CONFLICT
+    @Test
+    void rescue_candidateInVaultBeneficiaries_throwsBeneficiaryConflict() {
+        User oldPrimaryUser = user("oldprimary@example.test");
+        User candidate = user("ben2@example.test");
+        ExecutorAssignment primary = assignment(ExecutorType.PRIMARY, ExecutorStatus.REVOKED, oldPrimaryUser,
+                LocalDateTime.now().minusDays(40));
+
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(triggeredConfig()));
+        when(executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId)).thenReturn(List.of(primary));
+        when(userRepository.findByEmail("ben2@example.test")).thenReturn(Optional.of(candidate));
+        when(vaultRepository.existsBeneficiaryWithEmail(ownerId, "ben2@example.test")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.rescue(adminId, ownerId, "ben2@example.test"))
+                .isInstanceOf(DmsException.class)
+                .satisfies(e -> {
+                    DmsException ex = (DmsException) e;
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.BENEFICIARY_CONFLICT);
+                });
+
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
     }
 }
