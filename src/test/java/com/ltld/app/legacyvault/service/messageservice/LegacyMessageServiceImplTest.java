@@ -202,6 +202,26 @@ class LegacyMessageServiceImplTest {
     }
 
     @Test
+    @DisplayName("Tệp đính kèm vượt quá giới hạn 10MB ném lỗi FILE_TOO_LARGE")
+    void createMessage_AttachmentExceeds10MB_Throws() {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+
+        MockMultipartFile largeFile = new MockMultipartFile(
+                "attachment", "large.mp4", "video/mp4", new byte[10 * 1024 * 1024 + 1]);
+
+        CreateLegacyMessageRequest request = CreateLegacyMessageRequest.builder()
+                .title("Too large")
+                .content("Test")
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.ON_CLAIM)
+                .build();
+
+        assertThatThrownBy(() -> messageService.createMessage(ownerId, vaultId, request, largeFile))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Attachment size exceeds 10MB limit");
+    }
+
+    @Test
     @DisplayName("Người không sở hữu Vault gọi API ném lỗi 403 FORBIDDEN")
     void createMessage_NotVaultOwner_Throws() {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));

@@ -265,7 +265,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             </div>
 
                             <div>
-                                <label className="block font-medium mb-1">Attachment (Photo, Audio, Video, PDF - up to 25MB)</label>
+                                <label className="block font-medium mb-1">Attachment (Photo, Audio, Video, PDF - up to 10MB)</label>
                                 {editing?.hasAttachment && (
                                     <div className="mb-2 flex items-center gap-2 text-xs text-on-surface-variant">
                                         <input type="checkbox" id="keepAtt" checked={keepAttachment}
@@ -275,7 +275,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 )}
                                 <FilePicker file={file} onChange={setFile}
                                     accept="image/*,video/*,audio/*,application/pdf"
-                                    maxSize={25 * 1024 * 1024} />
+                                    maxSize={10 * 1024 * 1024} />
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
@@ -346,3 +346,4 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
         </Card>
     );
 }
+

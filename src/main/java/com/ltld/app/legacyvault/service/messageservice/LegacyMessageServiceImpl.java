@@ -39,7 +39,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class LegacyMessageServiceImpl implements LegacyMessageService {
 
-    private static final long MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024L; // 25MB
+    private static final long MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024L; // 10MB
 
     private final LegacyMessageRepository legacyMessageRepository;
     private final VaultRepository vaultRepository;
@@ -331,7 +331,7 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     private void validateAttachment(MultipartFile file) {
         if (file.getSize() > MAX_ATTACHMENT_SIZE) {
-            throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "Attachment size exceeds 25MB limit");
+            throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "Attachment size exceeds 10MB limit");
         }
         String filename = file.getOriginalFilename();
         if (filename != null) {
