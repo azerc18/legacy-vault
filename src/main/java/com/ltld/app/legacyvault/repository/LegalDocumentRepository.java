@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @Repository
 public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UUID> {
-    //Hàm này giúp lấy toàn bộ tài liệu pháp lý nằm trong 1 két sắt
+    // Hàm này giúp lấy toàn bộ tài liệu pháp lý nằm trong 1 két sắt
     List<LegalDocument> findByVaultId(UUID vaultid);
 
     // FR-18 (phần 2): lấy 1 tài liệu, bắt buộc thuộc đúng vault để không tải nhầm tài liệu của vault khác
@@ -23,9 +23,28 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
     // FR-18 (phần 2): danh sách có thứ tự ổn định (mới nhất trước)
     List<LegalDocument> findByVaultIdOrderByUploadedAtDescIdDesc(UUID vaultId);
 
+    // X5: Danh sách tài liệu hiện hành của một Vault (chỉ các bản isCurrent = true)
+    List<LegalDocument> findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(UUID vaultId);
+
+    // X5: Lấy toàn bộ lịch sử phiên bản của một nhóm tài liệu (mới nhất trước)
+    List<LegalDocument> findByDocumentGroupIdOrderByVersionDesc(UUID documentGroupId);
+
+    // X5: Tìm bản hiện hành của một nhóm tài liệu
+    Optional<LegalDocument> findByDocumentGroupIdAndIsCurrentTrue(UUID documentGroupId);
+
+    // X5: Tìm bản hiện hành của một nhóm tài liệu thuộc đúng vault
+    Optional<LegalDocument> findByVaultIdAndDocumentGroupIdAndIsCurrentTrue(UUID vaultId, UUID documentGroupId);
+
+    // X5: Tìm bản có version cao nhất trong một nhóm tài liệu
+    Optional<LegalDocument> findFirstByDocumentGroupIdOrderByVersionDesc(UUID documentGroupId);
+
+    // X5: Đếm tổng số phiên bản của một nhóm tài liệu
+    long countByDocumentGroupId(UUID documentGroupId);
+
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM LegalDocument d WHERE d.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
     // FR-27/FR-20: Đếm số lượng tài liệu trong Vault
     long countByVaultId(UUID vaultId);
 
