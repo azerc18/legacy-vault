@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi, needsReplaceConfirm } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
 
+// Tiêu đề/mô tả ở executors.positions.<type> (namespace dms)
 const POSITIONS = [
-    { type: 'PRIMARY', title: 'Primary Executor', text: 'Notified first when your Dead Man\'s Switch triggers.' },
-    { type: 'BACKUP', title: 'Backup Executor', text: 'Takes over if the primary does not respond within 14 days.' },
+    { type: 'PRIMARY' },
+    { type: 'BACKUP' },
 ];
 
+// Nhãn ở executors.status.<STATUS>
 const STATUS = {
-    INACTIVE: { label: 'Assigned', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
-    ACTIVE: { label: 'Activated', cls: 'bg-success-container text-on-success-container' },
+    INACTIVE: { cls: 'bg-secondary-fixed text-on-secondary-fixed' },
+    ACTIVE: { cls: 'bg-success-container text-on-success-container' },
 };
 
 export default function OwnerExecutors() {
+    const { t } = useTranslation('dms');
     const user = getUser();
     const [list, setList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -24,10 +28,10 @@ export default function OwnerExecutors() {
     const load = () =>
         ownerApi.listExecutors()
             .then((l) => setList(l ?? []))
-            .catch((err) => setError(getErrorMessage(err, 'Could not load executors.')))
+            .catch((err) => setError(getErrorMessage(err, t('executors.errors.load'))))
             .finally(() => setLoading(false));
 
-    useEffect(() => { load(); }, []);
+    useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ tải lần đầu
 
     if (!user) return <Navigate to="/login" replace />;
 
@@ -35,9 +39,9 @@ export default function OwnerExecutors() {
     const current = (type) => list.find((a) => a.executorType === type && a.status !== 'REVOKED') || null;
 
     return (
-        <OwnerLayout title="Executors" subtitle="Trusted people who handle the hand-over. They must have a verified LegacyVault account.">
+        <OwnerLayout title={t('executors.title')} subtitle={t('executors.subtitle')}>
             <Alert>{error}</Alert>
-            {loading ? <p className="text-on-surface-variant">Loading...</p> : (
+            {loading ? <p className="text-on-surface-variant">{t('executors.loading')}</p> : (
                 <div className="grid md:grid-cols-2 gap-6">
                     {POSITIONS.map((p) => (
                         <ExecutorCard key={p.type} position={p} assignment={current(p.type)} onChanged={load} />
@@ -49,6 +53,7 @@ export default function OwnerExecutors() {
 }
 
 function ExecutorCard({ position, assignment, onChanged }) {
+    const { t } = useTranslation('dms');
     const [editing, setEditing] = useState(false);
     const [email, setEmail] = useState('');
     const [confirmMsg, setConfirmMsg] = useState(null);
@@ -64,7 +69,7 @@ function ExecutorCard({ position, assignment, onChanged }) {
             onChanged();
         } catch (err) {
             if (needsReplaceConfirm(err)) setConfirmMsg(getErrorMessage(err));
-            else setError(getErrorMessage(err, 'Could not assign the executor.'));
+            else setError(getErrorMessage(err, t('executors.errors.assign')));
         } finally {
             setBusy(false);
         }
@@ -77,23 +82,24 @@ function ExecutorCard({ position, assignment, onChanged }) {
             setRevokeOpen(false);
             onChanged();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not revoke.'));
+            setError(getErrorMessage(err, t('executors.errors.revoke')));
             setRevokeOpen(false);
         } finally {
             setBusy(false);
         }
     };
 
-    const st = assignment && (STATUS[assignment.status] || STATUS.INACTIVE);
+    const stKey = assignment && (STATUS[assignment.status] ? assignment.status : 'INACTIVE');
+    const st = assignment && STATUS[stKey];
 
     return (
         <Card>
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h2 className="font-title-lg text-title-lg">{position.title}</h2>
-                    <p className="text-sm text-on-surface-variant mt-1">{position.text}</p>
+                    <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)}</h2>
+                    <p className="text-sm text-on-surface-variant mt-1">{t(`executors.positions.${position.type}.text`)}</p>
                 </div>
-                {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{st.label}</span>}
+                {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}
             </div>
 
             <div className="mt-5"><Alert>{error}</Alert></div>
@@ -105,42 +111,42 @@ function ExecutorCard({ position, assignment, onChanged }) {
                         <p className="font-semibold truncate">{assignment.fullName || assignment.email}</p>
                         <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
                         <p className="text-xs text-outline">
-                            Since {formatDate(assignment.assignedAt)}
-                            {assignment.activatedAt && ` · activated ${formatDate(assignment.activatedAt, true)}`}
+                            {t('executors.since', { date: formatDate(assignment.assignedAt) })}
+                            {assignment.activatedAt && ` · ${t('executors.activated', { date: formatDate(assignment.activatedAt, true) })}`}
                             {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
-                                ? ` · acknowledged ${formatDate(assignment.acknowledgedAt, true)}`
-                                : ' · awaiting acknowledgement')}
+                                ? ` · ${t('executors.acknowledged', { date: formatDate(assignment.acknowledgedAt, true) })}`
+                                : ` · ${t('executors.awaitingAck')}`)}
                         </p>
                     </div>
                 </div>
             )}
 
-            {!assignment && !editing && <p className="text-sm text-on-surface-variant">No one assigned.</p>}
+            {!assignment && !editing && <p className="text-sm text-on-surface-variant">{t('executors.noneAssigned')}</p>}
 
             {editing ? (
                 <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) assign(false); }} className="mt-4 space-y-3">
                     <input type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="executor@example.com" className={inputClass} />
                     <div className="flex gap-3">
-                        <button type="button" onClick={() => { setEditing(false); setError(''); }} className={btnOutline}>Cancel</button>
-                        <button type="submit" disabled={busy} className={btnPrimary}>{busy ? 'Saving...' : 'Save'}</button>
+                        <button type="button" onClick={() => { setEditing(false); setError(''); }} className={btnOutline}>{t('actions.cancel', { ns: 'common' })}</button>
+                        <button type="submit" disabled={busy} className={btnPrimary}>{busy ? t('executors.saving') : t('actions.save', { ns: 'common' })}</button>
                     </div>
                 </form>
             ) : (
                 <div className="mt-4 flex gap-3">
                     <button onClick={() => setEditing(true)} className={btnPrimary}>
-                        <Icon name={assignment ? 'swap_horiz' : 'person_add'} className="text-[18px]" /> {assignment ? 'Replace' : 'Assign'}
+                        <Icon name={assignment ? 'swap_horiz' : 'person_add'} className="text-[18px]" /> {assignment ? t('executors.replace') : t('executors.assign')}
                     </button>
                     {assignment && (
-                        <button onClick={() => setRevokeOpen(true)} className={btnOutline}>Revoke</button>
+                        <button onClick={() => setRevokeOpen(true)} className={btnOutline}>{t('executors.revoke')}</button>
                     )}
                 </div>
             )}
 
             <ConfirmDialog
                 open={!!confirmMsg}
-                title={`Replace ${position.title.toLowerCase()}?`}
+                title={t(`executors.replaceTitle.${position.type}`)}
                 message={confirmMsg}
-                confirmLabel="Replace"
+                confirmLabel={t('executors.replace')}
                 busy={busy}
                 onConfirm={() => assign(true)}
                 onCancel={() => setConfirmMsg(null)}
@@ -148,9 +154,9 @@ function ExecutorCard({ position, assignment, onChanged }) {
             <ConfirmDialog
                 open={revokeOpen}
                 danger
-                title={`Revoke ${position.title.toLowerCase()}?`}
-                message={`${assignment?.email} will no longer be able to handle your hand-over.`}
-                confirmLabel="Revoke"
+                title={t(`executors.revokeTitle.${position.type}`)}
+                message={t('executors.revokeMessage', { email: assignment?.email })}
+                confirmLabel={t('executors.revoke')}
                 busy={busy}
                 onConfirm={revoke}
                 onCancel={() => setRevokeOpen(false)}
