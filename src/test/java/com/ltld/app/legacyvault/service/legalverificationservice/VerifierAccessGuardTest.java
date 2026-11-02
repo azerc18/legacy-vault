@@ -5,6 +5,8 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,9 @@ public class VerifierAccessGuardTest {
 
     @Mock
     private VaultBeneficiaryRepository beneficiaryRepository;
+
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;
 
     @InjectMocks
     private VerifierAccessGuard guard;
@@ -86,6 +91,17 @@ public class VerifierAccessGuardTest {
 
         assertThatThrownBy(() -> guard.requireReadable(requestId, verifierId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    @Test
+    void verifierIsOtherExecutorOfOwner_requestIsNotFound() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                ownerId, verifierId, ExecutorStatus.REVOKED)).thenReturn(true);
+
+        assertThatThrownBy(() -> guard.requireReadable(requestId, verifierId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+        assertThat(guard.hasRelationshipConflict(request, verifierId)).isTrue();
     }
 
     @Test

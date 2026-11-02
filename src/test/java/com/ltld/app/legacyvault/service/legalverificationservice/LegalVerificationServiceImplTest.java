@@ -340,7 +340,7 @@ public class LegalVerificationServiceImplTest {
     @Test
     void reject_verifierIsBeneficiary_throwsConflictOfInterest() {
         when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
-        when(verifierAccessGuard.hasBeneficiaryConflict(requestId, verifierId)).thenReturn(true);
+        when(verifierAccessGuard.hasRelationshipConflict(pendingRequest, verifierId)).thenReturn(true);
         RejectVerificationRequestDto dto = rejectDto(RejectionReason.OTHER, "test");
 
         assertThatThrownBy(() -> service.reject(requestId, verifierId, dto))

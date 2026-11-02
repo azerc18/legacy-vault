@@ -1,9 +1,11 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ public class VerifierAccessGuard {
 
     private final LegalVerificationRequestRepository requestRepository;
     private final VaultBeneficiaryRepository beneficiaryRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     /**
      * Quy tắc quyền đọc hồ sơ của Verifier:
@@ -28,7 +31,7 @@ public class VerifierAccessGuard {
         LegalVerificationRequest request = requestRepository.findById(requestId)
                 .orElseThrow(() -> new VerificationRequestNotFoundException("Request not found: " + requestId));
 
-        if (isConflict(request, verifierId) || hasBeneficiaryConflict(requestId, verifierId)) {
+        if (hasRelationshipConflict(request, verifierId)) {
             throw new VerificationRequestNotFoundException("Request not found: " + requestId);
         }
 
@@ -38,6 +41,22 @@ public class VerifierAccessGuard {
                     "Only the Legal Verifier who handled this request can access it.");
         }
         return request;
+    }
+
+    /**
+     * Xung đột lợi ích: Verifier là Owner / Executor của hồ sơ, Executor (chính hoặc dự phòng) còn hiệu lực
+     * của Owner, hoặc beneficiary của bất kỳ vault nào trong hồ sơ.
+     */
+    public boolean hasRelationshipConflict(LegalVerificationRequest request, UUID verifierId) {
+        if (isConflict(request, verifierId)) {
+            return true;
+        }
+        UUID ownerId = request.getOwner() != null ? request.getOwner().getId() : null;
+        if (ownerId != null && executorAssignmentRepository
+                .existsByOwnerIdAndExecutorUserIdAndStatusNot(ownerId, verifierId, ExecutorStatus.REVOKED)) {
+            return true;
+        }
+        return hasBeneficiaryConflict(request.getId(), verifierId);
     }
 
     /** N2: Verifier là beneficiary của bất kỳ vault nào trong hồ sơ (xung đột lợi ích). */

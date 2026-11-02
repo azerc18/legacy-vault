@@ -1,10 +1,13 @@
 package com.ltld.app.legacyvault.repository;
 
+import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.entity.VerificationRequestVault;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -32,7 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "app.dms.scheduler.enabled=false",
         "app.beneficiary.notify-retry.enabled=false",
-        "app.beneficiary.vault-purge.enabled=false"
+        "app.beneficiary.vault-purge.enabled=false",
+        "app.beneficiary.claim-expiry.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 class VerifierBeneficiaryConflictIntegrationTest {
@@ -46,15 +50,18 @@ class VerifierBeneficiaryConflictIntegrationTest {
     @Autowired private LegalVerificationRequestRepository requestRepository;
     @Autowired private VaultRepository vaultRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private ExecutorAssignmentRepository executorAssignmentRepository;
 
     private final List<UUID> beneficiaryIds = new ArrayList<>();
     private final List<UUID> linkIds = new ArrayList<>();
     private final List<UUID> requestIds = new ArrayList<>();
     private final List<UUID> vaultIds = new ArrayList<>();
     private final List<UUID> userIds = new ArrayList<>();
+    private final List<UUID> assignmentIds = new ArrayList<>();
 
     @AfterEach
     void cleanUp() {
+        executorAssignmentRepository.deleteAllById(assignmentIds);
         beneficiaryRepository.deleteAllById(beneficiaryIds);
         requestVaultRepository.deleteAllById(linkIds);
         requestRepository.deleteAllById(requestIds);
@@ -65,6 +72,7 @@ class VerifierBeneficiaryConflictIntegrationTest {
         requestIds.clear();
         vaultIds.clear();
         userIds.clear();
+        assignmentIds.clear();
     }
 
     @Test
@@ -111,6 +119,35 @@ class VerifierBeneficiaryConflictIntegrationTest {
         assertThat(visibleIds(verifier)).doesNotContain(request.getId());
     }
 
+    // m2: Executor dự phòng của Owner (không phải Executor nộp hồ sơ) cũng không thấy / không đếm hồ sơ
+    @Test
+    void verifierIsBackupExecutorOfOwner_requestIsHiddenAndNotCounted() {
+        User owner = user("owner");
+        User executor = user("executor");
+        User verifier = user("verifier");
+        Vault vault = vault(owner);
+        LegalVerificationRequest request = request(owner, executor, vault);
+        assignment(owner, verifier, ExecutorType.BACKUP, ExecutorStatus.ACTIVE);
+
+        assertThat(visibleIds(verifier)).doesNotContain(request.getId());
+        assertThat(requestRepository.countPendingVisibleTo(LegalVerificationStatus.PENDING, verifier.getId()))
+                .isZero();
+        assertThat(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                owner.getId(), verifier.getId(), ExecutorStatus.REVOKED)).isTrue();
+    }
+
+    @Test
+    void verifierWasRevokedExecutorOfOwner_stillSeesTheRequest() {
+        User owner = user("owner");
+        User executor = user("executor");
+        User verifier = user("verifier");
+        Vault vault = vault(owner);
+        LegalVerificationRequest request = request(owner, executor, vault);
+        assignment(owner, verifier, ExecutorType.BACKUP, ExecutorStatus.REVOKED);
+
+        assertThat(visibleIds(verifier)).contains(request.getId());
+    }
+
     @Test
     void unrelatedVerifier_stillSeesAndCountsTheRequest() {
         User owner = user("owner");
@@ -141,6 +178,16 @@ class VerifierBeneficiaryConflictIntegrationTest {
                 .build());
         userIds.add(saved.getId());
         return saved;
+    }
+
+    private void assignment(User owner, User executorUser, ExecutorType type, ExecutorStatus status) {
+        ExecutorAssignment saved = executorAssignmentRepository.save(ExecutorAssignment.builder()
+                .owner(owner)
+                .executorUser(executorUser)
+                .executorType(type)
+                .status(status)
+                .build());
+        assignmentIds.add(saved.getId());
     }
 
     private Vault vault(User owner) {

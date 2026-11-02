@@ -588,7 +588,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     // Verifier không được xử lý hồ sơ của chính mình (là owner hoặc executor)
     private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
         if (VerifierAccessGuard.isConflict(request, verifierId)
-                || verifierAccessGuard.hasBeneficiaryConflict(request.getId(), verifierId)) {
+                || verifierAccessGuard.hasRelationshipConflict(request, verifierId)) {
             throw new ConflictOfInterestException(
                     "You cannot process a request that involves yourself.");
         }
