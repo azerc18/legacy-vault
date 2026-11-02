@@ -74,8 +74,9 @@ app:
     tmn-code: ${VNPAY_TMN_CODE:}
     hash-secret: ${VNPAY_HASH_SECRET:}
     pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-    # URL frontend VNPay chuyển người dùng về sau thanh toán
-    return-url: ${VNPAY_RETURN_URL:}
+    # URL BACKEND (/api/payments/vnpay-return) mà VNPay redirect trình duyệt về sau thanh toán (vnp_ReturnUrl).
+    # Phải truy cập được từ trình duyệt người dùng; production đặt VNPAY_RETURN_URL theo domain thật.
+    return-url: ${VNPAY_RETURN_URL:http://localhost:8084/api/payments/vnpay-return}
     # false: chỉ IPN (server-to-server, có chữ ký) mới kích hoạt gói; return-url chỉ để hiển thị kết quả
     activate-on-return: false
   ai:
