@@ -23,7 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,27 +47,35 @@ class PaymentServiceImplTest {
     private VnpayClient vnpayClient;
     private PaymentServiceImpl paymentService;
 
-    private User owner;
-    private SubscriptionPlan vipMonthPlan;
-
-    @BeforeEach
-    void setUp() {
-        vnpayClient = new VnpayClient(
+    private static VnpayProperties vnpayProperties(boolean activateOnReturn) {
+        return new VnpayProperties(
                 "DEMO_TMN",
                 "SECRET_KEY_FOR_TESTING_1234567890",
                 "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
                 "http://localhost:8084/api/payments/vnpay-return",
-                "http://localhost:5173"
-        );
-        paymentService = new PaymentServiceImpl(
+                activateOnReturn);
+    }
+
+    private PaymentServiceImpl newPaymentService(VnpayClient client, VnpayProperties properties) {
+        return new PaymentServiceImpl(
                 userRepository,
                 subscriptionPlanRepository,
                 subscriptionRepository,
                 paymentTransactionRepository,
                 entitlementService,
-                vnpayClient,
+                client,
+                properties,
                 auditLogService
         );
+    }
+
+    private User owner;
+    private SubscriptionPlan vipMonthPlan;
+
+    @BeforeEach
+    void setUp() {
+        vnpayClient = new VnpayClient(vnpayProperties(false), "http://localhost:5173");
+        paymentService = newPaymentService(vnpayClient, vnpayProperties(false));
 
         owner = User.builder()
                 .id(UUID.randomUUID())
@@ -302,7 +309,7 @@ class PaymentServiceImplTest {
     // Return URL Case 3: activate-on-return = true (dev local) -> kích hoạt gói
     @Test
     void handleVnpayReturn_validSignature_activateOnReturn_activates() {
-        ReflectionTestUtils.setField(paymentService, "activateOnReturn", true);
+        paymentService = newPaymentService(vnpayClient, vnpayProperties(true));
 
         UUID txId = UUID.randomUUID();
         PaymentTransaction tx = PaymentTransaction.builder()
@@ -356,16 +363,8 @@ class PaymentServiceImplTest {
 
     @Test
     void checkout_whenVnpayNotConfigured_throwsServiceUnavailable() {
-        VnpayClient unconfiguredVnpay = new VnpayClient("", "", "https://sandbox.vnpayment.vn", "", "http://localhost:5173");
-        PaymentServiceImpl unconfiguredPaymentService = new PaymentServiceImpl(
-                userRepository,
-                subscriptionPlanRepository,
-                subscriptionRepository,
-                paymentTransactionRepository,
-                entitlementService,
-                unconfiguredVnpay,
-                auditLogService
-        );
+        VnpayProperties empty = new VnpayProperties("", "", null, null, false);
+        PaymentServiceImpl unconfiguredPaymentService = newPaymentService(new VnpayClient(empty), empty);
 
         CheckoutRequest request = CheckoutRequest.builder().planCode("VIP_MONTH").build();
         BusinessException ex = assertThrows(

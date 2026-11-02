@@ -3,20 +3,13 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { formatStorage } from '../i18n/format.js';
 import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
 
 const formatVnd = (n) =>
     typeof n === 'number'
         ? n.toLocaleString('vi-VN') + ' ₫'
         : '0 ₫';
-
-const formatStorage = (bytes) => {
-    if (!bytes) return '50 MB';
-    const gb = bytes / (1024 * 1024 * 1024);
-    if (gb >= 1) return `${gb.toFixed(0)} GB`;
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(0)} MB`;
-};
 
 export default function BillingPage() {
     const { t } = useTranslation('payment');
@@ -74,11 +67,12 @@ export default function BillingPage() {
                                     </div>
                                     <div className="mt-1 font-bold text-base">
                                         {sub.status}
+                                        {/* m4: không còn VIP mà có expiresAt = gói VIP gần nhất đã hết hạn (EXPIRED + FREE) */}
                                         {sub.expiresAt && (
                                             <span className="block text-xs font-normal text-on-surface-variant">
-                                                {t('billing.current.expires', {
-                                                    date: formatDate(sub.expiresAt),
-                                                })}
+                                                {sub.vip
+                                                    ? t('billing.current.expires', { date: formatDate(sub.expiresAt) })
+                                                    : t('billing.current.expiredOn', { date: formatDate(sub.expiresAt) })}
                                             </span>
                                         )}
                                     </div>

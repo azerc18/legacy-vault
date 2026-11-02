@@ -31,6 +31,7 @@ http.interceptors.response.use(
                 return http(original);
             } catch {
                 clearAuth();
+                if (original.skipLoginRedirect) return Promise.reject(error);   // T1: trang công khai tự xử lý 401
                 window.location.href = '/login';
             }
         }

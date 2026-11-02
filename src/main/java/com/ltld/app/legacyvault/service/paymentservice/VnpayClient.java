@@ -2,8 +2,10 @@ package com.ltld.app.legacyvault.service.paymentservice;
 
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -21,8 +23,11 @@ import java.util.UUID;
 /**
  * T1: Tích hợp VNPay Sandbox v2.1.0 (tạo URL thanh toán + xác thực chữ ký HMAC-SHA512).
  * Hỗ trợ tự động suy ra vnp_ReturnUrl từ FRONTEND_BASE_URL khi deploy chung 1 container trên Azure (D8a/D8b).
+ * Cấu hình đọc từ {@link VnpayProperties} (app.vnpay.*); thiếu cấu hình không làm app dừng khởi động.
  */
+@Slf4j
 @Component
+@EnableConfigurationProperties(VnpayProperties.class)
 public class VnpayClient {
 
     private static final DateTimeFormatter VNP_TIME_FMT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
@@ -34,24 +39,24 @@ public class VnpayClient {
     private final String returnUrl;
 
     @Autowired
-    public VnpayClient(
-            @Value("${VNPAY_TMN_CODE:}") String tmnCode,
-            @Value("${VNPAY_HASH_SECRET:}") String hashSecret,
-            @Value("${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}") String payUrl,
-            @Value("${VNPAY_RETURN_URL:}") String returnUrl,
-            @Value("${app.frontend.base-url}") String frontendBaseUrl) {
-        this.tmnCode = tmnCode != null ? tmnCode.trim() : "";
-        this.hashSecret = hashSecret != null ? hashSecret.trim() : "";
-        this.payUrl = (payUrl != null && !payUrl.isBlank()) ? payUrl.trim() : "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
-        this.returnUrl = resolveReturnUrl(returnUrl, frontendBaseUrl);
+    public VnpayClient(VnpayProperties properties, @Value("${app.frontend.base-url}") String frontendBaseUrl) {
+        this.tmnCode = properties.tmnCode();
+        this.hashSecret = properties.hashSecret();
+        this.payUrl = properties.payUrl();
+        this.returnUrl = resolveReturnUrl(properties.returnUrl(), frontendBaseUrl);
+        // Bean singleton: cảnh báo đúng 1 lần lúc khởi động, không chặn app chạy
+        if (!properties.isConfigured()) {
+            log.warn("T1: VNPay chưa cấu hình (app.vnpay.tmn-code / app.vnpay.hash-secret trống). "
+                    + "App vẫn chạy nhưng mọi lần tạo thanh toán sẽ trả SERVICE_UNAVAILABLE.");
+        }
     }
 
-    public VnpayClient(String tmnCode, String hashSecret, String payUrl, String returnUrl) {
-        this(tmnCode, hashSecret, payUrl, returnUrl, "http://localhost:5173");
+    public VnpayClient(VnpayProperties properties) {
+        this(properties, "http://localhost:5173");
     }
 
     public boolean isConfigured() {
-        return !tmnCode.isBlank() && !hashSecret.isBlank();
+        return !tmnCode.isEmpty() && !hashSecret.isEmpty();
     }
 
     public void ensureConfigured() {

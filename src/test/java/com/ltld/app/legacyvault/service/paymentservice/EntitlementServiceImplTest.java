@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionOperations;
 
@@ -187,6 +189,44 @@ class EntitlementServiceImplTest {
         );
         assertEquals(ErrorCode.PLAN_LIMIT_REACHED, storageEx.getErrorCode());
         assertEquals(PlanFeature.STORAGE, storageEx.getFeature());
+    }
+
+    // m2: DB thiếu dòng FREE -> không ném IllegalStateException, log.warn và áp hạn mức FREE mặc định
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void missingFreePlanRow_logsWarningAndAppliesDefaultFreeLimits(CapturedOutput output) {
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(subscriptionPlanRepository.findByCode("FREE")).thenReturn(Optional.empty());
+
+        SubscriptionPlan plan = entitlementService.resolveEffectivePlan(owner.getId());
+        assertEquals("FREE", plan.getCode());
+        assertFalse(plan.isVip());
+        assertEquals(1, plan.getMaxVaults());
+        assertEquals(2, plan.getMaxBeneficiaries());
+        assertEquals(50L * 1024 * 1024, plan.getStorageQuotaBytes());
+        assertFalse(plan.isLegacyMessagesEnabled());
+        assertThat(output).contains("subscription plan FREE is missing");
+
+        // 1 vault
+        when(vaultRepository.countByOwnerId(owner.getId())).thenReturn(0L, 1L);
+        assertDoesNotThrow(() -> entitlementService.assertCanCreateVault(owner.getId()));
+        assertThrows(PlanLimitReachedException.class, () -> entitlementService.assertCanCreateVault(owner.getId()));
+
+        // 2 người thụ hưởng
+        assertDoesNotThrow(() -> entitlementService.assertCanAddBeneficiaries(owner.getId(), 2));
+        assertThrows(PlanLimitReachedException.class, () -> entitlementService.assertCanAddBeneficiaries(owner.getId(), 3));
+
+        // 50 MB
+        when(legalDocumentRepository.sumSizeBytesByOwnerId(owner.getId())).thenReturn(0L);
+        assertDoesNotThrow(() -> entitlementService.assertStorageQuota(owner.getId(), 50L * 1024 * 1024));
+        assertThrows(PlanLimitReachedException.class,
+                () -> entitlementService.assertStorageQuota(owner.getId(), 50L * 1024 * 1024 + 1));
+
+        // Tắt tính năng VIP
+        assertThrows(PlanLimitReachedException.class, () -> entitlementService.assertCanUseAdvancedAllocation(owner.getId()));
+        assertThrows(PlanLimitReachedException.class, () -> entitlementService.assertCanUseTrustedConfirmers(owner.getId()));
+        assertThrows(PlanLimitReachedException.class, () -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
     }
 
     @Test

@@ -13,7 +13,8 @@
     "expires": "Hết hạn ngày {{date}}",
     "viewBilling": "Xem lịch sử thanh toán",
     "loading": "Đang tải danh sách gói...",
-    "savePercent": "Tiết kiệm 17%",
+    "retry": "Thử lại",
+    "savePercent": "Tiết kiệm {{percent}}%",
     "free": "Miễn phí",
     "perDays": "/ {{days}} ngày",
     "features": {
@@ -33,6 +34,7 @@
     },
     "errors": {
       "loadFailed": "Không thể tải danh sách gói thuê bao.",
+      "noPlans": "Hiện chưa có gói thuê bao nào.",
       "checkoutFailed": "Không thể khởi tạo thanh toán VNPay."
     }
   },
@@ -48,6 +50,7 @@
       "vip": "VIP",
       "statusExpiry": "Trạng thái / Hết hạn",
       "expires": "Hết hạn ngày {{date}}",
+      "expiredOn": "Gói VIP đã hết hạn ngày {{date}}",
       "limits": "Giới hạn Két & Người thụ hưởng",
       "vaultsAndBens": "{{vaults}} két sắt · {{beneficiaries}} người thụ hưởng/két",
       "storage": "Lưu trữ mã hoá & Tin nhắn di nguyện",
@@ -75,7 +78,7 @@
     "successSubtitle": "Gói VIP của bạn đã được kích hoạt.",
     "failedSubtitle": "Giao dịch VNPay của bạn không thể hoàn tất.",
     "confirmingSubtitle": "Vui lòng đợi giây lát trong khi chúng tôi xác nhận giao dịch với VNPay.",
-    "welcomeVip": "Chào mừng bạn đến với LegacyVault VIP!",
+    "successHeading": "Chào mừng bạn đến với LegacyVault VIP!",
     "confirmingHeading": "Đang kiểm tra trạng thái kích hoạt...",
     "failedHeading": "Không thể xác nhận thanh toán",
     "confirmingMessage": "Hệ thống đang kiểm tra với cổng thanh toán (lần thử {{attempt}}/{{maxAttempts}}). Quyền lợi VIP sẽ sớm có hiệu lực.",
@@ -86,7 +89,16 @@
     "txId": "Mã giao dịch: {{id}}",
     "viewBilling": "Xem lịch sử thanh toán",
     "myVaults": "Đến danh sách Két sắt",
-    "tryAgain": "Thử lại"
+    "tryAgain": "Thử lại",
+    "processingTitle": "Đã nhận thanh toán",
+    "processingSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "processingHeading": "Đang xử lý kích hoạt gói VIP",
+    "processingMessage": "Việc này có thể mất vài phút. Bạn hãy xem lại trang Thanh toán sau ít phút, không cần thanh toán lại.",
+    "loginRequiredTitle": "Thanh toán thành công",
+    "loginRequiredSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "loginRequiredHeading": "Đăng nhập để xem gói của bạn",
+    "loginRequiredMessage": "Thanh toán thành công, đăng nhập để xem gói.",
+    "login": "Đăng nhập"
   },
   "upgradeDialog": {
     "title": "Nâng cấp lên VIP",

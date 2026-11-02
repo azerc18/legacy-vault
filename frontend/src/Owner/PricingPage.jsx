@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { formatStorage } from '../i18n/format.js';
 import { Alert, btnOutline, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
 
 const formatVnd = (n) =>
@@ -10,12 +11,13 @@ const formatVnd = (n) =>
         ? n.toLocaleString('vi-VN') + ' ₫'
         : '0 ₫';
 
-const formatStorage = (bytes) => {
-    if (!bytes) return '50 MB';
-    const gb = bytes / (1024 * 1024 * 1024);
-    if (gb >= 1) return `${gb.toFixed(0)} GB`;
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(0)} MB`;
+// n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
+const yearlySavingPercent = (plans) => {
+    const month = plans.find((p) => p.code === 'VIP_MONTH');
+    const year = plans.find((p) => p.code === 'VIP_YEAR');
+    if (!month?.priceVnd || !year?.priceVnd) return null;
+    const percent = Math.round((1 - year.priceVnd / (month.priceVnd * 12)) * 100);
+    return percent > 0 ? percent : null;
 };
 
 export default function PricingPage() {
@@ -24,14 +26,26 @@ export default function PricingPage() {
     const [loading, setLoading] = useState(true);
     const [busyCode, setBusyCode] = useState('');
     const [error, setError] = useState('');
+    const [loadError, setLoadError] = useState('');
+    const [reloadKey, setReloadKey] = useState(0);
 
+    // n1: danh sách gói lấy từ API (availablePlans của /subscriptions/me), không có danh sách viết cứng
     useEffect(() => {
         paymentApi
             .getMySubscription()
-            .then(setSub)
-            .catch((e) => setError(getErrorMessage(e, t('pricing.errors.loadFailed'))))
+            .then((data) => {
+                setSub(data);
+                setLoadError('');
+            })
+            .catch((e) => setLoadError(getErrorMessage(e, t('pricing.errors.loadFailed'))))
             .finally(() => setLoading(false));
-    }, [t]);
+    }, [t, reloadKey]);
+
+    const retryLoad = () => {
+        setLoading(true);
+        setLoadError('');
+        setReloadKey((k) => k + 1);
+    };
 
     const handleCheckout = async (planCode) => {
         setError('');
@@ -47,40 +61,8 @@ export default function PricingPage() {
         }
     };
 
-    const plans = sub?.availablePlans?.length
-        ? sub.availablePlans
-        : [
-              {
-                  code: 'FREE',
-                  name: 'Free Plan',
-                  priceVnd: 0,
-                  durationDays: null,
-                  maxVaults: 1,
-                  maxBeneficiariesPerVault: 2,
-                  maxStorageBytes: 52428800,
-                  legacyMessageEnabled: false,
-              },
-              {
-                  code: 'VIP_MONTH',
-                  name: 'VIP Monthly',
-                  priceVnd: 99000,
-                  durationDays: 30,
-                  maxVaults: 5,
-                  maxBeneficiariesPerVault: 10,
-                  maxStorageBytes: 5368709120,
-                  legacyMessageEnabled: true,
-              },
-              {
-                  code: 'VIP_YEAR',
-                  name: 'VIP Yearly',
-                  priceVnd: 990000,
-                  durationDays: 365,
-                  maxVaults: 5,
-                  maxBeneficiariesPerVault: 10,
-                  maxStorageBytes: 5368709120,
-                  legacyMessageEnabled: true,
-              },
-          ];
+    const plans = sub?.availablePlans ?? [];
+    const savingPercent = yearlySavingPercent(plans);
 
     return (
         <OwnerLayout
@@ -113,12 +95,20 @@ export default function PricingPage() {
 
             {loading ? (
                 <p className="text-on-surface-variant">{t('pricing.loading')}</p>
+            ) : loadError || plans.length === 0 ? (
+                <Card className="text-center">
+                    <p className="text-sm text-on-surface-variant">{loadError || t('pricing.errors.noPlans')}</p>
+                    <button type="button" onClick={retryLoad} className={`${btnOutline} mt-4`}>
+                        <Icon name="refresh" className="text-[18px]" /> {t('pricing.retry')}
+                    </button>
+                </Card>
             ) : (
                 <div className="grid md:grid-cols-3 gap-6">
                     {plans.map((p) => {
                         const isFree = p.code === 'FREE' || p.priceVnd <= 0;
                         const isCurrent = sub?.planCode === p.code && sub?.status === 'ACTIVE';
                         const isPopular = p.code === 'VIP_YEAR';
+                        const showSaving = isPopular && savingPercent !== null;
 
                         return (
                             <Card
@@ -130,9 +120,9 @@ export default function PricingPage() {
                                 <div>
                                     <div className="flex items-center justify-between gap-2">
                                         <h2 className="font-title-lg text-title-lg">{p.name}</h2>
-                                        {isPopular && (
+                                        {showSaving && (
                                             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-primary text-on-primary">
-                                                {t('pricing.savePercent')}
+                                                {t('pricing.savePercent', { percent: savingPercent })}
                                             </span>
                                         )}
                                     </div>

@@ -13,7 +13,8 @@
     "expires": "Expires {{date}}",
     "viewBilling": "View billing history",
     "loading": "Loading plans...",
-    "savePercent": "Save 17%",
+    "retry": "Try again",
+    "savePercent": "Save {{percent}}%",
     "free": "Free",
     "perDays": "/ {{days}} days",
     "features": {
@@ -33,6 +34,7 @@
     },
     "errors": {
       "loadFailed": "Could not load subscription plans.",
+      "noPlans": "No subscription plans are available right now.",
       "checkoutFailed": "Could not initiate VNPay checkout."
     }
   },
@@ -48,6 +50,7 @@
       "vip": "VIP",
       "statusExpiry": "Status / Expiry",
       "expires": "Expires {{date}}",
+      "expiredOn": "VIP plan expired on {{date}}",
       "limits": "Vault & Beneficiary Limit",
       "vaultsAndBens": "{{vaults}} vaults · {{beneficiaries}} beneficiaries/vault",
       "storage": "Encrypted Storage & Media",
@@ -75,7 +78,7 @@
     "successSubtitle": "Your VIP subscription has been activated.",
     "failedSubtitle": "Your VNPay transaction could not be completed.",
     "confirmingSubtitle": "Please wait while we confirm your payment with VNPay.",
-    "welcomeVip": "Welcome to LegacyVault VIP!",
+    "successHeading": "Welcome to LegacyVault VIP!",
     "confirmingHeading": "Confirming your VIP subscription...",
     "failedHeading": "We could not confirm your payment",
     "confirmingMessage": "We are checking with the payment gateway (attempt {{attempt}}/{{maxAttempts}}). Your privileges will be available in a few moments.",
@@ -86,7 +89,16 @@
     "txId": "Transaction ID: {{id}}",
     "viewBilling": "View Billing",
     "myVaults": "Go to My Vaults",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "processingTitle": "Payment Received",
+    "processingSubtitle": "VNPay reported a successful payment.",
+    "processingHeading": "Your VIP plan is still being activated",
+    "processingMessage": "This can take a few minutes. Check the Billing page shortly; you do not need to pay again.",
+    "loginRequiredTitle": "Payment Successful",
+    "loginRequiredSubtitle": "VNPay reported a successful payment.",
+    "loginRequiredHeading": "Sign in to see your plan",
+    "loginRequiredMessage": "Payment successful. Sign in to view your plan and billing details.",
+    "login": "Sign in"
   },
   "upgradeDialog": {
     "title": "Upgrade to VIP",

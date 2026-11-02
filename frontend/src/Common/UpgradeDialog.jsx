@@ -2,15 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
+import { formatStorage } from '../i18n/format.js';
 import { btnOutline, btnPrimary, Icon } from '../Owner/ownerUi.jsx';
-
-const formatStorage = (bytes) => {
-    if (!bytes) return '50 MB';
-    const gb = bytes / (1024 * 1024 * 1024);
-    if (gb >= 1) return `${gb.toFixed(0)} GB`;
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(0)} MB`;
-};
 
 export default function UpgradeDialog({ open, message, onClose }) {
     const { t } = useTranslation('payment');

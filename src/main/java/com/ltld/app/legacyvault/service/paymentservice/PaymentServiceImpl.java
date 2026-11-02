@@ -55,14 +55,11 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final EntitlementServiceImpl entitlementService;
     private final VnpayClient vnpayClient;
+    private final VnpayProperties vnpayProperties;
     private final AuditLogService auditLogService;
 
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl = "http://localhost:5173";
-
-    // Dev local: cho phép Return URL kích hoạt gói (mặc định false: chỉ IPN được kích hoạt)
-    @Value("${app.vnpay.activate-on-return:false}")
-    private boolean activateOnReturn = false;
 
     @Override
     @Transactional
@@ -119,7 +116,8 @@ public class PaymentServiceImpl implements PaymentService {
 
         boolean paidPerGateway = isPaid(params);
         boolean success = paidPerGateway;
-        if (activateOnReturn) {
+        // Dev local: cho phép Return URL kích hoạt gói (app.vnpay.activate-on-return, mặc định false)
+        if (vnpayProperties.activateOnReturn()) {
             try {
                 String rspCode = processPayment(params).get(RSP_CODE);
                 success = paidPerGateway && ("00".equals(rspCode) || "02".equals(rspCode));

@@ -17,12 +17,13 @@ class VnpayClientTest {
 
     @BeforeEach
     void setUp() {
-        vnpayClient = new VnpayClient(
+        vnpayClient = new VnpayClient(new VnpayProperties(
                 "TEST_TMN",
                 "TEST_SECRET_KEY_1234567890_ABCDEF",
                 "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
-                "http://localhost:8084/api/payments/vnpay-return"
-        );
+                "http://localhost:8084/api/payments/vnpay-return",
+                false
+        ));
     }
 
     @Test
@@ -56,7 +57,7 @@ class VnpayClientTest {
 
     @Test
     void unconfiguredClient_throwsServiceUnavailableOnCheckoutAndReturnsFalseOnVerify() {
-        VnpayClient emptyClient = new VnpayClient("", "", "https://sandbox.vnpayment.vn", "");
+        VnpayClient emptyClient = new VnpayClient(new VnpayProperties("", "", "https://sandbox.vnpayment.vn", "", false));
         assertFalse(emptyClient.isConfigured());
 
         BusinessException ex = assertThrows(

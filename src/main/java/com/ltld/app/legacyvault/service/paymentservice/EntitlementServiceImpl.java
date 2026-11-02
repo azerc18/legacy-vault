@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +27,7 @@ import java.util.UUID;
  *
  * <p>Hạn mức của từng gói đọc từ bảng subscription_plans; migration Flyway là nguồn duy nhất của 3 gói chuẩn.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -133,8 +135,24 @@ public class EntitlementServiceImpl implements EntitlementService {
                 }
             }
         }
-        return subscriptionPlanRepository.findByCode(PLAN_FREE)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Subscription plan " + PLAN_FREE + " is missing. Run the Flyway migration that seeds subscription_plans."));
+        return subscriptionPlanRepository.findByCode(PLAN_FREE).orElseGet(() -> {
+            // m2: thiếu dòng FREE trong DB thì không làm hỏng mọi thao tác của Owner; dùng hạn mức FREE mặc định
+            log.warn("T1: subscription plan {} is missing in subscription_plans; using default FREE limits. "
+                    + "Run the Flyway migration that seeds subscription_plans.", PLAN_FREE);
+            return defaultFreePlan();
+        });
+    }
+
+    /** Hạn mức FREE mặc định (khớp seed Flyway): 1 vault, 2 người thụ hưởng/vault, 50 MB, tắt tính năng VIP. */
+    static SubscriptionPlan defaultFreePlan() {
+        return SubscriptionPlan.builder()
+                .code(PLAN_FREE)
+                .name("Free Plan")
+                .priceVnd(0)
+                .maxVaults(1)
+                .maxBeneficiaries(2)
+                .storageQuotaBytes(50L * 1024 * 1024)
+                .legacyMessagesEnabled(false)
+                .build();
     }
 }
