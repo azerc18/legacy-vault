@@ -54,6 +54,8 @@ public enum AuditAction {
     // N2b: người thụ hưởng từ chối, quyền nhận chuyển sang người dự phòng / không còn người nhận
     ASSET_ALLOCATION_FALLBACK, CLAIM_DECLINED, CLAIM_STALLED, CLAIM_ACCEPTED,
     CLAIM_EXTENDED,DOSSIER_DOWNLOADED,
+    // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi
+    BENEFICIARY_REMINDER_SENT,
     // T1: Thanh toán VNPay & gói VIP
     PAYMENT_SUCCEEDED, PAYMENT_FAILED
 }

@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.executordto.BeneficiaryClaimProgressResponse;
 import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
@@ -12,6 +13,7 @@ import com.ltld.app.legacyvault.dto.executordto.VaultHandoverProgressResponse;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorClaimTrackingService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
@@ -52,6 +54,28 @@ public class ExecutorController {
     private final ExecutorVerificationService executorVerificationService;
     private final VerificationExchangeService verificationExchangeService;
     private final ExecutorSelfService executorSelfService;
+    private final ExecutorClaimTrackingService executorClaimTrackingService;
+
+    // N2-exec: tiến độ nhận tài sản của từng người thụ hưởng trong một Vault đã bàn giao
+    @GetMapping("/{assignmentId}/vaults/{vaultId}/beneficiaries")
+    public ResponseEntity<ApiResponse<List<BeneficiaryClaimProgressResponse>>> getBeneficiaryProgress(
+            @PathVariable UUID assignmentId, @PathVariable UUID vaultId, Principal principal) {
+
+        List<BeneficiaryClaimProgressResponse> response =
+                executorClaimTrackingService.listBeneficiaryProgress(assignmentId, vaultId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary progress retrieved", response));
+    }
+
+    // N2-exec: nhắc một người thụ hưởng chưa phản hồi, tối đa 1 lần/24h (429 REMINDER_TOO_SOON)
+    @PostMapping("/{assignmentId}/vaults/{vaultId}/beneficiaries/{vaultBeneficiaryId}/reminders")
+    public ResponseEntity<ApiResponse<BeneficiaryClaimProgressResponse>> remindBeneficiary(
+            @PathVariable UUID assignmentId, @PathVariable UUID vaultId, @PathVariable UUID vaultBeneficiaryId,
+            Principal principal) {
+
+        BeneficiaryClaimProgressResponse response = executorClaimTrackingService.sendReminder(
+                assignmentId, vaultId, vaultBeneficiaryId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Reminder sent", response));
+    }
 
     // B1: điểm vào của FE Executor, các assignment chưa REVOKED của người đăng nhập (gồm nhiều Owner).
     @GetMapping("/me")
