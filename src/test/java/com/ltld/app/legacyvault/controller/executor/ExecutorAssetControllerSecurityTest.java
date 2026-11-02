@@ -52,6 +52,7 @@ class ExecutorAssetControllerSecurityTest {
     @MockitoBean private ExecutorVerificationService executorVerificationService;
     @MockitoBean private VerificationExchangeService verificationExchangeService;
     @MockitoBean private com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService executorSelfService;
+    @MockitoBean private com.ltld.app.legacyvault.service.executorservice.ExecutorClaimTrackingService executorClaimTrackingService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     private static RequestPostProcessor token(UUID userId) {

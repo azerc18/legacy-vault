@@ -63,4 +63,8 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
             """)
     long countStalledInVault(@Param("vaultId") UUID vaultId,
                              @Param("deadStatuses") Collection<BeneficiaryInviteStatus> deadStatuses);
+
+    // N2-exec: mọi phân bổ của một vault, để biết phần của ai đã chuyển sang người dự phòng
+    @Query("SELECT al FROM AssetAllocation al WHERE al.asset.vault.id = :vaultId")
+    List<AssetAllocation> findByVaultId(@Param("vaultId") UUID vaultId);
 }
