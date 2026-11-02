@@ -191,6 +191,49 @@ class EntitlementServiceImplTest {
         assertEquals(PlanFeature.STORAGE, storageEx.getFeature());
     }
 
+    // F4a: lời nhắn di nguyện theo cột legacy_messages_enabled của gói
+    @Test
+    void legacyMessages_freePlan_isBlockedWithLegacyMessagesFeature() {
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(subscriptionPlanRepository.findByCode("FREE")).thenReturn(Optional.of(freePlan));
+
+        PlanLimitReachedException ex = assertThrows(PlanLimitReachedException.class,
+                () -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
+        assertEquals(ErrorCode.PLAN_LIMIT_REACHED, ex.getErrorCode());
+        assertEquals(PlanFeature.LEGACY_MESSAGES, ex.getFeature());
+    }
+
+    @Test
+    void legacyMessages_activeVipPlan_isAllowed() {
+        Subscription vipSub = Subscription.builder()
+                .user(owner).plan(vipPlan).status(SubscriptionStatus.ACTIVE)
+                .startedAt(LocalDateTime.now().minusDays(1)).expiresAt(LocalDateTime.now().plusDays(30))
+                .build();
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(vipSub));
+
+        assertDoesNotThrow(() -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
+    }
+
+    @Test
+    void legacyMessages_paidPlanWithColumnDisabled_isBlocked() {
+        // Quyết định theo cột legacy_messages_enabled, không theo việc gói có phải VIP hay không
+        SubscriptionPlan paidNoMedia = SubscriptionPlan.builder()
+                .code("VIP_MONTH").name("VIP Monthly").maxVaults(5).maxBeneficiaries(10)
+                .storageQuotaBytes(5_368_709_120L).legacyMessagesEnabled(false).build();
+        Subscription sub = Subscription.builder()
+                .user(owner).plan(paidNoMedia).status(SubscriptionStatus.ACTIVE)
+                .startedAt(LocalDateTime.now().minusDays(1)).expiresAt(LocalDateTime.now().plusDays(30))
+                .build();
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(sub));
+
+        PlanLimitReachedException ex = assertThrows(PlanLimitReachedException.class,
+                () -> entitlementService.assertCanUseLegacyMessages(owner.getId()));
+        assertEquals(PlanFeature.LEGACY_MESSAGES, ex.getFeature());
+    }
+
     // m2: DB thiếu dòng FREE -> không ném IllegalStateException, log.warn và áp hạn mức FREE mặc định
     @Test
     @ExtendWith(OutputCaptureExtension.class)
