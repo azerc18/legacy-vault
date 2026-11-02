@@ -40,6 +40,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationReviewProgressRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -98,6 +99,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final VerificationReviewProgressRepository progressRepository;
     private final ReviewProgressRecorder progressRecorder;
     private final VerifierAccessGuard verifierAccessGuard;
+    private final VaultBeneficiaryRepository beneficiaryRepository;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -585,7 +587,8 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // Verifier không được xử lý hồ sơ của chính mình (là owner hoặc executor)
     private void assertNoConflictOfInterest(LegalVerificationRequest request, UUID verifierId) {
-        if (VerifierAccessGuard.isConflict(request, verifierId)) {
+        if (VerifierAccessGuard.isConflict(request, verifierId)
+                || verifierAccessGuard.hasRelationshipConflict(request, verifierId)) {
             throw new ConflictOfInterestException(
                     "You cannot process a request that involves yourself.");
         }
@@ -612,9 +615,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // 1 hồ sơ: lấy vault riêng
     private VerificationRequestResponseDto toDto(LegalVerificationRequest r) {
-        return toDto(r, requestVaultRepository.findByRequestId(r.getId()).stream()
-                .map(LegalVerificationServiceImpl::toVaultDto)
-                .toList());
+        List<VerificationRequestVault> links = requestVaultRepository.findByRequestId(r.getId());
+        Map<UUID, List<String>> beneficiaries = maskedBeneficiariesByVault(links);
+        return toDto(r, links.stream().map(rv -> toVaultDto(rv, beneficiaries)).toList());
     }
 
     // M1: nhiều hồ sơ: lấy vault của tất cả trong 1 query
@@ -623,20 +626,46 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             return List.of();
         }
         List<UUID> ids = requests.stream().map(LegalVerificationRequest::getId).toList();
-        Map<UUID, List<VerificationVaultDto>> vaultsByRequest = requestVaultRepository.findByRequestIdIn(ids).stream()
+        List<VerificationRequestVault> links = requestVaultRepository.findByRequestIdIn(ids);
+        Map<UUID, List<String>> beneficiaries = maskedBeneficiariesByVault(links);
+        Map<UUID, List<VerificationVaultDto>> vaultsByRequest = links.stream()
                 .collect(Collectors.groupingBy(
                         rv -> rv.getRequest().getId(),
-                        Collectors.mapping(LegalVerificationServiceImpl::toVaultDto, Collectors.toList())));
+                        Collectors.mapping(rv -> toVaultDto(rv, beneficiaries), Collectors.toList())));
         return requests.stream()
                 .map(r -> toDto(r, vaultsByRequest.getOrDefault(r.getId(), List.of())))
                 .toList();
     }
 
-    private static VerificationVaultDto toVaultDto(VerificationRequestVault rv) {
+    private static VerificationVaultDto toVaultDto(VerificationRequestVault rv, Map<UUID, List<String>> beneficiaries) {
         return VerificationVaultDto.builder()
                 .id(rv.getVault().getId())
                 .name(rv.getVault().getName())
+                .beneficiaries(beneficiaries.getOrDefault(rv.getVault().getId(), List.of()))
                 .build();
+    }
+
+    // N2: beneficiary của các vault trong 1 query, email đã che
+    private Map<UUID, List<String>> maskedBeneficiariesByVault(List<VerificationRequestVault> links) {
+        if (links.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> vaultIds = links.stream().map(rv -> rv.getVault().getId()).distinct().toList();
+        return beneficiaryRepository.findByVaultIdInOrderByCreatedAtAsc(vaultIds).stream()
+                .collect(Collectors.groupingBy(
+                        b -> b.getVault().getId(),
+                        Collectors.mapping(b -> maskEmail(b.getEmail()), Collectors.toList())));
+    }
+
+    private static String maskEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        return email.charAt(0) + "***" + email.substring(at);
     }
 
     private VerificationRequestResponseDto toDto(LegalVerificationRequest r, List<VerificationVaultDto> vaults) {
