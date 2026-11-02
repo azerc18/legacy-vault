@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
@@ -63,7 +64,7 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         }
         // Q26: người thụ hưởng không được đồng thời là Executor
         if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
-            throw new DmsException("This person is a beneficiary of the owner and cannot also be the executor.", HttpStatus.CONFLICT);
+            throw new DmsException(ErrorCode.BENEFICIARY_CONFLICT, "This person is a beneficiary of the owner and cannot also be the executor.");
         }
         boolean isBackup = assignments.stream().anyMatch(a -> a.getExecutorType() == ExecutorType.BACKUP && a.getStatus() != ExecutorStatus.REVOKED && a.getExecutorUser().getId().equals(candidate.getId()));
         if (isBackup) {
