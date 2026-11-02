@@ -1,27 +1,18 @@
 import React, {useEffect, useState} from 'react';
 import {Link, Navigate} from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {getUser, ROLES} from '../auth/auth.js';
 import {getRequests, getSummary} from '../api/verifierApi.js';
 import {getErrorMessage} from '../api/http.js';
-import {formatDate, STATUS_LABEL} from './verifierUi.js';
+import {formatDate, statusLabel} from './verifierUi.js';
 import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 
 // Trang home của Legal Verifier — cùng bố cục với UserHome.
 // to = null => chưa làm, hiện "Coming soon".
 const FEATURES = [
-    {
-        icon: 'gavel',
-        title: 'Verification requests',
-        text: 'Review, approve and sign pending requests.',
-        to: '/verifier'
-    },
-    {
-        icon: 'manage_search',
-        title: 'Verification history',
-        text: 'Requests you have already signed or rejected.',
-        to: '/verifier/history'
-    },
+    {icon: 'gavel', key: 'requests', to: '/verifier'},
+    {icon: 'manage_search', key: 'history', to: '/verifier/history'},
 ];
 
 function Icon({name, className = ''}) {
@@ -29,6 +20,7 @@ function Icon({name, className = ''}) {
 }
 
 function FeatureCard({f}) {
+    const {t} = useTranslation('verifier');
     const body = (
         <>
             <div className="flex items-start justify-between">
@@ -37,12 +29,12 @@ function FeatureCard({f}) {
                 </div>
                 {!f.to && (
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-container text-outline">
-                        Coming soon
+                        {t('home.comingSoon')}
                     </span>
                 )}
             </div>
-            <h3 className="font-title-lg text-title-lg mt-4">{f.title}</h3>
-            <p className="mt-1 text-sm text-on-surface-variant">{f.text}</p>
+            <h3 className="font-title-lg text-title-lg mt-4">{t(`home.features.${f.key}.title`)}</h3>
+            <p className="mt-1 text-sm text-on-surface-variant">{t(`home.features.${f.key}.text`)}</p>
         </>
     );
 
@@ -73,6 +65,7 @@ function StatCard({icon, label, value, to}) {
 }
 
 export default function VerifierHome() {
+    const {t} = useTranslation('verifier');
     const user = getUser();
     const [requests, setRequests] = useState(null);
     const [summary, setSummary] = useState(null);
@@ -86,10 +79,10 @@ export default function VerifierHome() {
         // Hai nguồn độc lập: một bên lỗi thì bên kia vẫn hiển thị
         getRequests()
             .then(setRequests)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load requests.')));
+            .catch((e) => setError(getErrorMessage(e, t('home.loadError'))));
         getSummary()
             .then(setSummary)
-            .catch((e) => setError((prev) => prev || getErrorMessage(e, 'Could not load statistics.')));
+            .catch((e) => setError((prev) => prev || getErrorMessage(e, t('home.statsError'))));
     }, [isVerifier]);
 
     // Chưa đăng nhập -> login; không phải verifier -> home thường
@@ -102,16 +95,16 @@ export default function VerifierHome() {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             {/* Top bar */}
-            <AppHeader icon="verified_user" workspace="Legal Verifier portal" home="/verifier/home" userHome={hasOtherRoles}/>
+            <AppHeader icon="verified_user" workspace={t('portal')} home="/verifier/home" userHome={hasOtherRoles}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
                 <div className="mb-8">
-                    <h1 className="font-headline-md text-headline-md">Welcome back, {user.name}</h1>
+                    <h1 className="font-headline-md text-headline-md">{t('home.welcome', {name: user.name})}</h1>
                     <div className="mt-3 flex flex-wrap gap-2">
                         <span
                             className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                            Legal Verifier
+                            {t('role')}
                         </span>
                     </div>
                 </div>
@@ -123,35 +116,34 @@ export default function VerifierHome() {
 
                 {/* Thống kê nhanh */}
                 <section className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard icon="pending_actions" label="Pending review" value={summary?.pending} to="/verifier"/>
-                    <StatCard icon="draw" label="Awaiting signature" value={summary?.awaitingSignature} to="/verifier"/>
-                    <StatCard icon="task_alt" label="Signed"
+                    <StatCard icon="pending_actions" label={t('home.stats.pending')} value={summary?.pending} to="/verifier"/>
+                    <StatCard icon="draw" label={t('home.stats.awaiting')} value={summary?.awaitingSignature} to="/verifier"/>
+                    <StatCard icon="task_alt" label={t('home.stats.signed')}
                               value={summary?.signed} to="/verifier/history"/>
-                    <StatCard icon="block" label="Rejected"
+                    <StatCard icon="block" label={t('home.stats.rejected')}
                               value={summary?.rejected} to="/verifier/history"/>
                 </section>
 
                 {/* Chức năng */}
                 <section className="mb-10">
-                    <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Legal Verifier</h2>
+                    <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('role')}</h2>
                     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {FEATURES.map((f) => <FeatureCard key={f.title} f={f}/>)}
+                        {FEATURES.map((f) => <FeatureCard key={f.key} f={f}/>)}
                     </div>
                 </section>
 
                 {/* Việc cần xử lý */}
                 <section>
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-label-lg text-label-lg text-on-surface-variant">Needs your action</h2>
-                        <Link to="/verifier" className="text-sm font-semibold text-secondary hover:text-primary">View
-                            all →</Link>
+                        <h2 className="font-label-lg text-label-lg text-on-surface-variant">{t('home.needsAction')}</h2>
+                        <Link to="/verifier" className="text-sm font-semibold text-secondary hover:text-primary">{t('home.viewAll')}</Link>
                     </div>
 
-                    {requests === null && !error && <p className="text-on-surface-variant">Loading...</p>}
+                    {requests === null && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
                     {requests !== null && todo.length === 0 && (
-                        <EmptyState bordered compact icon="task_alt" title="You're all caught up"
-                                    text="No requests are waiting for review."
-                                    action={{ to: '/verifier/history', label: 'View history', icon: 'history' }} />
+                        <EmptyState bordered compact icon="task_alt" title={t('home.emptyTitle')}
+                                    text={t('home.emptyText')}
+                                    action={{ to: '/verifier/history', label: t('home.viewHistory'), icon: 'history' }} />
                     )}
 
                     {todo.length > 0 && (
@@ -166,12 +158,12 @@ export default function VerifierHome() {
                                     <div className="min-w-0">
                                         <p className="font-semibold text-on-surface truncate">{r.ownerName}</p>
                                         <p className="text-sm text-on-surface-variant truncate">
-                                            Executor: {r.executorName} · Submitted {formatDate(r.createdAt)}
+                                            {t('home.line', { executor: r.executorName, date: formatDate(r.createdAt) })}
                                         </p>
                                     </div>
                                     <span
                                         className="shrink-0 text-[11px] px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-semibold">
-                                        {STATUS_LABEL[r.status]}
+                                        {statusLabel(r.status)}
                                     </span>
                                 </Link>
                             ))}

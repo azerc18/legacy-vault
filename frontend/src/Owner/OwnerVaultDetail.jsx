@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
-import { ownerApi, needsReplaceConfirm } from '../api/ownerApi.js';
+import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
@@ -9,6 +9,7 @@ import {
 } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
@@ -41,7 +42,7 @@ export default function OwnerVaultDetail() {
                 <span className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">{vault.status}</span>
             )}
         >
-            {location.state?.created && <Alert type="success">Vault created. Now choose who will receive it.</Alert>}
+            {location.state?.created && <Alert type="success">Vault created.</Alert>}
             <Alert>{error}</Alert>
             {!vault && !error && <p className="text-on-surface-variant">Loading...</p>}
             {vault && !editable && (
@@ -52,7 +53,7 @@ export default function OwnerVaultDetail() {
                 <div className="space-y-6">
                     <DetailsSection vault={vault} editable={editable} onSaved={reload} />
                     <AssetSection vaultId={vaultId} editable={editable} onChanged={reload} />
-                    <BeneficiarySection vaultId={vaultId} current={vault.beneficiaryEmail} editable={editable} onSaved={reload} />
+                    <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
                     <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
                     <ActivitySection vaultId={vaultId} />
                     {editable && <DeleteSection vaultId={vaultId} />}
@@ -125,6 +126,7 @@ function DetailsSection({ vault, editable, onSaved }) {
 
 /* ---------- Tài sản số (FR-27) ---------- */
 function AssetSection({ vaultId, editable, onChanged }) {
+    const schemas = useAssetSchemas();
     const [assets, setAssets] = useState([]);
     const [error, setError] = useState('');
     const [viewing, setViewing] = useState(null);   // chi tiết đã giải mã
@@ -149,7 +151,13 @@ function AssetSection({ vaultId, editable, onChanged }) {
         setError('');
         try {
             const d = await ownerApi.getAsset(vaultId, a.id);
-            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '' });
+            // N3: tài sản theo schema -> bỏ giá trị trường bí mật (để trống = giữ nguyên)
+            let fields = null;
+            if (d.fields) {
+                const sec = new Set((schemaOf(schemas, d.assetType)?.fields || []).filter((x) => x.sensitive).map((x) => x.key));
+                fields = Object.fromEntries(Object.entries(d.fields).filter(([k]) => !sec.has(k)));
+            }
+            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '', fields });
         } catch (e) {
             setError(getErrorMessage(e, 'Could not open this asset.'));
         }
@@ -196,16 +204,17 @@ function AssetSection({ vaultId, editable, onChanged }) {
                 </ul>
             )}
             {editable && (
-                <button onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '' })} className={btnOutline}>
+                <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
                     <Icon name="add" className="text-[18px]" /> Add asset
                 </button>
             )}
 
-            {viewing && <AssetViewModal asset={viewing} onClose={() => setViewing(null)} />}
+            {viewing && <AssetViewModal asset={viewing} schemas={schemas} onClose={() => setViewing(null)} />}
             {form && (
                 <AssetFormModal
                     vaultId={vaultId}
                     initial={form}
+                    schemas={schemas}
                     onClose={() => setForm(null)}
                     onSaved={() => { setForm(null); load(); onChanged(); }}
                 />
@@ -234,8 +243,9 @@ function Modal({ children, onClose }) {
     );
 }
 
-function AssetViewModal({ asset, onClose }) {
+function AssetViewModal({ asset, schemas, onClose }) {
     const [reveal, setReveal] = useState(false);
+    const schema = asset.fields ? schemaOf(schemas, asset.assetType) : null;
     return (
         <Modal onClose={onClose}>
             <div className="flex justify-between items-start">
@@ -245,11 +255,15 @@ function AssetViewModal({ asset, onClose }) {
                 </div>
                 <button onClick={onClose}><Icon name="close" className="text-outline" /></button>
             </div>
-            <p className="mt-5 text-sm font-semibold text-on-surface-variant">Secret</p>
-            <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
-                <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
-            </div>
+            {schema ? <AssetFieldsView schema={schema} fields={asset.fields} /> : (
+                <>
+                    <p className="mt-5 text-sm font-semibold text-on-surface-variant">Secret</p>
+                    <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
+                        <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
+                        <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+                    </div>
+                </>
+            )}
             {asset.notes && (
                 <>
                     <p className="mt-4 text-sm font-semibold text-on-surface-variant">Notes</p>
@@ -261,27 +275,39 @@ function AssetViewModal({ asset, onClose }) {
     );
 }
 
-function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
+function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
     const isEdit = !!initial.id;
     const [f, setF] = useState(initial);
     const [show, setShow] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
+    const schema = schemaOf(schemas, f.assetType);
+    // Tài sản cũ (không có fields) giữ form kiểu cũ khi sửa; tài sản mới / đã theo schema dùng form động
+    const dynamic = !!schema && (!isEdit || initial.fields != null);
+    // Sửa tài sản đã theo schema mà không tải được schema -> báo lỗi, không rơi về form cũ (sẽ làm hỏng dữ liệu)
+    const schemaMissing = isEdit && initial.fields != null && !schema;
+    const changeType = (e) => setF((x) => ({ ...x, assetType: e.target.value, fields: {} }));
+    const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
 
     const submit = async (e) => {
         e.preventDefault();
         setError('');
         if (!f.assetName.trim()) return setError('Asset name is required.');
-        if (!isEdit && !f.secret.trim()) return setError('Secret is required for a new asset.');
+        if (schemaMissing) return setError('Could not load asset types. Reload the page and try again.');
+        if (dynamic) {
+            const msg = validateFields(schema, f.fields || {}, isEdit);
+            if (msg) return setError(msg);
+        } else if (!isEdit && !f.secret.trim()) return setError('Secret is required for a new asset.');
         setLoading(true);
         try {
             const body = {
                 assetType: f.assetType,
                 assetName: f.assetName.trim(),
-                secret: f.secret ? f.secret : null,        // sửa: để trống = giữ nguyên secret cũ
                 notes: isEdit ? f.notes.trim() : (f.notes.trim() || null), // sửa: "" = xoá ghi chú
             };
+            if (dynamic) body.fields = cleanFields(f.fields || {});
+            else body.secret = f.secret ? f.secret : null;     // sửa: để trống = giữ nguyên secret cũ
             if (isEdit) await ownerApi.updateAsset(vaultId, f.id, body);
             else await ownerApi.addAsset(vaultId, body);
             onSaved();
@@ -297,19 +323,23 @@ function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
             <h3 className="font-title-lg text-title-lg mb-4">{isEdit ? 'Edit asset' : 'Add asset'}</h3>
             <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
-                <select value={f.assetType} onChange={set('assetType')} className={inputClass}>
+                <select value={f.assetType} onChange={changeType} className={inputClass}>
                     {ASSET_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder="Asset name" className={inputClass} />
-                <div className="relative">
-                    <input
-                        type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
-                        placeholder={isEdit ? 'New secret (leave empty to keep current)' : 'Secret'} className={`${inputClass} pr-12`}
-                    />
-                    <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
-                        <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
-                    </button>
-                </div>
+                {dynamic ? (
+                    <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
+                ) : (
+                    <div className="relative">
+                        <input
+                            type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
+                            placeholder={isEdit ? 'New secret (leave empty to keep current)' : 'Secret'} className={`${inputClass} pr-12`}
+                        />
+                        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
+                            <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                        </button>
+                    </div>
+                )}
                 <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder="Notes for the beneficiary (optional)" className={textareaCls} />
                 <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={onClose} className={btnOutline}>Cancel</button>
@@ -320,24 +350,35 @@ function AssetFormModal({ vaultId, initial, onClose, onSaved }) {
     );
 }
 
-/* ---------- FR-02: người thụ hưởng ---------- */
-function BeneficiarySection({ vaultId, current, editable, onSaved }) {
-    const [email, setEmail] = useState('');
-    const [result, setResult] = useState(null);
+/* ---------- FR-02 / N2-owner: danh sách người thụ hưởng ---------- */
+const BENEFICIARY_STATUS = {
+    PENDING_REGISTRATION: 'Waiting for sign-up',
+    INVITED: 'Invited',
+};
+const emptyBeneficiaryForm = { email: '', fullName: '', relationship: '' };
+
+function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
+    const [form, setForm] = useState(emptyBeneficiaryForm);
     const [error, setError] = useState('');
-    const [confirm, setConfirm] = useState(null);
-    const [removeOpen, setRemoveOpen] = useState(false);
+    const [removing, setRemoving] = useState(null);   // beneficiary đang chờ xác nhận xoá
     const [loading, setLoading] = useState(false);
 
-    const submit = async (confirmReplace = false) => {
+    const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+    const handleAdd = async (e) => {
+        e.preventDefault();
+        if (!form.email.trim()) return;
         setError(''); setLoading(true);
         try {
-            setResult(await ownerApi.assignBeneficiary(vaultId, email.trim(), confirmReplace));
-            setConfirm(null); setEmail('');
+            await ownerApi.addBeneficiary(vaultId, {
+                email: form.email.trim(),
+                fullName: form.fullName.trim() || null,
+                relationship: form.relationship.trim() || null,
+            });
+            setForm(emptyBeneficiaryForm);
             onSaved();
         } catch (err) {
-            if (needsReplaceConfirm(err)) setConfirm(getErrorMessage(err));
-            else setError(getErrorMessage(err, 'Could not assign the beneficiary.'));
+            setError(getErrorMessage(err, 'Could not add the beneficiary.'));
         } finally {
             setLoading(false);
         }
@@ -346,66 +387,67 @@ function BeneficiarySection({ vaultId, current, editable, onSaved }) {
     const handleRemove = async () => {
         setLoading(true); setError('');
         try {
-            await ownerApi.removeBeneficiary(vaultId);
-            setRemoveOpen(false);
-            setResult(null);
+            await ownerApi.removeBeneficiaryById(vaultId, removing.id);
+            setRemoving(null);
             onSaved();
         } catch (err) {
+            // BENEFICIARY_IN_USE / LAST_BENEFICIARY đã có bản dịch trong errors.json
             setError(getErrorMessage(err, 'Could not remove the beneficiary.'));
-            setRemoveOpen(false);
+            setRemoving(null);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card title="Beneficiary" icon="family_restroom">
-            <p className="text-sm mb-4">
-                Current: <b>{current || 'Not assigned'}</b>
-            </p>
+        <Card title={`Beneficiaries (${beneficiaries.length})`} icon="family_restroom">
             <Alert>{error}</Alert>
-            {result && (
-                <Alert type="success">
-                    {result.replaced ? 'Beneficiary replaced: ' : 'Beneficiary set: '}
-                    <b>{result.beneficiaryName || result.beneficiaryEmail}</b>
-                    {result.pendingRegistration && ' — invitation sent, they will be linked after registering.'}
-                </Alert>
+            {beneficiaries.length === 0 ? (
+                <p className="text-sm mb-4">No beneficiaries yet.</p>
+            ) : (
+                <ul className="mb-4 space-y-2">
+                    {beneficiaries.map((b) => (
+                        <li key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-outline-variant/50">
+                            <div className="text-sm min-w-0">
+                                <b className="break-all">{b.email}</b>
+                                {b.fullName && <span> · {b.fullName}</span>}
+                                {b.relationship && <span className="text-on-surface-variant"> ({b.relationship})</span>}
+                                <div className="text-xs text-outline">{BENEFICIARY_STATUS[b.status] || humanize(b.status)}</div>
+                            </div>
+                            {editable && beneficiaries.length > 1 && (
+                                <button type="button" disabled={loading} onClick={() => setRemoving(b)}
+                                        className="text-sm text-error font-semibold shrink-0">
+                                    Remove
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
             )}
             {editable && (
-                <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) submit(false); }} className="flex flex-col sm:flex-row gap-3">
-                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                           placeholder={current ? 'New beneficiary email' : 'beneficiary@example.com'} className={inputClass} />
-                    <button type="submit" disabled={loading} className={`${btnPrimary} shrink-0`}>
-                        {loading ? 'Saving...' : current ? 'Replace' : 'Assign'}
+                <form onSubmit={handleAdd} className="space-y-3">
+                    <input type="email" required value={form.email} maxLength={255} onChange={(e) => setField('email', e.target.value)}
+                           placeholder="beneficiary@example.com" className={inputClass} />
+                    <div className="grid sm:grid-cols-2 gap-3">
+                        <input value={form.fullName} maxLength={255} onChange={(e) => setField('fullName', e.target.value)}
+                               placeholder="Full name (optional)" className={inputClass} />
+                        <input value={form.relationship} maxLength={50} onChange={(e) => setField('relationship', e.target.value)}
+                               placeholder="Relationship (optional)" className={inputClass} />
+                    </div>
+                    <button type="submit" disabled={loading || beneficiaries.length >= 10} className={btnPrimary}>
+                        {loading ? 'Saving...' : 'Add beneficiary'}
                     </button>
-                    {current && (
-                        <button type="button" disabled={loading} onClick={() => setRemoveOpen(true)}
-                                className={`${btnDanger} shrink-0`}>
-                            Remove
-                        </button>
-                    )}
                 </form>
             )}
-            {/* ConfirmDialog: thay thế người thụ hưởng */}
             <ConfirmDialog
-                open={!!confirm}
-                title="Replace beneficiary?"
-                message={confirm}
-                confirmLabel="Replace"
-                busy={loading}
-                onConfirm={() => submit(true)}
-                onCancel={() => setConfirm(null)}
-            />
-            {/* ConfirmDialog: gỡ người thụ hưởng (V8) */}
-            <ConfirmDialog
-                open={removeOpen}
+                open={!!removing}
                 danger
                 title="Remove beneficiary?"
-                message={`Remove ${current} as the beneficiary? Any pending invitation will also be cancelled.`}
+                message={`Remove ${removing?.email} from this vault? They will be notified.`}
                 confirmLabel="Remove"
                 busy={loading}
                 onConfirm={handleRemove}
-                onCancel={() => setRemoveOpen(false)}
+                onCancel={() => setRemoving(null)}
             />
         </Card>
     );

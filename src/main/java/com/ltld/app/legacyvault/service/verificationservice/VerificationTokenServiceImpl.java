@@ -5,13 +5,16 @@ import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.repository.VerificationTokenRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -38,6 +41,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
     private final EmailSender emailSender;
     private final AuditLogService auditLogService;
     private final VaultRepository vaultRepository;
+    private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final OtpHasher otpHasher;
 
     private static final int MAX_ATTEMPTS = 5;
@@ -196,6 +200,13 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
                     vault.getId(), "Vault", vault.getId().toString(), null);
         }
         vaultRepository.saveAll(pendingVaults);
+        // N2a: cập nhật bảng mới: gắn tài khoản và chuyển sang INVITED
+        List<VaultBeneficiary> pendingRows = vaultBeneficiaryRepository.findPendingByEmail(email);
+        for (VaultBeneficiary row : pendingRows) {
+            row.setUser(user);
+            row.setStatus(BeneficiaryInviteStatus.INVITED);
+        }
+        vaultBeneficiaryRepository.saveAll(pendingRows);
     }
 
     private void runAfterCommit(Runnable action) {

@@ -1,27 +1,11 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
-import com.ltld.app.legacyvault.entity.AuditLog;
-import com.ltld.app.legacyvault.entity.DmsCheckin;
-import com.ltld.app.legacyvault.entity.DmsConfig;
-import com.ltld.app.legacyvault.entity.ExecutorAssignment;
-import com.ltld.app.legacyvault.entity.User;
-import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.DmsCheckinType;
-import com.ltld.app.legacyvault.enums.DmsStatus;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.NotificationChannel;
-import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.DmsException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
-import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
-import com.ltld.app.legacyvault.repository.DmsConfigRepository;
-import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
-import com.ltld.app.legacyvault.repository.NotificationRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -48,23 +33,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * FR-03 chạy trên MySQL thật: lưu cấu hình DMS, nhắc check-in, check-in, và chỗ nối với FR-07 (trigger).
@@ -80,6 +54,7 @@ import static org.mockito.Mockito.verify;
         "app.dms.scheduler.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DmsConfigIntegrationTest {
 
     private static final Logger log = LoggerFactory.getLogger(DmsConfigIntegrationTest.class);

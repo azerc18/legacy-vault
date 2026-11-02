@@ -1,0 +1,10 @@
+{
+  "header": { "userHome": "Trang người dùng", "logout": "Đăng xuất" },
+  "actions": { "back": "Quay lại", "save": "Lưu", "cancel": "Huỷ", "confirm": "Xác nhận", "retry": "Thử lại" },
+  "language": { "label": "Ngôn ngữ", "en": "EN", "vi": "VI" },
+  "claim": {
+    "progress": "Tiến độ nhận tài sản",
+    "accepted": "{{accepted}}/{{required}} người đã đồng ý",
+    "status": { "UNLOCKED": "Đang chờ người thụ hưởng", "CLAIM_STALLED": "Quá hạn phản hồi", "CLAIMED": "Hoàn tất", "EXPIRED": "Hết hạn" }
+  }
+}

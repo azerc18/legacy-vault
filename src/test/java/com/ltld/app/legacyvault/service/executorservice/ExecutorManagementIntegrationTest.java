@@ -12,19 +12,11 @@ import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.DmsStatus;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
-import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
-import com.ltld.app.legacyvault.repository.DmsConfigRepository;
-import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
-import com.ltld.app.legacyvault.repository.NotificationRepository;
-import com.ltld.app.legacyvault.repository.UserRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationServiceImpl;
@@ -45,6 +37,7 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -59,24 +52,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.after;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.timeout;
-import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 /**
  * FR-06 chạy trên MySQL thật: chỉ định / thay / thu hồi Executor, nối với FR-07 (trigger + BR-03),
@@ -93,13 +74,14 @@ import static org.mockito.Mockito.verify;
         "app.dms.scheduler.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ExecutorManagementIntegrationTest {
-
-    private static final org.slf4j.Logger log = LoggerFactory.getLogger(ExecutorManagementIntegrationTest.class);
 
     @Container
     @ServiceConnection
     static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+
+    private static final org.slf4j.Logger log = LoggerFactory.getLogger(ExecutorManagementIntegrationTest.class);
 
     // Mail đã gửi chạy trên thread @Async: chờ tối đa MAIL_WAIT_MS; kiểm "không gửi" chờ NO_MAIL_WAIT_MS.
     private static final long MAIL_WAIT_MS = 5_000;

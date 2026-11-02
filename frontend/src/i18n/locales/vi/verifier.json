@@ -1,0 +1,195 @@
+{
+  "portal": "Cổng Người xác minh pháp lý",
+  "role": "Người xác minh pháp lý",
+  "loading": "Đang tải...",
+  "back": {
+    "all": "Tất cả yêu cầu",
+    "home": "Trang người xác minh"
+  },
+  "status": {
+    "PENDING": "Chờ xem xét",
+    "APPROVED": "Đã duyệt, chờ ký",
+    "SIGNED": "Đã ký",
+    "REJECTED": "Đã từ chối"
+  },
+  "dashboard": {
+    "title": "Yêu cầu xác minh",
+    "subtitle": "Chọn một hồ sơ để xem chi tiết và xử lý.",
+    "viewHistory": "Xem lịch sử xác minh",
+    "emptyTitle": "Bạn đã xử lý hết",
+    "emptyText": "Chưa có yêu cầu nào đang chờ xem xét. Yêu cầu mới từ người thi hành sẽ hiện ở đây.",
+    "awaiting": "Chờ bạn ký",
+    "pending": "Chờ xem xét",
+    "executor": "Người thi hành: {{name}}",
+    "meta": "#{{id}} · Gửi ngày {{date}} · {{count}} két",
+    "loadError": "Không tải được danh sách yêu cầu."
+  },
+  "home": {
+    "welcome": "Chào mừng trở lại, {{name}}",
+    "loadError": "Không tải được danh sách yêu cầu.",
+    "statsError": "Không tải được thống kê.",
+    "stats": {
+      "pending": "Chờ xem xét",
+      "awaiting": "Chờ ký",
+      "signed": "Đã ký",
+      "rejected": "Đã từ chối"
+    },
+    "features": {
+      "requests": {
+        "title": "Yêu cầu xác minh",
+        "text": "Xem xét, duyệt và ký các yêu cầu đang chờ."
+      },
+      "history": {
+        "title": "Lịch sử xác minh",
+        "text": "Các yêu cầu bạn đã ký hoặc từ chối."
+      }
+    },
+    "comingSoon": "Sắp ra mắt",
+    "needsAction": "Cần bạn xử lý",
+    "viewAll": "Xem tất cả →",
+    "emptyTitle": "Bạn đã xử lý hết",
+    "emptyText": "Chưa có yêu cầu nào đang chờ xem xét.",
+    "viewHistory": "Xem lịch sử",
+    "line": "Người thi hành: {{executor}} · Gửi ngày {{date}}"
+  },
+  "history": {
+    "title": "Lịch sử xác minh",
+    "result": "Kết quả",
+    "all": "Tất cả",
+    "awaitingSignature": "Chờ ký",
+    "from": "Từ ngày",
+    "to": "Đến ngày",
+    "clear": "Xoá bộ lọc",
+    "noResultsTitle": "Không có kết quả phù hợp",
+    "noResultsText": "Thử loại kết quả khác hoặc mở rộng khoảng ngày.",
+    "emptyTitle": "Chưa có quyết định nào",
+    "emptyText": "Các yêu cầu bạn duyệt, ký hoặc từ chối sẽ hiện ở đây.",
+    "openPending": "Mở các yêu cầu đang chờ",
+    "cols": {
+      "decided": "Ngày quyết định",
+      "owner": "Chủ két",
+      "executor": "Người thi hành",
+      "result": "Kết quả",
+      "note": "Ghi chú"
+    },
+    "prev": "← Trước",
+    "next": "Sau →",
+    "page": "Trang {{n}}",
+    "loadError": "Không tải được lịch sử."
+  },
+  "messages": {
+    "title": "Trao đổi với người thi hành",
+    "refresh": "Làm mới",
+    "refreshing": "Đang làm mới...",
+    "emptyTitle": "Chưa có tin nhắn",
+    "emptyCanSend": "Nếu cần, hãy nhờ người thi hành gửi bản rõ hơn hoặc bổ sung tài liệu.",
+    "emptyClosed": "Yêu cầu này không có tin nhắn nào.",
+    "verifier": "Người xác minh",
+    "executor": "Người thi hành",
+    "placeholder": "Viết phản hồi cho người thi hành...",
+    "replyLabel": "Phản hồi cho người thi hành",
+    "attach": "Đính kèm tệp",
+    "attachHint": "PDF, PNG hoặc JPG, tối đa 10MB",
+    "send": "Gửi phản hồi",
+    "sending": "Đang gửi...",
+    "closed": "Yêu cầu này đã đóng nên bạn chỉ có thể đọc tin nhắn.",
+    "loadError": "Không tải được tin nhắn.",
+    "tooBig": "Tệp vượt quá giới hạn 10MB.",
+    "sendError": "Không gửi được tin nhắn.",
+    "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này.",
+    "openError": "Không mở được tệp đính kèm."
+  },
+  "confirm": {
+    "processing": "Đang xử lý...",
+    "approve": {
+      "title": "Duyệt yêu cầu này?",
+      "message": "Bạn xác nhận tài liệu hợp lệ. Sau khi duyệt, bạn vẫn cần ký bằng mã dùng một lần để mở khoá két.",
+      "button": "Duyệt"
+    },
+    "reject": {
+      "title": "Từ chối yêu cầu này?",
+      "message": "Không thể hoàn tác. Lý do của bạn sẽ được lưu cùng yêu cầu và hiển thị cho người thi hành trên trang yêu cầu của họ.",
+      "button": "Từ chối"
+    },
+    "sign": {
+      "title": "Ký và mở khoá két?",
+      "message": "Không thể hoàn tác. Tất cả két trong yêu cầu này sẽ được mở khoá cho người thụ hưởng.",
+      "button": "Ký và mở khoá"
+    }
+  },
+  "detail": {
+    "notFound": "Không tìm thấy yêu cầu.",
+    "backToList": "Về danh sách",
+    "requestTitle": "Yêu cầu #{{id}}",
+    "ownerLine": "Chủ két: {{name}}",
+    "caseInfo": "Thông tin hồ sơ",
+    "deceased": "Người đã mất (Chủ két)",
+    "requester": "Người yêu cầu (Người thi hành)",
+    "submitted": "Ngày gửi",
+    "decided": "Ngày quyết định",
+    "vaultsTitle": "Két sẽ mở khoá ({{count}})",
+    "vaultsHint": "Khi ký yêu cầu này, tất cả két bên dưới sẽ được mở khoá cho người thụ hưởng.",
+    "unnamedVault": "Két chưa đặt tên",
+    "certificate": "Giấy chứng tử",
+    "docSubmitted": "Tài liệu do người thi hành nộp",
+    "noCertificate": "Chưa đính kèm giấy chứng tử.",
+    "checkDocument": "Kiểm tra tài liệu",
+    "checking": "Đang kiểm tra...",
+    "viewDocument": "Xem tài liệu",
+    "opening": "Đang mở...",
+    "checkFirst": "Hãy kiểm tra tài liệu trước",
+    "viewFirst": "Hãy xem tài liệu trước",
+    "valid": "Hợp lệ",
+    "invalid": "Không hợp lệ",
+    "steps": {
+      "check": "Kiểm tra",
+      "view": "Xem",
+      "approve": "Duyệt"
+    },
+    "rejectNeeds": "Muốn từ chối cần hoàn thành bước 1–2 (Kiểm tra, Xem).",
+    "actions": "Thao tác pháp lý",
+    "approveRequest": "Duyệt yêu cầu",
+    "rejectReason": "Lý do từ chối",
+    "selectReason": "Chọn một lý do...",
+    "reasonsError": "Không tải được danh sách lý do từ chối.",
+    "retry": "Thử lại",
+    "noteLabel": "Ghi chú từ chối",
+    "notePlaceholder": "Nhập ghi chú cho lý do này...",
+    "rejectRequest": "Từ chối yêu cầu",
+    "approvedBanner": "Yêu cầu đã được duyệt. Hãy ký bằng mã dùng một lần để mở khoá két.",
+    "sendCode": "Gửi mã ký đến email của tôi",
+    "sendingCode": "Đang gửi...",
+    "codeLabel": "Mã ký (6 chữ số)",
+    "resendIn": "Gửi lại mã sau {{s}} giây",
+    "resend": "Gửi lại mã",
+    "signUnlock": "Ký và mở khoá két",
+    "codeSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
+    "signedTitle": "Đã ký thành công",
+    "signedText": "Két đã được mở khoá cho người thụ hưởng.",
+    "rejectedTitle": "Yêu cầu này đã bị từ chối",
+    "reason": "Lý do: {{reason}}",
+    "recorded": "Quyết định của bạn sẽ được ghi vào lịch sử hệ thống.",
+    "err": {
+      "pickReason": "Vui lòng chọn lý do từ chối.",
+      "needNote": "Vui lòng nhập ghi chú cho lý do \"khác\".",
+      "noteTooLong": "Ghi chú tối đa 500 ký tự.",
+      "codeFormat": "Mã phải gồm đúng 6 chữ số.",
+      "approve": "Không duyệt được.",
+      "reject": "Không từ chối được.",
+      "sign": "Không ký được.",
+      "check": "Không kiểm tra được tài liệu.",
+      "sendCode": "Không gửi được mã.",
+      "openDocument": "Không mở được tài liệu (HTTP {{status}}).",
+      "noResponse": "không có phản hồi",
+      "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này."
+    }
+  },
+  "rejectReason": {
+    "DOCUMENT_UNREADABLE": "Tài liệu bị mờ hoặc không đọc được",
+    "DOCUMENT_INVALID": "Tài liệu không phải giấy chứng tử hợp lệ",
+    "INFO_MISMATCH": "Thông tin không khớp với chủ tài khoản",
+    "SUSPECTED_FORGERY": "Tài liệu bị nghi là giả mạo",
+    "DOCUMENT_INCOMPLETE": "Tài liệu thiếu trang hoặc thiếu dấu chứng thực",
+    "OTHER": "Lý do khác"
+  }
+}
