@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -65,6 +66,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private final AuditLogService auditLogService;
     // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
     private final ApplicationEventPublisher eventPublisher;
+    // X2 (m1): chặn chỉ định Executor trùng người xác nhận chéo của Owner
+    private final DmsConfirmerRepository dmsConfirmerRepository;
 
     // READ_COMMITTED: MySQL chạy REPEATABLE READ nên các câu đọc thường sau khi giữ khóa User vẫn thấy snapshot
     // cũ; READ_COMMITTED để existsBy... và lần nạp roles thấy dữ liệu đã commit mới nhất.
@@ -94,6 +97,12 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
             throw new ExecutorManagementException(ErrorCode.BENEFICIARY_CONFLICT,
                     "This person is your beneficiary and cannot also be your Digital Executor.");
+        }
+
+        // X2 (m1): người xác nhận chéo DMS của Owner không được đồng thời là Executor (bấm UNREACHABLE sẽ tự kích hoạt mình).
+        if (dmsConfirmerRepository.existsByOwnerIdAndEmail(ownerId, email)) {
+            throw new ExecutorManagementException(ErrorCode.CONFLICT,
+                    "This person is your trusted confirmer and cannot also be your Digital Executor.");
         }
 
         ExecutorAssignment current = executorAssignmentRepository

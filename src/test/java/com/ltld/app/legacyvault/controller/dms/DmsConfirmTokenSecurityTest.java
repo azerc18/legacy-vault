@@ -1,15 +1,17 @@
 package com.ltld.app.legacyvault.controller.dms;
 
+import com.ltld.app.legacyvault.controller.DmsConfirmerController;
 import com.ltld.app.legacyvault.controller.VaultController;
-import com.ltld.app.legacyvault.enums.DmsConfirmerDecision;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.security.JwtConfig;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerServiceImpl;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -24,18 +27,20 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -46,14 +51,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = {VaultController.class, DmsConfirmerController.class},
         properties = {
                 "security.jwt.secret=dms-confirm-security-test-secret-at-least-32-bytes!!",
-                "app.frontend.base-url=http://fe.test",
-                "app.backend.base-url=http://api.test"
+                "app.frontend.base-url=http://fe.test"
         })
 @Import({SecurityConfig.class, JwtConfig.class, DmsConfirmerServiceImpl.class})
 class DmsConfirmTokenSecurityTest {
-
-    private static final String INVALID_REDIRECT =
-            "http://fe.test/dms/confirm-done?status=error&errorCode=CONFIRMER_TOKEN_INVALID";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtEncoder jwtEncoder;
@@ -62,18 +63,21 @@ class DmsConfirmTokenSecurityTest {
     @MockitoBean private VaultService vaultService;
     @MockitoBean private DmsConfigRepository dmsConfigRepository;
     @MockitoBean private DmsConfirmerRepository dmsConfirmerRepository;
+    @MockitoBean private ExecutorAssignmentRepository executorAssignmentRepository;
     @MockitoBean private DmsActivationProcessor dmsActivationProcessor;
+    @MockitoBean private EntitlementService entitlementService;
     @MockitoBean private EmailSender emailSender;
     @MockitoBean private AuditLogService auditLogService;
 
     private final UUID ownerId = UUID.randomUUID();
     private final UUID confirmerId = UUID.randomUUID();
+    private final LocalDateTime deadlineAt = LocalDateTime.now().plusHours(72);
 
     // ---------- (a) token xác nhận KHÔNG dùng được như access token ----------
 
     @Test
     void confirmToken_asBearer_onVaults_returns401() throws Exception {
-        String confirmToken = dmsConfirmerService.generateConfirmationToken(confirmerId, DmsConfirmerDecision.ALIVE);
+        String confirmToken = dmsConfirmerService.generateConfirmationToken(confirmerId, deadlineAt);
 
         mockMvc.perform(get("/api/vaults").header(HttpHeaders.AUTHORIZATION, "Bearer " + confirmToken))
                 .andExpect(status().isUnauthorized());
@@ -90,17 +94,10 @@ class DmsConfirmTokenSecurityTest {
     // ---------- (b) access token KHÔNG dùng được làm token xác nhận ----------
 
     @Test
-    void accessToken_asConfirmToken_redirectsWithConfirmerTokenInvalid() throws Exception {
-        String accessToken = accessToken();
-
-        // SecurityConfig trên main chưa permitAll /api/dms/confirm (PR hạ tầng riêng), nên gửi kèm header để
-        // request tới được controller; header không ảnh hưởng việc kiểm tham số token.
-        mockMvc.perform(get("/api/dms/confirm")
-                        .param("token", accessToken)
-                        .param("decision", "UNREACHABLE")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, INVALID_REDIRECT));
+    void accessToken_asConfirmToken_returns400ConfirmerTokenInvalid() throws Exception {
+        mockMvc.perform(confirm(accessToken(), "UNREACHABLE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CONFIRMER_TOKEN_INVALID"));
 
         verifyNoInteractions(dmsConfigRepository, dmsConfirmerRepository, dmsActivationProcessor, auditLogService);
     }
@@ -116,14 +113,11 @@ class DmsConfirmTokenSecurityTest {
                 .issuedAt(Instant.now())
                 .expiresAt(Instant.now().plusSeconds(3600))
                 .claim(DmsConfirmerServiceImpl.PURPOSE_CLAIM, DmsConfirmerServiceImpl.PURPOSE_DMS_CONFIRM)
-                .claim(DmsConfirmerServiceImpl.DECISION_CLAIM, DmsConfirmerDecision.UNREACHABLE.name())
                 .build());
 
-        mockMvc.perform(get("/api/dms/confirm")
-                        .param("token", token)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken()))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, INVALID_REDIRECT));
+        mockMvc.perform(confirm(token, "UNREACHABLE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CONFIRMER_TOKEN_INVALID"));
 
         verifyNoInteractions(dmsConfigRepository, dmsConfirmerRepository, dmsActivationProcessor, auditLogService);
     }
@@ -131,17 +125,23 @@ class DmsConfirmTokenSecurityTest {
     // Đối chứng: token xác nhận thật qua được decoder riêng (tới bước tra confirmer trong DB).
     @Test
     void realConfirmToken_passesDecoder_control() throws Exception {
-        String confirmToken = dmsConfirmerService.generateConfirmationToken(confirmerId, DmsConfirmerDecision.ALIVE);
-        when(dmsConfirmerRepository.existsByLastTokenJti(any())).thenReturn(false);
+        String confirmToken = dmsConfirmerService.generateConfirmationToken(confirmerId, deadlineAt);
         when(dmsConfirmerRepository.findById(confirmerId)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/dms/confirm")
-                        .param("token", confirmToken)
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken()))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, INVALID_REDIRECT));
+        mockMvc.perform(confirm(confirmToken, "ALIVE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CONFIRMER_TOKEN_INVALID"));
 
         verify(dmsConfirmerRepository).findById(confirmerId);
+    }
+
+    // SecurityConfig trên main chưa permitAll POST /api/dms/confirm (PR #147 + X2 sẽ thêm), nên gửi kèm access token
+    // để request tới được controller; header không ảnh hưởng việc kiểm token trong body.
+    private MockHttpServletRequestBuilder confirm(String token, String decision) {
+        return post("/api/dms/confirm")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"decision\":\"" + decision + "\"}");
     }
 
     // Access token giống TokenServiceImpl.generateAccessToken.

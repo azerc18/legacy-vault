@@ -5,6 +5,12 @@
 ALTER TABLE `dms_configs` MODIFY COLUMN `status`
     enum('ACTIVE','SUSPENDED','TRIGGERED','PENDING_CONFIRMATION') COLLATE utf8mb4_unicode_ci NOT NULL;
 
+-- m2: số lần confirmer bấm ALIVE trong đợt hiện tại; ALIVE chỉ 1 lần/đợt, check-in / lưu cấu hình đặt lại 0.
+-- m3: mốc bắt đầu chu kỳ nhắc (ALIVE dời mốc này, không đụng last_check_in_at thật); NULL thì dùng last_checkin_at.
+ALTER TABLE `dms_configs`
+    ADD COLUMN `confirmation_deferrals` int NOT NULL DEFAULT 0,
+    ADD COLUMN `cycle_started_at` datetime(6) DEFAULT NULL;
+
 CREATE TABLE `dms_confirmers` (
   `created_at` datetime(6) NOT NULL,
   `responded_at` datetime(6) DEFAULT NULL,

@@ -5,7 +5,6 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerResponse;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.enums.DmsConfirmerDecision;
-import com.ltld.app.legacyvault.exception.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,35 +18,50 @@ public interface DmsConfirmerService {
     /** Danh sách người xác nhận chéo của Owner (tối đa 2 người). */
     List<DmsConfirmerResponse> listConfirmers(UUID ownerId);
 
-    /** Thêm người xác nhận chéo (tối đa 2 người, không trùng email Owner). */
+    /**
+     * Thêm người xác nhận chéo: tính năng VIP (PLAN_LIMIT_REACHED với gói FREE), tối đa 2 người, không trùng email,
+     * không phải chính Owner, không phải Executor còn hiệu lực của Owner.
+     */
     DmsConfirmerResponse addConfirmer(UUID ownerId, DmsConfirmerRequest request);
 
     /** Xóa người xác nhận chéo của Owner. */
     void removeConfirmer(UUID ownerId, UUID confirmerId);
 
-    /** Sinh JWT token xác nhận chéo cho một confirmer (purpose=DMS_CONFIRM, hạn 72h, jti one-time). */
-    String generateConfirmationToken(UUID confirmerId, DmsConfirmerDecision decision);
+    /**
+     * Sinh JWT xác nhận cho MỘT confirmer trong MỘT đợt (purpose=DMS_CONFIRM, jti dùng một lần).
+     * Token không mang quyết định; claim round gắn token với hạn chờ của đợt (deadlineAt).
+     */
+    String generateConfirmationToken(UUID confirmerId, LocalDateTime deadlineAt);
 
     /**
-     * Được gọi từ DmsActivationProcessor.trigger() khi DMS quá hạn:
-     * - Nếu Owner có cấu hình ít nhất 1 dms_confirmer -> chuyển DMS sang PENDING_CONFIRMATION (72h),
-     *   gửi email khẩn cấp kèm 2 link xác nhận cho các confirmer và trả về true.
-     * - Nếu chưa có confirmer nào -> trả về false để kích hoạt thẳng sang TRIGGERED.
+     * Được gọi từ DmsActivationProcessor.trigger() khi DMS quá hạn, trong transaction của trigger:
+     * - Owner có ít nhất 1 dms_confirmer -> chuyển PENDING_CONFIRMATION (72h), ghi audit và phát
+     *   DmsConfirmationRequestedEvent; mail được gửi SAU commit (DmsConfirmationRequestListener). Trả về true.
+     * - Chưa có confirmer nào -> trả về false để kích hoạt thẳng sang TRIGGERED.
      */
     boolean initiatePendingConfirmationIfConfigured(DmsConfig config, LocalDateTime now);
 
     /**
-     * Xử lý phản hồi của Confirmer từ link email:
-     * - ALIVE ("Owner is safe"): gia hạn thời gian chờ thêm 7 ngày, chuyển DMS về ACTIVE, gửi cảnh báo cho Owner.
-     * - UNREACHABLE ("Unreachable / Confirmed"): lập tức chuyển DMS sang TRIGGERED và kích hoạt Executor.
-     * Token hết hạn / sai chữ ký / dùng lại lần 2 -> ném DmsException 400 CONFIRMER_TOKEN_INVALID.
+     * Dữ liệu để gửi mail cho đợt xác nhận (đọc trong transaction mới, sau commit của trigger).
+     * Trả về null nếu đợt không còn hiệu lực (Owner đã check-in / lưu cấu hình, hay đợt khác đã bắt đầu).
      */
-    DmsConfirmationDecisionResponse respondByToken(String rawToken, DmsConfirmerDecision decisionParam, LocalDateTime now);
+    ConfirmationMails prepareConfirmationMails(UUID configId, LocalDateTime deadlineAt);
 
-    /** Xử lý phản hồi từ endpoint GET /api/dms/confirm và trả về URL chuyển hướng về FE. */
-    String respondAndBuildRedirectUrl(String rawToken, String decisionParam);
+    /**
+     * Xử lý quyết định của Confirmer từ trang FE /dms/confirm (POST /api/dms/confirm):
+     * - ALIVE: chỉ 1 lần mỗi đợt; DMS về ACTIVE, hạn mới +7 ngày, lịch nhắc dựng lại, báo Owner (sau commit).
+     * - UNREACHABLE: lập tức chuyển DMS sang TRIGGERED và kích hoạt Executor.
+     * Quyết định CHỈ lấy từ tham số (body request), không từ token. Token hết hạn / sai chữ ký / dùng lại /
+     * thuộc đợt khác -> DmsException 400 CONFIRMER_TOKEN_INVALID.
+     */
+    DmsConfirmationDecisionResponse respondByToken(String rawToken, DmsConfirmerDecision decision, LocalDateTime now);
 
-    /** URL trang FE /dms/confirm-done?status=error&errorCode=<tên ErrorCode> khi xác nhận từ email thất bại. */
-    String buildErrorRedirectUrl(ErrorCode errorCode);
+    /** Một mail xác nhận cho một confirmer. */
+    record ConfirmerMail(String email, String name, String token) {
+    }
+
+    /** Mọi mail của một đợt xác nhận, kèm thông tin Owner để báo Owner (m5). */
+    record ConfirmationMails(String ownerEmail, String ownerName, LocalDateTime deadlineAt,
+                             List<ConfirmerMail> confirmers) {
+    }
 }
-

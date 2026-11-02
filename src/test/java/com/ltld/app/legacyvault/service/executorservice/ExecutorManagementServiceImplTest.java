@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
@@ -72,6 +73,7 @@ class ExecutorManagementServiceImplTest {
     @Mock private VaultRepository vaultRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private DmsConfirmerRepository dmsConfirmerRepository;
 
     private ExecutorManagementServiceImpl service;
 
@@ -85,7 +87,7 @@ class ExecutorManagementServiceImplTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository/executorAssignmentRepository giữ nguyên.
         service = new ExecutorManagementServiceImpl(executorAssignmentRepository, dmsConfigRepository, userRepository,
                 new ExecutorRoleManager(roleRepository, executorAssignmentRepository), vaultRepository,
-                auditLogService, eventPublisher);
+                auditLogService, eventPublisher, dmsConfirmerRepository);
 
         ownerId = UUID.randomUUID();
         owner = user(ownerId, OWNER_EMAIL, UserStatus.ACTIVE);
@@ -729,6 +731,21 @@ class ExecutorManagementServiceImplTest {
                 candidate.getId(), ExecutorStatus.REVOKED, current.getId());
         order.verify(executorAssignmentRepository).saveAndFlush(current);
         verify(userRepository, times(1)).findByIdForUpdate(any());
+    }
+
+    // ---------- X2 (m1): Executor ≠ người xác nhận chéo DMS ----------
+
+    @Test
+    @DisplayName("X2/m1: email đang là người xác nhận chéo của Owner -> 409 CONFLICT, không lưu, không audit, không event")
+    void assign_candidateIsTrustedConfirmer_conflict() {
+        when(dmsConfirmerRepository.existsByOwnerIdAndEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.assignExecutor(ownerId, ExecutorType.BACKUP, request("  Exec@Example.TEST ", false)))
+                .isInstanceOfSatisfying(ExecutorManagementException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
+        verify(dmsConfirmerRepository).existsByOwnerIdAndEmail(ownerId, CANDIDATE_EMAIL);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher, roleRepository);
     }
 
     // ---------- m2 (Q26): Executor ≠ người thụ hưởng ----------

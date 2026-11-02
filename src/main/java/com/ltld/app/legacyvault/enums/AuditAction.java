@@ -17,6 +17,7 @@ public enum AuditAction {
     // X2: người xác nhận chéo DMS (Trusted Social Confirmers)
     DMS_CONFIRMER_ADDED, DMS_CONFIRMER_REMOVED,
     DMS_CONFIRMATION_REQUESTED, DMS_CONFIRMED_ALIVE, DMS_CONFIRMED_UNREACHABLE, DMS_CONFIRMATION_TIMEOUT,
+    DMS_CONFIRMATION_UNDELIVERED,
     // FR-18 (phần 2): tải tài liệu pháp lý
     DOCUMENT_DOWNLOADED,
     // FR-16: thông báo bàn giao cho Beneficiary

@@ -1,79 +1,90 @@
 package com.ltld.app.legacyvault.controller.dms;
 
+import com.ltld.app.legacyvault.controller.DmsConfirmerController;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmationDecisionResponse;
+import com.ltld.app.legacyvault.enums.DmsConfirmerDecision;
+import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** X2: GET /api/dms/confirm luôn redirect về trang FE /dms/confirm-done, kể cả khi lỗi. */
+/** X2 (C1/M1): quyết định đi bằng POST /api/dms/confirm {token, decision}; GET không còn thay đổi gì. */
 @WebMvcTest(DmsConfirmerController.class)
 class DmsConfirmerControllerTest {
-
-    private static final String ERROR_URL_PREFIX = "http://localhost:5173/dms/confirm-done?status=error&errorCode=";
 
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private DmsConfirmerService dmsConfirmerService;
 
     @Test
-    void confirm_validToken_redirectsToSuccessPage() throws Exception {
-        String redirect = "http://localhost:5173/dms/confirm-done?status=success&decision=ALIVE&dmsStatus=ACTIVE";
-        when(dmsConfirmerService.respondAndBuildRedirectUrl("good-token", "ALIVE")).thenReturn(redirect);
+    void confirm_post_usesDecisionFromBody() throws Exception {
+        when(dmsConfirmerService.respondByToken(eq("good-token"), eq(DmsConfirmerDecision.ALIVE), any()))
+                .thenReturn(DmsConfirmationDecisionResponse.builder()
+                        .decision(DmsConfirmerDecision.ALIVE).dmsStatus(DmsStatus.ACTIVE).build());
 
-        mockMvc.perform(get("/api/dms/confirm").param("token", "good-token").param("decision", "ALIVE"))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, redirect));
+        mockMvc.perform(post("/api/dms/confirm").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"good-token\",\"decision\":\"ALIVE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.decision").value("ALIVE"))
+                .andExpect(jsonPath("$.data.dmsStatus").value("ACTIVE"));
 
-        verify(dmsConfirmerService, never()).buildErrorRedirectUrl(any());
+        verify(dmsConfirmerService).respondByToken(eq("good-token"), eq(DmsConfirmerDecision.ALIVE), any());
     }
 
     @Test
-    void confirm_invalidToken_redirectsWithConfirmerTokenInvalid() throws Exception {
-        when(dmsConfirmerService.respondAndBuildRedirectUrl("used-token", "UNREACHABLE"))
+    void confirm_post_invalidToken_returns400WithConfirmerTokenInvalid() throws Exception {
+        when(dmsConfirmerService.respondByToken(eq("used-token"), eq(DmsConfirmerDecision.UNREACHABLE), any()))
                 .thenThrow(new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "This confirmation link has already been used."));
-        when(dmsConfirmerService.buildErrorRedirectUrl(ErrorCode.CONFIRMER_TOKEN_INVALID))
-                .thenReturn(ERROR_URL_PREFIX + "CONFIRMER_TOKEN_INVALID");
 
-        mockMvc.perform(get("/api/dms/confirm").param("token", "used-token").param("decision", "UNREACHABLE"))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, ERROR_URL_PREFIX + "CONFIRMER_TOKEN_INVALID"));
+        mockMvc.perform(post("/api/dms/confirm").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"used-token\",\"decision\":\"UNREACHABLE\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("CONFIRMER_TOKEN_INVALID"));
     }
 
     @Test
-    void confirm_unexpectedError_redirectsWithInternalError() throws Exception {
-        when(dmsConfirmerService.respondAndBuildRedirectUrl("token", null))
-                .thenThrow(new IllegalStateException("DB down"));
-        when(dmsConfirmerService.buildErrorRedirectUrl(ErrorCode.INTERNAL_ERROR))
-                .thenReturn(ERROR_URL_PREFIX + "INTERNAL_ERROR");
+    void confirm_post_missingDecision_returns400_andServiceNotCalled() throws Exception {
+        mockMvc.perform(post("/api/dms/confirm").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"good-token\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_FAILED"));
 
-        mockMvc.perform(get("/api/dms/confirm").param("token", "token"))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, ERROR_URL_PREFIX + "INTERNAL_ERROR"));
+        verify(dmsConfirmerService, never()).respondByToken(any(), any(), any());
     }
 
     @Test
-    void confirm_missingToken_stillRedirectsInsteadOfJson400() throws Exception {
-        when(dmsConfirmerService.respondAndBuildRedirectUrl(isNull(), isNull()))
-                .thenThrow(new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Confirmation token is missing."));
-        when(dmsConfirmerService.buildErrorRedirectUrl(ErrorCode.CONFIRMER_TOKEN_INVALID))
-                .thenReturn(ERROR_URL_PREFIX + "CONFIRMER_TOKEN_INVALID");
+    void confirm_post_unknownDecision_returns400_andServiceNotCalled() throws Exception {
+        mockMvc.perform(post("/api/dms/confirm").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"good-token\",\"decision\":\"MAYBE\"}"))
+                .andExpect(status().isBadRequest());
 
-        mockMvc.perform(get("/api/dms/confirm"))
-                .andExpect(status().isFound())
-                .andExpect(header().string(HttpHeaders.LOCATION, ERROR_URL_PREFIX + "CONFIRMER_TOKEN_INVALID"));
+        verify(dmsConfirmerService, never()).respondByToken(any(), any(), any());
+    }
+
+    // C1: trình quét link của hộp thư chỉ gọi GET; GET không còn endpoint nào xử lý quyết định.
+    @Test
+    void confirm_get_isNotHandled_andChangesNothing() throws Exception {
+        mockMvc.perform(get("/api/dms/confirm").param("token", "good-token").param("decision", "UNREACHABLE"))
+                .andExpect(status().isMethodNotAllowed());
+
+        verifyNoInteractions(dmsConfirmerService);
     }
 }

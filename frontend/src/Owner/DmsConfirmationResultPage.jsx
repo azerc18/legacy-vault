@@ -3,13 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { btnOutline, Card, Icon } from './ownerUi.jsx';
 
-// X2: trang công khai sau khi người xác nhận chéo bấm link trong email (BE redirect tới /dms/confirm-done).
+// X2: trang công khai sau khi người xác nhận chéo bấm nút trên /dms/confirm (DmsConfirmPage chuyển tới đây).
 export default function DmsConfirmationResultPage() {
     const { t, i18n } = useTranslation('dmsConfirm');
     const [searchParams] = useSearchParams();
-    const isError = (searchParams.get('status') || 'success').toLowerCase() === 'error';
+    // n1: chỉ báo thành công khi có đủ status=success và decision hợp lệ; thiếu hay sai thì coi là lỗi.
+    const status = (searchParams.get('status') || '').toLowerCase();
     const errorCode = searchParams.get('errorCode');
-    const decision = (searchParams.get('decision') || 'ALIVE').toUpperCase();
+    const decision = (searchParams.get('decision') || '').toUpperCase();
+    const isError = status !== 'success' || (decision !== 'ALIVE' && decision !== 'UNREACHABLE');
     const isAlive = decision === 'ALIVE';
 
     // Mã lỗi BE gửi qua URL -> bản dịch trong namespace errors; mã chưa có bản dịch thì dùng câu chung.

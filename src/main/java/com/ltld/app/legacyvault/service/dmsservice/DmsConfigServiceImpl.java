@@ -289,8 +289,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         DmsSchedule schedule = scheduleCalculator.calculate(now, config.getCheckinIntervalDays(),
                 config.getGracePeriodDays(), config.getReminderCount());
         config.setLastCheckinAt(now);
+        config.setCycleStartedAt(now);          // X2 (m3): mốc chu kỳ nhắc trùng lần check-in thật
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
+        config.setConfirmationDeferrals(0);     // X2 (m2): Owner tự check-in / lưu cấu hình thì đếm ALIVE lại từ 0
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }

@@ -47,13 +47,14 @@ public class DmsReminderProcessor {
                 || config.getNextReminderAt() == null || config.getNextReminderAt().isAfter(now)) {
             return Optional.empty();
         }
-        if (config.getLastCheckinAt() == null || config.getCheckinIntervalDays() == null
+        LocalDateTime cycleAnchor = cycleAnchor(config);
+        if (cycleAnchor == null || config.getCheckinIntervalDays() == null
                 || config.getGracePeriodDays() == null || config.getReminderCount() == null) {
             log.warn("FR-03: dmsConfig {} has nextReminderAt but incomplete schedule settings", configId);
             return Optional.empty();
         }
 
-        DmsSchedule schedule = scheduleCalculator.calculate(config.getLastCheckinAt(),
+        DmsSchedule schedule = scheduleCalculator.calculate(cycleAnchor,
                 config.getCheckinIntervalDays(), config.getGracePeriodDays(), config.getReminderCount());
         int reminderCount = schedule.reminderTimes().size();
         // Số lần nhắc đã đến hạn tính tới now. Server tắt lâu thì có thể > remindersSent + 1:
@@ -85,6 +86,14 @@ public class DmsReminderProcessor {
         // DmsCheckin REMINDER_SENT chỉ ghi sau khi gửi mail thành công (recordReminderSent).
         return Optional.of(new ReminderMail(config.getOwner().getEmail(), schedule.checkinDueAt(),
                 triggerAt, due, reminderCount, previousRemindersSent));
+    }
+
+    /**
+     * X2 (m3): mốc bắt đầu chu kỳ nhắc. cycle_started_at do startNewCycle ghi (cùng lastCheckinAt) hoặc do ALIVE
+     * dời đi; dòng cũ chưa có cột này thì dùng lastCheckinAt như trước.
+     */
+    static LocalDateTime cycleAnchor(DmsConfig config) {
+        return config.getCycleStartedAt() != null ? config.getCycleStartedAt() : config.getLastCheckinAt();
     }
 
     /** M1: ghi nhận lần nhắc đã gửi mail thành công, trong transaction riêng sau khi gửi. */

@@ -694,6 +694,7 @@ class DmsConfigIntegrationTest {
         DmsConfig config = config(s);
         LocalDateTime start = LocalDateTime.now().minusDays(daysAgo).truncatedTo(ChronoUnit.MICROS);
         config.setLastCheckinAt(start);
+        config.setCycleStartedAt(start);   // X2 (m3): lịch nhắc đọc cycle_started_at; startNewCycle luôn ghi cả hai mốc
         config.setNextCheckinDueAt(start.plusDays(INTERVAL_DAYS + GRACE_DAYS));
         config.setNextReminderAt(start.plusDays(INTERVAL_DAYS));
         dmsConfigRepository.saveAndFlush(config);

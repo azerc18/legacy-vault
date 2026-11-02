@@ -15,15 +15,16 @@ import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.security.JwtConfig;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
@@ -39,14 +40,18 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.crypto.spec.SecretKeySpec;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -61,43 +66,47 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
     public static final String PURPOSE_CLAIM = "purpose";
     public static final String PURPOSE_DMS_CONFIRM = "DMS_CONFIRM";
-    public static final String DECISION_CLAIM = "decision";
+    // C1/M1: token không mang quyết định; claim round = hạn chờ của đợt (epoch giây, UTC) để token chỉ dùng trong đợt đó.
+    public static final String ROUND_CLAIM = "round";
     public static final Duration TOKEN_TTL = Duration.ofHours(CONFIRMATION_TIMEOUT_HOURS);
     // X2 (giống F2): audience riêng, KHÔNG chứa JwtConfig.AUDIENCE -> token xác nhận không dùng được như access token.
     public static final String CONFIRM_AUDIENCE = "legacyvault-dms-confirm";
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsConfirmerRepository dmsConfirmerRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsActivationProcessor dmsActivationProcessor;
+    private final EntitlementService entitlementService;
     private final JwtEncoder jwtEncoder;
     // Decoder riêng (không phải bean JwtDecoder chung): chỉ nhận audience CONFIRM_AUDIENCE, nên access token bị từ chối.
     private final JwtDecoder confirmTokenDecoder;
     private final EmailSender emailSender;
     private final AuditLogService auditLogService;
-    private final String backendBaseUrl;
-    private final String frontendBaseUrl;
+    private final ApplicationEventPublisher eventPublisher;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
 
     public DmsConfirmerServiceImpl(
             DmsConfigRepository dmsConfigRepository,
             DmsConfirmerRepository dmsConfirmerRepository,
+            ExecutorAssignmentRepository executorAssignmentRepository,
             @Lazy DmsActivationProcessor dmsActivationProcessor,
+            EntitlementService entitlementService,
             JwtEncoder jwtEncoder,
             JwtProperties jwtProperties,
             EmailSender emailSender,
             AuditLogService auditLogService,
-            @Value("${app.backend.base-url:${BACKEND_BASE_URL:}}") String backendBaseUrl,
-            @Value("${app.frontend.base-url:${FRONTEND_BASE_URL:http://localhost:5173}}") String frontendBaseUrl
+            ApplicationEventPublisher eventPublisher
     ) {
         this.dmsConfigRepository = dmsConfigRepository;
         this.dmsConfirmerRepository = dmsConfirmerRepository;
+        this.executorAssignmentRepository = executorAssignmentRepository;
         this.dmsActivationProcessor = dmsActivationProcessor;
+        this.entitlementService = entitlementService;
         this.jwtEncoder = jwtEncoder;
         this.confirmTokenDecoder = buildConfirmTokenDecoder(jwtProperties.getSecret());
         this.emailSender = emailSender;
         this.auditLogService = auditLogService;
-        this.frontendBaseUrl = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
-        this.backendBaseUrl = resolveBackendBaseUrl(backendBaseUrl, this.frontendBaseUrl);
+        this.eventPublisher = eventPublisher;
     }
 
     // Cùng khoá HS256 với JwtConfig (security.jwt.secret, UTF-8), nhưng validator đòi issuer JwtConfig.ISSUER
@@ -120,22 +129,6 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         return decoder;
     }
 
-    static String resolveBackendBaseUrl(String explicitBackendUrl, String frontendBaseUrl) {
-        if (explicitBackendUrl != null && !explicitBackendUrl.isBlank()) {
-            return normalizeBaseUrl(explicitBackendUrl, "http://localhost:8084");
-        }
-        if (frontendBaseUrl != null && !frontendBaseUrl.isBlank()) {
-            String trimmed = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
-            if (!trimmed.contains("localhost:5173")
-                    && !trimmed.contains("127.0.0.1:5173")
-                    && !trimmed.contains("localhost:3000")
-                    && !trimmed.contains("127.0.0.1:3000")) {
-                return trimmed;
-            }
-        }
-        return "http://localhost:8084";
-    }
-
     @Override
     @Transactional(readOnly = true)
     public List<DmsConfirmerResponse> listConfirmers(UUID ownerId) {
@@ -150,29 +143,39 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     @Override
     @Transactional
     public DmsConfirmerResponse addConfirmer(UUID ownerId, DmsConfirmerRequest request) {
+        // m4: mọi lỗi dùng ErrorCode có sẵn đúng nghĩa (CONFLICT / BAD_REQUEST / DATA_CONFLICT)
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
-                .orElseThrow(() -> new DmsException(
-                        "Configure and enable the Dead Man's Switch before adding trusted confirmers.",
-                        HttpStatus.CONFLICT));
+                .orElseThrow(() -> new DmsException(ErrorCode.CONFLICT,
+                        "Configure and enable the Dead Man's Switch before adding trusted confirmers."));
+
+        // M2: tính năng VIP; FREE -> 403 PLAN_LIMIT_REACHED (feature=TRUSTED_CONFIRMERS). Kiểm sau khi khoá config.
+        // Không chặn ở initiatePendingConfirmationIfConfigured: VIP hết hạn thì confirmer đã khai vẫn được hỏi.
+        entitlementService.assertCanUseTrustedConfirmers(ownerId);
 
         if (config.getStatus() == DmsStatus.TRIGGERED) {
-            throw new DmsException("The Dead Man's Switch has already been triggered.", HttpStatus.CONFLICT);
+            throw new DmsException(ErrorCode.CONFLICT, "The Dead Man's Switch has already been triggered.");
         }
 
         String normalizedEmail = request.getEmail().trim().toLowerCase(Locale.ROOT);
         User owner = config.getOwner();
         if (owner != null && owner.getEmail() != null && owner.getEmail().trim().equalsIgnoreCase(normalizedEmail)) {
-            throw new DmsException(ErrorCode.BENEFICIARY_SELF, "You cannot assign yourself as a trusted confirmer.");
+            throw new DmsException(ErrorCode.BAD_REQUEST, "You cannot assign yourself as a trusted confirmer.");
+        }
+
+        // m1: Executor còn hiệu lực (Primary hoặc Backup) của Owner không được làm người xác nhận chéo,
+        // vì bấm UNREACHABLE sẽ kích hoạt chính mình. Chiều ngược lại chặn ở ExecutorManagementServiceImpl.
+        if (executorAssignmentRepository.existsLiveExecutorWithEmail(ownerId, normalizedEmail)) {
+            throw new DmsException(ErrorCode.CONFLICT, "Your executor cannot also be a trusted confirmer.");
         }
 
         long currentCount = dmsConfirmerRepository.countByDmsConfigId(config.getId());
         if (currentCount >= MAX_CONFIRMERS) {
-            throw new DmsException("You can configure at most " + MAX_CONFIRMERS + " trusted social confirmers.",
-                    HttpStatus.CONFLICT);
+            throw new DmsException(ErrorCode.CONFLICT,
+                    "You can configure at most " + MAX_CONFIRMERS + " trusted social confirmers.");
         }
 
         if (dmsConfirmerRepository.existsByDmsConfigIdAndEmailIgnoreCase(config.getId(), normalizedEmail)) {
-            throw new DmsException("This email is already added as a trusted confirmer.", HttpStatus.CONFLICT);
+            throw new DmsException(ErrorCode.DATA_CONFLICT, "This email is already added as a trusted confirmer.");
         }
 
         DmsConfirmer confirmer = DmsConfirmer.builder()
@@ -203,14 +206,14 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     @Transactional
     public void removeConfirmer(UUID ownerId, UUID confirmerId) {
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
-                .orElseThrow(() -> new DmsException("Dead Man's Switch is not configured.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new DmsException(ErrorCode.NOT_FOUND, "Dead Man's Switch is not configured."));
 
         if (config.getStatus() == DmsStatus.TRIGGERED) {
-            throw new DmsException("The Dead Man's Switch has already been triggered.", HttpStatus.CONFLICT);
+            throw new DmsException(ErrorCode.CONFLICT, "The Dead Man's Switch has already been triggered.");
         }
 
         DmsConfirmer confirmer = dmsConfirmerRepository.findByIdAndDmsConfigId(confirmerId, config.getId())
-                .orElseThrow(() -> new DmsException("Trusted confirmer not found.", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new DmsException(ErrorCode.NOT_FOUND, "Trusted confirmer not found."));
 
         dmsConfirmerRepository.delete(confirmer);
         dmsConfirmerRepository.flush();
@@ -229,7 +232,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     }
 
     @Override
-    public String generateConfirmationToken(UUID confirmerId, DmsConfirmerDecision decision) {
+    public String generateConfirmationToken(UUID confirmerId, LocalDateTime deadlineAt) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
 
@@ -242,7 +245,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                 .issuedAt(now)
                 .expiresAt(now.plus(TOKEN_TTL))
                 .claim(PURPOSE_CLAIM, PURPOSE_DMS_CONFIRM)
-                .claim(DECISION_CLAIM, decision.name())
+                .claim(ROUND_CLAIM, roundOf(deadlineAt))
                 .build();
 
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
@@ -256,7 +259,8 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             return false;
         }
 
-        LocalDateTime deadlineAt = now.plusHours(CONFIRMATION_TIMEOUT_HOURS);
+        // DATETIME(6): cắt về micro giây để giá trị đọc lại từ DB trùng giá trị trong bộ nhớ (so sánh đợt).
+        LocalDateTime deadlineAt = now.plusHours(CONFIRMATION_TIMEOUT_HOURS).truncatedTo(ChronoUnit.MICROS);
         config.setStatus(DmsStatus.PENDING_CONFIRMATION);
         config.setNextCheckinDueAt(deadlineAt);
         config.setNextReminderAt(null);
@@ -282,42 +286,39 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                         + ", deadlineAt=" + deadlineAt
         );
 
-        String base = normalizeBaseUrl(backendBaseUrl, "http://localhost:8084");
-        User owner = config.getOwner();
-        for (DmsConfirmer confirmer : confirmers) {
-            String aliveToken = generateConfirmationToken(confirmer.getId(), DmsConfirmerDecision.ALIVE);
-            String unreachableToken = generateConfirmationToken(confirmer.getId(), DmsConfirmerDecision.UNREACHABLE);
-            String aliveUrl = base + "/api/dms/confirm?token="
-                    + URLEncoder.encode(aliveToken, StandardCharsets.UTF_8) + "&decision=ALIVE";
-            String unreachableUrl = base + "/api/dms/confirm?token="
-                    + URLEncoder.encode(unreachableToken, StandardCharsets.UTF_8) + "&decision=UNREACHABLE";
-            try {
-                emailSender.sendDmsCrossConfirmationRequest(
-                        confirmer.getEmail(),
-                        confirmer.getName(),
-                        owner.getFullName(),
-                        owner.getEmail(),
-                        deadlineAt,
-                        aliveUrl,
-                        unreachableUrl
-                );
-            } catch (RuntimeException ex) {
-                log.warn("X2: failed to send cross-confirmation email to {} for dmsConfig {}: {}",
-                        confirmer.getEmail(), config.getId(), ex.getMessage());
-            }
-        }
+        // M3: không gửi SMTP trong transaction đang khoá DmsConfig; listener gửi sau commit (rollback thì không gửi).
+        eventPublisher.publishEvent(new DmsConfirmationRequestedEvent(config.getId(), deadlineAt));
         return true;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public ConfirmationMails prepareConfirmationMails(UUID configId, LocalDateTime deadlineAt) {
+        DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
+        if (config == null || config.getStatus() != DmsStatus.PENDING_CONFIRMATION
+                || !sameRound(config.getNextCheckinDueAt(), deadlineAt)) {
+            return null;
+        }
+        List<ConfirmerMail> mails = dmsConfirmerRepository.findAllByDmsConfigIdOrderByCreatedAtAsc(configId).stream()
+                .map(c -> new ConfirmerMail(c.getEmail(), c.getName(), generateConfirmationToken(c.getId(), deadlineAt)))
+                .toList();
+        User owner = config.getOwner();
+        return new ConfirmationMails(owner.getEmail(), owner.getFullName(), deadlineAt, mails);
     }
 
     @Override
     @Transactional
     public DmsConfirmationDecisionResponse respondByToken(
             String rawToken,
-            DmsConfirmerDecision decisionParam,
+            DmsConfirmerDecision decision,
             LocalDateTime now
     ) {
         if (rawToken == null || rawToken.isBlank()) {
             throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Confirmation token is missing.");
+        }
+        // M1: quyết định chỉ lấy từ body request (người bấm nút), không từ token hay URL.
+        if (decision == null) {
+            throw new DmsException(ErrorCode.MISSING_PARAMETER, "Confirmation decision (ALIVE or UNREACHABLE) is required.");
         }
 
         Jwt jwt;
@@ -341,10 +342,6 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Confirmation token is missing jti.");
         }
 
-        if (dmsConfirmerRepository.existsByLastTokenJti(jti)) {
-            throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "This confirmation link has already been used.");
-        }
-
         UUID confirmerId;
         try {
             confirmerId = UUID.fromString(jwt.getSubject());
@@ -352,11 +349,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Confirmation token subject is invalid.");
         }
 
-        DmsConfirmerDecision tokenDecision = parseDecision(jwt.getClaimAsString(DECISION_CLAIM));
-        DmsConfirmerDecision effectiveDecision = decisionParam != null ? decisionParam : tokenDecision;
-        if (effectiveDecision == null) {
-            throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Confirmation decision (ALIVE or UNREACHABLE) is required.");
-        }
+        Long round = roundClaim(jwt);
 
         DmsConfirmer confirmer = dmsConfirmerRepository.findById(confirmerId)
                 .orElseThrow(() -> new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Trusted confirmer record no longer exists."));
@@ -364,8 +357,17 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(confirmer.getDmsConfig().getOwner().getId())
                 .orElseThrow(() -> new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Dead Man's Switch is not configured."));
 
+        // m7: kiểm jti SAU khi khoá dòng DmsConfig, để hai request cùng token không cùng lọt qua bước kiểm.
+        if (dmsConfirmerRepository.existsByLastTokenJti(jti)) {
+            throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "This confirmation link has already been used.");
+        }
+
         if (config.getStatus() != DmsStatus.PENDING_CONFIRMATION) {
             throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "This Dead Man's Switch is not awaiting confirmation.");
+        }
+        // Mỗi confirmer mỗi đợt một token: link của đợt trước không dùng được cho đợt hiện tại.
+        if (round == null || config.getNextCheckinDueAt() == null || round != roundOf(config.getNextCheckinDueAt())) {
+            throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "This confirmation link belongs to an earlier request.");
         }
 
         LocalDateTime effectiveNow = now != null ? now : LocalDateTime.now();
@@ -374,11 +376,14 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
         User owner = config.getOwner();
         UUID ownerId = owner.getId();
+        String ownerName = owner.getFullName() != null ? owner.getFullName() : owner.getEmail();
 
-        if (effectiveDecision == DmsConfirmerDecision.ALIVE) {
+        if (decision == DmsConfirmerDecision.ALIVE) {
             confirmer.setStatus(DmsConfirmerStatus.CONFIRMED_ALIVE);
             LocalDateTime postponedUntil = effectiveNow.plusDays(POSTPONE_SAFE_DAYS);
             config.setStatus(DmsStatus.ACTIVE);
+            // m2: ALIVE chỉ 1 lần/đợt; đợt quá hạn kế tiếp mà Owner chưa check-in thì kích hoạt luôn.
+            config.setConfirmationDeferrals(config.getConfirmationDeferrals() + 1);
             startPostponedCycle(config, postponedUntil);
 
             try {
@@ -400,22 +405,27 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                             + ", postponedUntil=" + postponedUntil
             );
 
-            try {
-                emailSender.sendOwnerConfirmedSafeNotice(owner.getEmail(), confirmer.getName(), postponedUntil);
-            } catch (RuntimeException ex) {
-                log.warn("X2: could not send owner safe notice for dmsConfig {}: {}", config.getId(), ex.getMessage());
-            }
+            String ownerEmail = owner.getEmail();
+            String confirmerName = confirmer.getName();
+            UUID configId = config.getId();
+            runAfterCommit(() -> {
+                try {
+                    emailSender.sendOwnerConfirmedSafeNotice(ownerEmail, confirmerName, postponedUntil);
+                } catch (RuntimeException ex) {
+                    log.warn("X2: could not send owner safe notice for dmsConfig {}: {}", configId, ex.getMessage());
+                }
+            });
 
             return DmsConfirmationDecisionResponse.builder()
                     .dmsStatus(DmsStatus.ACTIVE)
                     .decision(DmsConfirmerDecision.ALIVE)
-                    .ownerName(owner.getFullName() != null ? owner.getFullName() : owner.getEmail())
+                    .ownerName(ownerName)
                     .postponedUntil(postponedUntil)
                     .message("Confirmed owner is safe. Dead Man's Switch postponed by 7 days.")
                     .build();
         }
 
-        // UNREACHABLE -> kích hoạt ngay lập tức
+        // UNREACHABLE -> kích hoạt ngay lập tức (một người là đủ: Owner đã quá hạn và hết thời gian ân hạn)
         confirmer.setStatus(DmsConfirmerStatus.CONFIRMED_UNREACHABLE);
         try {
             dmsConfirmerRepository.saveAndFlush(confirmer);
@@ -439,35 +449,17 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         return DmsConfirmationDecisionResponse.builder()
                 .dmsStatus(DmsStatus.TRIGGERED)
                 .decision(DmsConfirmerDecision.UNREACHABLE)
-                .ownerName(owner.getFullName() != null ? owner.getFullName() : owner.getEmail())
+                .ownerName(ownerName)
                 .triggeredAt(effectiveNow)
                 .message("Confirmed owner is unreachable. Dead Man's Switch triggered and executor notified.")
                 .build();
     }
 
-    @Override
-    @Transactional
-    public String respondAndBuildRedirectUrl(String rawToken, String decisionParam) {
-        DmsConfirmerDecision decision = parseDecision(decisionParam);
-        DmsConfirmationDecisionResponse res = respondByToken(rawToken, decision, LocalDateTime.now());
-        String base = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
-        return base + "/dms/confirm-done?status=success&decision=" + res.getDecision().name()
-                + "&dmsStatus=" + res.getDmsStatus().name();
-    }
-
-    @Override
-    public String buildErrorRedirectUrl(ErrorCode errorCode) {
-        ErrorCode code = errorCode != null ? errorCode : ErrorCode.INTERNAL_ERROR;
-        String base = normalizeBaseUrl(frontendBaseUrl, "http://localhost:5173");
-        return base + "/dms/confirm-done?status=error&errorCode=" + code.name();
-    }
-
     /**
      * ALIVE: hạn mới là postponedUntil và Owner phải được nhắc lại theo đúng lịch nhắc như sau check-in.
-     * Dùng chung DmsScheduleCalculator và cùng các trường như DmsConfigServiceImpl.startNewCycle, chỉ khác mốc:
-     * chu kỳ được đặt để triggerAt rơi đúng postponedUntil, nên các lần nhắc chia đều thời gian chờ ngay trước hạn.
-     * DmsReminderProcessor tính lại lịch từ lastCheckinAt nên lastCheckinAt phải là mốc chu kỳ này.
-     * remindersSent về 0: nhắc lần lượt rồi dừng (nextReminderAt = null sau lần cuối), không nhắc lặp vô hạn.
+     * m3: chỉ dời cycle_started_at (mốc lịch nhắc), KHÔNG đụng lastCheckinAt: lastCheckinAt luôn là lần check-in thật
+     * (trang DMS / Admin / F1 hiển thị và dùng nó). Mốc chu kỳ đặt để triggerAt rơi đúng postponedUntil, nên các lần
+     * nhắc chia đều thời gian chờ ngay trước hạn. remindersSent về 0: nhắc lần lượt rồi dừng.
      */
     private void startPostponedCycle(DmsConfig config, LocalDateTime postponedUntil) {
         Integer interval = config.getCheckinIntervalDays();
@@ -480,22 +472,48 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         }
         LocalDateTime cycleStart = postponedUntil.minusDays((long) interval + grace);
         DmsSchedule schedule = scheduleCalculator.calculate(cycleStart, interval, grace, reminders);
-        config.setLastCheckinAt(cycleStart);
+        config.setCycleStartedAt(cycleStart);
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }
 
-    private static DmsConfirmerDecision parseDecision(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
+    // Đợt xác nhận nhận diện bằng hạn chờ (cắt về giây, UTC) để không lệch vì độ chính xác DATETIME(6).
+    static long roundOf(LocalDateTime deadlineAt) {
+        return deadlineAt.truncatedTo(ChronoUnit.SECONDS).toEpochSecond(ZoneOffset.UTC);
+    }
+
+    private static boolean sameRound(LocalDateTime a, LocalDateTime b) {
+        return a != null && b != null && roundOf(a) == roundOf(b);
+    }
+
+    private static Long roundClaim(Jwt jwt) {
+        Object raw = jwt.getClaims().get(ROUND_CLAIM);
+        if (raw instanceof Number n) {
+            return n.longValue();
         }
-        try {
-            return DmsConfirmerDecision.valueOf(raw.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException ex) {
-            throw new DmsException(ErrorCode.CONFIRMER_TOKEN_INVALID, "Invalid confirmation decision (must be ALIVE or UNREACHABLE).");
+        if (raw instanceof String s) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
         }
+        return null;
+    }
+
+    private static void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private DmsConfirmerResponse toResponse(DmsConfirmer c) {
@@ -508,10 +526,5 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                 .respondedAt(c.getRespondedAt())
                 .createdAt(c.getCreatedAt())
                 .build();
-    }
-
-    private static String normalizeBaseUrl(String url, String fallback) {
-        String raw = (url == null || url.isBlank()) ? fallback : url.trim();
-        return raw.endsWith("/") ? raw.substring(0, raw.length() - 1) : raw;
     }
 }

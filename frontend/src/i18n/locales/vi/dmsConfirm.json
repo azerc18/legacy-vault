@@ -29,5 +29,19 @@
     "errorGeneric": "Liên kết xác nhận này không còn hợp lệ.",
     "errorHint": "Nếu chủ két vẫn cần bạn xác nhận, vui lòng dùng email mới nhất từ LegacyVault.",
     "backHome": "Về trang chủ LegacyVault"
+  },
+  "confirm": {
+    "title": "Chủ két có an toàn không?",
+    "intro": "Chủ két chưa check-in và đã hết thời gian ân hạn. Họ đã chọn bạn làm người xác nhận chéo. Hãy cho chúng tôi biết bạn có liên lạc được với họ không. Hiện chưa có gì thay đổi; câu trả lời chỉ được ghi nhận khi bạn bấm nút.",
+    "aliveButton": "Chủ két vẫn an toàn (hoãn 7 ngày)",
+    "unreachableButton": "Tôi không liên lạc được với chủ két",
+    "unreachableConfirmTitle": "Thông báo cho người thi hành ngay?",
+    "unreachableConfirmBody": "Việc này sẽ thông báo ngay cho người thi hành của chủ két để bắt đầu bàn giao và không thể hoàn tác.",
+    "unreachableConfirm": "Đồng ý, thông báo cho người thi hành",
+    "back": "Quay lại",
+    "submitting": "Đang gửi...",
+    "submitFailed": "Không ghi nhận được câu trả lời của bạn.",
+    "missingToken": "Liên kết này không đầy đủ. Vui lòng mở email mới nhất từ LegacyVault.",
+    "hint": "Nếu chưa chắc chắn, hãy chọn \"Chủ két vẫn an toàn\": chủ két sẽ được nhắc check-in."
   }
 }

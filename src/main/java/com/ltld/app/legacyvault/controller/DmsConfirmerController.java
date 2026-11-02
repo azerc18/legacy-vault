@@ -1,15 +1,13 @@
-package com.ltld.app.legacyvault.controller.dms;
+package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmDecisionRequest;
+import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmationDecisionResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerResponse;
-import com.ltld.app.legacyvault.exception.BusinessException;
-import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,18 +17,16 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * X2: Quản lý người xác nhận chéo DMS của Owner và endpoint công khai (permitAll) để Confirmer xác nhận từ email.
+ * X2: Quản lý người xác nhận chéo DMS của Owner, và endpoint công khai để Confirmer gửi quyết định.
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/dms")
 @RequiredArgsConstructor
@@ -72,29 +68,15 @@ public class DmsConfirmerController {
     }
 
     /**
-     * Endpoint công khai (permitAll): Confirmer bấm nút "Owner is safe" (decision=ALIVE)
-     * hoặc "Unreachable / Confirmed" (decision=UNREACHABLE) trong email khẩn cấp.
+     * X2 (C1): link trong email chỉ mở trang FE /dms/confirm (trình quét link của hộp thư có thể tự mở mọi URL);
+     * quyết định, đặc biệt UNREACHABLE (không thể hoàn tác), phải là POST do người bấm nút trên trang.
+     * Endpoint công khai: cần POST permitAll /api/dms/confirm trong SecurityConfig. Lỗi đi qua GlobalExceptionHandler.
      */
-    // Người xác nhận bấm từ email (trình duyệt), nên lỗi cũng redirect về trang FE thay vì trả JSON.
-    // Bắt lỗi ở đây, NGOÀI transaction của service: proxy đã rollback xong rồi mới chuyển hướng.
-    // required = false: thiếu token -> service ném CONFIRMER_TOKEN_INVALID -> cũng redirect.
-    @GetMapping("/confirm")
-    public ResponseEntity<Void> confirmFromEmail(
-            @RequestParam(value = "token", required = false) String token,
-            @RequestParam(value = "decision", required = false) String decision
+    @PostMapping("/confirm")
+    public ResponseEntity<ApiResponse<DmsConfirmationDecisionResponse>> confirm(
+            @Valid @RequestBody DmsConfirmDecisionRequest request
     ) {
-        String redirectUrl;
-        try {
-            redirectUrl = dmsConfirmerService.respondAndBuildRedirectUrl(token, decision);
-        } catch (BusinessException e) {
-            redirectUrl = dmsConfirmerService.buildErrorRedirectUrl(e.getErrorCode());
-        } catch (RuntimeException e) {
-            log.error("X2: DMS cross-confirmation from email failed unexpectedly", e);
-            redirectUrl = dmsConfirmerService.buildErrorRedirectUrl(ErrorCode.INTERNAL_ERROR);
-        }
-        return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, URI.create(redirectUrl).toString())
-                .build();
+        return ResponseEntity.ok(ApiResponse.success("Confirmation recorded",
+                dmsConfirmerService.respondByToken(request.getToken(), request.getDecision(), LocalDateTime.now())));
     }
 }
-
