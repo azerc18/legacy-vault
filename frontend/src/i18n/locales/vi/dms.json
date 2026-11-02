@@ -1,0 +1,99 @@
+{
+  "dms": {
+    "title": "Dead Man's Switch",
+    "subtitle": "Nếu bạn ngừng check-in, các két của bạn sẽ được bàn giao cho người thi hành.",
+    "loading": "Đang tải...",
+    "createVaultFirst": "Tạo két trước →",
+    "status": {
+      "ACTIVE": "Đang bật",
+      "TRIGGERED": "Đã kích hoạt",
+      "SUSPENDED": "Tạm dừng"
+    },
+    "notSetUp": "Chưa thiết lập",
+    "notSetUpHint": "Chọn lịch ở bên phải rồi lưu để bật.",
+    "checkIn": "Tôi vẫn ổn — check-in",
+    "checkingIn": "Đang check-in...",
+    "triggeredNote": "Quy trình bàn giao đã được kích hoạt lúc {{date}}. Không thể thay đổi cài đặt nữa.",
+    "suspendedNote": "Quản trị viên đã tạm dừng tính năng này. Vui lòng liên hệ bộ phận hỗ trợ.",
+    "info": {
+      "lastCheckin": "Lần check-in gần nhất",
+      "nextDue": "Hạn check-in tiếp theo",
+      "triggerAt": "Bắt đầu bàn giao nếu không check-in",
+      "nextReminder": "Lần nhắc tiếp theo",
+      "remindersSent": "Đã gửi nhắc",
+      "notifiedBy": "Kênh thông báo"
+    },
+    "channel": {
+      "EMAIL": "Email",
+      "IN_APP": "Trong ứng dụng"
+    },
+    "schedule": "Lịch check-in",
+    "fields": {
+      "checkinIntervalDays": {
+        "label": "Check-in mỗi (ngày)",
+        "hint": "Bao lâu bạn cần xác nhận mình vẫn ổn một lần."
+      },
+      "gracePeriodDays": {
+        "label": "Thời gian gia hạn (ngày)",
+        "hint": "Thời gian chờ thêm sau khi lỡ check-in, trước khi bắt đầu bàn giao."
+      },
+      "reminderCount": {
+        "label": "Số lần nhắc",
+        "hint": "Số email nhắc gửi trong thời gian gia hạn."
+      }
+    },
+    "rangeError": "{{field}} phải từ {{min}} đến {{max}}.",
+    "saving": "Đang lưu...",
+    "saveChanges": "Lưu thay đổi",
+    "turnOn": "Bật",
+    "saved": "Đã lưu cài đặt.",
+    "checkedIn": "Đã check-in. Chúng tôi sẽ nhắc bạn trước hạn tiếp theo.",
+    "errors": {
+      "load": "Không thể tải cài đặt.",
+      "save": "Không thể lưu cài đặt.",
+      "checkIn": "Check-in không thành công."
+    }
+  },
+  "executors": {
+    "title": "Người thi hành",
+    "subtitle": "Những người bạn tin tưởng sẽ lo việc bàn giao. Họ cần có tài khoản LegacyVault đã xác minh.",
+    "loading": "Đang tải...",
+    "positions": {
+      "PRIMARY": {
+        "title": "Người thi hành chính",
+        "text": "Được báo đầu tiên khi Dead Man's Switch kích hoạt."
+      },
+      "BACKUP": {
+        "title": "Người thi hành dự phòng",
+        "text": "Thay thế nếu người thi hành chính không phản hồi trong 14 ngày."
+      }
+    },
+    "status": {
+      "INACTIVE": "Đã chỉ định",
+      "ACTIVE": "Đã kích hoạt"
+    },
+    "since": "Từ {{date}}",
+    "activated": "kích hoạt lúc {{date}}",
+    "acknowledged": "đã xác nhận lúc {{date}}",
+    "awaitingAck": "đang chờ xác nhận",
+    "noneAssigned": "Chưa chỉ định ai.",
+    "saving": "Đang lưu...",
+    "assign": "Chỉ định",
+    "replace": "Thay người",
+    "revoke": "Thu hồi",
+    "replaceTitle": {
+      "PRIMARY": "Thay người thi hành chính?",
+      "BACKUP": "Thay người thi hành dự phòng?"
+    },
+    "revokeTitle": {
+      "PRIMARY": "Thu hồi người thi hành chính?",
+      "BACKUP": "Thu hồi người thi hành dự phòng?"
+    },
+    "revokeMessage": "{{email}} sẽ không còn được xử lý việc bàn giao của bạn.",
+    "errors": {
+      "load": "Không thể tải danh sách người thi hành.",
+      "assign": "Không thể chỉ định người thi hành.",
+      "revoke": "Không thể thu hồi."
+    }
+  }
+}

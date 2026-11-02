@@ -1,0 +1,99 @@
+{
+  "dms": {
+    "title": "Dead Man's Switch",
+    "subtitle": "If you stop checking in, your vaults are handed over to your Executor.",
+    "loading": "Loading...",
+    "createVaultFirst": "Create a vault first →",
+    "status": {
+      "ACTIVE": "Active",
+      "TRIGGERED": "Triggered",
+      "SUSPENDED": "Suspended"
+    },
+    "notSetUp": "Not set up yet",
+    "notSetUpHint": "Choose your schedule on the right and save to turn it on.",
+    "checkIn": "I'm okay — check in",
+    "checkingIn": "Checking in...",
+    "triggeredNote": "The hand-over was triggered on {{date}}. Settings can no longer be changed.",
+    "suspendedNote": "Suspended by an administrator. Please contact support.",
+    "info": {
+      "lastCheckin": "Last check-in",
+      "nextDue": "Next check-in due",
+      "triggerAt": "Hand-over starts if no check-in",
+      "nextReminder": "Next reminder",
+      "remindersSent": "Reminders sent",
+      "notifiedBy": "Notified by"
+    },
+    "channel": {
+      "EMAIL": "Email",
+      "IN_APP": "In-app"
+    },
+    "schedule": "Schedule",
+    "fields": {
+      "checkinIntervalDays": {
+        "label": "Check-in every (days)",
+        "hint": "How often you need to confirm you are okay."
+      },
+      "gracePeriodDays": {
+        "label": "Grace period (days)",
+        "hint": "Extra time after a missed check-in before hand-over starts."
+      },
+      "reminderCount": {
+        "label": "Reminders",
+        "hint": "Emails sent during the grace period."
+      }
+    },
+    "rangeError": "{{field}} must be between {{min}} and {{max}}.",
+    "saving": "Saving...",
+    "saveChanges": "Save changes",
+    "turnOn": "Turn on",
+    "saved": "Settings saved.",
+    "checkedIn": "Checked in. We'll remind you before the next deadline.",
+    "errors": {
+      "load": "Could not load settings.",
+      "save": "Could not save settings.",
+      "checkIn": "Check-in failed."
+    }
+  },
+  "executors": {
+    "title": "Executors",
+    "subtitle": "Trusted people who handle the hand-over. They must have a verified LegacyVault account.",
+    "loading": "Loading...",
+    "positions": {
+      "PRIMARY": {
+        "title": "Primary Executor",
+        "text": "Notified first when your Dead Man's Switch triggers."
+      },
+      "BACKUP": {
+        "title": "Backup Executor",
+        "text": "Takes over if the primary does not respond within 14 days."
+      }
+    },
+    "status": {
+      "INACTIVE": "Assigned",
+      "ACTIVE": "Activated"
+    },
+    "since": "Since {{date}}",
+    "activated": "activated {{date}}",
+    "acknowledged": "acknowledged {{date}}",
+    "awaitingAck": "awaiting acknowledgement",
+    "noneAssigned": "No one assigned.",
+    "saving": "Saving...",
+    "assign": "Assign",
+    "replace": "Replace",
+    "revoke": "Revoke",
+    "replaceTitle": {
+      "PRIMARY": "Replace primary executor?",
+      "BACKUP": "Replace backup executor?"
+    },
+    "revokeTitle": {
+      "PRIMARY": "Revoke primary executor?",
+      "BACKUP": "Revoke backup executor?"
+    },
+    "revokeMessage": "{{email}} will no longer be able to handle your hand-over.",
+    "errors": {
+      "load": "Could not load executors.",
+      "assign": "Could not assign the executor.",
+      "revoke": "Could not revoke."
+    }
+  }
+}
