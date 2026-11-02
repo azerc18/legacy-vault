@@ -1,20 +1,48 @@
-// Chuông thông báo trong app cho Beneficiary (FR-16)
+// Chuông thông báo trong app: Beneficiary (FR-16) và Executor (D6, FR-11 / FR-12 / FR-14)
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
+import { executorApi } from '../api/executorApi.js';
 
-const TYPE_ICON = { VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge' };
+const TYPE_ICON = {
+    VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge', VERIFIER_REPLY: 'forum', VERIFICATION_DECIDED: 'gavel',
+};
 const fmt = (v) => (v ? new Date(v).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
-export default function NotificationBell() {
+// Mỗi nguồn: lấy danh sách, đánh dấu đã đọc, và trang cần mở khi bấm (null = ở lại)
+const SOURCES = {
+    beneficiary: {
+        list: () => beneficiaryApi.listNotifications(),
+        markRead: (id) => beneficiaryApi.markNotificationRead(id),
+        target: async (n) => (n.vaultId ? `/beneficiary/vaults/${n.vaultId}` : null),
+    },
+    // API chung /api/notifications: theo referenceType (quy ước ở NotificationResponse)
+    executor: {
+        list: () => executorApi.listNotifications(),
+        count: () => executorApi.unreadCount(), // đúng cả khi có hơn 20 thông báo (danh sách chỉ lấy trang đầu)
+        markRead: (id) => executorApi.markRead(id),
+        target: async (n) => {
+            if (n.referenceType === 'Vault') return `/beneficiary/vaults/${n.referenceId}`; // người vừa là Beneficiary
+            if (n.referenceType !== 'LegalVerificationRequest') return null;
+            const assignmentId = await executorApi.findAssignmentOfRequest(n.referenceId).catch(() => null);
+            return assignmentId ? `/executor/cases/${assignmentId}` : '/executor/home';
+        },
+    },
+};
+
+export default function NotificationBell({ source = 'beneficiary' }) {
+    const api = SOURCES[source];
     const navigate = useNavigate();
     const [items, setItems] = useState([]);
+    const [serverUnread, setServerUnread] = useState(null);
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
+    // Tải lại mỗi lần mở để thấy thông báo mới mà không cần F5
     useEffect(() => {
-        beneficiaryApi.listNotifications().then(setItems).catch(() => setItems([]));
-    }, []);
+        api.list().then(setItems).catch(() => setItems([]));
+        api.count?.().then(setServerUnread).catch(() => setServerUnread(null));
+    }, [api, open]);
 
     // Click ra ngoài thì đóng
     useEffect(() => {
@@ -24,15 +52,17 @@ export default function NotificationBell() {
         return () => document.removeEventListener('mousedown', onClick);
     }, [open]);
 
-    const unread = items.filter((n) => !n.read).length;
+    const unread = serverUnread ?? items.filter((n) => !n.read).length;
 
     const openItem = async (n) => {
         if (!n.read) {
             setItems((list) => list.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-            beneficiaryApi.markNotificationRead(n.id).catch(() => {});
+            setServerUnread((c) => (c == null ? c : Math.max(0, c - 1)));
+            api.markRead(n.id).catch(() => {});
         }
         setOpen(false);
-        if (n.vaultId) navigate(`/beneficiary/vaults/${n.vaultId}`);
+        const to = await api.target(n);
+        if (to) navigate(to);
     };
 
     return (

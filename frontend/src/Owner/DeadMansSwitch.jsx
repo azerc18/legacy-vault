@@ -23,7 +23,7 @@ const STATUS = {
 export default function DeadMansSwitch() {
     const { t } = useTranslation('dms');
     const user = getUser();
-    const [config, setConfig] = useState(null);       // DmsConfigResponse | null (chưa cấu hình)
+    const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
     const [saving, setSaving] = useState(false);
@@ -33,19 +33,22 @@ export default function DeadMansSwitch() {
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
     };
 
     useEffect(() => {
         ownerApi.getDms()
             .then(applyConfig)
-            .catch((err) => { if (err.response?.status !== 404) setError(getErrorMessage(err, t('dms.errors.load'))); })
+            .catch((err) => setError(getErrorMessage(err, t('dms.errors.load'))))
             .finally(() => setLoading(false));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps -- t chỉ dùng cho thông báo lỗi
 
     if (!user) return <Navigate to="/login" replace />;
 
-    const locked = config && config.status !== 'ACTIVE'; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    const configured = config?.configured === true;
+    const locked = configured && config.status !== 'ACTIVE'; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
+    const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
     const save = async (e) => {
         e.preventDefault();
@@ -83,10 +86,10 @@ export default function DeadMansSwitch() {
         }
     };
 
-    const statusKey = config && STATUS[config.status] ? config.status : 'ACTIVE';
-    const s = config ? STATUS[statusKey] : null;
+    const statusKey = configured && STATUS[config.status] ? config.status : 'ACTIVE';
+    const s = configured ? STATUS[statusKey] : null;
     // Dựa vào câu lỗi của BE (mã CONFLICT, chưa có bản dịch nên giữ nguyên tiếng Anh) — giữ nguyên logic cũ
-    const needVault = /Vault/i.test(error) && !config;
+    const needVault = /Vault/i.test(error) && !configured;
 
     return (
         <OwnerLayout title={t('dms.title')} subtitle={t('dms.subtitle')}>
@@ -95,12 +98,18 @@ export default function DeadMansSwitch() {
             {needVault && (
                 <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">{t('dms.createVaultFirst')}</Link></p>
             )}
+            {noExecutor && (
+                <Alert type="warning">
+                    {configured ? t('dms.noExecutor.configured') : t('dms.noExecutor.notConfigured')}{' '}
+                    <Link to="/owner/executors" className="font-semibold underline">{t('dms.manageExecutors')}</Link>
+                </Alert>
+            )}
 
             {loading ? <p className="text-on-surface-variant">{t('dms.loading')}</p> : (
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
                     {/* Trạng thái + check-in */}
                     <Card>
-                        {!config ? (
+                        {!configured ? (
                             <div className="text-center py-6">
                                 <Icon name="heart_minus" className="text-[40px] text-outline" />
                                 <p className="mt-3 font-semibold">{t('dms.notSetUp')}</p>
@@ -156,7 +165,7 @@ export default function DeadMansSwitch() {
                                 </label>
                             ))}
                             <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
-                                {saving ? t('dms.saving') : config ? t('dms.saveChanges') : t('dms.turnOn')}
+                                {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
                             </button>
                         </form>
                     </Card>
