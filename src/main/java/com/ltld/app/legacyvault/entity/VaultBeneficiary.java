@@ -51,6 +51,9 @@ public class VaultBeneficiary {
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
 
+    // N2-exec: lần gần nhất Executor gửi nhắc nhở (giới hạn 1 lần/24h)
+    private LocalDateTime lastReminderAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

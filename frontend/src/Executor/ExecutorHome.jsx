@@ -4,6 +4,7 @@ import {getUser} from '../auth/auth.js';
 import {getErrorMessage} from '../api/http.js';
 import {executorApi, caseStep} from '../api/executorApi.js';
 import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 
 const EXECUTOR = 'EXECUTOR';
@@ -143,7 +144,7 @@ export default function ExecutorHome() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 <div className="mb-8">

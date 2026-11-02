@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
-import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
+import { executorApi, caseStep, HANDOVER_LABEL, CLAIM_PROGRESS_LABEL } from '../api/executorApi.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
@@ -67,7 +68,7 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle
@@ -114,6 +115,8 @@ export default function ExecutorCase() {
                         )}
 
                         <ProgressSection progress={progress} />
+
+                        <BeneficiaryClaimsSection assignmentId={assignmentId} progress={progress} />
 
                         <MessagesSection assignmentId={assignmentId} progress={progress} />
                     </>
@@ -271,6 +274,92 @@ function ProgressSection({ progress }) {
                 </table>
             </div>
         </Card>
+    );
+}
+
+/* ---------- N2-exec: người thụ hưởng đã nhận tài sản chưa + nhắc nhở ---------- */
+function BeneficiaryClaimsSection({ assignmentId, progress }) {
+    // Chỉ vault đã mở khoá trở đi mới có người thụ hưởng phản hồi
+    const vaults = [...new Map(progress
+        .filter((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus))
+        .map((p) => [p.vaultId, p])).values()];
+    if (vaults.length === 0) return null;
+    return (
+        <Card title="Beneficiary claims" icon="group">
+            <div className="space-y-6">
+                {vaults.map((p) => <VaultClaims key={p.vaultId} assignmentId={assignmentId} vault={p} />)}
+            </div>
+        </Card>
+    );
+}
+
+function VaultClaims({ assignmentId, vault }) {
+    const [rows, setRows] = useState(null);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [busyId, setBusyId] = useState(null);
+
+    useEffect(() => {
+        executorApi.getBeneficiaryProgress(assignmentId, vault.vaultId)
+            .then(setRows)
+            .catch((e) => { setError(getErrorMessage(e, 'Could not load beneficiaries.')); setRows([]); });
+    }, [assignmentId, vault.vaultId]);
+
+    const remind = async (row) => {
+        setBusyId(row.vaultBeneficiaryId); setError(''); setNotice('');
+        try {
+            const updated = await executorApi.remindBeneficiary(assignmentId, vault.vaultId, row.vaultBeneficiaryId);
+            setRows((prev) => prev.map((r) => (r.vaultBeneficiaryId === updated.vaultBeneficiaryId ? updated : r)));
+            setNotice(`Reminder sent to ${row.fullName || row.maskedEmail}.`);
+        } catch (e) {
+            setError(getErrorMessage(e, 'Could not send the reminder.'));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div>
+            <h3 className="font-semibold mb-2">{vault.vaultName}</h3>
+            <Alert>{error}</Alert>
+            {notice && <Alert type="info">{notice}</Alert>}
+            {rows === null && <p className="text-sm text-on-surface-variant">Loading...</p>}
+            {rows?.length === 0 && !error && <p className="text-sm text-on-surface-variant">No beneficiaries.</p>}
+            {rows?.length > 0 && (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-on-surface-variant">
+                            <tr><th className="py-2 pr-4">Beneficiary</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Responded</th><th className="py-2">Reminder</th></tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((r) => {
+                                const b = CLAIM_PROGRESS_LABEL[r.status] || {};
+                                return (
+                                    <tr key={r.vaultBeneficiaryId} className="border-t border-outline-variant/20">
+                                        <td className="py-2 pr-4">
+                                            <p className="font-semibold">{r.fullName || '—'}</p>
+                                            <p className="text-xs text-on-surface-variant">{r.maskedEmail}{r.relationship && ` · ${r.relationship}`}</p>
+                                        </td>
+                                        <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${b.cls}`}>{b.label || r.status}</span></td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.claimedAt || r.respondedAt)}</td>
+                                        <td className="py-2">
+                                            {r.canRemind && (
+                                                <button type="button" onClick={() => remind(r)} disabled={busyId === r.vaultBeneficiaryId} className={btnOutline}>
+                                                    <Icon name="notifications_active" className="text-[18px]" /> {busyId === r.vaultBeneficiaryId ? 'Sending...' : 'Send reminder'}
+                                                </button>
+                                            )}
+                                            {!r.canRemind && r.nextReminderAllowedAt && (
+                                                <span className="text-xs text-on-surface-variant">Reminded · next after {formatDate(r.nextReminderAllowedAt, true)}</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
     );
 }
 

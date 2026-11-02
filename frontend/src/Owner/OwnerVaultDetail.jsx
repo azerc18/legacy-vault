@@ -9,6 +9,7 @@ import {
 } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import LegacyMessageSection from './LegacyMessageSection.jsx';
 import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
@@ -55,6 +56,7 @@ export default function OwnerVaultDetail() {
                     <AssetSection vaultId={vaultId} editable={editable} onChanged={reload} />
                     <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
                     <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
+                    <LegacyMessageSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} />
                     <ActivitySection vaultId={vaultId} />
                     {editable && <DeleteSection vaultId={vaultId} />}
                 </div>
