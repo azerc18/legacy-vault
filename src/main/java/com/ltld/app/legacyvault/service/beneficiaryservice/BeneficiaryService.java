@@ -104,5 +104,11 @@ public interface BeneficiaryService {
      */
     CloseVaultPreviewResponse previewClose(UUID vaultId, UUID currentUserId);
 
+    /**
+     * N2-notify: tiến độ theo từng tài sản của người này (cho ClaimProgress) và số người ở cấp vault.
+     * Cùng cổng truy cập với previewClose, yêu cầu phiên xác thực còn hiệu lực (403 nếu hết).
+     */
+    ClaimProgressResponse getClaimProgress(UUID vaultId, UUID currentUserId);
+
     InheritanceDossierData getDossierData(UUID vaultId, UUID currentUserId);
 }

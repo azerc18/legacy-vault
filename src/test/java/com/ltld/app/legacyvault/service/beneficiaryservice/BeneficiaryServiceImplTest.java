@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.ClaimProgressResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
@@ -25,6 +26,7 @@ import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
+import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -73,6 +75,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -2339,5 +2342,130 @@ public class BeneficiaryServiceImplTest {
 
         assertThat(detail.getId()).isEqualTo(assetId);
         verify(assetAccessRecordRepository).insertIfAbsent(any(), any(), eq(assetId), any());
+    }
+
+
+    // ===================== N2-notify: tiến độ theo tài sản + thông báo fallback =====================
+
+    @Test
+    void getClaimProgress_listsOnlyMyAssets_withAllocationInfo() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset proportional = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset viaFallback = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        VaultBeneficiary declinedOne = otherRow(BeneficiaryInviteStatus.DECLINED);
+        AssetAllocation alProportional = AssetAllocation.builder().id(UUID.randomUUID()).asset(proportional)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("60.00")).build();
+        AssetAllocation alFallback = AssetAllocation.builder().id(UUID.randomUUID()).asset(viaFallback)
+                .beneficiary(declinedOne).contingentBeneficiary(beneficiaryRow)
+                .effectiveBeneficiary(beneficiaryRow).mode(AllocationMode.EXCLUSIVE).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(proportional, viaFallback, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(alProportional, alFallback));
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(viaFallback));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(declinedOne, beneficiaryRow));
+
+        ClaimProgressResponse response = beneficiaryService.getClaimProgress(vaultId, currentUserId);
+
+        assertThat(response.getTotalAssets()).isEqualTo(2);
+        assertThat(response.getViewedAssets()).isEqualTo(1);
+        assertThat(response.getTotalBeneficiaries()).isEqualTo(1);
+        assertThat(response.getDeclinedBeneficiaries()).isEqualTo(1);
+        assertThat(response.getAssets()).extracting(ClaimProgressResponse.AssetProgress::getAssetName)
+                .containsExactly("Vietcombank", "Gmail");
+        ClaimProgressResponse.AssetProgress first = response.getAssets().get(0);
+        assertThat(first.getAllocationMode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(first.getSharePercent()).isEqualByComparingTo("60.00");
+        assertThat(first.isReassignedToMe()).isFalse();
+        assertThat(first.isViewed()).isTrue();
+        ClaimProgressResponse.AssetProgress second = response.getAssets().get(1);
+        assertThat(second.isReassignedToMe()).isTrue();
+        assertThat(second.getSharePercent()).isNull();
+        assertThat(second.isViewed()).isFalse();
+    }
+
+    @Test
+    void getClaimProgress_noViewSession_throws403() {
+        stubClaimForClose();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN, () -> beneficiaryService.getClaimProgress(vaultId, currentUserId));
+
+        verify(digitalAssetRepository, never()).findByVaultIdAndStatus(any(), any());
+    }
+
+    @Test
+    void declineClaim_withContingent_notifiesReceiverInApp() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
+        AssetAllocation al = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification saved = captor.getValue();
+        assertThat(saved.getRecipient()).isSameAs(contingent.getUser());
+        assertThat(saved.getType()).isEqualTo(NotificationType.ASSET_REASSIGNED);
+        assertThat(saved.getChannel()).isEqualTo(NotificationChannel.IN_APP);
+        assertThat(saved.getReferenceId()).isEqualTo(vaultId);
+        assertThat(saved.getContent()).contains("1 asset(s)");
+    }
+
+    @Test
+    void declineClaim_twoAssetsToSameReceiver_sendsOneNotification() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
+        AssetAllocation al1 = allocation(beneficiaryRow, contingent);
+        AssetAllocation al2 = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al1, al2));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getContent()).contains("2 asset(s)");
+    }
+
+    @Test
+    void declineClaim_withoutContingent_sendsNoNotification() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void declineClaim_receiverWithoutAccount_isReassignedButNotNotified() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.PENDING_REGISTRATION);
+        contingent.setUser(null);   // chưa đăng ký: có phân bổ nhưng chưa có tài khoản để nhận thông báo
+        AssetAllocation al = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getReassignedAssets()).isEqualTo(1);
+        verify(notificationRepository, never()).save(any(Notification.class));
     }
 }
