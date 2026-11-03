@@ -14,6 +14,10 @@ public enum AuditAction {
     LEGAL_SIGN_OTP_SENT, LEGAL_REQUEST_REOPENED,
     // FR-07: kích hoạt DMS và Executor
     DMS_TRIGGERED, DMS_TRIGGERED_NO_EXECUTOR, EXECUTOR_ACTIVATED, EXECUTOR_ACKNOWLEDGED,
+    // X2: người xác nhận chéo DMS (Trusted Social Confirmers)
+    DMS_CONFIRMER_ADDED, DMS_CONFIRMER_REMOVED,
+    DMS_CONFIRMATION_REQUESTED, DMS_CONFIRMED_ALIVE, DMS_CONFIRMED_UNREACHABLE, DMS_CONFIRMATION_TIMEOUT,
+    DMS_CONFIRMATION_UNDELIVERED,
     // FR-18 (phần 2): tải tài liệu pháp lý
     DOCUMENT_DOWNLOADED,
     // FR-16: thông báo bàn giao cho Beneficiary
@@ -59,5 +63,7 @@ public enum AuditAction {
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi
     BENEFICIARY_REMINDER_SENT,
     // T1: Thanh toán VNPay & gói VIP
-    PAYMENT_SUCCEEDED, PAYMENT_FAILED
+    PAYMENT_SUCCEEDED, PAYMENT_FAILED,
+    // X1: người thụ hưởng đồng ý mở tài sản JOINT_CONSENSUS
+    ASSET_CONSENSUS_APPROVED
 }

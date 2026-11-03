@@ -22,6 +22,8 @@ import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 import OwnerActivity from './Owner/OwnerActivity.jsx';
+import DmsConfirmationResultPage from './Owner/DmsConfirmationResultPage.jsx';
+import DmsConfirmPage from './Owner/DmsConfirmPage.jsx';
 import PricingPage from './Owner/PricingPage.jsx';
 import BillingPage from './Owner/BillingPage.jsx';
 import PaymentResultPage from './Owner/PaymentResultPage.jsx';
@@ -60,6 +62,8 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/dms/confirm-done" element={<DmsConfirmationResultPage />} />
+                <Route path="/dms/confirm" element={<DmsConfirmPage />} />
                 <Route path="/payment/result" element={<PaymentResultPage />} />
                 <Route path="/dms/checkin" element={<CheckinConfirmPage />} />
                 <Route path="/dms/checkin-done" element={<CheckinDonePage />} />

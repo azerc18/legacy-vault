@@ -52,4 +52,20 @@ public class AssetAllocation {
 
     @Column(name = "allocation_note", columnDefinition = "TEXT")
     private String note;
+
+    // X1 (JOINT_CONSENSUS): cần consensusThreshold người đồng ý thì mới mở tài sản
+    @Column(name = "consensus_threshold")
+    private Integer consensusThreshold;
+
+    // Phần khóa Shamir của người này, đã mã hóa bằng CryptoService
+    @Column(name = "consensus_share", columnDefinition = "TEXT")
+    private String consensusShare;
+
+    // SHA-256 (hex) của khóa gốc, dùng để kiểm tra ghép đúng khi đủ K phần
+    @Column(name = "consensus_key_hash", length = 64)
+    private String consensusKeyHash;
+
+    // Thời điểm người này bấm đồng ý (NULL = chưa đồng ý)
+    @Column(name = "consensus_approved_at")
+    private java.time.LocalDateTime consensusApprovedAt;
 }

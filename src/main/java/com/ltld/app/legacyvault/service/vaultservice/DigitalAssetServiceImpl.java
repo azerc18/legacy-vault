@@ -23,6 +23,8 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
+import com.ltld.app.legacyvault.service.beneficiaryservice.JointConsensusService;
+import com.ltld.app.legacyvault.utility.ShamirSecretSharing;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldsValidator;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
@@ -56,6 +58,9 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     private final AssetAllocationRepository assetAllocationRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final EntitlementService entitlementService;
+
+    // X1: nguồn ngẫu nhiên an toàn để sinh khóa gốc và hệ số đa thức Shamir
+    private static final java.security.SecureRandom CONSENSUS_RANDOM = new java.security.SecureRandom();
 
     // =========================================================
     // FR-27: Xem danh sách tài sản ACTIVE của Vault
@@ -257,7 +262,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
     // N2-owner: kiểm tra rồi ghi lại toàn bộ dòng phân bổ của tài sản
     private void applyAllocation(Vault vault, DigitalAsset asset, UUID ownerId,
-                                 DigitalAssetRequest.AllocationRequest req) {
+                                 DigitalAssetRequest.AllocationRequest req) throws Exception {
         List<DigitalAssetRequest.Recipient> recipients = req.getRecipients();
         if (recipients == null || recipients.isEmpty()) {
             assetAllocationRepository.deleteByAssetId(asset.getId());   // quay về mặc định: thuộc tất cả
@@ -288,8 +293,25 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         }
 
         switch (req.getMode()) {
-            case JOINT_CONSENSUS -> throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                    "JOINT_CONSENSUS is not available yet");
+            case JOINT_CONSENSUS -> {
+                // X1: đồng thuận K-of-N, là tính năng của gói nâng cao
+                entitlementService.assertCanUseAdvancedAllocation(ownerId);
+                if (recipients.size() < 2) {
+                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                            "JOINT_CONSENSUS needs at least 2 recipients");
+                }
+                Integer threshold = req.getThreshold();
+                if (threshold == null || threshold < 2 || threshold > recipients.size()) {
+                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                            "threshold must be between 2 and the number of recipients");
+                }
+                for (DigitalAssetRequest.Recipient r : recipients) {
+                    if (r.getContingentBeneficiaryId() != null) {
+                        throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
+                                "Contingent beneficiary is only for EXCLUSIVE");
+                    }
+                }
+            }
             case EXCLUSIVE -> {
                 if (recipients.size() != 1) {
                     throw new VaultException(ErrorCode.ASSET_FIELD_INVALID, "EXCLUSIVE needs exactly one recipient");
@@ -327,19 +349,36 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
             }
         }
 
+        // X1: sinh khóa gốc ngẫu nhiên, chia thành N phần Shamir (mỗi người nhận 1 phần), chỉ lưu hash của khóa gốc
+        List<ShamirSecretSharing.Share> shares = null;
+        String keyHash = null;
+        if (req.getMode() == AllocationMode.JOINT_CONSENSUS) {
+            byte[] key = new byte[32];
+            CONSENSUS_RANDOM.nextBytes(key);
+            keyHash = JointConsensusService.hashKey(key);
+            shares = ShamirSecretSharing.split(key, recipients.size(), req.getThreshold(), CONSENSUS_RANDOM);
+        }
+
         assetAllocationRepository.deleteByAssetId(asset.getId());
+        int index = 0;
         for (DigitalAssetRequest.Recipient r : recipients) {
             VaultBeneficiary contingent = r.getContingentBeneficiaryId() == null
                     ? null : inVault.get(r.getContingentBeneficiaryId());
-            assetAllocationRepository.save(AssetAllocation.builder()
+            AssetAllocation.AssetAllocationBuilder row = AssetAllocation.builder()
                     .asset(asset)
                     .beneficiary(inVault.get(r.getBeneficiaryId()))
                     .contingentBeneficiary(contingent)
                     .mode(req.getMode())
-                    .sharePercent(req.getMode() == AllocationMode.EXCLUSIVE
-                            ? new BigDecimal("100.00") : r.getSharePercent())
-                    .note(req.getNote())
-                    .build());
+                    .sharePercent(req.getMode() == AllocationMode.PROPORTIONAL
+                            ? r.getSharePercent() : new BigDecimal("100.00"))
+                    .note(req.getNote());
+            if (shares != null) {
+                row.consensusThreshold(req.getThreshold())
+                        .consensusShare(cryptoService.encrypt(shares.get(index).encode()))
+                        .consensusKeyHash(keyHash);
+            }
+            assetAllocationRepository.save(row.build());
+            index++;
         }
     }
 
@@ -406,6 +445,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                         .mode(al.getMode())
                         .sharePercent(al.getSharePercent())
                         .note(al.getNote())
+                        .consensusThreshold(al.getConsensusThreshold())
                         .build()).toList())
                 .build();
     }

@@ -164,7 +164,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     @Transactional
     public DmsConfigResponse checkIn(UUID ownerId) {
         DmsConfig config = findConfig(ownerId);
-        if (config.getStatus() != DmsStatus.ACTIVE) {
+        // [X2 / Sửa #5]: cho phép Owner check-in khi DMS đang ACTIVE hoặc đang chờ xác nhận chéo (PENDING_CONFIRMATION)
+        if (config.getStatus() != DmsStatus.ACTIVE && config.getStatus() != DmsStatus.PENDING_CONFIRMATION) {
             // TRIGGERED: SRS không cho Owner hủy quy trình bàn giao đã kích hoạt bằng check-in.
             // SUSPENDED (Q28): chỉ Admin gỡ được.
             throw new DmsException(switch (config.getStatus()) {
@@ -176,6 +177,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         assertScheduleComplete(config);
 
         LocalDateTime now = LocalDateTime.now();
+        config.setStatus(DmsStatus.ACTIVE);
         startNewCycle(config, now);
         config = dmsConfigRepository.saveAndFlush(config);
         recordOwnerResponded(config, now);
@@ -353,8 +355,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         DmsSchedule schedule = scheduleCalculator.calculate(now, config.getCheckinIntervalDays(),
                 config.getGracePeriodDays(), config.getReminderCount());
         config.setLastCheckinAt(now);
+        config.setCycleStartedAt(now);          // X2 (m3): mốc chu kỳ nhắc trùng lần check-in thật
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
+        config.setConfirmationDeferrals(0);     // X2 (m2): Owner tự check-in / lưu cấu hình thì đếm ALIVE lại từ 0
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }

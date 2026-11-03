@@ -87,6 +87,18 @@ public class DmsConfig {
     @Builder.Default
     private int triggerDeferrals = 0;
 
+    // X2 (m2): số lần người xác nhận chéo bấm ALIVE trong đợt hiện tại. ALIVE chỉ hoãn 1 lần/đợt;
+    // đợt quá hạn kế tiếp mà giá trị >= 1 thì kích hoạt luôn. Check-in / lưu cấu hình đặt lại 0.
+    @Column(name = "confirmation_deferrals", nullable = false)
+    @ColumnDefault("0")
+    @Builder.Default
+    private int confirmationDeferrals = 0;
+
+    // X2 (m3): mốc bắt đầu chu kỳ nhắc. startNewCycle ghi cùng lastCheckinAt; ALIVE chỉ ghi cột này để
+    // lastCheckinAt luôn là lần check-in thật. NULL (dòng cũ) thì lịch nhắc dùng lastCheckinAt.
+    @Column(name = "cycle_started_at")
+    private LocalDateTime cycleStartedAt;
+
     @Column(name = "triggered_at")
     private LocalDateTime triggeredAt;
 
