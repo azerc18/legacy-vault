@@ -8,6 +8,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -183,12 +185,15 @@ public class EmailSender {
     }
 
     /**
-     * F2: nhắc Owner check-in Dead Man's Switch kèm nút/liên kết một chạm ("Tôi vẫn an toàn / I'm OK").
+     * F2: nhắc Owner check-in kèm link một chạm tới trang FE /dms/checkin; mở link chỉ hiện trang,
+     * Owner bấm nút "I'm OK" thì mới check-in. checkinToken null/rỗng -> mail như cũ, không kèm link.
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
-                                       int reminderNumber, int reminderCount, String oneClickCheckinUrl) {
-        String linkSection = (oneClickCheckinUrl != null && !oneClickCheckinUrl.isBlank())
-                ? "\n\nOne-click check-in (Tôi vẫn an toàn / I'm OK): " + oneClickCheckinUrl
+                                       int reminderNumber, int reminderCount, String checkinToken) {
+        String base = frontendBase();
+        String linkSection = (base != null && checkinToken != null && !checkinToken.isBlank())
+                ? "\n\nStill here? Open this link and press \"I'm OK\" to check in without signing in: "
+                        + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8)
                 : "";
         sendWithoutOtpFooter(email,
                 "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",

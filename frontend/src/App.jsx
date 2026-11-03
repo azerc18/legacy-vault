@@ -23,6 +23,7 @@ import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 import OwnerActivity from './Owner/OwnerActivity.jsx';
 import CheckinDonePage from './Owner/CheckinDonePage.jsx';
+import CheckinConfirmPage from './Owner/CheckinConfirmPage.jsx';
 import AdminUsers from './Admin/AdminUsers.jsx';
 import AdminVaults from './Admin/AdminVaults.jsx';
 import RequireRole from './Common/RequireRole.jsx';
@@ -55,7 +56,8 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/checkin/done" element={<CheckinDonePage />} />
+                <Route path="/dms/checkin" element={<CheckinConfirmPage />} />
+                <Route path="/dms/checkin-done" element={<CheckinDonePage />} />
 
                 {/* Đã đăng nhập */}
                 <Route path="/home" element={guard(null, <UserHome />)} />

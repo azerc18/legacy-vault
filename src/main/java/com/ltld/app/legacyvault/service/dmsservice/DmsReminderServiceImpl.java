@@ -5,7 +5,6 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -20,9 +19,8 @@ public class DmsReminderServiceImpl implements DmsReminderService {
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsReminderProcessor processor;
     private final EmailSender emailSender;
-
-    @Autowired(required = false)
-    private DmsOneClickCheckinService oneClickCheckinService;
+    // F2: token cho link check-in một chạm trong mail nhắc
+    private final DmsOneClickCheckinService oneClickCheckinService;
 
     // Không @Transactional ở đây: mỗi Owner chạy trong transaction riêng của processor và đã commit
     // khi prepareReminder trả về, nên mail chỉ được gửi cho lần nhắc đã ghi nhận thành công.
@@ -45,14 +43,10 @@ public class DmsReminderServiceImpl implements DmsReminderService {
     // Gửi lỗi thì trả lại lần nhắc để lượt quét sau gửi lại; gửi được thì mới ghi DmsCheckin REMINDER_SENT.
     private void send(UUID configId, DmsReminderProcessor.ReminderMail mail, LocalDateTime now) {
         try {
-            if (oneClickCheckinService != null) {
-                String checkinLink = oneClickCheckinService.buildCheckinLinkForConfig(configId);
-                emailSender.sendDmsCheckinReminder(mail.ownerEmail(), mail.checkinDueAt(), mail.triggerAt(),
-                        mail.reminderNumber(), mail.reminderCount(), checkinLink);
-            } else {
-                emailSender.sendDmsCheckinReminder(mail.ownerEmail(), mail.checkinDueAt(), mail.triggerAt(),
-                        mail.reminderNumber(), mail.reminderCount());
-            }
+            // Sinh token trong try: lỗi sinh token cũng tính như gửi lỗi, lần nhắc được trả lại.
+            String checkinToken = oneClickCheckinService.generateCheckinTokenForConfig(configId);
+            emailSender.sendDmsCheckinReminder(mail.ownerEmail(), mail.checkinDueAt(), mail.triggerAt(),
+                    mail.reminderNumber(), mail.reminderCount(), checkinToken);
         } catch (RuntimeException e) {
             log.error("FR-03: sending reminder {}/{} for dmsConfig {} failed, will retry",
                     mail.reminderNumber(), mail.reminderCount(), configId, e);

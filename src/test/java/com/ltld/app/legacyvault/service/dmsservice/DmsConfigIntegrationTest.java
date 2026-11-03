@@ -670,9 +670,9 @@ class DmsConfigIntegrationTest {
         return request;
     }
 
-    // F2: mail nhắc check-in kèm link một chạm do DmsOneClickCheckinService tạo.
+    // F2: mail nhắc check-in kèm token check-in một chạm (JWT 3 phần) do DmsOneClickCheckinService sinh.
     private static String oneClickCheckinLink() {
-        return argThat(link -> link != null && link.contains("/api/dms/checkin-link?token="));
+        return argThat(token -> token != null && token.split("\\.").length == 3);
     }
 
     private DmsConfig config(Seed s) {

@@ -3,18 +3,19 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { btnOutline, btnPrimary, Card, formatDate, Icon } from './ownerUi.jsx';
 
+// F2: kết quả check-in một chạm (sau khi Owner bấm nút ở /dms/checkin).
 export default function CheckinDonePage() {
-    const { t, i18n } = useTranslation('checkin');
+    const { t } = useTranslation('checkin');
     const [searchParams] = useSearchParams();
-    const status = searchParams.get('status') || 'success';
+    // n1: chỉ status=success mới là thành công; mở trang trống không hiện "Đã check-in"
+    const isSuccess = searchParams.get('status') === 'success';
     const nextDue = searchParams.get('nextDue');
-    const errorCode = searchParams.get('errorCode');
-    const isSuccess = status.toLowerCase() === 'success';
+    const reason = searchParams.get('reason');
 
-    // Mã lỗi BE gửi qua URL -> bản dịch trong namespace errors; mã chưa có bản dịch thì dùng câu chung.
-    const errorMessage = errorCode && i18n.exists(errorCode, { ns: 'errors' })
-        ? t(errorCode, { ns: 'errors' })
-        : t('done.errorGeneric');
+    // m5: lý do BE trả (data.reason) -> câu riêng trong namespace checkin; lạ hoặc thiếu thì dùng câu chung.
+    // Gợi ý "đăng nhập để check-in thủ công" chỉ đúng khi lỗi nằm ở link (TOKEN_INVALID).
+    const errorMessage = t(`done.reason.${reason}`, { defaultValue: t('done.errorGeneric') });
+    const showHint = !reason || reason === 'TOKEN_INVALID';
 
     return (
         <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center px-5 py-12">
@@ -36,7 +37,7 @@ export default function CheckinDonePage() {
                 </h1>
 
                 <p className="mt-2 text-sm text-on-surface-variant">
-                    {isSuccess ? t('done.successBody') : `${errorMessage} ${t('done.errorHint')}`}
+                    {isSuccess ? t('done.successBody') : (showHint ? `${errorMessage} ${t('done.errorHint')}` : errorMessage)}
                 </p>
 
                 {isSuccess && nextDue && (

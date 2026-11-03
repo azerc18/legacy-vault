@@ -1,10 +1,25 @@
 {
+  "confirm": {
+    "title": "Confirm You're OK",
+    "intro": "Press the button below to check in to your Dead Man's Switch. This starts a new check-in cycle, just like checking in from the app. You don't need to sign in.",
+    "button": "I'm OK — check in now",
+    "submitting": "Checking in…",
+    "missingToken": "This page needs the check-in link from your reminder email. Please open the link in the email again, or sign in to check in manually.",
+    "hint": "Opening this page does not check you in. Only pressing the button does.",
+    "submitFailed": "Could not check in right now. Please try again."
+  },
   "done": {
     "successTitle": "You're Checked In — Dead Man's Switch Reset",
     "successBody": "We have confirmed that you are safe. Your Dead Man's Switch countdown has been reset for a new cycle.",
     "errorTitle": "Check-In Link Could Not Be Verified",
     "errorGeneric": "This check-in link is no longer valid.",
     "errorHint": "Please sign in to LegacyVault to check in manually.",
+    "reason": {
+      "TOKEN_INVALID": "This check-in link is invalid, expired, already used, or from an earlier reminder cycle.",
+      "TRIGGERED": "Your Dead Man's Switch has already started the handover process, so check-in is no longer possible.",
+      "SUSPENDED": "Your Dead Man's Switch is currently suspended by an administrator. Please contact an admin.",
+      "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration."
+    },
     "nextDue": "Next check-in due:",
     "openDms": "Open Dead Man's Switch",
     "backHome": "Back to Home"
