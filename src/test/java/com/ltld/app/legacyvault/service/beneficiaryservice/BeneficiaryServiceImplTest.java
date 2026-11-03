@@ -129,6 +129,8 @@ public class BeneficiaryServiceImplTest {
     private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock
     private AssetAllocationRepository assetAllocationRepository;
+    @Mock
+    private JointConsensusService jointConsensusService;   // X1
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;

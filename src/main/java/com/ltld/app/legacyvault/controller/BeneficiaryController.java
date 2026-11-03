@@ -117,6 +117,30 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(detail));
     }
 
+    // X1: tiến độ đồng thuận K-of-N của tài sản JOINT_CONSENSUS
+    @PreAuthorize("hasRole('BENEFICIARY')")
+    @GetMapping("/vaults/{vaultId}/assets/{assetId}/consensus")
+    public ResponseEntity<ApiResponse<ConsensusStatusResponse>> getConsensusStatus(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        return ResponseEntity.ok(ApiResponse.success(
+                beneficiaryService.getConsensusStatus(vaultId, assetId, currentUserId(principal))));
+    }
+
+    // X1: đồng ý mở tài sản JOINT_CONSENSUS (đủ K người đồng ý thì tất cả người nhận xem được)
+    @PreAuthorize("hasRole('BENEFICIARY')")
+    @PostMapping("/vaults/{vaultId}/assets/{assetId}/consensus/approve")
+    public ResponseEntity<ApiResponse<ConsensusStatusResponse>> approveConsensus(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        return ResponseEntity.ok(ApiResponse.success("Your approval has been recorded.",
+                beneficiaryService.approveConsensus(vaultId, assetId, currentUserId(principal))));
+    }
+
     // FR-18: Tải xuống thông tin tài sản đã giải mã dưới dạng tệp. Không cho cache dữ liệu nhạy cảm.
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping(value = "/vaults/{vaultId}/assets/{assetId}/download",

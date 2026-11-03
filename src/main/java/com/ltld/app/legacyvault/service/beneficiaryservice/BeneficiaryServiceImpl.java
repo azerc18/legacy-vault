@@ -95,6 +95,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final NotificationRepository notificationRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final AssetAllocationRepository assetAllocationRepository;
+    private final JointConsensusService jointConsensusService;   // X1
     private final DigitalSignatureRepository digitalSignatureRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
 
@@ -400,12 +401,20 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // N2-access: bỏ tài sản đã phân bổ cho người khác
         Set<UUID> hidden = hiddenAssetIds(vault.getId(), currentUserId);
-        return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
-                .filter(asset -> !hidden.contains(asset.getId()))
+        List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
+                .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
+
+        // X1: tiến độ đồng thuận của các tài sản JOINT_CONSENSUS (1 query cho cả vault)
+        UUID myId = requireBeneficiary(vault.getId(), currentUserId).getId();
+        Map<UUID, JointConsensusService.Info> consensus = jointConsensusService.infoByAsset(
+                assetAllocationRepository.findByAssetIdIn(visible.stream().map(DigitalAsset::getId).toList()), myId);
+
+        return visible.stream()
                 .map(asset -> InheritedAssetSummaryResponse.builder()
                         .id(asset.getId())
                         .assetType(asset.getAssetType())
                         .assetName(asset.getAssetName())
+                        .consensus(toConsensusResponse(asset.getId(), consensus.get(asset.getId())))
                         .build())
                 .toList();
     }
@@ -631,6 +640,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     "This asset is not allocated to you.");
         }
 
+        // X1: tài sản JOINT_CONSENSUS chỉ mở khi đủ K người đồng ý (chặn trước khi giải mã)
+        jointConsensusService.assertReached(asset.getId());
+
         DecryptedAsset decrypted;
         try {
             // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
@@ -647,6 +659,73 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // Chỉ ghi nhận khi giải mã thành công (điều kiện đóng hồ sơ ở FR-19)
         markContentAccessed(ctx.claim().getId(), asset.getId());
         return decrypted;
+    }
+
+    // ===================== X1: đồng thuận K-of-N =====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public ConsensusStatusResponse getConsensusStatus(UUID vaultId, UUID assetId, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+        DigitalAsset asset = requireVisibleAsset(vault, assetId, currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+
+        JointConsensusService.Info info = jointConsensusService.infoOf(
+                assetAllocationRepository.findByAssetId(asset.getId()), me.getId());
+        if (!info.joint()) {
+            throw new BeneficiaryException(ErrorCode.CONSENSUS_NOT_APPLICABLE,
+                    "This asset does not require joint consensus.");
+        }
+        return toConsensusResponse(asset.getId(), info);
+    }
+
+    @Override
+    @Transactional
+    public ConsensusStatusResponse approveConsensus(UUID vaultId, UUID assetId, UUID currentUserId) {
+        Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+        DigitalAsset asset = requireVisibleAsset(vault, assetId, currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+
+        boolean alreadyApproved = assetAllocationRepository.findByAssetId(asset.getId()).stream()
+                .anyMatch(r -> r.getBeneficiary().getId().equals(me.getId()) && r.getConsensusApprovedAt() != null);
+        JointConsensusService.Info info = jointConsensusService.approve(asset.getId(), me);
+
+        if (!alreadyApproved) {
+            auditLogService.log(AuditAction.ASSET_CONSENSUS_APPROVED, AuditResult.SUCCESS, currentUserId,
+                    emailOf(vault, currentUserId), vault.getId(), "DigitalAsset", asset.getId().toString(),
+                    "approved=" + info.approved() + "/" + info.threshold() + ", reached=" + info.reached());
+        }
+        return toConsensusResponse(asset.getId(), info);
+    }
+
+    // Tài sản ACTIVE của vault và đã phân bổ cho người này (không thì 404 / ASSET_NOT_ALLOCATED_TO_YOU)
+    private DigitalAsset requireVisibleAsset(Vault vault, UUID assetId, UUID currentUserId) {
+        DigitalAsset asset = digitalAssetRepository
+                .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
+                .orElseThrow(() -> new BeneficiaryException("Asset not found.", HttpStatus.NOT_FOUND));
+        if (hiddenAssetIds(vault.getId(), currentUserId).contains(asset.getId())) {
+            throw new BeneficiaryException(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU,
+                    "This asset is not allocated to you.");
+        }
+        return asset;
+    }
+
+    private static ConsensusStatusResponse toConsensusResponse(UUID assetId, JointConsensusService.Info info) {
+        if (info == null || !info.joint()) {
+            return null;
+        }
+        return ConsensusStatusResponse.builder()
+                .assetId(assetId)
+                .threshold(info.threshold())
+                .total(info.total())
+                .approved(info.approved())
+                .myApproved(info.myApproved())
+                .reached(info.reached())
+                .build();
     }
 
     // FR-19: ghi nhận LẦN ĐẦU Beneficiary xem chi tiết hoặc tải xuống nội dung của từng tài sản

@@ -62,6 +62,8 @@ public class DigitalAssetRequest {
         private List<Recipient> recipients = new ArrayList<>();
         @Size(max = 1000, message = "Allocation note must be at most 1000 characters")
         private String note;
+        // X1: bắt buộc với JOINT_CONSENSUS, số người cần đồng ý (2 <= threshold <= số người nhận)
+        private Integer threshold;
     }
 
     @Data
