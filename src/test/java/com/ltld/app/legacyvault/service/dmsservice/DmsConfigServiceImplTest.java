@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
@@ -35,6 +36,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
@@ -153,6 +159,16 @@ class DmsConfigServiceImplTest {
         return captor.getValue();
     }
 
+    /** FR-03: đúng 1 DmsCheckin OWNER_RESPONDED cho cấu hình vừa lưu, occurredAt = mốc bắt đầu chu kỳ mới. */
+    private void verifyOwnerRespondedRecorded(DmsConfig saved) {
+        ArgumentCaptor<DmsCheckin> checkin = ArgumentCaptor.forClass(DmsCheckin.class);
+        verify(dmsCheckinRepository).saveAndFlush(checkin.capture());
+        assertThat(checkin.getValue().getDmsConfig()).isSameAs(saved);
+        assertThat(checkin.getValue().getCheckinType()).isEqualTo(DmsCheckinType.OWNER_RESPONDED);
+        assertThat(checkin.getValue().getOccurredAt()).isEqualTo(saved.getLastCheckinAt());
+        assertThat(checkin.getValue().getChannel()).isNull();
+    }
+
     private void verifyNothingWritten() {
         verify(dmsConfigRepository, never()).saveAndFlush(any());
         verifyNoInteractions(dmsCheckinRepository, auditLogService);
@@ -161,7 +177,7 @@ class DmsConfigServiceImplTest {
     // ---------- upsertConfig ----------
 
     @Test
-    @DisplayName("FR-03: tạo mới -> ACTIVE, EMAIL, chờ Backup 14 ngày, lịch tính từ lúc lưu, audit DMS_CONFIGURED")
+    @DisplayName("FR-03: tạo mới -> ACTIVE, EMAIL, chờ Backup 14 ngày, lịch tính từ lúc lưu, ghi DmsCheckin OWNER_RESPONDED, audit DMS_CONFIGURED")
     void upsert_createsNewConfig() {
         LocalDateTime before = LocalDateTime.now();
 
@@ -188,18 +204,20 @@ class DmsConfigServiceImplTest {
         assertThat(response.getCheckinDueAt()).isEqualTo(start.plusDays(30));
         assertThat(response.getTriggerAt()).isEqualTo(start.plusDays(37));
         assertThat(response.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(response.getConfigured()).isTrue();
 
-        InOrder order = inOrder(dmsConfigRepository, auditLogService);
+        verifyOwnerRespondedRecorded(saved);
+        InOrder order = inOrder(dmsConfigRepository, dmsCheckinRepository, auditLogService);
         order.verify(dmsConfigRepository).saveAndFlush(saved);
+        order.verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
         order.verify(auditLogService).log(eq(AuditAction.DMS_CONFIGURED), eq(AuditResult.SUCCESS),
                 eq(ownerId), eq("owner@example.test"), isNull(),
                 eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(saved.getId().toString()),
                 contains("created=true"));
-        verifyNoInteractions(dmsCheckinRepository);
     }
 
     @Test
-    @DisplayName("FR-03: cập nhật -> giữ backupActivationWaitDays, reset remindersSent, bắt đầu chu kỳ mới, không tạo DmsCheckin")
+    @DisplayName("FR-03: cập nhật -> giữ backupActivationWaitDays, reset remindersSent, bắt đầu chu kỳ mới, ghi DmsCheckin OWNER_RESPONDED")
     void upsert_updatesExistingConfig() {
         DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
         LocalDateTime before = LocalDateTime.now();
@@ -223,7 +241,12 @@ class DmsConfigServiceImplTest {
                 eq(ownerId), eq("owner@example.test"), isNull(),
                 eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()),
                 contains("created=false"));
-        verifyNoInteractions(dmsCheckinRepository);
+        verifyOwnerRespondedRecorded(existing);
+        InOrder order = inOrder(dmsConfigRepository, dmsCheckinRepository, auditLogService);
+        order.verify(dmsConfigRepository).saveAndFlush(existing);
+        order.verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
+        order.verify(auditLogService).log(eq(AuditAction.DMS_CONFIGURED), any(), any(), any(), any(), any(), any(),
+                anyString());
     }
 
     @Test
@@ -278,7 +301,7 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
-    @DisplayName("FR-03: hai yêu cầu tạo đồng thời (trùng owner_id) -> 409 rõ ràng, không audit")
+    @DisplayName("FR-03: hai yêu cầu tạo đồng thời (trùng owner_id) -> 409 rõ ràng, không ghi DmsCheckin, không audit")
     void upsert_concurrentCreate_returns409() {
         when(dmsConfigRepository.saveAndFlush(any(DmsConfig.class)))
                 .thenThrow(new DataIntegrityViolationException("uk_dms_config_owner"));
@@ -287,7 +310,7 @@ class DmsConfigServiceImplTest {
                 .isInstanceOf(DmsException.class)
                 .hasMessageContaining("another request")
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(dmsCheckinRepository, auditLogService);
     }
 
     @Test
@@ -299,7 +322,7 @@ class DmsConfigServiceImplTest {
 
         assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
-        verifyNoInteractions(auditLogService);
+        verifyNoInteractions(dmsCheckinRepository, auditLogService);
     }
 
     // ---------- FR-03: bật lần đầu phải có Executor chính; lưu lại chỉ cần còn Executor nhận bàn giao ----------
@@ -493,12 +516,39 @@ class DmsConfigServiceImplTest {
 
     // ---------- getConfig ----------
 
+    // Cột trống = chưa có dòng cho vị trí đó. Chưa cấu hình: điều kiện bật DMS lần đầu (Primary chưa REVOKED),
+    // nên chỉ có Backup INACTIVE vẫn là false (khác với khi đã cấu hình).
+    @ParameterizedTest(name = "Primary={0}, Backup={1} -> hasUsableExecutor={2}")
+    @CsvSource({
+            "INACTIVE, , true",
+            "ACTIVE, INACTIVE, true",
+            "REVOKED, INACTIVE, false",
+            ", INACTIVE, false",
+            ", , false"
+    })
+    @DisplayName("FR-03: xem cấu hình khi chưa có -> configured=false, hasUsableExecutor = có Primary chưa REVOKED, còn lại null")
+    void getConfig_withoutConfig_returnsNotConfigured(ExecutorStatus primary, ExecutorStatus backup, boolean expected) {
+        List<ExecutorAssignment> rows = new ArrayList<>();
+        if (primary != null) rows.add(executor(ExecutorType.PRIMARY, primary));
+        if (backup != null) rows.add(executor(ExecutorType.BACKUP, backup));
+        executors(rows.toArray(ExecutorAssignment[]::new));
+
+        DmsConfigResponse response = service.getConfig(ownerId);
+
+        assertThat(response.getConfigured()).isFalse();
+        assertThat(response.getHasUsableExecutor()).isEqualTo(expected);
+        assertThat(response).usingRecursiveComparison()
+                .ignoringFields("configured", "hasUsableExecutor")
+                .isEqualTo(new DmsConfigResponse());
+        verifyNothingWritten();
+    }
+
     @Test
-    @DisplayName("FR-03: xem cấu hình khi chưa có -> 404")
-    void getConfig_withoutConfig_returns404() {
-        assertThatThrownBy(() -> service.getConfig(ownerId))
-                .isInstanceOf(DmsException.class)
-                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+    @DisplayName("FR-03: xem cấu hình đã có -> configured=true")
+    void getConfig_withConfig_returnsConfigured() {
+        existingConfig(DmsStatus.ACTIVE);
+
+        assertThat(service.getConfig(ownerId).getConfigured()).isTrue();
     }
 
     @Test
@@ -551,6 +601,45 @@ class DmsConfigServiceImplTest {
         executors(executor(ExecutorType.PRIMARY, ExecutorStatus.ACTIVE));
 
         assertThat(service.getConfig(ownerId).getHasUsableExecutor()).isNull();
+    }
+
+    // ---------- getCheckins ----------
+
+    @Test
+    @DisplayName("FR-03: lịch sử check-in khi chưa cấu hình -> trang rỗng, không đọc dms_checkins")
+    void getCheckins_withoutConfig_returnsEmptyPage() {
+        Page<DmsCheckinResponse> page = service.getCheckins(ownerId, PageRequest.of(0, 20));
+
+        assertThat(page.getContent()).isEmpty();
+        assertThat(page.getTotalElements()).isZero();
+        verifyNoInteractions(dmsCheckinRepository);
+    }
+
+    @Test
+    @DisplayName("FR-03: lịch sử check-in -> theo DmsConfig của chính Owner, mới nhất trước (bỏ sort của người gọi), map đủ trường")
+    void getCheckins_mapsRowsNewestFirst() {
+        DmsConfig config = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime at = LocalDateTime.of(2026, 10, 1, 9, 0);
+        DmsCheckin reminder = DmsCheckin.builder().dmsConfig(config).checkinType(DmsCheckinType.REMINDER_SENT)
+                .channel(NotificationChannel.EMAIL).occurredAt(at).build();
+        when(dmsCheckinRepository.findByDmsConfigId(eq(config.getId()), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(reminder), inv.getArgument(1), 3));
+
+        Page<DmsCheckinResponse> page = service.getCheckins(ownerId,
+                PageRequest.of(1, 1, Sort.by(Sort.Direction.ASC, "occurredAt")));
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(dmsCheckinRepository).findByDmsConfigId(eq(config.getId()), pageable.capture());
+        assertThat(pageable.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageable.getValue().getPageSize()).isEqualTo(1);
+        assertThat(pageable.getValue().getSort())
+                .isEqualTo(Sort.by(Sort.Order.desc("occurredAt"), Sort.Order.desc("id")));
+        assertThat(page.getTotalElements()).isEqualTo(3);
+        assertThat(page.getContent()).singleElement().satisfies(r -> {
+            assertThat(r.getCheckinType()).isEqualTo(DmsCheckinType.REMINDER_SENT);
+            assertThat(r.getChannel()).isEqualTo(NotificationChannel.EMAIL);
+            assertThat(r.getOccurredAt()).isEqualTo(at);
+        });
     }
 
     // ---------- assertHandoverNotStarted (O1) ----------

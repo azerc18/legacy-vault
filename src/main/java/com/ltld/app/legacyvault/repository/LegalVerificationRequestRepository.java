@@ -19,10 +19,20 @@ import java.util.UUID;
 
 public interface LegalVerificationRequestRepository extends JpaRepository<LegalVerificationRequest, UUID> {
 
-    // Q23-b + N6: Loại hồ sơ mà verifier gọi là Owner hoặc Executor
+    // Q23-b + N6 + N2: Loại hồ sơ mà verifier là Owner, Executor (của hồ sơ hoặc của Owner) hoặc beneficiary của BẤT KỲ vault nào trong hồ sơ
+    // Giữ đồng bộ điều kiện với VaultBeneficiaryRepository.isBeneficiaryOfRequest và ExecutorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot
     @Query("""
         SELECT r FROM LegalVerificationRequest r JOIN FETCH r.owner o JOIN FETCH r.executor e
         WHERE r.status = :status AND o.id <> :verifierId AND e.id <> :verifierId
+        AND NOT EXISTS (
+            SELECT 1 FROM ExecutorAssignment ea
+            WHERE ea.owner = r.owner AND ea.executorUser.id = :verifierId
+              AND ea.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED)
+        AND NOT EXISTS (
+            SELECT 1 FROM VerificationRequestVault rv, VaultBeneficiary b
+            WHERE rv.request = r AND b.vault = rv.vault
+              AND (b.user.id = :verifierId
+                   OR LOWER(b.email) = (SELECT LOWER(u.email) FROM User u WHERE u.id = :verifierId)))
         ORDER BY r.createdAt ASC
     """)
     List<LegalVerificationRequest> findPendingVisibleTo(@Param("status") LegalVerificationStatus status,
@@ -32,6 +42,15 @@ public interface LegalVerificationRequestRepository extends JpaRepository<LegalV
     @Query("""
         SELECT COUNT(r) FROM LegalVerificationRequest r
         WHERE r.status = :status AND r.owner.id <> :verifierId AND r.executor.id <> :verifierId
+        AND NOT EXISTS (
+            SELECT 1 FROM ExecutorAssignment ea
+            WHERE ea.owner = r.owner AND ea.executorUser.id = :verifierId
+              AND ea.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED)
+        AND NOT EXISTS (
+            SELECT 1 FROM VerificationRequestVault rv, VaultBeneficiary b
+            WHERE rv.request = r AND b.vault = rv.vault
+              AND (b.user.id = :verifierId
+                   OR LOWER(b.email) = (SELECT LOWER(u.email) FROM User u WHERE u.id = :verifierId)))
     """)
     long countPendingVisibleTo(@Param("status") LegalVerificationStatus status,
                                @Param("verifierId") UUID verifierId);

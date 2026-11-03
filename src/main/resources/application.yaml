@@ -69,6 +69,16 @@ app:
   security:
     crypto:
       master-key: ${CRYPTO_MASTER_KEY}
+  vnpay:
+    # Lấy từ cổng merchant VNPay; để trống khi chưa tích hợp. KHÔNG commit giá trị thật.
+    tmn-code: ${VNPAY_TMN_CODE:}
+    hash-secret: ${VNPAY_HASH_SECRET:}
+    pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+    # URL BACKEND (/api/payments/vnpay-return) mà VNPay redirect trình duyệt về sau thanh toán (vnp_ReturnUrl).
+    # Phải truy cập được từ trình duyệt người dùng; production đặt VNPAY_RETURN_URL theo domain thật.
+    return-url: ${VNPAY_RETURN_URL:http://localhost:8084/api/payments/vnpay-return}
+    # false: chỉ IPN (server-to-server, có chữ ký) mới kích hoạt gói; return-url chỉ để hiển thị kết quả
+    activate-on-return: false
   ai:
     provider: ${AI_PROVIDER:mock}
     gemini:

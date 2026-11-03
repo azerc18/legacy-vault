@@ -1,0 +1,18 @@
+{
+  "welcome": "Chào mừng trở lại, {{name}}",
+  "comingSoon": "Sắp ra mắt",
+  "notNamedYet": "Các kho được thừa kế sẽ hiện ở đây khi có người chỉ định bạn là người thụ hưởng.",
+  "noFeatures": "Tài khoản của bạn hiện chưa có chức năng nào.",
+  "features": {
+    "ownerVaults": { "title": "Kho di sản của tôi", "text": "Tạo kho, thêm giấy tờ, chọn người thụ hưởng." },
+    "ownerDms": { "title": "Dead Man's Switch", "text": "Cài lịch check-in và check-in." },
+    "ownerExecutors": { "title": "Người thi hành", "text": "Chỉ định người thi hành chính và dự phòng." },
+    "ownerActivity": { "title": "Nhật ký hoạt động", "text": "Các sự kiện Dead Man's Switch và người thi hành." },
+    "beneficiaryVaults": { "title": "Kho được thừa kế", "text": "Xác minh danh tính và nhận tài sản." },
+    "executorHome": { "title": "Nhiệm vụ người thi hành", "text": "Xem các kho mà bạn là người thi hành." },
+    "verifierRequests": { "title": "Yêu cầu xác minh", "text": "Xem xét và ký các yêu cầu đang chờ." },
+    "verifierHistory": { "title": "Lịch sử xác minh", "text": "Các yêu cầu bạn đã xử lý." },
+    "adminUsers": { "title": "Người dùng", "text": "Khoá tài khoản, cấp quyền Người xác minh, tạm dừng DMS." },
+    "adminVaults": { "title": "Tất cả kho", "text": "Xem mọi kho và trạng thái của chúng." }
+  }
+}

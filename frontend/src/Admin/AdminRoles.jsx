@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, ConfirmDialog, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
@@ -10,6 +11,7 @@ const EMPTY_FORM = { code: '', name: '', description: '', authorities: [] };
 const byCode = (a, b) => a.code.localeCompare(b.code);
 
 export default function AdminRoles() {
+    const { t } = useTranslation('admin');
     const [roles, setRoles] = useState(null);
     const [authorities, setAuthorities] = useState([]);
     const [error, setError] = useState('');
@@ -21,7 +23,7 @@ export default function AdminRoles() {
     useEffect(() => {
         Promise.all([adminApi.listRoles(), adminApi.listAuthorities()])
             .then(([r, a]) => { setRoles(r); setAuthorities(a); })
-            .catch((e) => setError(getErrorMessage(e, 'Could not load roles.')));
+            .catch((e) => setError(getErrorMessage(e, t('roles.loadError'))));
     }, []);
 
     const resetMessages = () => { setError(''); setSuccess(''); };
@@ -46,15 +48,15 @@ export default function AdminRoles() {
             if (editing.mode === 'create') {
                 const created = await adminApi.createRole({ code: form.code.trim(), ...body });
                 setRoles((rs) => [...rs, created].sort(byCode));
-                setSuccess(`Role ${created.code} created.`);
+                setSuccess(t('roles.created', { code: created.code }));
             } else {
                 const updated = await adminApi.updateRole(form.code, body);
                 setRoles((rs) => rs.map((r) => (r.code === updated.code ? updated : r)));
-                setSuccess(`Role ${updated.code} updated. Users get the new permissions within 15 minutes or after signing in again.`);
+                setSuccess(t('roles.updated', { code: updated.code }));
             }
             setEditing(null);
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not save role.')); // giữ form mở để sửa lại
+            setError(getErrorMessage(e, t('roles.saveError'))); // giữ form mở để sửa lại
         } finally {
             setBusy(false);
         }
@@ -65,9 +67,9 @@ export default function AdminRoles() {
         try {
             await adminApi.deleteRole(deleting.code);
             setRoles((rs) => rs.filter((r) => r.code !== deleting.code));
-            setSuccess(`Role ${deleting.code} deleted.`);
+            setSuccess(t('roles.deleted', { code: deleting.code }));
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not delete role.'));
+            setError(getErrorMessage(e, t('roles.deleteError')));
         } finally {
             setBusy(false);
             setDeleting(null);
@@ -75,11 +77,11 @@ export default function AdminRoles() {
     };
 
     return (
-        <AdminLayout title="Roles & permissions" subtitle="Create custom roles and choose which permissions each role grants.">
+        <AdminLayout title={t('roles.title')} subtitle={t('roles.subtitle')}>
             <div className="flex justify-end mb-6">
                 {!editing && (
                     <button onClick={openCreate} className={btnPrimary}>
-                        <Icon name="add" className="text-[18px]" /> New role
+                        <Icon name="add" className="text-[18px]" /> {t('roles.newRole')}
                     </button>
                 )}
             </div>
@@ -99,16 +101,16 @@ export default function AdminRoles() {
                 />
             )}
 
-            {!roles && !error && <p className="text-on-surface-variant">Loading...</p>}
+            {!roles && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
 
             {roles && (
                 <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-surface-container-low text-on-surface-variant">
                         <tr>
-                            <th className="p-4">Role</th>
-                            <th className="p-4">Permissions</th>
-                            <th className="p-4 text-right">Actions</th>
+                            <th className="p-4">{t('roles.cols.role')}</th>
+                            <th className="p-4">{t('roles.cols.permissions')}</th>
+                            <th className="p-4 text-right">{t('roles.cols.actions')}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -116,9 +118,9 @@ export default function AdminRoles() {
                             <tr key={r.code} className="border-t border-outline-variant/20 align-top">
                                 <td className="p-4">
                                     <p className="font-semibold flex items-center gap-2">
-                                        {r.name}
+                                        {t(`common:roles.${r.code}`, { defaultValue: r.name })}
                                         {r.system && (
-                                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-outline">System</span>
+                                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-outline">{t('roles.system')}</span>
                                         )}
                                     </p>
                                     <p className="text-xs text-outline font-mono">{r.code}</p>
@@ -133,9 +135,9 @@ export default function AdminRoles() {
                                 </td>
                                 <td className="p-4">
                                     <div className="flex flex-col items-end gap-1.5">
-                                        <button onClick={() => openEdit(r)} className="text-xs font-semibold text-secondary hover:text-primary">Edit</button>
+                                        <button onClick={() => openEdit(r)} className="text-xs font-semibold text-secondary hover:text-primary">{t('roles.edit')}</button>
                                         {!r.system && (
-                                            <button onClick={() => { resetMessages(); setDeleting(r); }} className="text-xs font-semibold text-error">Delete</button>
+                                            <button onClick={() => { resetMessages(); setDeleting(r); }} className="text-xs font-semibold text-error">{t('roles.delete')}</button>
                                         )}
                                     </div>
                                 </td>
@@ -148,9 +150,9 @@ export default function AdminRoles() {
 
             <ConfirmDialog
                 open={!!deleting}
-                title={`Delete role ${deleting?.code}?`}
-                message="This cannot be undone. Remove the role from all users first."
-                confirmLabel="Delete"
+                title={t('roles.deleteDialog.title', { code: deleting?.code })}
+                message={t('roles.deleteDialog.message')}
+                confirmLabel={t('roles.delete')}
                 danger
                 busy={busy}
                 onConfirm={remove}
@@ -161,15 +163,16 @@ export default function AdminRoles() {
 }
 
 function RoleForm({ mode, initial, authorities, busy, onSave, onCancel }) {
+    const { t } = useTranslation('admin');
     const [form, setForm] = useState(initial);
     const [submitted, setSubmitted] = useState(false);
     const isCreate = mode === 'create';
     const isAdminRole = form.code === 'ADMIN';
 
     const codeError = isCreate && !CODE_PATTERN.test(form.code)
-        ? '3–50 characters: A–Z, 0–9 or _, starting with a letter.' : '';
-    const nameError = !form.name.trim() ? 'Name is required.' : '';
-    const authError = form.authorities.length === 0 ? 'Select at least one permission.' : '';
+        ? t('roles.form.codeError') : '';
+    const nameError = !form.name.trim() ? t('roles.form.nameError') : '';
+    const authError = form.authorities.length === 0 ? t('roles.form.authError') : '';
     const valid = !codeError && !nameError && !authError;
 
     const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
@@ -194,33 +197,33 @@ function RoleForm({ mode, initial, authorities, busy, onSave, onCancel }) {
 
     return (
         <form onSubmit={submit} className="mb-8 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-            <h2 className="font-title-lg text-title-lg mb-4">{isCreate ? 'New role' : `Edit ${form.code}`}</h2>
+            <h2 className="font-title-lg text-title-lg mb-4">{isCreate ? t('roles.newRole') : t('roles.form.editTitle', { code: form.code })}</h2>
 
             <div className="grid sm:grid-cols-2 gap-4">
                 <label className="block">
-                    <span className="text-sm font-semibold">Code</span>
+                    <span className="text-sm font-semibold">{t('roles.form.code')}</span>
                     <input
                         value={form.code}
                         disabled={!isCreate}
                         onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '_') }))}
-                        placeholder="e.g. AUDITOR"
+                        placeholder={t('roles.form.codePlaceholder')}
                         className={`${inputClass} mt-1 font-mono disabled:opacity-60`}
                     />
                     {fieldError(codeError)}
                 </label>
                 <label className="block">
-                    <span className="text-sm font-semibold">Name</span>
-                    <input value={form.name} onChange={set('name')} maxLength={100} placeholder="e.g. Auditor" className={`${inputClass} mt-1`} />
+                    <span className="text-sm font-semibold">{t('roles.form.name')}</span>
+                    <input value={form.name} onChange={set('name')} maxLength={100} placeholder={t('roles.form.namePlaceholder')} className={`${inputClass} mt-1`} />
                     {fieldError(nameError)}
                 </label>
             </div>
 
             <label className="block mt-4">
-                <span className="text-sm font-semibold">Description</span>
-                <input value={form.description} onChange={set('description')} maxLength={255} placeholder="Optional" className={`${inputClass} mt-1`} />
+                <span className="text-sm font-semibold">{t('roles.form.description')}</span>
+                <input value={form.description} onChange={set('description')} maxLength={255} placeholder={t('roles.form.optional')} className={`${inputClass} mt-1`} />
             </label>
 
-            <p className="mt-6 text-sm font-semibold">Permissions</p>
+            <p className="mt-6 text-sm font-semibold">{t('roles.cols.permissions')}</p>
             <div className="mt-2 grid sm:grid-cols-2 gap-2">
                 {authorities.map((a) => {
                     const checked = form.authorities.includes(a.code);
@@ -232,7 +235,7 @@ function RoleForm({ mode, initial, authorities, busy, onSave, onCancel }) {
                             <span>
                                 <span className="block font-mono text-xs font-semibold">{a.code}</span>
                                 <span className="block text-sm text-on-surface-variant">{a.description}</span>
-                                {locked && <span className="block text-xs text-outline">Required for the ADMIN role</span>}
+                                {locked && <span className="block text-xs text-outline">{t('roles.form.adminRequired')}</span>}
                             </span>
                         </label>
                     );
@@ -241,9 +244,9 @@ function RoleForm({ mode, initial, authorities, busy, onSave, onCancel }) {
             {fieldError(authError)}
 
             <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={onCancel} className={btnOutline}>Cancel</button>
+                <button type="button" onClick={onCancel} className={btnOutline}>{t('common:actions.cancel')}</button>
                 <button type="submit" disabled={busy} className={btnPrimary}>
-                    {busy ? 'Please wait...' : isCreate ? 'Create role' : 'Save changes'}
+                    {busy ? t('wait') : isCreate ? t('roles.form.create') : t('roles.form.save')}
                 </button>
             </div>
         </form>

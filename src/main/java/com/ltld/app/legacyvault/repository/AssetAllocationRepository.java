@@ -29,6 +29,23 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
 
     boolean existsByBeneficiaryId(UUID beneficiaryId);
 
+    // F1: id các tài sản ACTIVE của Owner đã có ít nhất 1 dòng phân bổ tường minh (một query cho cả Owner)
+    @Query("""
+            SELECT DISTINCT al.asset.id FROM AssetAllocation al
+            WHERE al.asset.vault.owner.id = :ownerId
+              AND al.asset.status = com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE
+            """)
+    List<UUID> findAllocatedActiveAssetIdsByOwnerId(@Param("ownerId") UUID ownerId);
+
+    // F1 (tiêu chí 6): Owner có ít nhất 1 tài sản ACTIVE đã chỉ định người thụ hưởng dự phòng không (1 query)
+    @Query("""
+            SELECT COUNT(al) > 0 FROM AssetAllocation al
+            WHERE al.contingentBeneficiary IS NOT NULL
+              AND al.asset.status = com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE
+              AND al.asset.vault.owner.id = :ownerId
+            """)
+    boolean existsContingentForOwner(@Param("ownerId") UUID ownerId);
+
     @Modifying(flushAutomatically = true)
     @Query("UPDATE AssetAllocation al SET al.contingentBeneficiary = NULL WHERE al.contingentBeneficiary.id = :bid")
     int clearContingentByBeneficiaryId(@Param("bid") UUID bid);
@@ -55,4 +72,8 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
             """)
     long countStalledInVault(@Param("vaultId") UUID vaultId,
                              @Param("deadStatuses") Collection<BeneficiaryInviteStatus> deadStatuses);
+
+    // N2-exec: mọi phân bổ của một vault, để biết phần của ai đã chuyển sang người dự phòng
+    @Query("SELECT al FROM AssetAllocation al WHERE al.asset.vault.id = :vaultId")
+    List<AssetAllocation> findByVaultId(@Param("vaultId") UUID vaultId);
 }

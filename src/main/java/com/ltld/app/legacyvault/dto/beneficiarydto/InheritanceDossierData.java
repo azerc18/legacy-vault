@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.TransferMechanism;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 // X4: dữ liệu để vẽ hồ sơ khai nhận. KHÔNG chứa trường bí mật.
@@ -31,7 +32,8 @@ public record InheritanceDossierData(
 
     public record AssetLine(String assetName, AssetType type, TransferMechanism mechanism,
                             AllocationMode mode, BigDecimal sharePercent, String note,
-                            boolean viaFallback) {}
+                            boolean viaFallback,
+                            Map<String, String> publicFields) {}   // key -> value, đúng thứ tự schema, đã che số TK
 
     public record DocumentLine(String fileName, DocumentType type, LocalDateTime uploadedAt) {}
 }
