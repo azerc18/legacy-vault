@@ -25,6 +25,7 @@ import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
+import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -2183,6 +2184,78 @@ public class BeneficiaryServiceImplTest {
         assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
         verify(vaultRepository, never()).save(any());
+    }
+
+
+    // ===================== X1: review PR #164 =====================
+
+    // Mục 1: joint chỉ kẹt khi còn ít hơn K người nhận được; còn đủ K thì không báo stalled
+    @Test
+    void declineClaim_jointAsset_enoughLeft_notStalled() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(jointConsensusService.isStalled(any())).thenReturn(false);
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getStalledAssets()).isZero();
+        assertThat(response.getReassignedAssets()).isZero();
+        verify(auditLogService, never()).log(eq(AuditAction.CLAIM_STALLED), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void declineClaim_jointAsset_tooFewLeft_isStalledAndAudited() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(jointConsensusService.isStalled(any())).thenReturn(true);
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getStalledAssets()).isEqualTo(1);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_STALLED), eq(AuditResult.FAILURE), eq(currentUserId),
+                any(), eq("Vault"), eq(vaultId.toString()), any());
+    }
+
+    // Mục 1: còn tài sản joint thiếu người thì vault không sang CLAIMED
+    @Test
+    void closeVault_jointStalled_vaultStaysUnlocked() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+        when(jointConsensusService.countStalledAssets(vaultId)).thenReturn(1L);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(vaultRepository, never()).save(any());
+    }
+
+    // Mục 2: đóng hồ sơ tự ghi nhận đồng ý với các tài sản joint đang giữ
+    @Test
+    void closeVault_autoApprovesHeldJointAssets_andAudits() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+        when(jointConsensusService.approveAllHeldBy(eq(vaultId), any())).thenReturn(2);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        verify(jointConsensusService).approveAllHeldBy(eq(vaultId), any());
+        verify(auditLogService).log(eq(AuditAction.ASSET_CONSENSUS_APPROVED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), eq("autoApprovedOnClose=2"));
     }
 
 

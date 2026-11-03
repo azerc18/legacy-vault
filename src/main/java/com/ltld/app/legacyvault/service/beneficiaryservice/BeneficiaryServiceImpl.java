@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
@@ -400,12 +401,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertViewSession(vault.getId(), currentUserId);
 
         // N2-access: bỏ tài sản đã phân bổ cho người khác
-        Set<UUID> hidden = hiddenAssetIds(vault.getId(), currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
         List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
                 .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
 
         // X1: tiến độ đồng thuận của các tài sản JOINT_CONSENSUS (1 query cho cả vault)
-        UUID myId = requireBeneficiary(vault.getId(), currentUserId).getId();
+        UUID myId = me.getId();
         Map<UUID, JointConsensusService.Info> consensus = jointConsensusService.infoByAsset(
                 assetAllocationRepository.findByAssetIdIn(visible.stream().map(DigitalAsset::getId).toList()), myId);
 
@@ -599,6 +601,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
         claim.setStatus(ClaimStatus.CLAIMED);
         claim.setClaimedAt(now);
+        // X1: đóng hồ sơ coi như đồng ý với các tài sản joint mình đang giữ, kẻo người còn lại bị kẹt
+        // (sau CLAIMED không approve được nữa, vd. 2-of-2 mà A đóng hồ sơ trước khi bấm đồng ý)
+        int autoApproved = jointConsensusService.approveAllHeldBy(vaultId, requireBeneficiary(vaultId, currentUserId));
+        if (autoApproved > 0) {
+            auditLogService.log(AuditAction.ASSET_CONSENSUS_APPROVED, AuditResult.SUCCESS, currentUserId,
+                    emailOf(vault, currentUserId), "Vault", vault.getId().toString(),
+                    "autoApprovedOnClose=" + autoApproved);
+        }
         // N2b: chỉ đóng phần của người này; vault sang CLAIMED khi mọi phần đã xong
         completeVaultIfAllDone(vault);
 
@@ -870,7 +880,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // Auto-fallback: chuyển từng phân bổ đang giữ sang người dự phòng còn nhận được
         int reassigned = 0;
         int stalled = 0;
-        for (AssetAllocation allocation : assetAllocationRepository.findHeldBy(vaultId, me.getId())) {
+        List<AssetAllocation> held = assetAllocationRepository.findHeldBy(vaultId, me.getId());
+        for (AssetAllocation allocation : held) {
+            if (allocation.getMode() == AllocationMode.JOINT_CONSENSUS) {
+                continue; // joint không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
+            }
             VaultBeneficiary next = allocation.getContingentBeneficiary();
             if (next != null && !next.getId().equals(me.getId()) && canReceive(vaultId, next)) {
                 allocation.setEffectiveBeneficiary(next);
@@ -883,6 +897,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 stalled++;
             }
         }
+
+        // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
+        stalled += (int) held.stream()
+                .filter(a -> a.getMode() == AllocationMode.JOINT_CONSENSUS)
+                .map(a -> a.getAsset().getId())
+                .distinct()
+                .filter(id -> jointConsensusService.isStalled(assetAllocationRepository.findByAssetId(id)))
+                .count();
 
         auditLogService.log(AuditAction.CLAIM_DECLINED, AuditResult.SUCCESS, currentUserId, me.getEmail(),
                 "Vault", vaultId.toString(), "reassigned=" + reassigned + ", stalled=" + stalled
@@ -932,8 +954,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // Nếu không ai đã đóng (vd. tất cả từ chối) thì giữ nguyên UNLOCKED đến hết hạn nhận.
     private void completeVaultIfAllDone(Vault vault) {
         // Q49: còn phân bổ không có người nhận thì giữ UNLOCKED, chờ Admin xử lý hoặc hết hạn BR-04
+        // X1: cộng thêm tài sản joint thiếu người (còn nhận được < K)
         if (assetAllocationRepository.countStalledInVault(vault.getId(),
-                List.of(BeneficiaryInviteStatus.DECLINED, BeneficiaryInviteStatus.WAIVED)) > 0) {
+                List.of(BeneficiaryInviteStatus.DECLINED, BeneficiaryInviteStatus.WAIVED)) > 0
+                || jointConsensusService.countStalledAssets(vault.getId()) > 0) {
             return;
         }
         List<UUID> claimedUserIds = claimRepository.findAllByVaultId(vault.getId()).stream()

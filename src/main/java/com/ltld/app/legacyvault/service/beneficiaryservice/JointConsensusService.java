@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 import com.ltld.app.legacyvault.entity.AssetAllocation;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AllocationMode;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
@@ -55,12 +56,55 @@ public class JointConsensusService {
         return !rows.isEmpty() && rows.get(0).getMode() == AllocationMode.JOINT_CONSENSUS;
     }
 
+    // Người nhận còn hiệu lực: chưa từ chối / từ bỏ. Phần đồng ý của người đã từ chối không được đếm.
+    // Lưu ý: JOINT_CONSENSUS không có người dự phòng nên so theo getBeneficiary(), không cần effectiveBeneficiary.
+    // Nếu sau này cho phép dự phòng cho joint thì phải đổi sang effectiveBeneficiary ở mọi chỗ trong lớp này.
+    private static boolean alive(AssetAllocation r) {
+        BeneficiaryInviteStatus st = r.getBeneficiary().getStatus();
+        return st != BeneficiaryInviteStatus.DECLINED && st != BeneficiaryInviteStatus.WAIVED;
+    }
+
+    private static int thresholdOf(List<AssetAllocation> rows) {
+        return rows.get(0).getConsensusThreshold() == null ? 0 : rows.get(0).getConsensusThreshold();
+    }
+
+    /** Tài sản joint bị kẹt khi số người còn nhận được ít hơn K (không thể đủ đồng thuận nữa). */
+    public boolean isStalled(List<AssetAllocation> rows) {
+        return isJoint(rows) && rows.stream().filter(JointConsensusService::alive).count() < thresholdOf(rows);
+    }
+
+    /** Số tài sản joint của vault đang bị kẹt, dùng cho quyết định hoàn tất vault. */
+    public long countStalledAssets(UUID vaultId) {
+        return assetAllocationRepository.findByVaultId(vaultId).stream()
+                .collect(Collectors.groupingBy(r -> r.getAsset().getId()))
+                .values().stream()
+                .filter(this::isStalled)
+                .count();
+    }
+
+    /**
+     * Người nhận đóng hồ sơ thì coi như đồng ý với mọi tài sản joint mình đang giữ.
+     * Nếu không, claim CLAIMED chặn approve và người còn lại bị kẹt (vd. 2-of-2).
+     * Trả về số tài sản vừa được ghi nhận.
+     */
+    public int approveAllHeldBy(UUID vaultId, VaultBeneficiary me) {
+        int count = 0;
+        for (AssetAllocation r : assetAllocationRepository.findHeldBy(vaultId, me.getId())) {
+            if (r.getMode() == AllocationMode.JOINT_CONSENSUS && r.getConsensusApprovedAt() == null) {
+                r.setConsensusApprovedAt(LocalDateTime.now());
+                assetAllocationRepository.save(r);
+                count++;
+            }
+        }
+        return count;
+    }
+
     public Info infoOf(List<AssetAllocation> rows, UUID myBeneficiaryId) {
         if (!isJoint(rows)) {
             return Info.notJoint();
         }
-        int threshold = rows.get(0).getConsensusThreshold() == null ? 0 : rows.get(0).getConsensusThreshold();
-        int approved = (int) rows.stream().filter(r -> r.getConsensusApprovedAt() != null).count();
+        int threshold = thresholdOf(rows);
+        int approved = (int) rows.stream().filter(r -> alive(r) && r.getConsensusApprovedAt() != null).count();
         boolean mine = myBeneficiaryId != null && rows.stream()
                 .anyMatch(r -> r.getBeneficiary().getId().equals(myBeneficiaryId) && r.getConsensusApprovedAt() != null);
         return new Info(true, threshold, rows.size(), approved, mine, isReached(rows, threshold));
@@ -110,7 +154,7 @@ public class JointConsensusService {
     // Đủ K người đồng ý và ghép K phần khóa của họ ra đúng khóa gốc
     private boolean isReached(List<AssetAllocation> rows, int threshold) {
         List<AssetAllocation> approvers = rows.stream()
-                .filter(r -> r.getConsensusApprovedAt() != null)
+                .filter(r -> alive(r) && r.getConsensusApprovedAt() != null)
                 .limit(threshold)
                 .toList();
         if (threshold < 2 || approvers.size() < threshold) {

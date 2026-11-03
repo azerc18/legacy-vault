@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.entity.AssetAllocation;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AllocationMode;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -158,5 +160,96 @@ class JointConsensusServiceTest {
         assertThatThrownBy(() -> service.approve(assetId, outsider))
                 .isInstanceOfSatisfying(BeneficiaryException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU));
+    }
+
+    // ---- Review PR #164, mục 3: người đã từ chối không được đếm ----
+
+    @Test
+    @DisplayName("Người đã đồng ý rồi bị DECLINED thì không còn được đếm")
+    void declinedApprover_notCounted() {
+        service.approve(assetId, bA);
+        service.approve(assetId, bB);
+        bB.setStatus(BeneficiaryInviteStatus.DECLINED);
+
+        JointConsensusService.Info info = service.infoOf(rows, bA.getId());
+
+        assertThat(info.approved()).isEqualTo(1);
+        assertThat(info.reached()).isFalse();
+        assertThatThrownBy(() -> service.assertReached(assetId)).isInstanceOf(BeneficiaryException.class);
+    }
+
+    @Test
+    @DisplayName("Người từ bỏ (WAIVED) cũng không được đếm")
+    void waivedApprover_notCounted() {
+        service.approve(assetId, bA);
+        service.approve(assetId, bC);
+        bC.setStatus(BeneficiaryInviteStatus.WAIVED);
+
+        assertThat(service.infoOf(rows, bA.getId()).reached()).isFalse();
+    }
+
+    // ---- Review PR #164, mục 1: kẹt khi còn nhận được < K ----
+
+    @Test
+    @DisplayName("2-of-3: một người từ chối thì chưa kẹt, hai người từ chối thì kẹt")
+    void isStalled_onlyWhenFewerThanKLeft() {
+        assertThat(service.isStalled(rows)).isFalse();
+
+        bA.setStatus(BeneficiaryInviteStatus.DECLINED);
+        assertThat(service.isStalled(rows)).isFalse();
+
+        bB.setStatus(BeneficiaryInviteStatus.DECLINED);
+        assertThat(service.isStalled(rows)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Tài sản thường không bao giờ bị coi là joint-stalled")
+    void isStalled_falseForNonJoint() {
+        AssetAllocation plain = AssetAllocation.builder()
+                .asset(asset).beneficiary(bA).mode(AllocationMode.EXCLUSIVE).build();
+        bA.setStatus(BeneficiaryInviteStatus.DECLINED);
+
+        assertThat(service.isStalled(List.of(plain))).isFalse();
+    }
+
+    @Test
+    @DisplayName("countStalledAssets đếm số tài sản joint thiếu người trong vault")
+    void countStalledAssets_countsOnlyStalled() {
+        UUID vaultId = UUID.randomUUID();
+        when(assetAllocationRepository.findByVaultId(vaultId)).thenReturn(rows);
+        assertThat(service.countStalledAssets(vaultId)).isZero();
+
+        bA.setStatus(BeneficiaryInviteStatus.DECLINED);
+        bB.setStatus(BeneficiaryInviteStatus.DECLINED);
+        assertThat(service.countStalledAssets(vaultId)).isEqualTo(1);
+    }
+
+    // ---- Review PR #164, mục 2: đóng hồ sơ = đồng ý ----
+
+    @Test
+    @DisplayName("approveAllHeldBy ghi nhận đồng ý cho tài sản joint đang giữ, gọi lại thì không ghi thêm")
+    void approveAllHeldBy_approvesOnce() {
+        UUID vaultId = UUID.randomUUID();
+        when(assetAllocationRepository.findHeldBy(vaultId, bA.getId())).thenReturn(List.of(rows.get(0)));
+
+        int first = service.approveAllHeldBy(vaultId, bA);
+        int second = service.approveAllHeldBy(vaultId, bA);
+
+        assertThat(first).isEqualTo(1);
+        assertThat(second).isZero();
+        assertThat(rows.get(0).getConsensusApprovedAt()).isNotNull();
+        verify(assetAllocationRepository, times(1)).save(rows.get(0));
+    }
+
+    @Test
+    @DisplayName("approveAllHeldBy bỏ qua tài sản không phải joint")
+    void approveAllHeldBy_ignoresNonJoint() {
+        UUID vaultId = UUID.randomUUID();
+        AssetAllocation plain = AssetAllocation.builder()
+                .asset(asset).beneficiary(bA).mode(AllocationMode.EXCLUSIVE).build();
+        when(assetAllocationRepository.findHeldBy(vaultId, bA.getId())).thenReturn(List.of(plain));
+
+        assertThat(service.approveAllHeldBy(vaultId, bA)).isZero();
+        verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
     }
 }
