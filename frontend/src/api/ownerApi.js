@@ -1,5 +1,5 @@
 // API cho Vault Owner — khớp VaultController, DigitalAssetController, DocumentController, VaultActivityLogController,
-// DmsController, OwnerExecutorController, OwnerReadinessController. Dùng http.js chung (tự gắn token + refresh).
+// DmsController, DmsConfirmerController, OwnerExecutorController, OwnerReadinessController. Dùng http.js chung (tự gắn token + refresh).
 import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
@@ -117,7 +117,7 @@ export const ownerApi = {
         return http.get('/owner/activity-logs', { params }).then(unwrap);
     },
 
-    /* ---------- Dead Man's Switch (FR-03) ---------- */
+    /* ---------- Dead Man's Switch (FR-03 & X2) ---------- */
     // configured=false = chưa cấu hình (chỉ có hasUsableExecutor, các trường khác null)
     getDms: () => http.get('/dms').then(unwrap),
     // { checkinIntervalDays 1-365, gracePeriodDays 1-90, reminderCount 1-10 }
@@ -126,6 +126,13 @@ export const ownerApi = {
     // Lịch sử check-in, mới nhất trước: Page { content[{ checkinType, channel, occurredAt }], totalPages, totalElements, number, size }
     getDmsCheckins: ({ page = 0, size = 20 } = {}) =>
         http.get('/dms/check-ins', { params: { page, size } }).then(unwrap),
+
+    // X2: Trusted Social Confirmers (tối đa 2 người)
+    listDmsConfirmers: () => http.get('/dms/confirmers').then((r) => unwrap(r) ?? []),
+    addDmsConfirmer: ({ name, email, relationship }) =>
+        http.post('/dms/confirmers', { name, email, relationship }).then(unwrap).then(changed),
+    removeDmsConfirmer: (confirmerId) =>
+        http.delete(`/dms/confirmers/${confirmerId}`).then(unwrap).then(changed),
 
     /* ---------- Executor (FR-06) ---------- */
     // Danh sách vị trí (gồm cả đã thu hồi)
