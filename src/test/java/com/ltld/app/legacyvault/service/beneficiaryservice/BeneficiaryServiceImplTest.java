@@ -1624,7 +1624,7 @@ public class BeneficiaryServiceImplTest {
     private void stubDownloadableDocument(UUID docId, String fileName) throws Exception {
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, fileName)));
         when(fileStorageService.readFile("uploads/stored.bin")).thenReturn(new byte[]{1, 2, 3});
         when(cryptoService.decryptBytes(any(byte[].class))).thenReturn("noi-dung-goc".getBytes(StandardCharsets.UTF_8));
@@ -1634,7 +1634,7 @@ public class BeneficiaryServiceImplTest {
     void getVaultDocuments_withViewSession_returnsSummariesWithoutDecrypting() {
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(
+        when(legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(
                 legalDocument(UUID.randomUUID(), "di-chuc.pdf"),
                 legalDocument(UUID.randomUUID(), "so-do.png")));
 
@@ -1741,7 +1741,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.empty());
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId)).thenReturn(Optional.empty());
 
         expectError(HttpStatus.NOT_FOUND,
                 () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
@@ -1756,7 +1756,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any())).thenThrow(new IOException("/secret/server/path"));
 
@@ -1777,7 +1777,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any()))
                 .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
@@ -1795,7 +1795,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any())).thenReturn(new byte[]{1});
         when(cryptoService.decryptBytes(any(byte[].class))).thenThrow(new RuntimeException("boom"));

@@ -1,0 +1,82 @@
+{
+  "title": "Hồ sơ của tôi",
+  "back": "Về trang chủ",
+  "loading": "Đang tải...",
+  "loadFailed": "Không tải được hồ sơ.",
+  "status": { "ACTIVE": "Đang hoạt động", "PENDING": "Chờ xác minh", "LOCKED": "Đã khoá" },
+  "summary": {
+    "rolesTitle": "VAI TRÒ",
+    "memberSince": "Tham gia từ",
+    "lastSignIn": "Đăng nhập gần nhất"
+  },
+  "avatar": {
+    "change": "Đổi ảnh",
+    "remove": "Xoá ảnh",
+    "errors": {
+      "type": "Chỉ nhận ảnh PNG hoặc JPG.",
+      "size": "Ảnh tối đa 2MB.",
+      "upload": "Không tải ảnh lên được.",
+      "remove": "Không xoá ảnh được."
+    }
+  },
+  "info": {
+    "title": "Thông tin cá nhân",
+    "fullName": "Họ và tên",
+    "phone": "Số điện thoại",
+    "optional": "Không bắt buộc",
+    "email": "Email",
+    "emailHint": "Email dùng để đăng nhập và không thể thay đổi.",
+    "save": "Lưu thay đổi",
+    "saving": "Đang lưu...",
+    "saved": "Đã cập nhật hồ sơ.",
+    "errors": {
+      "nameLength": "Họ tên phải từ 2 đến 100 ký tự.",
+      "phone": "Số điện thoại không hợp lệ.",
+      "failed": "Không cập nhật được hồ sơ."
+    }
+  },
+  "password": {
+    "title": "Đổi mật khẩu",
+    "notice": "Sau khi đổi mật khẩu, bạn sẽ bị đăng xuất trên mọi thiết bị.",
+    "current": "Mật khẩu hiện tại",
+    "new": "Mật khẩu mới",
+    "newHint": "8–72 ký tự",
+    "confirm": "Xác nhận mật khẩu mới",
+    "submit": "Cập nhật mật khẩu",
+    "submitting": "Đang cập nhật...",
+    "show": "Hiện mật khẩu",
+    "hide": "Ẩn mật khẩu",
+    "changed": "Đã đổi mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.",
+    "errors": {
+      "required": "Vui lòng điền đủ các ô mật khẩu.",
+      "weak": "Mật khẩu mới chưa đạt yêu cầu.",
+      "mismatch": "Mật khẩu xác nhận không khớp.",
+      "same": "Mật khẩu mới phải khác mật khẩu hiện tại.",
+      "failed": "Không đổi được mật khẩu."
+    }
+  },
+  "mfa": {
+    "title": "Xác thực 2 lớp",
+    "description": "Yêu cầu mã từ ứng dụng xác thực (Google Authenticator, Microsoft Authenticator…) mỗi khi đăng nhập.",
+    "on": "Đang bật",
+    "off": "Đang tắt",
+    "turnOn": "Bật",
+    "turnOff": "Tắt",
+    "wait": "Vui lòng chờ...",
+    "step1": "Quét mã QR này bằng ứng dụng xác thực.",
+    "step2": "Nhập mã 6 số mà ứng dụng hiển thị.",
+    "qrAlt": "Mã QR xác thực 2 lớp",
+    "manualKey": "Không quét được? Nhập khoá này thủ công:",
+    "verifyOn": "Xác nhận và bật",
+    "verifying": "Đang kiểm tra...",
+    "disableHint": "Nhập mã từ ứng dụng xác thực hoặc một mã dự phòng để tắt xác thực 2 lớp.",
+    "disablePlaceholder": "123456 hoặc XXXX-XXXX",
+    "confirmOff": "Tắt xác thực 2 lớp",
+    "backupTitle": "Lưu các mã dự phòng",
+    "backupWarning": "Hãy cất các mã này ở nơi an toàn. Mỗi mã dùng được 1 lần khi bạn mất điện thoại. Mã sẽ không được hiển thị lại.",
+    "download": "Tải về",
+    "saved": "Tôi đã lưu",
+    "fileHeader": "Mã dự phòng LegacyVault ({{email}})\nMỗi mã chỉ dùng được 1 lần.",
+    "failed": "Đã có lỗi xảy ra."
+  }
+}

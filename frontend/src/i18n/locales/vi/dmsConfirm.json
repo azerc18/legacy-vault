@@ -1,25 +1,4 @@
 {
-  "status": {
-    "pendingConfirmation": "Đang chờ xác nhận chéo (72 giờ)"
-  },
-  "pending": {
-    "body": "Bạn đã quá hạn check-in và thời gian gia hạn. Chúng tôi đã nhờ người xác nhận chéo của bạn xác minh tình trạng của bạn trước {{deadline}}. Bấm \"{{button}}\" để hủy ngay."
-  },
-  "confirmers": {
-    "title": "Người xác nhận chéo (chống kích hoạt nhầm)",
-    "subtitle": "Tối đa 2 người thân/bạn bè tin cậy sẽ nhận email xác nhận khẩn cấp (trong 72 giờ) trước khi người thi hành của bạn được kích hoạt.",
-    "empty": "Chưa có người xác nhận chéo nào. Thêm tối đa 2 người bên dưới để khi bạn lỡ check-in (ví dụ đi xa, nằm viện), việc kích hoạt có thể được hoãn 7 ngày.",
-    "remove": "Xóa",
-    "namePlaceholder": "Họ và tên",
-    "emailPlaceholder": "Địa chỉ email",
-    "relationshipPlaceholder": "Quan hệ (ví dụ: Vợ/chồng)",
-    "add": "Thêm",
-    "missingFields": "Vui lòng nhập cả họ tên và email của người xác nhận chéo.",
-    "added": "Đã thêm người xác nhận chéo.",
-    "addFailed": "Không thể thêm người xác nhận chéo.",
-    "removed": "Đã xóa người xác nhận chéo.",
-    "removeFailed": "Không thể xóa người xác nhận chéo."
-  },
   "done": {
     "aliveTitle": "Cảm ơn bạn — đã xác nhận chủ két vẫn an toàn",
     "aliveBody": "Chúng tôi đã hoãn việc kích hoạt Dead Man's Switch của chủ két thêm 7 ngày và nhắc họ check-in.",

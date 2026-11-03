@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,10 +36,10 @@ class InheritanceDossierPdfServiceTest {
                 sig,
                 List.of(new InheritanceDossierData.AssetLine("Vietcombank CN Sài Gòn", AssetType.BANK_ACCOUNT,
                                 TransferMechanism.LEGAL_CLAIM_DOSSIER, AllocationMode.PROPORTIONAL,
-                                new BigDecimal("50.00"), "Sổ tiết kiệm", false),
+                                new BigDecimal("50.00"), "Sổ tiết kiệm", false, Map.of("institutionName", "Vietcombank", "branchName", "CN Sài Gòn", "accountNumber", "****6789")),
                         new InheritanceDossierData.AssetLine("Ví MetaMask", AssetType.CRYPTO_WALLET,
                                 TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY, AllocationMode.EXCLUSIVE,
-                                new BigDecimal("100.00"), null, true)),
+                                new BigDecimal("100.00"), null, true,Map.of())),
                 List.of(new InheritanceDossierData.DocumentLine("di-chuc-2026.pdf", DocumentType.WILL, LocalDateTime.now())),
                 LocalDateTime.now());
     }

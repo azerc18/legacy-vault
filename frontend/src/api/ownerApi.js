@@ -1,5 +1,5 @@
 // API cho Vault Owner — khớp VaultController, DigitalAssetController, DocumentController, VaultActivityLogController,
-// DmsController, DmsConfirmerController, OwnerExecutorController. Dùng http.js chung (tự gắn token + refresh).
+// DmsController, DmsConfirmerController, OwnerExecutorController, OwnerReadinessController. Dùng http.js chung (tự gắn token + refresh).
 import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
@@ -72,17 +72,22 @@ export const ownerApi = {
     removeBeneficiaryById: (vaultId, beneficiaryId) =>
         http.delete(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`).then(changed),
 
-    // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
+    // FR-04 & X5: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
-    uploadDocument: (vaultId, type, file) => {
+    // documentGroupId (tùy chọn): gửi kèm để tạo phiên bản mới (v2, v3...) cho nhóm tài liệu đã có
+    uploadDocument: (vaultId, type, file, documentGroupId) => {
         const form = new FormData();
         form.append('vaultId', vaultId);
         form.append('type', type);
         form.append('file', file);
+        if (documentGroupId) form.append('documentGroupId', documentGroupId);
         return http.post('/documents/upload', form).then(unwrap);
     },
-    // -> [{ id, vaultId, documentType, fileName, uploadedAt }]
+    // -> [{ id, vaultId, documentGroupId, documentType, fileName, uploadedAt, version, isCurrent, totalVersions, archived }]
     listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
+    // X5: lịch sử các phiên bản của một nhóm tài liệu (bản hiện hành có isCurrent = true)
+    getDocumentVersions: (vaultId, groupId) =>
+        http.get(`/documents/vault/${vaultId}/groups/${groupId}/versions`).then((r) => unwrap(r) ?? []),
     downloadDocument: (docId, fileName) => saveBlob(`/documents/${docId}/download`, fileName || 'document'),
     // F4a: Lời nhắn di nguyện & Hẹn giờ tương lai
     listLegacyMessages: (vaultId) => http.get(`/vaults/${vaultId}/messages`).then((r) => unwrap(r) ?? []),
@@ -136,6 +141,9 @@ export const ownerApi = {
     assignExecutor: (type, email, confirmReplace = false) =>
         http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap).then(changed),
     revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap).then(changed),
+
+    /* ---------- Estate Readiness Score (F1) ---------- */
+    getReadiness: () => http.get('/owner/readiness').then(unwrap),
 };
 
 // BE báo "đã có người, gửi lại với confirmReplace=true" bằng 409 + message chứa "confirmReplace"

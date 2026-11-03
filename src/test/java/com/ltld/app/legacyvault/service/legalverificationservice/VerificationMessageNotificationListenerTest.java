@@ -3,7 +3,9 @@ package com.ltld.app.legacyvault.service.legalverificationservice;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.event.VerificationMessagePostedEvent;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,8 @@ class VerificationMessageNotificationListenerTest {
 
     @Mock private UserRepository userRepository;
     @Mock private EmailSender emailSender;
+    @Mock private VaultBeneficiaryRepository beneficiaryRepository;
+    @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @InjectMocks private VerificationRequestNotificationListener listener;
 
     private final UUID requestId = UUID.randomUUID();

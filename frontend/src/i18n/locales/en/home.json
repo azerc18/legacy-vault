@@ -1,0 +1,18 @@
+{
+  "welcome": "Welcome back, {{name}}",
+  "comingSoon": "Coming soon",
+  "notNamedYet": "You'll see inherited vaults here if someone names you as a beneficiary.",
+  "noFeatures": "No features are available for your account yet.",
+  "features": {
+    "ownerVaults": { "title": "My vaults", "text": "Create vaults, add documents, choose beneficiaries." },
+    "ownerDms": { "title": "Dead Man's Switch", "text": "Set your check-in schedule and check in." },
+    "ownerExecutors": { "title": "Executors", "text": "Assign your primary and backup executor." },
+    "ownerActivity": { "title": "Activity log", "text": "Dead Man's Switch and executor events." },
+    "beneficiaryVaults": { "title": "Inherited vaults", "text": "Verify your identity and receive assets." },
+    "executorHome": { "title": "Executor duties", "text": "See vaults where you are the executor." },
+    "verifierRequests": { "title": "Verification requests", "text": "Review and sign pending requests." },
+    "verifierHistory": { "title": "Verification history", "text": "Requests you have already handled." },
+    "adminUsers": { "title": "Users", "text": "Lock accounts, grant Legal Verifier access, hold DMS." },
+    "adminVaults": { "title": "All vaults", "text": "Browse every vault and its status." }
+  }
+}

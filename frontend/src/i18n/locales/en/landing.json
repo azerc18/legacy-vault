@@ -1,0 +1,86 @@
+{
+  "nav": { "how": "How it works", "security": "Security", "roles": "Roles", "faq": "FAQ" },
+  "signIn": "Sign in",
+  "getStarted": "Get started",
+  "hero": {
+    "title": "Your digital life deserves a plan, too.",
+    "text": "Keep passwords, accounts and documents in one encrypted vault, and make sure they reach the right people when it matters.",
+    "cta": "Create your vault",
+    "how": "How it works"
+  },
+  "badges": {
+    "encryption": "AES-256 encryption",
+    "twoStep": "Two-step verification",
+    "legal": "Legal verification",
+    "dms": "Dead Man's Switch"
+  },
+  "problem": {
+    "eyebrow": "The problem",
+    "title": "What happens to your digital assets when you are gone?",
+    "items": {
+      "day1": { "when": "Day 1", "text": "Family cannot find your accounts or passwords." },
+      "month1": { "when": "Month 1", "text": "Banks and platforms lock access without proof." },
+      "month6": { "when": "Month 6", "text": "Subscriptions keep charging, data starts expiring." },
+      "forever": { "when": "Forever", "text": "Photos, documents and memories are lost." }
+    }
+  },
+  "how": {
+    "eyebrow": "How it works",
+    "title": "Four steps. Then it runs quietly in the background.",
+    "step": "Step {{n}}",
+    "items": {
+      "create": { "title": "Create your vault", "text": "Store assets and legal documents, encrypted before they are saved." },
+      "people": { "title": "Name your people", "text": "Choose an Executor and the Beneficiaries who will receive each asset." },
+      "checkin": { "title": "Check in regularly", "text": "The Dead Man's Switch only starts counting when you stop checking in." },
+      "handover": { "title": "Verified hand-over", "text": "A Legal Verifier reviews the case before the vault is ever unlocked." }
+    }
+  },
+  "security": {
+    "eyebrow": "Security",
+    "title": "Built so that nobody can open it early.",
+    "items": {
+      "encrypted": { "title": "Encrypted at rest", "text": "Every asset and document is encrypted with a master key the database never sees in plain text." },
+      "noFalseAlarm": { "title": "No false alarms", "text": "Reminders are sent before the switch triggers, so a missed check-in never unlocks anything." },
+      "human": { "title": "Human verification", "text": "Unlocking requires a Legal Verifier to approve the request and sign with a one-time code." }
+    }
+  },
+  "assets": {
+    "eyebrow": "Your vault",
+    "title": "What you can keep inside",
+    "items": {
+      "passwords": "Passwords", "banks": "Bank accounts", "crypto": "Crypto wallets",
+      "legal": "Legal documents", "notes": "Private notes", "files": "Files & photos"
+    }
+  },
+  "rolesSection": {
+    "eyebrow": "Who is involved",
+    "title": "Everyone has one clear job",
+    "items": {
+      "OWNER": "Builds the vault, sets the switch and decides who receives what.",
+      "EXECUTOR": "Is notified when the switch triggers and starts the hand-over.",
+      "BENEFICIARY": "Verifies identity and receives only the assets assigned to them.",
+      "LEGAL_VERIFIER": "Reviews documents and signs off before anything is released."
+    }
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Common questions",
+    "items": {
+      "staff": { "q": "Can LegacyVault staff read my assets?", "a": "No. Assets are encrypted before storage and are only decrypted for the assigned beneficiary after verification." },
+      "forget": { "q": "What if I forget to check in?", "a": "You receive reminders before the deadline. The switch only triggers after the full grace period has passed." },
+      "unlock": { "q": "Who decides when the vault is unlocked?", "a": "A Legal Verifier must approve the request and sign it. The switch alone cannot release your assets." },
+      "change": { "q": "Can I change my beneficiaries later?", "a": "Yes. As long as the vault is active, you can update people and assets at any time." }
+    }
+  },
+  "closing": {
+    "title": "Start your plan today. It takes ten minutes.",
+    "text": "Peace of mind for you, a clear path for the people you love.",
+    "cta": "Create your vault"
+  },
+  "footer": {
+    "rights": "© 2026 LegacyVault. All rights reserved.",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "support": "Support"
+  }
+}

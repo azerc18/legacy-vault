@@ -37,6 +37,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
+import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceImplTest {
@@ -438,7 +442,114 @@ public class AuthServiceImplTest {
         verify(userRepository, never()).save(any());
     }
 
+    // ===================== H4: đăng nhập 2 bước =====================
 
+    private void stubPasswordOk() {
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
+    }
+
+    private void stubTokens() {
+        when(tokenService.generateAccessToken(user)).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
+        when(tokenService.getAccessTokenExpiry()).thenReturn(EXPIRES_AT);
+    }
+
+    /** Đặt user vào trạng thái "đã qua bước 1, đang chờ mã" */
+    private void withPendingChallenge(Instant expiresAt) {
+        user.setMfaEnabled(true);
+        user.setMfaChallengeHash("stored-hash");
+        user.setMfaChallengeExpiresAt(expiresAt);
+        when(userRepository.findByMfaChallengeHashForUpdate(anyString())).thenReturn(Optional.of(user));
+    }
+
+    @Test
+    void login_mfaEnabled_returnsChallenge_withoutIssuingTokens() {
+        user.setMfaEnabled(true);
+        user.setFailedLoginAttempts(2);
+        stubPasswordOk();
+
+        LoginResult result = authService.login(loginRequest("test@example.com", "Password123"), IP, USER_AGENT);
+
+        assertThat(result.refreshToken()).isNull();
+        assertThat(result.response().isMfaRequired()).isTrue();
+        assertThat(result.response().getMfaToken()).isNotBlank();
+        assertThat(result.response().getAccessToken()).isNull();
+        // DB chỉ lưu hash, không lưu token gốc
+        assertThat(user.getMfaChallengeHash()).isNotNull().isNotEqualTo(result.response().getMfaToken());
+        assertThat(user.getMfaChallengeExpiresAt()).isAfter(Instant.now());
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        // Chưa tính là đăng nhập
+        assertThat(user.getLastLoginAt()).isNull();
+        verify(tokenService, never()).generateAccessToken(any());
+        verify(auditLogService, never()).success(AuditAction.LOGIN, user.getId(), "test@example.com");
+    }
+
+    @Test
+    void loginWithMfa_correctCode_issuesTokens_andClearsChallenge() {
+        withPendingChallenge(Instant.now().plus(5, ChronoUnit.MINUTES));
+        when(mfaService.verifyCode(user, "123456")).thenReturn(true);
+        stubTokens();
+
+        LoginResult result = authService.loginWithMfa(new MfaLoginRequest("raw-token", "123456"), IP, USER_AGENT);
+
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+        assertThat(result.response().getAccessToken()).isEqualTo("access-token");
+        assertThat(user.getMfaChallengeHash()).isNull();          // dùng 1 lần
+        assertThat(user.getMfaChallengeExpiresAt()).isNull();
+        assertThat(user.getLastLoginAt()).isNotNull();
+        verify(auditLogService).success(AuditAction.LOGIN, user.getId(), "test@example.com");
+    }
+
+    @Test
+    void loginWithMfa_wrongCode_throwsMfaInvalidCode_andCountsAttempt() {
+        withPendingChallenge(Instant.now().plus(5, ChronoUnit.MINUTES));
+        when(mfaService.verifyCode(user, "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.loginWithMfa(new MfaLoginRequest("raw-token", "000000"), IP, USER_AGENT))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MFA_INVALID_CODE));
+
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(1);
+        assertThat(user.getMfaChallengeHash()).isNotNull();        // vẫn cho nhập lại
+        verify(tokenService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void loginWithMfa_fifthWrongCode_locksAccount_andClearsChallenge() {
+        withPendingChallenge(Instant.now().plus(5, ChronoUnit.MINUTES));
+        user.setFailedLoginAttempts(4);
+        when(mfaService.verifyCode(user, "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.loginWithMfa(new MfaLoginRequest("raw-token", "000000"), IP, USER_AGENT))
+                .isInstanceOf(LockedAccountException.class);
+
+        assertThat(user.getLockedUntil()).isAfter(Instant.now());
+        assertThat(user.getMfaChallengeHash()).isNull();
+    }
+
+    @Test
+    void loginWithMfa_expiredChallenge_throwsChallengeExpired_withoutCheckingCode() {
+        withPendingChallenge(Instant.now().minus(1, ChronoUnit.MINUTES));
+
+        assertThatThrownBy(() -> authService.loginWithMfa(new MfaLoginRequest("raw-token", "123456"), IP, USER_AGENT))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MFA_CHALLENGE_EXPIRED));
+
+        assertThat(user.getMfaChallengeHash()).isNull();
+        verify(mfaService, never()).verifyCode(any(), anyString());
+    }
+
+    @Test
+    void loginWithMfa_unknownOrReusedToken_throwsChallengeExpired() {
+        when(userRepository.findByMfaChallengeHashForUpdate(anyString())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.loginWithMfa(new MfaLoginRequest("used-token", "123456"), IP, USER_AGENT))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.MFA_CHALLENGE_EXPIRED));
+
+        verify(mfaService, never()).verifyCode(any(), anyString());
+    }
 
 
 }

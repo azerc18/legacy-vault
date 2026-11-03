@@ -31,6 +31,15 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     @Query("SELECT b FROM VaultBeneficiary b WHERE b.user IS NULL AND b.email = :email")
     List<VaultBeneficiary> findPendingByEmail(@Param("email") String email);
 
+    // N2-verifier: verifier là beneficiary của bất kỳ vault nào trong hồ sơ (theo tài khoản hoặc email)
+    @Query("""
+            SELECT COUNT(b) > 0 FROM VaultBeneficiary b
+            WHERE b.vault.id IN (SELECT rv.vault.id FROM VerificationRequestVault rv WHERE rv.request.id = :requestId)
+              AND (b.user.id = :verifierId
+                   OR LOWER(b.email) = (SELECT LOWER(u.email) FROM User u WHERE u.id = :verifierId))
+            """)
+    boolean isBeneficiaryOfRequest(@Param("requestId") UUID requestId, @Param("verifierId") UUID verifierId);
+
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM VaultBeneficiary b WHERE b.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
@@ -54,4 +63,8 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
             WHERE vb.id = :id AND (vb.lastReminderAt IS NULL OR vb.lastReminderAt <= :cutoff)
             """)
     int markReminded(@Param("id") UUID id, @Param("now") LocalDateTime now, @Param("cutoff") LocalDateTime cutoff);
+
+    // F1: id các vault của Owner có ít nhất 1 người thụ hưởng (một query cho cả Owner, tránh N+1)
+    @Query("SELECT DISTINCT b.vault.id FROM VaultBeneficiary b WHERE b.vault.owner.id = :ownerId")
+    List<UUID> findVaultIdsWithBeneficiaryByOwnerId(@Param("ownerId") UUID ownerId);
 }

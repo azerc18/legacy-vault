@@ -546,7 +546,7 @@ public class VaultServiceImpl implements VaultService {
 
         return vaults.stream()
                 .map(vault -> {
-                    long docCount = legalDocumentRepository.countByVaultId(vault.getId());
+                    long docCount = legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vault.getId());
                     long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
                     String lockReason = lockReasonMap.get(vault.getId());
                     String benEmail = vault.getBeneficiary() != null ? vault.getBeneficiary().getEmail() : vault.getBeneficiaryEmail();
@@ -579,7 +579,7 @@ public class VaultServiceImpl implements VaultService {
         // Tái sử dụng loadOwnedVault để kiểm tra sở hữu và chống lộ ID (404)
         Vault vault = loadOwnedVault(vaultId, ownerId);
 
-        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long docCount = legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vaultId);
         long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
         Optional<String> lockReason = vaultModificationGuard.lockReason(vault);
 
@@ -623,7 +623,7 @@ public class VaultServiceImpl implements VaultService {
                 ownerId, vault.getOwner().getEmail(), vaultId,
                 "Vault", vaultId.toString(), null);
 
-        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long docCount = legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vaultId);
         long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
 
         return VaultResponse.builder()
@@ -670,7 +670,7 @@ public class VaultServiceImpl implements VaultService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new VaultException("Vault not found", HttpStatus.NOT_FOUND));
 
-        long docCount = legalDocumentRepository.countByVaultId(vaultId);
+        long docCount = legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vaultId);
         long assetCount = digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE);
 
         // m2: Ghi audit log khi Admin xem chi tiết Vault
