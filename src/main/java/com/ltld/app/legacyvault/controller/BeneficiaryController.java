@@ -149,6 +149,18 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(beneficiaryService.previewClose(vaultId, currentUserId(principal))));
     }
 
+
+    // N2-notify: tiến độ theo từng tài sản của người này (cho ClaimProgress), không giải mã gì
+    @GetMapping("/vaults/{vaultId}/progress")
+    public ResponseEntity<ApiResponse<ClaimProgressResponse>> getClaimProgress(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.getClaimProgress(vaultId, currentUserId(principal))));
+    }
+
     // FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault
     @PostMapping("/vaults/{vaultId}/close")
     public ResponseEntity<ApiResponse<CloseVaultResponse>> closeVault(
