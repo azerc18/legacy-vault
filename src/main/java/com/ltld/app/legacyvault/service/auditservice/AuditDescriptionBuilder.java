@@ -109,6 +109,13 @@ public class AuditDescriptionBuilder {
             // FR-03 / FR-06 / FR-07: nhật ký cấp Owner; detail chứa ownerId và id nội bộ nên không nối
             case DMS_CONFIGURED -> "Saved the Dead Man's Switch configuration.";
             case DMS_CHECKIN -> "Checked in to confirm still active.";
+            case DMS_CONFIRMER_ADDED -> "Added a trusted social confirmer for the Dead Man's Switch.";
+            case DMS_CONFIRMER_REMOVED -> "Removed a trusted social confirmer from the Dead Man's Switch.";
+            case DMS_CONFIRMATION_REQUESTED -> "Requested cross-confirmation from trusted confirmers before triggering the Dead Man's Switch.";
+            case DMS_CONFIRMED_ALIVE -> "A trusted confirmer verified that the owner is safe; Dead Man's Switch postponed by 7 days.";
+            case DMS_CONFIRMED_UNREACHABLE -> "A trusted confirmer reported that the owner is unreachable; Dead Man's Switch triggered.";
+            case DMS_CONFIRMATION_TIMEOUT -> "No trusted confirmer responded within 72 hours; Dead Man's Switch triggered automatically.";
+            case DMS_CONFIRMATION_UNDELIVERED -> "No confirmation email could be sent to any trusted confirmer; Dead Man's Switch triggered as usual.";
             case DMS_TRIGGERED -> "The Dead Man's Switch was triggered because the check-in deadline passed.";
             case DMS_TRIGGER_DEFERRED -> "Dead Man's Switch activation postponed 24 hours because the owner has not received any reminder.";
             case DMS_TRIGGERED_NO_EXECUTOR ->"The Dead Man's Switch was triggered but no executor is available.";

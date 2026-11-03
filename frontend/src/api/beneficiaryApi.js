@@ -56,6 +56,10 @@ export const beneficiaryApi = {
     downloadAsset: (vaultId, assetId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/download`, `${name || 'asset'}.txt`),
 
+    // X1: đồng thuận K-of-N cho tài sản JOINT_CONSENSUS
+    getConsensus: (vaultId, assetId) => http.get(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus`).then(unwrap),
+    approveConsensus: (vaultId, assetId) => http.post(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus/approve`).then(unwrap),
+
     // FR-18 (phần 2): tài liệu pháp lý
     listDocuments: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/documents`).then(unwrap),
     downloadDocument: (vaultId, docId, name) =>

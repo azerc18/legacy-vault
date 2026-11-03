@@ -12,4 +12,6 @@ public class InheritedAssetSummaryResponse {
     private UUID id;
     private AssetType assetType;
     private String assetName;
+    // X1: chỉ có với tài sản JOINT_CONSENSUS (null với tài sản thường)
+    private ConsensusStatusResponse consensus;
 }

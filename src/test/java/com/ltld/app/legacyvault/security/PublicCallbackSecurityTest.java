@@ -75,11 +75,10 @@ class PublicCallbackSecurityTest {
     }
 
     @Test
-    void dmsConfirm_postWithoutToken_returns401() throws Exception {
-        // m2: /api/dms/confirm chưa được mở; X2 sẽ tự thêm permitAll cùng controller của nó
+    void dmsConfirm_postWithoutToken_isNotBlockedBySecurity() throws Exception {
+        // X2 (M4): người xác nhận chéo không đăng nhập; token riêng được kiểm tại DmsConfirmerController
         mockMvc.perform(post("/api/dms/confirm"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.errorCode").value("UNAUTHORIZED"));
+                .andExpect(notBlockedBySecurity());
     }
 
     @Test

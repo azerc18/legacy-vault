@@ -271,6 +271,26 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 function AssetList({ vaultId, assets, onError }) {
     const [detail, setDetail] = useState(null);
     const [busyId, setBusyId] = useState(null);
+    // X1: trạng thái đồng thuận mới nhất theo assetId (ghi đè giá trị trong danh sách sau khi đồng ý / làm mới)
+    const [consensusById, setConsensusById] = useState({});
+    const consensusOf = (a) => consensusById[a.id] || a.consensus || null;
+
+    const approve = async (asset) => {
+        setBusyId(asset.id);
+        try {
+            const c = await beneficiaryApi.approveConsensus(vaultId, asset.id);
+            setConsensusById((m) => ({ ...m, [asset.id]: c }));
+        }
+        catch (err) { onError(err); }
+        finally { setBusyId(null); }
+    };
+
+    const refresh = async (asset) => {
+        setBusyId(asset.id);
+        try { const c = await beneficiaryApi.getConsensus(vaultId, asset.id); setConsensusById((m) => ({ ...m, [asset.id]: c })); }
+        catch (err) { onError(err); }
+        finally { setBusyId(null); }
+    };
 
     const view = async (asset) => {
         setBusyId(asset.id);
@@ -295,19 +315,42 @@ function AssetList({ vaultId, assets, onError }) {
                 <ul className="divide-y divide-outline-variant/30 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     {assets.map((a) => {
                         const t = ASSET_TYPE[a.assetType] || ASSET_TYPE.OTHER;
+                        const c = consensusOf(a);
+                        const locked = !!c && !c.reached;   // X1: chưa đủ K người đồng ý thì chưa xem / tải được
                         return (
-                            <li key={a.id} className="flex items-center gap-4 p-4">
+                            <li key={a.id} className="flex flex-wrap items-center gap-4 p-4">
                                 <div className="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center shrink-0">
                                     <Icon name={t.icon} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold truncate">{a.assetName}</p>
                                     <p className="text-xs text-outline">{t.label}</p>
+                                    {c && (
+                                        <p className="mt-1 text-xs text-on-surface-variant">
+                                            {c.reached
+                                                ? `Joint approval complete (${c.approved} of ${c.total} approved)`
+                                                : `Needs approval from ${c.threshold} of ${c.total} recipients (${c.approved} so far)`}
+                                        </p>
+                                    )}
                                 </div>
-                                <button onClick={() => view(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
+                                {locked && (
+                                    <>
+                                        {c.myApproved ? (
+                                            <span className="text-xs font-semibold text-primary">You approved</span>
+                                        ) : (
+                                            <button onClick={() => approve(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold bg-primary text-on-primary disabled:opacity-50">
+                                                Approve
+                                            </button>
+                                        )}
+                                        <button onClick={() => refresh(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
+                                            Refresh
+                                        </button>
+                                    </>
+                                )}
+                                <button onClick={() => view(a)} disabled={busyId === a.id || locked} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
                                     View
                                 </button>
-                                <button onClick={() => download(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
+                                <button onClick={() => download(a)} disabled={busyId === a.id || locked} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
                                     <Icon name="download" className="text-[18px]" />
                                 </button>
                             </li>

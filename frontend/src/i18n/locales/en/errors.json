@@ -47,6 +47,8 @@
   "ALLOCATION_MODE_NOT_ALLOWED": "This allocation mode is not allowed for this asset.",
   "ASSET_FIELD_INVALID": "Some asset details are invalid.",
   "ASSET_NOT_ALLOCATED_TO_YOU": "This asset is not allocated to you.",
+  "CONSENSUS_NOT_REACHED": "This asset opens only after enough recipients approve.",
+  "CONSENSUS_NOT_APPLICABLE": "This asset does not need joint approval.",
   "CLAIM_NOT_READY": "This asset is not ready to be claimed yet.",
   "IDENTITY_NOT_VERIFIED": "Please verify your identity first.",
   "CLAIM_ALREADY_RESPONDED": "You have already responded to this claim.",

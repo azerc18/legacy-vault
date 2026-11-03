@@ -47,6 +47,8 @@
   "ALLOCATION_MODE_NOT_ALLOWED": "Cách phân bổ này không áp dụng cho tài sản này.",
   "ASSET_FIELD_INVALID": "Một số thông tin tài sản không hợp lệ.",
   "ASSET_NOT_ALLOCATED_TO_YOU": "Tài sản này không được phân bổ cho bạn.",
+  "CONSENSUS_NOT_REACHED": "Tài sản này chỉ mở khi có đủ số người nhận đồng ý.",
+  "CONSENSUS_NOT_APPLICABLE": "Tài sản này không cần đồng thuận chung.",
   "CLAIM_NOT_READY": "Tài sản này chưa đủ điều kiện để nhận.",
   "IDENTITY_NOT_VERIFIED": "Vui lòng xác minh danh tính trước.",
   "CLAIM_ALREADY_RESPONDED": "Bạn đã phản hồi yêu cầu nhận tài sản này rồi.",

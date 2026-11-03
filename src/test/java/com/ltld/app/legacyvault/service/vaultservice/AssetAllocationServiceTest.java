@@ -338,12 +338,70 @@ class AssetAllocationServiceTest {
 
     // ===== JOINT_CONSENSUS, mode thiếu =====
 
+    private static DigitalAssetRequest.AllocationRequest joint(Integer threshold,
+                                                               DigitalAssetRequest.Recipient... recipients) {
+        var a = alloc(AllocationMode.JOINT_CONSENSUS, recipients);
+        a.setThreshold(threshold);
+        return a;
+    }
+
     @Test
-    @DisplayName("JOINT_CONSENSUS → ALLOCATION_MODE_NOT_ALLOWED cho đến khi có X1")
-    void jointConsensus_notAllowed() {
-        var a = alloc(AllocationMode.JOINT_CONSENSUS, recipient(bA, null, null));
+    @DisplayName("X1 JOINT_CONSENSUS 2/3: lưu 3 dòng, mỗi dòng 1 phần khóa, 2 phần ghép ra đúng khóa gốc")
+    void jointConsensus_ok_storesShares() throws Exception {
+        when(cryptoService.encrypt(any())).thenAnswer(inv -> "ENC:" + inv.getArgument(0));
+        var a = joint(2, recipient(bA, null, null), recipient(bB, null, null), recipient(bC, null, null));
+
+        update(AssetType.BANK_ACCOUNT, a);
+
+        verify(entitlementService).assertCanUseAdvancedAllocation(ownerId);
+        ArgumentCaptor<AssetAllocation> captor = ArgumentCaptor.forClass(AssetAllocation.class);
+        verify(assetAllocationRepository, times(3)).save(captor.capture());
+        List<AssetAllocation> rows = captor.getAllValues();
+        assertThat(rows).allSatisfy(r -> {
+            assertThat(r.getMode()).isEqualTo(AllocationMode.JOINT_CONSENSUS);
+            assertThat(r.getConsensusThreshold()).isEqualTo(2);
+            assertThat(r.getConsensusShare()).startsWith("ENC:");
+            assertThat(r.getConsensusApprovedAt()).isNull();
+            assertThat(r.getSharePercent()).isEqualByComparingTo("100");
+        });
+        // Hai phần bất kỳ ghép lại phải ra khóa gốc có hash trùng với hash đã lưu
+        var shares = rows.stream()
+                .map(r -> com.ltld.app.legacyvault.utility.ShamirSecretSharing.Share
+                        .decode(r.getConsensusShare().substring(4)))
+                .toList();
+        byte[] key = com.ltld.app.legacyvault.utility.ShamirSecretSharing.combine(List.of(shares.get(0), shares.get(2)));
+        assertThat(com.ltld.app.legacyvault.service.beneficiaryservice.JointConsensusService.hashKey(key))
+                .isEqualTo(rows.get(0).getConsensusKeyHash());
+    }
+
+    @Test
+    @DisplayName("X1 JOINT_CONSENSUS: thiếu threshold / threshold < 2 / threshold > số người → ASSET_FIELD_INVALID")
+    void jointConsensus_badThreshold_throws() {
+        var noThreshold = joint(null, recipient(bA, null, null), recipient(bB, null, null));
+        var tooLow = joint(1, recipient(bA, null, null), recipient(bB, null, null));
+        var tooHigh = joint(3, recipient(bA, null, null), recipient(bB, null, null));
+
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, noThreshold), ErrorCode.ASSET_FIELD_INVALID);
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, tooLow), ErrorCode.ASSET_FIELD_INVALID);
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, tooHigh), ErrorCode.ASSET_FIELD_INVALID);
+        verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
+    }
+
+    @Test
+    @DisplayName("X1 JOINT_CONSENSUS: chỉ 1 người nhận → ASSET_FIELD_INVALID")
+    void jointConsensus_singleRecipient_throws() {
+        var a = joint(2, recipient(bA, null, null));
+
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ASSET_FIELD_INVALID);
+    }
+
+    @Test
+    @DisplayName("X1 JOINT_CONSENSUS: có người dự phòng → ALLOCATION_MODE_NOT_ALLOWED")
+    void jointConsensus_withContingent_throws() {
+        var a = joint(2, recipient(bA, null, bC), recipient(bB, null, null));
 
         assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
+        verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
     }
 
     @Test
