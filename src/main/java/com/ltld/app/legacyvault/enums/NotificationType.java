@@ -7,5 +7,7 @@ public enum NotificationType {
     VERIFIER_REPLY,
     VERIFICATION_DECIDED,
     // N2-notify: phần tài sản của người khác đã từ chối được chuyển sang mình (fallback)
-    ASSET_REASSIGNED
+    ASSET_REASSIGNED,
+    // F4b: thông báo có lời nhắn di nguyện mới được mở khóa
+    LEGACY_MESSAGE_DELIVERED
 }

@@ -119,7 +119,7 @@ export default function BeneficiaryVaultDetail() {
                 </>
             )}
 
-            {(stage === 'verify' || stage === 'content' || stage === 'claimed') && (
+            {(stage === 'content' || stage === 'claimed') && (
                 <BeneficiaryLegacyMessages vaultId={vaultId} />
             )}
         </BeneficiaryLayout>

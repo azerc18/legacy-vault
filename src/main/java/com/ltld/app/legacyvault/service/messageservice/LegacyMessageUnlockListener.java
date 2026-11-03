@@ -23,7 +23,7 @@ public class LegacyMessageUnlockListener {
     private final LegacyMessageService legacyMessageService;
 
     @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onVaultsUnlocked(VaultsUnlockedEvent event) {
         if (event == null || event.vaultIds() == null) {
             return;
@@ -40,4 +40,3 @@ public class LegacyMessageUnlockListener {
         }
     }
 }
-

@@ -25,8 +25,8 @@ public interface LegacyMessageRepository extends JpaRepository<LegacyMessage, UU
 
     Optional<LegacyMessage> findByIdAndVaultId(UUID id, UUID vaultId);
 
-    @Query("SELECT m FROM LegacyMessage m WHERE m.vault.id = :vaultId " +
-           "AND (m.recipientType = :allType OR (m.recipientBeneficiary IS NOT NULL AND m.recipientBeneficiary.id = :beneficiaryId)) " +
+    @Query("SELECT m FROM LegacyMessage m WHERE m.vault.id = :vaultId AND " +
+           "(m.recipientType = :allType OR m.recipientBeneficiary.id = :beneficiaryId) " +
            "ORDER BY m.createdAt DESC")
     List<LegacyMessage> findForBeneficiary(
             @Param("vaultId") UUID vaultId,
