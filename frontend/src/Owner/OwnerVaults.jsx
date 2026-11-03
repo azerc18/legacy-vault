@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
-import EmptyState from "../Common/EmptyState.jsx";
+import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
 
 export default function OwnerVaults() {
+    const { t } = useTranslation('vault');
     const user = getUser();
     const [vaults, setVaults] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -16,19 +18,19 @@ export default function OwnerVaults() {
     useEffect(() => {
         ownerApi.listVaults()
             .then(setVaults)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load your vaults.')))
+            .catch((e) => setError(getErrorMessage(e, t('list.loadError'))))
             .finally(() => setLoading(false));
-    }, []);
+    }, [t]);
 
     if (!user) return <Navigate to="/login" replace />;
 
     return (
         <OwnerLayout
-            title="My vaults"
-            subtitle="Store assets and legal documents for the people you trust."
+            title={t('list.title')}
+            subtitle={t('list.subtitle')}
             actions={
                 <Link to="/owner/vaults/new" className={btnPrimary}>
-                    <Icon name="add" className="text-[18px]" /> New vault
+                    <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
                 </Link>
             }
         >
@@ -37,11 +39,11 @@ export default function OwnerVaults() {
             <EstateReadinessCard />
 
             {loading ? (
-                <p className="text-on-surface-variant">Loading...</p>
+                <p className="text-on-surface-variant">{t('ui.loading')}</p>
             ) : vaults.length === 0 ? (
-                <EmptyState bordered icon="inventory_2" title="No vaults yet"
-                            text="A vault holds the assets and documents you want to pass on. Create one, then choose who receives it."
-                            action={{ to: '/owner/vaults/new', label: 'Create your first vault', icon: 'add' }} />
+                <EmptyState bordered icon="inventory_2" title={t('list.emptyTitle')}
+                            text={t('list.emptyText')}
+                            action={{ to: '/owner/vaults/new', label: t('list.emptyAction'), icon: 'add' }} />
             ) : (
                 <div className="grid sm:grid-cols-2 gap-5">
                     {vaults.map((v) => (
@@ -58,23 +60,23 @@ export default function OwnerVaults() {
                                             title={v.lockReason}
                                             className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
                                         >
-                                            <Icon name="lock" className="text-[14px]" /> Locked
+                                            <Icon name="lock" className="text-[14px]" /> {t('list.locked')}
                                         </span>
                                     )}
                                     <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                                        {v.status}
+                                        {t(`status.${v.status}`, { defaultValue: v.status })}
                                     </span>
                                 </div>
                             </div>
                             {v.description && <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">{v.description}</p>}
                             <div className="mt-4 flex flex-wrap gap-4 text-xs text-on-surface-variant">
-                                <span>Beneficiary: <strong className="text-on-surface">{v.beneficiaryEmail || 'None'}</strong></span>
+                                <span>{t('list.beneficiary')} <strong className="text-on-surface">{v.beneficiaryEmail || t('list.none')}</strong></span>
                                 <span>·</span>
-                                <span>{v.totalAssets ?? 0} asset(s)</span>
+                                <span>{t('list.assetsCount', { count: v.totalAssets ?? 0 })}</span>
                                 <span>·</span>
-                                <span>{v.totalDocuments ?? 0} doc(s)</span>
+                                <span>{t('list.docsCount', { count: v.totalDocuments ?? 0 })}</span>
                             </div>
-                            <p className="mt-2 text-xs text-outline">Created {formatDate(v.createdAt)}</p>
+                            <p className="mt-2 text-xs text-outline">{t('list.createdOn', { date: formatDate(v.createdAt) })}</p>
                         </Link>
                     ))}
                 </div>
