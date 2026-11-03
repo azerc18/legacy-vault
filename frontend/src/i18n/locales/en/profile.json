@@ -1,0 +1,82 @@
+{
+  "title": "My profile",
+  "back": "Back to home",
+  "loading": "Loading...",
+  "loadFailed": "Could not load your profile.",
+  "status": { "ACTIVE": "Active", "PENDING": "Pending", "LOCKED": "Locked" },
+  "summary": {
+    "rolesTitle": "ROLES",
+    "memberSince": "Member since",
+    "lastSignIn": "Last sign-in"
+  },
+  "avatar": {
+    "change": "Change photo",
+    "remove": "Remove photo",
+    "errors": {
+      "type": "Only PNG or JPG images.",
+      "size": "Image must be 2MB or smaller.",
+      "upload": "Could not upload image.",
+      "remove": "Could not remove image."
+    }
+  },
+  "info": {
+    "title": "Personal information",
+    "fullName": "Full name",
+    "phone": "Phone number",
+    "optional": "Optional",
+    "email": "Email",
+    "emailHint": "Email is your sign-in ID and cannot be changed.",
+    "save": "Save changes",
+    "saving": "Saving...",
+    "saved": "Profile updated.",
+    "errors": {
+      "nameLength": "Full name must be 2–100 characters.",
+      "phone": "Phone number is not valid.",
+      "failed": "Could not update profile."
+    }
+  },
+  "password": {
+    "title": "Change password",
+    "notice": "After changing your password you will be signed out on every device.",
+    "current": "Current password",
+    "new": "New password",
+    "newHint": "8–72 characters",
+    "confirm": "Confirm new password",
+    "submit": "Update password",
+    "submitting": "Updating...",
+    "show": "Show password",
+    "hide": "Hide password",
+    "changed": "Password changed. Please sign in with your new password.",
+    "errors": {
+      "required": "Please fill in all password fields.",
+      "weak": "New password does not meet the requirements.",
+      "mismatch": "Password confirmation does not match.",
+      "same": "New password must be different from the current one.",
+      "failed": "Could not change password."
+    }
+  },
+  "mfa": {
+    "title": "Two-factor authentication",
+    "description": "Require a code from an authenticator app (Google Authenticator, Microsoft Authenticator…) when you sign in.",
+    "on": "On",
+    "off": "Off",
+    "turnOn": "Turn on",
+    "turnOff": "Turn off",
+    "wait": "Please wait...",
+    "step1": "Scan this QR code with your authenticator app.",
+    "step2": "Enter the 6-digit code the app shows.",
+    "qrAlt": "2FA QR code",
+    "manualKey": "Can't scan? Enter this key manually:",
+    "verifyOn": "Verify and turn on",
+    "verifying": "Verifying...",
+    "disableHint": "Enter a code from your authenticator app or one of your backup codes to turn off 2FA.",
+    "disablePlaceholder": "123456 or XXXX-XXXX",
+    "confirmOff": "Turn off 2FA",
+    "backupTitle": "Save your backup codes",
+    "backupWarning": "Store these codes somewhere safe. Each code works once if you lose your phone. They will not be shown again.",
+    "download": "Download",
+    "saved": "I have saved them",
+    "fileHeader": "LegacyVault backup codes ({{email}})\nEach code can be used once.",
+    "failed": "Something went wrong."
+  }
+}
