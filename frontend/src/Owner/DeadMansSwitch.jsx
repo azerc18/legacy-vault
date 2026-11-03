@@ -125,7 +125,7 @@ export default function DeadMansSwitch() {
             setConfirmerForm({ name: '', email: '', relationship: '' });
             setSuccess(t('dms.confirmers.added'));
         } catch (err) {
-            // PLAN_LIMIT_REACHED (gói FREE): getErrorMessage hiện câu đã dịch; UpgradeDialog chung mở khi T1 (#132) merge
+            // PLAN_LIMIT_REACHED (gói FREE): getErrorMessage hiện câu đã dịch; PlanLimitUpgradeDialog chung (T1) tự mở
             setError(getErrorMessage(err, t('dms.confirmers.addFailed')));
         } finally {
             setAddingConfirmer(false);
