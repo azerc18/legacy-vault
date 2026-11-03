@@ -63,4 +63,8 @@ public interface LegalDocumentRepository extends JpaRepository<LegalDocument, UU
     // Chỉ lấy đường dẫn file, không nạp entity (để bulk delete sau đó không để lại entity "mồ côi" trong persistence context)
     @Query("SELECT d.fileUrlEncrypted FROM LegalDocument d WHERE d.vault.id = :vaultId")
     List<String> findFileUrlsByVaultId(@Param("vaultId") UUID vaultId);
+
+    // T1 (M3): dung lượng đã dùng (byte, sau mã hóa) của mọi tài liệu thuộc các vault của Owner; tài liệu cũ chưa có size_bytes tính là 0
+    @Query("SELECT COALESCE(SUM(d.sizeBytes), 0) FROM LegalDocument d WHERE d.vault.owner.id = :ownerId")
+    long sumSizeBytesByOwnerId(@Param("ownerId") UUID ownerId);
 }

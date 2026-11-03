@@ -47,6 +47,7 @@ import { resetNamedBeneficiaryCache } from '../Common/useNamedBeneficiary.js';
 export function logout() {
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     resetNamedBeneficiaryCache();
+    try { sessionStorage.removeItem('lv_sub_cache'); } catch { /* T1: xoá cache badge VIP; sessionStorage có thể bị chặn */ }
     clearAuth();
 }
 

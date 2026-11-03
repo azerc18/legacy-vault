@@ -75,6 +75,8 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
         if (attachment != null && !attachment.isEmpty()) {
             validateAttachment(attachment);
+            // T1 (m7): đính kèm tính vào quota dung lượng của gói
+            entitlementService.assertStorageQuota(ownerId, attachment.getSize());
             byte[] encryptedBytes = cryptoService.encryptBytes(attachment.getBytes());
             String savedPath = fileStorageService.storeFile(attachment, encryptedBytes);
             message.setAttachmentName(attachment.getOriginalFilename());
@@ -139,6 +141,9 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
             if (message.getAttachmentPath() != null) {
                 oldPathToDelete = message.getAttachmentPath();
             }
+            // T1 (m7): đính kèm tính vào quota gói; thay file thì chỉ tính phần tăng thêm
+            long replacedBytes = message.getAttachmentSize() != null ? message.getAttachmentSize() : 0L;
+            entitlementService.assertStorageQuota(ownerId, Math.max(0L, attachment.getSize() - replacedBytes));
             byte[] encryptedBytes = cryptoService.encryptBytes(attachment.getBytes());
             String savedPath = fileStorageService.storeFile(attachment, encryptedBytes);
             message.setAttachmentName(attachment.getOriginalFilename());

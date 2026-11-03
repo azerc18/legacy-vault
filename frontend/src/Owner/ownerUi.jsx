@@ -90,6 +90,7 @@ export function OwnerLayout({ title, subtitle, back, actions, children }) {
         { to: '/owner/dms', label: t('nav.dms'), icon: 'favorite' },
         { to: '/owner/executors', label: t('nav.executors'), icon: 'badge' },
         { to: '/owner/activity', label: t('nav.activity'), icon: 'history' },
+        { to: '/billing', label: t('nav.billing'), icon: 'workspace_premium' },
     ];
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">

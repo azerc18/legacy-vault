@@ -3,7 +3,8 @@
     "myVaults": "My vaults",
     "dms": "Dead Man's Switch",
     "executors": "Executors",
-    "activity": "Activity"
+    "activity": "Activity",
+    "billing": "Billing & VIP"
   },
   "common": {
     "loading": "Loading...",

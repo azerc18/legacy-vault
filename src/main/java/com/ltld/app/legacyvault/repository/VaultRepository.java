@@ -111,6 +111,9 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // Lấy danh sách Vault của Owner (mới nhất xếp trước)
     List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
+    // T1 (m6): đếm vault của Owner để kiểm tra giới hạn gói, không nạp entity
+    long countByOwnerId(UUID ownerId);
+
     // Admin tìm kiếm và lọc Vault theo trạng thái
     Page<Vault> findByStatus(VaultStatus status, Pageable pageable);
 
