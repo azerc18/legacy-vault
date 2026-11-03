@@ -11,7 +11,9 @@ import com.ltld.app.legacyvault.enums.LegacyMessageDeliveryTrigger;
 import com.ltld.app.legacyvault.enums.LegacyMessageRecipientType;
 import com.ltld.app.legacyvault.enums.LegacyMessageStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
 import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -219,6 +221,64 @@ class LegacyMessageServiceImplTest {
         assertThatThrownBy(() -> messageService.createMessage(ownerId, vaultId, request, largeFile))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Attachment size exceeds 10MB limit");
+    }
+
+    @Test
+    @DisplayName("T1 (m7): đính kèm vượt quota gói bị chặn trước khi lưu file")
+    void createMessage_AttachmentOverStorageQuota_Throws() throws Exception {
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        MockMultipartFile file = new MockMultipartFile(
+                "attachment", "video.mp4", "video/mp4", "fake video data".getBytes());
+        doThrow(new PlanLimitReachedException(PlanFeature.STORAGE, "Storage quota exceeded"))
+                .when(entitlementService).assertStorageQuota(ownerId, file.getSize());
+
+        CreateLegacyMessageRequest request = CreateLegacyMessageRequest.builder()
+                .title("Video")
+                .content("Hello")
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.ON_CLAIM)
+                .build();
+
+        assertThatThrownBy(() -> messageService.createMessage(ownerId, vaultId, request, file))
+                .isInstanceOf(PlanLimitReachedException.class);
+        verify(fileStorageService, never()).storeFile(any(), any());
+        verify(legacyMessageRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("T1 (m7): thay đính kèm chỉ tính phần dung lượng tăng thêm vào quota")
+    void updateMessage_ReplaceAttachment_ChecksOnlyGrowth() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        LegacyMessage existing = LegacyMessage.builder()
+                .id(messageId)
+                .vault(vault)
+                .title("Old")
+                .content("enc:old")
+                .attachmentName("old.mp4")
+                .attachmentPath("uploads/messages/old.mp4")
+                .attachmentType("video/mp4")
+                .attachmentSize(10L)
+                .build();
+        when(legacyMessageRepository.findByIdAndVaultId(messageId, vaultId)).thenReturn(Optional.of(existing));
+        when(cryptoService.encrypt("New")).thenReturn("enc:New");
+        MockMultipartFile file = new MockMultipartFile(
+                "attachment", "new.mp4", "video/mp4", new byte[25]);
+        doThrow(new PlanLimitReachedException(PlanFeature.STORAGE, "Storage quota exceeded"))
+                .when(entitlementService).assertStorageQuota(ownerId, 15L);
+
+        UpdateLegacyMessageRequest request = UpdateLegacyMessageRequest.builder()
+                .title("New")
+                .content("New")
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.ON_CLAIM)
+                .build();
+
+        // 25 byte mới - 10 byte cũ = 15 byte tăng thêm
+        assertThatThrownBy(() -> messageService.updateMessage(ownerId, vaultId, messageId, request, file))
+                .isInstanceOf(PlanLimitReachedException.class);
+        verify(entitlementService).assertStorageQuota(ownerId, 15L);
+        verify(fileStorageService, never()).storeFile(any(), any());
     }
 
     @Test
