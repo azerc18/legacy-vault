@@ -206,9 +206,9 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TOKEN_INVALID,
                     "This check-in link belongs to an earlier check-in cycle.");
         }
-        // Cùng luật trạng thái với checkIn(). Khi X2 thêm PENDING_CONFIRMATION, sửa cả hai nơi.
+        // Cùng luật trạng thái với checkIn(): ACTIVE hoặc đang chờ xác nhận chéo (X2 PENDING_CONFIRMATION).
         switch (config.getStatus()) {
-            case ACTIVE -> { }
+            case ACTIVE, PENDING_CONFIRMATION -> { }
             case TRIGGERED -> throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TRIGGERED,
                     "The Dead Man's Switch has been triggered; check-in is no longer possible.");
             case SUSPENDED -> throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.SUSPENDED,
@@ -221,6 +221,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        config.setStatus(DmsStatus.ACTIVE);   // như checkIn(): Owner tự xác nhận thì thoát PENDING_CONFIRMATION
         startNewCycle(config, now);
         config = dmsConfigRepository.saveAndFlush(config);
         try {

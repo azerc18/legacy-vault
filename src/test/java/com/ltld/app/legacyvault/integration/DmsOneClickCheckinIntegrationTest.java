@@ -151,6 +151,21 @@ class DmsOneClickCheckinIntegrationTest extends MySqlTestContainer {
         assertThat(ownerResponded()).isEmpty();
     }
 
+    // X2: đang chờ người xác nhận chéo thì Owner bấm link vẫn check-in được, DMS về ACTIVE (như checkIn trong app)
+    @Test
+    void pendingConfirmation_checkInByLink_returnsToActive() {
+        String token = oneClickCheckinService.generateCheckinTokenForConfig(configId);
+        DmsConfig config = config();
+        config.setStatus(DmsStatus.PENDING_CONFIRMATION);
+        dmsConfigRepository.save(config);
+
+        oneClickCheckinService.checkInWithToken(token);
+
+        assertThat(config().getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(config().getLastCheckinAt()).isAfter(initialCheckin);
+        assertThat(auditActions()).containsExactly(AuditAction.DMS_CHECKIN_ONE_CLICK);
+    }
+
     @Test
     void tokenJti_isUniqueInDatabase() {
         String jti = UUID.randomUUID().toString();
