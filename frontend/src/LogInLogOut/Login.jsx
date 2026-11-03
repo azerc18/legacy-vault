@@ -5,6 +5,7 @@ import { getErrorMessage, getErrorCode } from '../api/http.js';
 import { saveSession, ROLES, getUser, updateStoredUser } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import {useTranslation} from "react-i18next";
 
 // Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
 const homeFor = (u) =>
@@ -29,6 +30,7 @@ export default function Login() {
 
     // Đã đăng nhập -> không cho vào lại trang login
     const current = getUser();
+    const { t } = useTranslation('auth');
     if (current) {
         return <Navigate to={homeFor(current)} replace />;
     }
@@ -49,7 +51,7 @@ export default function Login() {
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!email || !password) {
-            setError('Please enter both your email and password.');
+            setError(t('login.errors.required'));
             return;
         }
         setError(''); setNeedVerify(false); setLoading(true);
@@ -62,7 +64,7 @@ export default function Login() {
             }
             await finishLogin(res.accessToken);
         } catch (err) {
-            setError(getErrorMessage(err, 'Login failed.'));
+            getErrorMessage(err, t('login.errors.failed'));
             // 403 = chưa xác thực email hoặc tài khoản bị khoá
             if (err.response?.status === 403) setNeedVerify(true);
         } finally {
@@ -72,13 +74,13 @@ export default function Login() {
 
     const handleMfa = async (e) => {
         e.preventDefault();
-        if (!code.trim()) return setError('Please enter the code.');
+        if (!code.trim()) return setError(t('mfa.errors.required'));
         setError(''); setLoading(true);
         try {
             const { accessToken } = await authApi.loginMfa(mfaToken, code.trim());
             await finishLogin(accessToken);
         } catch (err) {
-            const msg = getErrorMessage(err, 'Verification failed.');
+            const msg = getErrorMessage(err, t('mfa.errors.failed'));
             const ec = getErrorCode(err);
             // Phiếu hết hạn / tài khoản bị khoá -> quay lại nhập mật khẩu
             if (ec === 'MFA_CHALLENGE_EXPIRED' || ec === 'ACCOUNT_LOCKED') backToPassword();
@@ -97,16 +99,16 @@ export default function Login() {
                     <span className="material-symbols-outlined text-[28px]">shield_locked</span>
                 </div>
                 <h1 className="font-headline-lg text-primary font-bold tracking-tight text-2xl">LegacyVault</h1>
-                <p className="font-body-sm text-on-surface-variant mt-1">A secure platform for managing and transferring digital legacies</p>
+                <p className="font-body-sm text-on-surface-variant mt-1">{t('brand.tagline')}</p>
             </div>
 
             {/* Login Card */}
             <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30 max-w-[420px] w-full">
                 <h2 className="font-headline-md text-on-surface font-bold mb-2">
-                    {mfaToken ? 'Two-factor verification' : 'Sign in'}
+                    {mfaToken ? t('mfa.title') : t('login.title')}
                 </h2>
                 <p className="text-sm text-on-surface-variant mb-6">
-                    {mfaToken ? `Signing in as ${email.trim()}` : 'Enter your account details to access the portal.'}
+                    {mfaToken ? t('mfa.signingInAs', { email: email.trim() }) : t('login.subtitle')}
                 </p>
 
                 {location.state?.message && !error && !mfaToken && (
@@ -116,7 +118,7 @@ export default function Login() {
                 )}
                 {needVerify && !mfaToken && (
                     <Link to="/verify-email" state={{ email }} className="block mb-4 text-sm text-secondary font-semibold">
-                        Haven't verified your email? Verify now →
+                        {t('login.notVerified')}
                     </Link>
                 )}
 
@@ -131,7 +133,7 @@ export default function Login() {
                     /* ---------- Bước 1: email + mật khẩu ---------- */
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label className="font-label-sm text-on-surface-variant font-semibold">Account email</label>
+                            <label className="font-label-sm text-on-surface-variant font-semibold">{t('login.email')}</label>
                             <input
                                 type="email"
                                 placeholder="name@example.com"
@@ -143,8 +145,8 @@ export default function Login() {
 
                         <div className="flex flex-col gap-1.5">
                             <div className="flex justify-between items-center">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">Password</label>
-                                <Link to="/forgot-password" className="text-xs text-secondary hover:text-primary transition-colors font-semibold">Forgot password?</Link>
+                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('login.password')}</label>
+                                <Link to="/forgot-password" className="text-xs text-secondary hover:text-primary transition-colors font-semibold">{t('login.forgot')}</Link>
                             </div>
                             <input
                                 type="password"
@@ -161,7 +163,7 @@ export default function Login() {
                             className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
                         >
                             <span className="material-symbols-outlined text-[18px]">login</span>
-                            {loading ? 'Signing in...' : 'Sign in'}
+                            {loading ? t('login.submitting') : t('login.submit')}
                         </button>
                     </form>
                 ) : (
@@ -191,17 +193,17 @@ export default function Login() {
                             className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
                         >
                             <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                            {loading ? 'Verifying...' : 'Verify'}
+                            {loading ? t('mfa.verifying') : t('mfa.verify')}
                         </button>
                         <div className="flex justify-between text-sm">
                             <button type="button"
                                     onClick={() => { setUseBackup(!useBackup); setCode(''); setError(''); }}
                                     className="text-secondary font-semibold hover:text-primary">
-                                {useBackup ? 'Use authenticator app' : 'Use a backup code'}
+                                {useBackup ? t('mfa.useApp') : t('mfa.useBackup')}
                             </button>
                             <button type="button" onClick={backToPassword}
                                     className="text-on-surface-variant hover:text-primary">
-                                ← Back
+                                {t('mfa.back')}
                             </button>
                         </div>
                     </form>
@@ -210,9 +212,9 @@ export default function Login() {
                 {!mfaToken && (
                     <div className="mt-6 pt-6 border-t border-outline-variant/20 text-center">
                         <p className="text-sm text-on-surface-variant">
-                            Don't have an account?{' '}
+                            {t('login.noAccount')}{' '}
                             <Link to="/register" className="text-secondary font-bold hover:underline">
-                                Sign up
+                                {t('login.signUp')}
                             </Link>
                         </p>
                     </div>
@@ -222,7 +224,7 @@ export default function Login() {
             {/* Security Footer Note */}
             <div className="mt-8 flex items-center gap-2 text-xs text-outline">
                 <span className="material-symbols-outlined text-[16px]">lock</span>
-                <span>End-to-end encrypted • Released only after legal verification</span>
+                <span>{t('brand.footer')}</span>
             </div>
         </div>
     );

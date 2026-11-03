@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
-import PasswordStrengthMeter from "../Common/PasswordStrengthMeter.jsx";
-import {isPasswordValid} from "../Common/passwordPolicy.js";
+import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
+import { isPasswordValid } from '../Common/passwordPolicy.js';
+import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 
 const RESEND_SECONDS = 60;
 
+const inputClass =
+    'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
+
 export default function ResetPassword() {
+    const { t } = useTranslation('auth');
     const location = useLocation();
     const [email, setEmail] = useState(location.state?.email || '');
     const [otp, setOtp] = useState('');
@@ -19,7 +25,7 @@ export default function ResetPassword() {
     const [done, setDone] = useState(false);
     const [cooldown, setCooldown] = useState(RESEND_SECONDS);
 
-    // Countdown for the "Resend code" button
+    // Đếm ngược cho nút "Gửi lại mã"
     useEffect(() => {
         if (cooldown <= 0) return;
         const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
@@ -28,16 +34,16 @@ export default function ResetPassword() {
 
     const handleResend = async () => {
         if (!email.trim()) {
-            setError('Please enter your email address.');
+            setError(t('reset.errors.emailRequired'));
             return;
         }
         setError('');
         try {
             await authApi.forgotPassword(email.trim());
-            setInfo('If this email is registered, a new code has been sent.');
+            setInfo(t('reset.resent'));
             setCooldown(RESEND_SECONDS);
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not resend code.'));
+            setError(getErrorMessage(err, t('reset.errors.resendFailed')));
         }
     };
 
@@ -46,19 +52,19 @@ export default function ResetPassword() {
         setInfo('');
 
         if (!email.trim() || !otp || !password || !passwordConfirm) {
-            setError('Please fill in all fields.');
+            setError(t('reset.errors.required'));
             return;
         }
         if (!/^\d{6}$/.test(otp)) {
-            setError('The code must be exactly 6 digits.');
+            setError(t('reset.errors.otpFormat'));
             return;
         }
         if (!isPasswordValid(password)) {
-            setError('Password does not meet the requirements.');
+            setError(t('reset.errors.weakPassword'));
             return;
         }
         if (password !== passwordConfirm) {
-            setError('Passwords do not match.');
+            setError(t('reset.errors.mismatch'));
             return;
         }
 
@@ -68,17 +74,15 @@ export default function ResetPassword() {
             await authApi.resetPassword(email.trim(), otp, password, passwordConfirm);
             setDone(true);
         } catch (err) {
-            setError(getErrorMessage(err, 'Invalid or expired code.'));
+            setError(getErrorMessage(err, t('reset.errors.failed')));
         } finally {
             setLoading(false);
         }
     };
 
-    const inputClass =
-        'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
-
     return (
-        <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4 py-8">
+        <div className="relative bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4 py-8">
+            <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
             <div className="mb-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
@@ -89,29 +93,25 @@ export default function ResetPassword() {
 
             <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30 max-w-[420px] w-full">
                 {done ? (
-                    /* Success state */
+                    /* Thành công */
                     <div className="text-center">
                         <div className="w-14 h-14 rounded-full bg-success-container text-on-success-container flex items-center justify-center mx-auto mb-4">
                             <span className="material-symbols-outlined text-[30px]">check_circle</span>
                         </div>
-                        <h2 className="font-headline-md text-on-surface font-bold mb-2">Password updated</h2>
-                        <p className="text-sm text-on-surface-variant mb-6">
-                            Your password has been reset successfully. You can now sign in with your new password.
-                        </p>
+                        <h2 className="font-headline-md text-on-surface font-bold mb-2">{t('reset.doneTitle')}</h2>
+                        <p className="text-sm text-on-surface-variant mb-6">{t('reset.doneText')}</p>
                         <Link
                             to="/login"
                             className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center"
                         >
-                            Go to sign in
+                            {t('reset.goToSignIn')}
                         </Link>
                     </div>
                 ) : (
-                    /* Form state */
+                    /* Form */
                     <>
-                        <h2 className="font-headline-md text-on-surface font-bold mb-2">Reset your password</h2>
-                        <p className="text-sm text-on-surface-variant mb-6">
-                            Enter the 6-digit code we sent to your email, then choose a new password.
-                        </p>
+                        <h2 className="font-headline-md text-on-surface font-bold mb-2">{t('reset.title')}</h2>
+                        <p className="text-sm text-on-surface-variant mb-6">{t('reset.subtitle')}</p>
 
                         {error && (
                             <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function ResetPassword() {
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">Account email</label>
+                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.email')}</label>
                                 <input
                                     type="email"
                                     placeholder="name@example.com"
@@ -140,14 +140,14 @@ export default function ResetPassword() {
 
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex justify-between items-center">
-                                    <label className="font-label-sm text-on-surface-variant font-semibold">Verification code (OTP)</label>
+                                    <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.otp')}</label>
                                     <button
                                         type="button"
                                         onClick={handleResend}
                                         disabled={cooldown > 0}
                                         className="text-xs text-secondary font-semibold hover:text-primary disabled:text-outline disabled:cursor-not-allowed"
                                     >
-                                        {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+                                        {cooldown > 0 ? t('reset.resendIn', { seconds: cooldown }) : t('reset.resend')}
                                     </button>
                                 </div>
                                 <input
@@ -162,10 +162,10 @@ export default function ResetPassword() {
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">New password</label>
+                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.newPassword')}</label>
                                 <input
                                     type="password"
-                                    placeholder="At least 8 characters"
+                                    placeholder={t('reset.newPasswordPlaceholder')}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className={inputClass}
@@ -174,10 +174,10 @@ export default function ResetPassword() {
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">Confirm new password</label>
+                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.confirm')}</label>
                                 <input
                                     type="password"
-                                    placeholder="Re-enter new password"
+                                    placeholder={t('reset.confirmPlaceholder')}
                                     value={passwordConfirm}
                                     onChange={(e) => setPasswordConfirm(e.target.value)}
                                     className={inputClass}
@@ -190,20 +190,15 @@ export default function ResetPassword() {
                                 className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                             >
                                 <span className="material-symbols-outlined text-[18px]">lock_reset</span>
-                                {loading ? 'Updating...' : 'Reset password'}
+                                {loading ? t('reset.submitting') : t('reset.submit')}
                             </button>
                         </form>
 
                         <div className="mt-6 pt-6 border-t border-outline-variant/20 text-center">
                             <Link to="/login" className="text-sm text-secondary font-bold hover:underline">
-                                Back to sign in
+                                {t('backToSignIn')}
                             </Link>
                         </div>
-
-                        {/* Demo hint (remove when the real API is integrated) */}
-                        <p className="mt-4 text-xs text-outline text-center">
-                            Demo: the valid code is <strong>123456</strong>.
-                        </p>
                     </>
                 )}
             </div>
