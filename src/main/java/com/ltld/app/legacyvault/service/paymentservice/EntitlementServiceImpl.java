@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
+import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
@@ -39,6 +40,7 @@ public class EntitlementServiceImpl implements EntitlementService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final VaultRepository vaultRepository;
     private final LegalDocumentRepository legalDocumentRepository;
+    private final LegacyMessageRepository legacyMessageRepository;
 
     @Override
     public void assertCanCreateVault(UUID ownerId) {
@@ -115,7 +117,9 @@ public class EntitlementServiceImpl implements EntitlementService {
             return;
         }
         SubscriptionPlan plan = resolveEffectivePlan(ownerId);
-        long usedBytes = legalDocumentRepository.sumSizeBytesByOwnerId(ownerId);
+        // m7: dung lượng đã dùng = tài liệu pháp lý (mọi phiên bản) + đính kèm lời nhắn di nguyện (F4a)
+        long usedBytes = legalDocumentRepository.sumSizeBytesByOwnerId(ownerId)
+                + legacyMessageRepository.sumAttachmentSizeByOwnerId(ownerId);
         if (usedBytes + additionalBytes > plan.getStorageQuotaBytes()) {
             throw new PlanLimitReachedException(
                     PlanFeature.STORAGE,

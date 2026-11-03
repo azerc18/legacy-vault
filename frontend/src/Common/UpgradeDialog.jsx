@@ -5,8 +5,9 @@ import { paymentApi } from '../api/paymentApi.js';
 import { formatStorage } from '../i18n/format.js';
 import { btnOutline, btnPrimary, Icon } from '../Owner/ownerUi.jsx';
 
-export default function UpgradeDialog({ open, message, onClose }) {
-    const { t } = useTranslation('payment');
+// feature (T1 m6): PlanFeature BE trả về trong data.feature, dùng để chọn câu upgradeDialog.feature.<FEATURE>
+export default function UpgradeDialog({ open, message, feature, onClose }) {
+    const { t, i18n } = useTranslation('payment');
     const navigate = useNavigate();
     const [sub, setSub] = useState(null);
 
@@ -47,11 +48,16 @@ export default function UpgradeDialog({ open, message, onClose }) {
                 </div>
                 <p className="mt-3 text-sm text-on-surface-variant">
                     {message ||
-                        t('upgradeDialog.defaultMessage', {
-                            vaults: maxVaults,
-                            beneficiaries: maxBeneficiaries,
-                            storage: storageStr,
-                        })}
+                        t(
+                            feature && i18n.exists(`upgradeDialog.feature.${feature}`, { ns: 'payment' })
+                                ? `upgradeDialog.feature.${feature}`
+                                : 'upgradeDialog.defaultMessage',
+                            {
+                                vaults: maxVaults,
+                                beneficiaries: maxBeneficiaries,
+                                storage: storageStr,
+                            },
+                        )}
                 </p>
                 <ul className="mt-4 space-y-2 text-sm text-on-surface">
                     <li className="flex items-center gap-2">

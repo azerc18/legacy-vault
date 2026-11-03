@@ -34,6 +34,7 @@ import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
+import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -102,6 +103,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
             </Routes>
             <AssistantWidget />
+            <PlanLimitUpgradeDialog />
         </BrowserRouter>
     );
 }

@@ -24,7 +24,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.NoTransactionException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -123,10 +125,20 @@ public class PaymentServiceImpl implements PaymentService {
                 success = paidPerGateway && ("00".equals(rspCode) || "02".equals(rspCode));
             } catch (RuntimeException ex) {
                 log.warn("T1: activate-on-return failed for txnRef {}: {}", txnRef, ex.getMessage());
+                // n6: không để đơn đã chuyển SUCCESS được commit khi bước tạo gói lỗi; IPN sau đó vẫn xử lý lại được đơn PENDING
+                markRollbackOnly();
                 success = false;
             }
         }
         return buildFrontendResultUrl(success ? "success" : "failed", txnRef, null);
+    }
+
+    private static void markRollbackOnly() {
+        try {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        } catch (NoTransactionException ignored) {
+            // Gọi ngoài transaction (unit test với mock): không có gì để rollback
+        }
     }
 
     /** Logic dùng chung cho IPN và (khi bật cờ dev) Return URL. */

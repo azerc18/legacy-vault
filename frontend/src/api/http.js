@@ -13,6 +13,9 @@ http.interceptors.request.use((config) => {
     return config;
 });
 
+// T1 (m6): 403 PLAN_LIMIT_REACHED -> phát sự kiện để App mở UpgradeDialog dùng chung (detail.data.feature cho biết tính năng nào)
+export const PLAN_LIMIT_EVENT = 'lv:plan-limit-reached';
+
 // Gặp 401 -> gọi /auth/refresh 1 lần -> gửi lại request cũ
 let refreshing = null;
 http.interceptors.response.use(
@@ -34,6 +37,9 @@ http.interceptors.response.use(
                 if (original.skipLoginRedirect) return Promise.reject(error);   // T1: trang công khai tự xử lý 401
                 window.location.href = '/login';
             }
+        }
+        if (error.response?.data?.errorCode === 'PLAN_LIMIT_REACHED') {
+            window.dispatchEvent(new CustomEvent(PLAN_LIMIT_EVENT, { detail: error.response.data }));
         }
         return Promise.reject(error);
     }

@@ -109,6 +109,14 @@
       "media": "Legacy audio & video farewell messages"
     },
     "notNow": "Not now",
-    "viewPlans": "View VIP Plans"
+    "viewPlans": "View VIP Plans",
+    "feature": {
+      "MULTIPLE_VAULTS": "You have reached the vault limit of the Free plan. Upgrade to VIP to create up to {{vaults}} vaults.",
+      "BENEFICIARY_LIMIT": "You have reached the beneficiary limit of the Free plan. Upgrade to VIP for up to {{beneficiaries}} beneficiaries per vault.",
+      "ADVANCED_ALLOCATION": "Percentage splits and contingent beneficiaries are VIP features.",
+      "TRUSTED_CONFIRMERS": "Trusted confirmers for the Dead Man's Switch are a VIP feature.",
+      "LEGACY_MESSAGES": "Legacy messages are a VIP feature.",
+      "STORAGE": "You have used all of the Free plan storage. Upgrade to VIP for {{storage}} of encrypted storage."
+    }
   }
 }

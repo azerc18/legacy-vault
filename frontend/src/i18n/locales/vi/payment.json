@@ -109,6 +109,14 @@
       "media": "Tin nhắn di nguyện âm thanh & video"
     },
     "notNow": "Để sau",
-    "viewPlans": "Xem các gói VIP"
+    "viewPlans": "Xem các gói VIP",
+    "feature": {
+      "MULTIPLE_VAULTS": "Bạn đã đạt giới hạn két sắt của gói Miễn phí. Nâng cấp lên VIP để tạo tối đa {{vaults}} két.",
+      "BENEFICIARY_LIMIT": "Bạn đã đạt giới hạn người thụ hưởng của gói Miễn phí. Nâng cấp lên VIP để có tối đa {{beneficiaries}} người mỗi két.",
+      "ADVANCED_ALLOCATION": "Chia theo tỷ lệ và người thụ hưởng dự phòng là tính năng của gói VIP.",
+      "TRUSTED_CONFIRMERS": "Người xác nhận chéo cho Dead Man's Switch là tính năng của gói VIP.",
+      "LEGACY_MESSAGES": "Tin nhắn di nguyện là tính năng của gói VIP.",
+      "STORAGE": "Bạn đã dùng hết dung lượng của gói Miễn phí. Nâng cấp lên VIP để có {{storage}} lưu trữ mã hoá."
+    }
   }
 }

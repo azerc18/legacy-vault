@@ -76,6 +76,7 @@ public class PaymentController {
         if (request == null) {
             return "127.0.0.1";
         }
+        // n8: X-Forwarded-For do client gửi nên có thể giả; chỉ dùng để điền vnp_IpAddr (thông tin cho VNPay), không dùng để phân quyền hay giới hạn
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
             return xff.split(",")[0].trim();

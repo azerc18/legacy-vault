@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.PlanFeature;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.PlanLimitReachedException;
+import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
@@ -39,6 +40,7 @@ class EntitlementServiceImplTest {
     @Mock private SubscriptionPlanRepository subscriptionPlanRepository;
     @Mock private VaultRepository vaultRepository;
     @Mock private LegalDocumentRepository legalDocumentRepository;
+    @Mock private LegacyMessageRepository legacyMessageRepository;
     @Mock private EmailSender emailSender;
 
     private EntitlementServiceImpl entitlementService;
@@ -54,7 +56,8 @@ class EntitlementServiceImplTest {
                 subscriptionRepository,
                 subscriptionPlanRepository,
                 vaultRepository,
-                legalDocumentRepository
+                legalDocumentRepository,
+                legacyMessageRepository
         );
         expiryScheduler = new SubscriptionExpiryScheduler(
                 subscriptionRepository,
@@ -189,6 +192,24 @@ class EntitlementServiceImplTest {
         );
         assertEquals(ErrorCode.PLAN_LIMIT_REACHED, storageEx.getErrorCode());
         assertEquals(PlanFeature.STORAGE, storageEx.getFeature());
+    }
+
+    // m7: dung lượng đã dùng gồm cả đính kèm lời nhắn di nguyện (F4a), không chỉ tài liệu pháp lý
+    @Test
+    void assertStorageQuota_countsLegacyMessageAttachments() {
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(subscriptionPlanRepository.findByCode("FREE")).thenReturn(Optional.of(freePlan));
+        when(legalDocumentRepository.sumSizeBytesByOwnerId(owner.getId())).thenReturn(20_000_000L);
+        when(legacyMessageRepository.sumAttachmentSizeByOwnerId(owner.getId())).thenReturn(30_000_000L);
+
+        // 20MB tài liệu + 30MB đính kèm = 50MB; thêm 2MB vẫn <= 52.4MB, thêm 3MB thì vượt
+        assertDoesNotThrow(() -> entitlementService.assertStorageQuota(owner.getId(), 2_000_000L));
+        PlanLimitReachedException ex = assertThrows(
+                PlanLimitReachedException.class,
+                () -> entitlementService.assertStorageQuota(owner.getId(), 3_000_000L)
+        );
+        assertEquals(PlanFeature.STORAGE, ex.getFeature());
     }
 
     // F4a: lời nhắn di nguyện theo cột legacy_messages_enabled của gói
