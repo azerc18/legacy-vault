@@ -76,4 +76,20 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
     // N2-exec: mọi phân bổ của một vault, để biết phần của ai đã chuyển sang người dự phòng
     @Query("SELECT al FROM AssetAllocation al WHERE al.asset.vault.id = :vaultId")
     List<AssetAllocation> findByVaultId(@Param("vaultId") UUID vaultId);
+
+
+    // N2-access: id các tài sản ACTIVE của vault đã được phân bổ cho NGƯỜI KHÁC, tức có dòng phân bổ
+    // nhưng không dòng nào đang thuộc về holder. Tài sản chưa có dòng phân bổ nào không nằm trong kết quả
+    // (Q47 phương án b: mặc định ai cũng thấy).
+    @Query("""
+            SELECT DISTINCT al.asset.id FROM AssetAllocation al
+            WHERE al.asset.vault.id = :vaultId
+              AND al.asset.status = com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE
+              AND al.asset.id NOT IN (
+                  SELECT al2.asset.id FROM AssetAllocation al2
+                  WHERE al2.asset.vault.id = :vaultId
+                    AND ((al2.effectiveBeneficiary IS NULL AND al2.beneficiary.id = :holderId)
+                         OR al2.effectiveBeneficiary.id = :holderId))
+            """)
+    List<UUID> findAssetIdsNotHeldBy(@Param("vaultId") UUID vaultId, @Param("holderId") UUID holderId);
 }

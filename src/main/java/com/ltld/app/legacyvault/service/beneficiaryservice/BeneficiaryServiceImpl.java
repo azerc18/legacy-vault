@@ -398,7 +398,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
+        // N2-access: bỏ tài sản đã phân bổ cho người khác
+        Set<UUID> hidden = hiddenAssetIds(vault.getId(), currentUserId);
         return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(asset -> !hidden.contains(asset.getId()))
                 .map(asset -> InheritedAssetSummaryResponse.builder()
                         .id(asset.getId())
                         .assetType(asset.getAssetType())
@@ -520,9 +523,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
-        int total = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).size();
+        // N2-access: chỉ đếm phần của người này
+        Set<UUID> hidden = hiddenAssetIds(vault.getId(), currentUserId);
+        int total = (int) digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(a -> !hidden.contains(a.getId()))
+                .count();
         List<InheritedAssetSummaryResponse> unviewed = digitalAssetRepository
                 .findUnaccessedAssets(vault.getId(), ctx.claim().getId()).stream()
+                .filter(a -> !hidden.contains(a.getId()))
                 .map(a -> InheritedAssetSummaryResponse.builder()
                         .id(a.getId())
                         .assetType(a.getAssetType())
@@ -556,9 +564,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertViewSession(vault.getId(), currentUserId);
 
         // Sau CLAIMED không giải mã được nữa (Q1), nên tài sản chưa xem sẽ mất quyền xem.
-        List<DigitalAsset> unviewed = digitalAssetRepository.findUnaccessedAssets(vault.getId(), claim.getId());
+        // N2-access: chỉ tính phần của người này (tài sản của người khác không bắt họ xem, cũng không cảnh báo "chưa xem")
+        Set<UUID> hidden = hiddenAssetIds(vault.getId(), currentUserId);
+        List<DigitalAsset> unviewed = digitalAssetRepository.findUnaccessedAssets(vault.getId(), claim.getId()).stream()
+                .filter(a -> !hidden.contains(a.getId()))
+                .toList();
         // FR-19 (SRS Precondition): Vault có tài sản thì Beneficiary phải xem/tải ít nhất một tài sản trước khi đóng
-        long totalAssets = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE);
+        long totalAssets = digitalAssetRepository.countByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
+                - hidden.size();
         if (totalAssets > 0 && unviewed.size() == totalAssets) {
             throw new BeneficiaryException(
                     "You must view or download at least one asset before closing the case.", HttpStatus.BAD_REQUEST);
@@ -612,6 +625,12 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .findByIdAndVaultIdAndStatus(assetId, vault.getId(), AssetStatus.ACTIVE)
                 .orElseThrow(() -> new BeneficiaryException("Asset not found.", HttpStatus.NOT_FOUND));
 
+        // N2-access: chặn trước khi giải mã và trước khi ghi nhận "đã xem" (dùng chung cho xem chi tiết và tải xuống)
+        if (hiddenAssetIds(vault.getId(), currentUserId).contains(asset.getId())) {
+            throw new BeneficiaryException(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU,
+                    "This asset is not allocated to you.");
+        }
+
         DecryptedAsset decrypted;
         try {
             // Giải mã trong bộ nhớ cho phiên xem, không lưu lại bản rõ
@@ -633,6 +652,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // FR-19: ghi nhận LẦN ĐẦU Beneficiary xem chi tiết hoặc tải xuống nội dung của từng tài sản
     private void markContentAccessed(UUID claimId, UUID assetId) {
         assetAccessRecordRepository.insertIfAbsent(UUID.randomUUID(), claimId, assetId, LocalDateTime.now());
+    }
+
+
+    // N2-access: id các tài sản ACTIVE đã phân bổ cho người khác (người này không được xem/tải/đếm).
+    // Tính theo effective_beneficiary nên tự đúng sau fallback của N2b. Tài sản chưa có phân bổ thì không bị ẩn (Q47 b).
+    private Set<UUID> hiddenAssetIds(UUID vaultId, UUID currentUserId) {
+        VaultBeneficiary me = requireBeneficiary(vaultId, currentUserId);
+        return new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, me.getId()));
     }
 
     private String buildDownloadContent(DecryptedAsset decrypted) {
