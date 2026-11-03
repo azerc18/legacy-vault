@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ownerApi } from '../api/ownerApi.js';
 import { Icon, inputClass } from './ownerUi.jsx';
+import i18n from '../i18n/index.js';
 
 // N3: schema các loại tài sản lấy từ BE (GET /api/asset-types), cache trong bộ nhớ
 let cache = null;
@@ -36,15 +38,16 @@ export const OPTION_LABEL = {
 
 // Trả về thông báo lỗi đầu tiên hoặc ''
 export function validateFields(schema, values, isEdit) {
+    const t = i18n.getFixedT(null, 'vault');
     // Ví crypto cần seed phrase hoặc private key (khi sửa, để trống = giữ nguyên bí mật cũ)
     if (schema.assetType === 'CRYPTO_WALLET' && !isEdit
         && !(values.seedPhrase || '').trim() && !(values.privateKey || '').trim()) {
-        return 'Seed phrase or private key is required.';
+        return t('assetFields.errors.cryptoSecretRequired');
     }
     for (const f of schema.fields) {
         const v = (values[f.key] || '').trim();
-        if (!v && f.required && !(isEdit && f.sensitive)) return `${f.label} is required.`;
-        if (v && f.pattern && !new RegExp(f.pattern).test(v)) return `${f.label} has an invalid format.`;
+        if (!v && f.required && !(isEdit && f.sensitive)) return t('assetFields.errors.fieldRequired', { label: f.label });
+        if (v && f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label: f.label });
     }
     return '';
 }
@@ -57,12 +60,13 @@ export function cleanFields(values) {
 }
 
 export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
+    const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
     return (
         <div className="space-y-3">
             {schema.mechanism && (
                 <p className="text-xs text-on-surface-variant bg-surface-container-low rounded-lg p-3">
-                    {MECHANISM_TEXT[schema.mechanism]}
+                    {t(`assetFields.mechanisms.${schema.mechanism}`, { defaultValue: MECHANISM_TEXT[schema.mechanism] })}
                 </p>
             )}
             {schema.fields.map((f) => {
@@ -74,8 +78,12 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
                         <span className="text-sm font-semibold text-on-surface-variant">{label}</span>
                         {f.type === 'SELECT' && (
                             <select value={v} onChange={set} className={inputClass}>
-                                <option value="">Select...</option>
-                                {f.options.map((o) => <option key={o} value={o}>{OPTION_LABEL[o] || o}</option>)}
+                                <option value="">{t('common.select')}</option>
+                                {f.options.map((o) => (
+                                    <option key={o} value={o}>
+                                        {t(`assetFields.options.${o}`, { defaultValue: OPTION_LABEL[o] || o })}
+                                    </option>
+                                ))}
                             </select>
                         )}
                         {f.type === 'TEXTAREA' && (
@@ -89,7 +97,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
                             <div className="relative">
                                 <input type={shown[f.key] ? 'text' : 'password'} value={v} onChange={set} maxLength={2000}
                                        autoComplete="new-password" className={`${inputClass} pr-12`}
-                                       placeholder={isEdit ? 'Leave empty to keep current' : ''} />
+                                       placeholder={isEdit ? t('assetFields.keepCurrentPlaceholder') : ''} />
                                 <button type="button" onClick={() => setShown((s) => ({ ...s, [f.key]: !s[f.key] }))}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
                                     <Icon name={shown[f.key] ? 'visibility_off' : 'visibility'} className="text-[20px]" />
@@ -105,6 +113,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
 
 // Xem chi tiết: hiện từng trường, trường bí mật bị che cho tới khi bấm mắt
 export function AssetFieldsView({ schema, fields }) {
+    const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
     return (
         <div className="mt-4 space-y-3">
@@ -119,7 +128,9 @@ export function AssetFieldsView({ schema, fields }) {
                             </button>
                         </div>
                     ) : (
-                        <p className="mt-1 text-sm whitespace-pre-wrap break-words">{OPTION_LABEL[fields[f.key]] || fields[f.key]}</p>
+                        <p className="mt-1 text-sm whitespace-pre-wrap break-words">
+                            {t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
+                        </p>
                     )}
                 </div>
             ))}

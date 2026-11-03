@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
@@ -8,14 +9,14 @@ import {
     ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger,
 } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
-import EmptyState from "../Common/EmptyState.jsx";
+import EmptyState from '../Common/EmptyState.jsx';
 import LegacyMessageSection from './LegacyMessageSection.jsx';
 import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 
-const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 
 export default function OwnerVaultDetail() {
+    const { t } = useTranslation(['vault', 'enums']);
     const { vaultId } = useParams();
     const location = useLocation();
     const user = getUser();
@@ -25,8 +26,8 @@ export default function OwnerVaultDetail() {
     const reload = useCallback(() => {
         ownerApi.getVault(vaultId)
             .then(setVault)
-            .catch((e) => setError(getErrorMessage(e, 'Vault not found.')));
-    }, [vaultId]);
+            .catch((e) => setError(getErrorMessage(e, t('detail.notFound'))));
+    }, [vaultId, t]);
 
     useEffect(() => { reload(); }, [reload]);
 
@@ -37,17 +38,23 @@ export default function OwnerVaultDetail() {
 
     return (
         <OwnerLayout
-            title={vault?.name || 'Vault'}
-            subtitle={vault ? `Created ${formatDate(vault.createdAt)} · ${vault.totalAssets} asset(s) · ${vault.totalDocuments} document(s)` : ''}
+            title={vault?.name || t('detail.defaultTitle')}
+            subtitle={vault ? t('detail.subtitle', {
+                date: formatDate(vault.createdAt),
+                assets: vault.totalAssets,
+                docs: vault.totalDocuments
+            }) : ''}
             actions={vault && (
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">{vault.status}</span>
+                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                    {t(`status.${vault.status}`, { defaultValue: vault.status })}
+                </span>
             )}
         >
-            {location.state?.created && <Alert type="success">Vault created.</Alert>}
+            {location.state?.created && <Alert type="success">{t('detail.createdSuccess')}</Alert>}
             <Alert>{error}</Alert>
-            {!vault && !error && <p className="text-on-surface-variant">Loading...</p>}
+            {!vault && !error && <p className="text-on-surface-variant">{t('common.loading')}</p>}
             {vault && !editable && (
-                <Alert type="warning">{vault.lockReason || `This vault is ${vault.status.toLowerCase()} — it can no longer be changed.`}</Alert>
+                <Alert type="warning">{vault.lockReason || t('detail.lockedNotice', { status: vault.status.toLowerCase() })}</Alert>
             )}
 
             {vault && (
@@ -67,6 +74,7 @@ export default function OwnerVaultDetail() {
 
 /* ---------- Tên / mô tả (FR-27) ---------- */
 function DetailsSection({ vault, editable, onSaved }) {
+    const { t } = useTranslation('vault');
     const [editing, setEditing] = useState(false);
     const [name, setName] = useState(vault.name);
     const [description, setDescription] = useState(vault.description || '');
@@ -75,50 +83,50 @@ function DetailsSection({ vault, editable, onSaved }) {
 
     const save = async (e) => {
         e.preventDefault();
-        if (!name.trim()) return setError('Name is required.');
+        if (!name.trim()) return setError(t('detail.details.nameRequired'));
         setError(''); setLoading(true);
         try {
             await ownerApi.updateVault(vault.id, { name: name.trim(), description: description.trim() || null });
             setEditing(false);
             onSaved();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not save.'));
+            setError(getErrorMessage(err, t('detail.details.saveError')));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card title="Details" icon="info">
+        <Card title={t('detail.details.title')} icon="info">
             <Alert>{error}</Alert>
             {!editing ? (
                 <div className="flex flex-wrap justify-between gap-4">
                     <dl className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm flex-1">
                         <div className="sm:col-span-2">
-                            <dt className="text-outline">Description / hand-over instructions</dt>
+                            <dt className="text-outline">{t('detail.details.descriptionLabel')}</dt>
                             <dd className="whitespace-pre-wrap">{vault.description || '—'}</dd>
                         </div>
-                        <div><dt className="text-outline">Last updated</dt><dd>{formatDate(vault.updatedAt, true)}</dd></div>
-                        {vault.unlockedAt && <div><dt className="text-outline">Unlocked</dt><dd>{formatDate(vault.unlockedAt, true)}</dd></div>}
-                        {vault.claimDeadlineAt && <div><dt className="text-outline">Claim deadline</dt><dd>{formatDate(vault.claimDeadlineAt)}</dd></div>}
+                        <div><dt className="text-outline">{t('detail.details.lastUpdated')}</dt><dd>{formatDate(vault.updatedAt, true)}</dd></div>
+                        {vault.unlockedAt && <div><dt className="text-outline">{t('detail.details.unlocked')}</dt><dd>{formatDate(vault.unlockedAt, true)}</dd></div>}
+                        {vault.claimDeadlineAt && <div><dt className="text-outline">{t('detail.details.claimDeadline')}</dt><dd>{formatDate(vault.claimDeadlineAt)}</dd></div>}
                     </dl>
                     {editable && (
-                        <button onClick={() => setEditing(true)} className={btnOutline}><Icon name="edit" className="text-[18px]" /> Edit</button>
+                        <button onClick={() => setEditing(true)} className={btnOutline}><Icon name="edit" className="text-[18px]" /> {t('common.edit')}</button>
                     )}
                 </div>
             ) : (
                 <form onSubmit={save} className="space-y-4">
                     <label className="block">
-                        <span className="text-sm font-semibold text-on-surface-variant">Name *</span>
+                        <span className="text-sm font-semibold text-on-surface-variant">{t('detail.details.nameLabel')}</span>
                         <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)} className={`${inputClass} mt-1`} />
                     </label>
                     <label className="block">
-                        <span className="text-sm font-semibold text-on-surface-variant">Description</span>
+                        <span className="text-sm font-semibold text-on-surface-variant">{t('detail.details.descriptionField')}</span>
                         <textarea rows={3} maxLength={500} value={description} onChange={(e) => setDescription(e.target.value)} className={textareaCls} />
                     </label>
                     <div className="flex gap-3">
-                        <button type="button" onClick={() => setEditing(false)} className={btnOutline}>Cancel</button>
-                        <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Saving...' : 'Save'}</button>
+                        <button type="button" onClick={() => setEditing(false)} className={btnOutline}>{t('common.cancel')}</button>
+                        <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('common.saving') : t('common.save')}</button>
                     </div>
                 </form>
             )}
@@ -128,6 +136,7 @@ function DetailsSection({ vault, editable, onSaved }) {
 
 /* ---------- Tài sản số (FR-27) ---------- */
 function AssetSection({ vaultId, editable, onChanged }) {
+    const { t } = useTranslation(['vault', 'enums']);
     const schemas = useAssetSchemas();
     const [assets, setAssets] = useState([]);
     const [error, setError] = useState('');
@@ -136,16 +145,21 @@ function AssetSection({ vaultId, editable, onChanged }) {
     const [deleting, setDeleting] = useState(null);
     const [busy, setBusy] = useState(false);
 
+    const getAssetLabel = (type) => {
+        const fallback = ASSET_TYPES.find((a) => a.value === type)?.label || type;
+        return t(`enums:assetType.${type}`, { defaultValue: fallback });
+    };
+
     const load = useCallback(() => {
-        ownerApi.listAssets(vaultId).then(setAssets).catch((e) => setError(getErrorMessage(e, 'Could not load assets.')));
-    }, [vaultId]);
+        ownerApi.listAssets(vaultId).then(setAssets).catch((e) => setError(getErrorMessage(e, t('detail.assets.errors.load'))));
+    }, [vaultId, t]);
 
     useEffect(() => { load(); }, [load]);
 
     const view = async (a) => {
         setError('');
         try { setViewing(await ownerApi.getAsset(vaultId, a.id)); }
-        catch (e) { setError(getErrorMessage(e, 'Could not open this asset.')); }
+        catch (e) { setError(getErrorMessage(e, t('detail.assets.errors.open'))); }
     };
 
     // Sửa: lấy chi tiết để điền sẵn tên/ghi chú; secret để trống = giữ nguyên
@@ -161,7 +175,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
             }
             setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '', fields });
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not open this asset.'));
+            setError(getErrorMessage(e, t('detail.assets.errors.open')));
         }
     };
 
@@ -172,7 +186,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
             setDeleting(null);
             load(); onChanged();
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not delete.'));
+            setError(getErrorMessage(e, t('detail.assets.errors.delete')));
             setDeleting(null);
         } finally {
             setBusy(false);
@@ -180,11 +194,11 @@ function AssetSection({ vaultId, editable, onChanged }) {
     };
 
     return (
-        <Card title={`Assets (${assets.length})`} icon="key">
+        <Card title={t('detail.assets.title', { count: assets.length })} icon="key">
             <Alert>{error}</Alert>
             {assets.length === 0 && (
-                <EmptyState compact icon="key" title="No assets yet"
-                            text={editable ? 'Add bank accounts, crypto wallets or social accounts below.' : 'This vault has no assets.'} />
+                <EmptyState compact icon="key" title={t('detail.assets.emptyTitle')}
+                            text={editable ? t('detail.assets.emptyEditable') : t('detail.assets.emptyLocked')} />
             )}
             {assets.length > 0 && (
                 <ul className="divide-y divide-outline-variant/30 mb-4">
@@ -192,13 +206,13 @@ function AssetSection({ vaultId, editable, onChanged }) {
                         <li key={a.id} className="py-3 flex items-center gap-3">
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold truncate">{a.assetName}</p>
-                                <p className="text-xs text-outline">{assetLabel(a.assetType)} · updated {formatDate(a.updatedAt)}</p>
+                                <p className="text-xs text-outline">{getAssetLabel(a.assetType)} · {t('detail.assets.updatedOn', { date: formatDate(a.updatedAt) })}</p>
                             </div>
-                            <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">View</button>
+                            <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('common.view')}</button>
                             {editable && (
                                 <>
-                                    <button onClick={() => edit(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">Edit</button>
-                                    <button onClick={() => setDeleting(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">Delete</button>
+                                    <button onClick={() => edit(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('common.edit')}</button>
+                                    <button onClick={() => setDeleting(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">{t('common.delete')}</button>
                                 </>
                             )}
                         </li>
@@ -207,7 +221,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
             )}
             {editable && (
                 <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
-                    <Icon name="add" className="text-[18px]" /> Add asset
+                    <Icon name="add" className="text-[18px]" /> {t('detail.assets.addAsset')}
                 </button>
             )}
 
@@ -224,9 +238,9 @@ function AssetSection({ vaultId, editable, onChanged }) {
             <ConfirmDialog
                 open={!!deleting}
                 danger
-                title="Delete this asset?"
-                message={`"${deleting?.assetName}" will be permanently deleted.`}
-                confirmLabel="Delete"
+                title={t('detail.assets.deleteTitle')}
+                message={t('detail.assets.deleteMessage', { name: deleting?.assetName })}
+                confirmLabel={t('common.delete')}
                 busy={busy}
                 onConfirm={remove}
                 onCancel={() => setDeleting(null)}
@@ -246,20 +260,24 @@ function Modal({ children, onClose }) {
 }
 
 function AssetViewModal({ asset, schemas, onClose }) {
+    const { t } = useTranslation(['vault', 'enums']);
     const [reveal, setReveal] = useState(false);
     const schema = asset.fields ? schemaOf(schemas, asset.assetType) : null;
+    const fallbackLabel = ASSET_TYPES.find((a) => a.value === asset.assetType)?.label || asset.assetType;
+    const typeLabel = t(`enums:assetType.${asset.assetType}`, { defaultValue: fallbackLabel });
+
     return (
         <Modal onClose={onClose}>
             <div className="flex justify-between items-start">
                 <div>
-                    <p className="text-xs text-outline">{assetLabel(asset.assetType)}</p>
+                    <p className="text-xs text-outline">{typeLabel}</p>
                     <h3 className="font-title-lg text-title-lg">{asset.assetName}</h3>
                 </div>
                 <button onClick={onClose}><Icon name="close" className="text-outline" /></button>
             </div>
             {schema ? <AssetFieldsView schema={schema} fields={asset.fields} /> : (
                 <>
-                    <p className="mt-5 text-sm font-semibold text-on-surface-variant">Secret</p>
+                    <p className="mt-5 text-sm font-semibold text-on-surface-variant">{t('detail.assets.secretLabel')}</p>
                     <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
                         <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
                         <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
@@ -268,16 +286,17 @@ function AssetViewModal({ asset, schemas, onClose }) {
             )}
             {asset.notes && (
                 <>
-                    <p className="mt-4 text-sm font-semibold text-on-surface-variant">Notes</p>
+                    <p className="mt-4 text-sm font-semibold text-on-surface-variant">{t('detail.assets.notesLabel')}</p>
                     <p className="mt-1 text-sm whitespace-pre-wrap">{asset.notes}</p>
                 </>
             )}
-            <p className="mt-5 text-xs text-outline">Every view is recorded in the vault's activity log.</p>
+            <p className="mt-5 text-xs text-outline">{t('detail.assets.auditNotice')}</p>
         </Modal>
     );
 }
 
 function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
+    const { t } = useTranslation(['vault', 'enums']);
     const isEdit = !!initial.id;
     const [f, setF] = useState(initial);
     const [show, setShow] = useState(false);
@@ -295,12 +314,12 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
     const submit = async (e) => {
         e.preventDefault();
         setError('');
-        if (!f.assetName.trim()) return setError('Asset name is required.');
-        if (schemaMissing) return setError('Could not load asset types. Reload the page and try again.');
+        if (!f.assetName.trim()) return setError(t('detail.assets.errors.nameRequired'));
+        if (schemaMissing) return setError(t('detail.assets.errors.schemaMissing'));
         if (dynamic) {
             const msg = validateFields(schema, f.fields || {}, isEdit);
             if (msg) return setError(msg);
-        } else if (!isEdit && !f.secret.trim()) return setError('Secret is required for a new asset.');
+        } else if (!isEdit && !f.secret.trim()) return setError(t('detail.assets.errors.secretRequired'));
         setLoading(true);
         try {
             const body = {
@@ -314,7 +333,7 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
             else await ownerApi.addAsset(vaultId, body);
             onSaved();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not save.'));
+            setError(getErrorMessage(err, t('detail.assets.errors.save')));
         } finally {
             setLoading(false);
         }
@@ -322,30 +341,34 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
 
     return (
         <Modal onClose={onClose}>
-            <h3 className="font-title-lg text-title-lg mb-4">{isEdit ? 'Edit asset' : 'Add asset'}</h3>
+            <h3 className="font-title-lg text-title-lg mb-4">{isEdit ? t('detail.assets.editTitle') : t('detail.assets.addTitle')}</h3>
             <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
                 <select value={f.assetType} onChange={changeType} className={inputClass}>
-                    {ASSET_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    {ASSET_TYPES.map((typeItem) => (
+                        <option key={typeItem.value} value={typeItem.value}>
+                            {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
+                        </option>
+                    ))}
                 </select>
-                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder="Asset name" className={inputClass} />
+                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={inputClass} />
                 {dynamic ? (
                     <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
                 ) : (
                     <div className="relative">
                         <input
                             type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
-                            placeholder={isEdit ? 'New secret (leave empty to keep current)' : 'Secret'} className={`${inputClass} pr-12`}
+                            placeholder={isEdit ? t('detail.assets.newSecretPlaceholder') : t('detail.assets.secretPlaceholder')} className={`${inputClass} pr-12`}
                         />
                         <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
                             <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
                         </button>
                     </div>
                 )}
-                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder="Notes for the beneficiary (optional)" className={textareaCls} />
+                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={textareaCls} />
                 <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={onClose} className={btnOutline}>Cancel</button>
-                    <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Saving...' : 'Save'}</button>
+                    <button type="button" onClick={onClose} className={btnOutline}>{t('common.cancel')}</button>
+                    <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('common.saving') : t('common.save')}</button>
                 </div>
             </form>
         </Modal>
@@ -353,13 +376,10 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
 }
 
 /* ---------- FR-02 / N2-owner: danh sách người thụ hưởng ---------- */
-const BENEFICIARY_STATUS = {
-    PENDING_REGISTRATION: 'Waiting for sign-up',
-    INVITED: 'Invited',
-};
 const emptyBeneficiaryForm = { email: '', fullName: '', relationship: '' };
 
 function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
+    const { t } = useTranslation('vault');
     const [form, setForm] = useState(emptyBeneficiaryForm);
     const [error, setError] = useState('');
     const [removing, setRemoving] = useState(null);   // beneficiary đang chờ xác nhận xoá
@@ -380,7 +400,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
             setForm(emptyBeneficiaryForm);
             onSaved();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not add the beneficiary.'));
+            setError(getErrorMessage(err, t('detail.beneficiaries.errors.add')));
         } finally {
             setLoading(false);
         }
@@ -394,7 +414,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
             onSaved();
         } catch (err) {
             // BENEFICIARY_IN_USE / LAST_BENEFICIARY đã có bản dịch trong errors.json
-            setError(getErrorMessage(err, 'Could not remove the beneficiary.'));
+            setError(getErrorMessage(err, t('detail.beneficiaries.errors.remove')));
             setRemoving(null);
         } finally {
             setLoading(false);
@@ -402,10 +422,10 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
     };
 
     return (
-        <Card title={`Beneficiaries (${beneficiaries.length})`} icon="family_restroom">
+        <Card title={t('detail.beneficiaries.title', { count: beneficiaries.length })} icon="family_restroom">
             <Alert>{error}</Alert>
             {beneficiaries.length === 0 ? (
-                <p className="text-sm mb-4">No beneficiaries yet.</p>
+                <p className="text-sm mb-4">{t('detail.beneficiaries.empty')}</p>
             ) : (
                 <ul className="mb-4 space-y-2">
                     {beneficiaries.map((b) => (
@@ -414,12 +434,14 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                                 <b className="break-all">{b.email}</b>
                                 {b.fullName && <span> · {b.fullName}</span>}
                                 {b.relationship && <span className="text-on-surface-variant"> ({b.relationship})</span>}
-                                <div className="text-xs text-outline">{BENEFICIARY_STATUS[b.status] || humanize(b.status)}</div>
+                                <div className="text-xs text-outline">
+                                    {t(`detail.beneficiaries.status.${b.status}`, { defaultValue: humanize(b.status) })}
+                                </div>
                             </div>
                             {editable && beneficiaries.length > 1 && (
                                 <button type="button" disabled={loading} onClick={() => setRemoving(b)}
                                         className="text-sm text-error font-semibold shrink-0">
-                                    Remove
+                                    {t('common.remove')}
                                 </button>
                             )}
                         </li>
@@ -429,24 +451,24 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
             {editable && (
                 <form onSubmit={handleAdd} className="space-y-3">
                     <input type="email" required value={form.email} maxLength={255} onChange={(e) => setField('email', e.target.value)}
-                           placeholder="beneficiary@example.com" className={inputClass} />
+                           placeholder={t('detail.beneficiaries.emailPlaceholder')} className={inputClass} />
                     <div className="grid sm:grid-cols-2 gap-3">
                         <input value={form.fullName} maxLength={255} onChange={(e) => setField('fullName', e.target.value)}
-                               placeholder="Full name (optional)" className={inputClass} />
+                               placeholder={t('detail.beneficiaries.fullNamePlaceholder')} className={inputClass} />
                         <input value={form.relationship} maxLength={50} onChange={(e) => setField('relationship', e.target.value)}
-                               placeholder="Relationship (optional)" className={inputClass} />
+                               placeholder={t('detail.beneficiaries.relationshipPlaceholder')} className={inputClass} />
                     </div>
                     <button type="submit" disabled={loading || beneficiaries.length >= 10} className={btnPrimary}>
-                        {loading ? 'Saving...' : 'Add beneficiary'}
+                        {loading ? t('common.saving') : t('detail.beneficiaries.addButton')}
                     </button>
                 </form>
             )}
             <ConfirmDialog
                 open={!!removing}
                 danger
-                title="Remove beneficiary?"
-                message={`Remove ${removing?.email} from this vault? They will be notified.`}
-                confirmLabel="Remove"
+                title={t('detail.beneficiaries.removeTitle')}
+                message={t('detail.beneficiaries.removeMessage', { email: removing?.email })}
+                confirmLabel={t('common.remove')}
                 busy={loading}
                 onConfirm={handleRemove}
                 onCancel={() => setRemoving(null)}
@@ -461,6 +483,7 @@ const ALLOWED = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
 const MAX_SIZE = 10 * 1024 * 1024;
 
 function DocumentSection({ vaultId, editable, onChanged }) {
+    const { t } = useTranslation(['vault', 'enums']);
     const [docs, setDocs] = useState([]);
     const [type, setType] = useState('WILL');
     const [file, setFile] = useState(null);
@@ -473,16 +496,18 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     const [versions, setVersions] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
 
+    const getDocTypeLabel = (docType) => t(`enums:documentType.${docType}`, { defaultValue: humanize(docType) });
+
     const load = useCallback(() => {
-        ownerApi.listDocuments(vaultId).then(setDocs).catch((e) => setError(getErrorMessage(e, 'Could not load documents.')));
-    }, [vaultId]);
+        ownerApi.listDocuments(vaultId).then(setDocs).catch((e) => setError(getErrorMessage(e, t('detail.documents.errors.load'))));
+    }, [vaultId, t]);
 
     useEffect(() => { load(); }, [load]);
 
     const validateFile = (f) => {
-        if (!f) return 'Please choose a file.';
-        if (!ALLOWED.some((ext) => f.name.toLowerCase().endsWith(ext))) return 'Only PDF, DOC/DOCX, JPG/PNG are allowed.';
-        if (f.size > MAX_SIZE) return 'File exceeds the 10MB limit.';
+        if (!f) return t('detail.documents.errors.chooseFile');
+        if (!ALLOWED.some((ext) => f.name.toLowerCase().endsWith(ext))) return t('detail.documents.errors.invalidType');
+        if (f.size > MAX_SIZE) return t('detail.documents.errors.tooLarge');
         return '';
     };
 
@@ -497,7 +522,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             setFile(null);
             load(); onChanged();
         } catch (err) {
-            setError(getErrorMessage(err, 'Upload failed.'));
+            setError(getErrorMessage(err, t('detail.documents.errors.upload')));
         } finally {
             setLoading(false);
         }
@@ -516,7 +541,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             setNewVersionFile(null);
             load(); onChanged();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not upload new version.'));
+            setError(getErrorMessage(err, t('detail.documents.errors.uploadVersion')));
         } finally {
             setLoading(false);
         }
@@ -531,7 +556,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             const list = await ownerApi.getDocumentVersions(vaultId, d.documentGroupId);
             setVersions(list);
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not load version history.'));
+            setError(getErrorMessage(err, t('detail.documents.errors.history')));
             setHistoryDoc(null);
         } finally {
             setHistoryLoading(false);
@@ -541,7 +566,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     const download = async (d) => {
         setError('');
         try { await ownerApi.downloadDocument(d.id, d.fileName); }
-        catch (err) { setError(getErrorMessage(err, 'Download failed.')); }
+        catch (err) { setError(getErrorMessage(err, t('detail.documents.errors.download'))); }
     };
 
     const remove = async () => {
@@ -551,7 +576,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             setDeleting(null);
             load(); onChanged();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not delete.')); // 409: đang nằm trong hồ sơ xác minh
+            setError(getErrorMessage(err, t('detail.documents.errors.delete'))); // 409: đang nằm trong hồ sơ xác minh
             setDeleting(null);
         } finally {
             setLoading(false);
@@ -559,7 +584,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     };
 
     return (
-        <Card title={`Legal documents (${docs.length})`} icon="description">
+        <Card title={t('detail.documents.title', { count: docs.length })} icon="description">
             <Alert>{error}</Alert>
             {docs.length > 0 && (
                 <ul className="divide-y divide-outline-variant/30 mb-5">
@@ -575,23 +600,23 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-outline">{humanize(d.documentType)} · {formatDate(d.uploadedAt, true)}</p>
+                                <p className="text-xs text-outline">{getDocTypeLabel(d.documentType)} · {formatDate(d.uploadedAt, true)}</p>
                             </div>
-                            <button type="button" onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1" title="Download">
+                            <button type="button" onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1" title={t('common.download')}>
                                 <Icon name="download" className="text-[18px]" />
                             </button>
                             {d.documentGroupId && (
                                 <button type="button" onClick={() => openHistory(d)} className="h-9 px-3 rounded-lg font-semibold text-secondary hover:bg-surface-container-low">
-                                    History
+                                    {t('detail.documents.history')}
                                 </button>
                             )}
                             {editable && d.documentGroupId && (
                                 <button type="button" onClick={() => { setUpdatingDoc(d); setNewVersionFile(null); setError(''); }} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low">
-                                    Upload new version
+                                    {t('detail.documents.uploadNewVersion')}
                                 </button>
                             )}
                             {editable && (
-                                <button type="button" onClick={() => setDeleting(d)} className="h-9 px-3 rounded-lg font-semibold text-error hover:bg-error-container">Delete</button>
+                                <button type="button" onClick={() => setDeleting(d)} className="h-9 px-3 rounded-lg font-semibold text-error hover:bg-error-container">{t('common.delete')}</button>
                             )}
                         </li>
                     ))}
@@ -599,28 +624,36 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             )}
             {editable && (
                 <>
-                    <p className="text-sm text-on-surface-variant mb-3">PDF, DOC/DOCX, JPG/PNG — up to 10MB. Files are encrypted before storage.</p>
+                    <p className="text-sm text-on-surface-variant mb-3">{t('detail.documents.hint')}</p>
                     <form onSubmit={upload} className="grid sm:grid-cols-[180px_1fr_auto] gap-3 items-center">
                         <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
-                            {DOCUMENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            {DOCUMENT_TYPES.map((tItem) => (
+                                <option key={tItem.value} value={tItem.value}>
+                                    {t(`enums:documentType.${tItem.value}`, { defaultValue: tItem.label })}
+                                </option>
+                            ))}
                         </select>
                         <FilePicker file={file} onChange={setFile} accept={ALLOWED.join(',')} disabled={loading} />
-                        <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Uploading...' : 'Upload'}</button>
+                        <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('common.uploading') : t('common.upload')}</button>
                     </form>
                 </>
             )}
             {updatingDoc && (
                 <Modal onClose={() => { setUpdatingDoc(null); setNewVersionFile(null); }}>
-                    <h3 className="font-title-lg text-title-lg mb-2">Upload new version</h3>
+                    <h3 className="font-title-lg text-title-lg mb-2">{t('detail.documents.uploadNewVersionTitle')}</h3>
                     <p className="text-sm text-on-surface-variant mb-4">
-                        Replacing <b>{updatingDoc.fileName}</b> ({humanize(updatingDoc.documentType)}, current v{updatingDoc.version || 1}). Previous versions remain in history.
+                        {t('detail.documents.replacingDesc', {
+                            fileName: updatingDoc.fileName,
+                            type: getDocTypeLabel(updatingDoc.documentType),
+                            version: updatingDoc.version || 1
+                        })}
                     </p>
                     <form onSubmit={uploadNewVersion} className="space-y-4">
                         <FilePicker file={newVersionFile} onChange={setNewVersionFile} accept={ALLOWED.join(',')} disabled={loading} />
                         <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>Cancel</button>
+                            <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>{t('common.cancel')}</button>
                             <button type="submit" disabled={loading || !newVersionFile} className={btnPrimary}>
-                                {loading ? 'Uploading...' : `Upload v${(updatingDoc.version || 1) + 1}`}
+                                {loading ? t('common.uploading') : t('detail.documents.uploadVersionBtn', { version: (updatingDoc.version || 1) + 1 })}
                             </button>
                         </div>
                     </form>
@@ -628,10 +661,10 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             )}
             {historyDoc && (
                 <Modal onClose={() => setHistoryDoc(null)}>
-                    <h3 className="font-title-lg text-title-lg mb-1">Version history</h3>
-                    <p className="text-xs text-outline mb-4">{humanize(historyDoc.documentType)}</p>
+                    <h3 className="font-title-lg text-title-lg mb-1">{t('detail.documents.historyTitle')}</h3>
+                    <p className="text-xs text-outline mb-4">{getDocTypeLabel(historyDoc.documentType)}</p>
                     {historyLoading ? (
-                        <p className="text-sm text-on-surface-variant">Loading...</p>
+                        <p className="text-sm text-on-surface-variant">{t('common.loading')}</p>
                     ) : (
                         <ul className="divide-y divide-outline-variant/30 mb-4 max-h-72 overflow-y-auto">
                             {versions.map((v) => (
@@ -642,7 +675,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                             <span className="truncate">{v.fileName}</span>
                                             {v.isCurrent && (
                                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                                                    Current
+                                                    {t('detail.documents.currentBadge')}
                                                 </span>
                                             )}
                                         </div>
@@ -656,16 +689,16 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         </ul>
                     )}
                     <div className="flex justify-end">
-                        <button type="button" onClick={() => setHistoryDoc(null)} className={btnOutline}>Close</button>
+                        <button type="button" onClick={() => setHistoryDoc(null)} className={btnOutline}>{t('common.close')}</button>
                     </div>
                 </Modal>
             )}
             <ConfirmDialog
                 open={!!deleting}
                 danger
-                title="Delete this document?"
-                message={`"${deleting?.fileName}" will be permanently deleted.`}
-                confirmLabel="Delete"
+                title={t('detail.documents.deleteTitle')}
+                message={t('detail.documents.deleteMessage', { name: deleting?.fileName })}
+                confirmLabel={t('common.delete')}
                 busy={loading}
                 onConfirm={remove}
                 onCancel={() => setDeleting(null)}
@@ -676,6 +709,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
 
 /* ---------- Nhật ký hoạt động (mặc định 30 ngày gần nhất) ---------- */
 function ActivitySection({ vaultId }) {
+    const { t } = useTranslation('vault');
     const [page, setPage] = useState(0);
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
@@ -684,22 +718,29 @@ function ActivitySection({ vaultId }) {
         setError('');
         ownerApi.getActivityLogs(vaultId, { page, size: 10 })
             .then(setData)
-            .catch((err) => setError(getErrorMessage(err, 'Could not load activity.')));
-    }, [vaultId, page]);
+            .catch((err) => setError(getErrorMessage(err, t('detail.activity.loadError'))));
+    }, [vaultId, page, t]);
 
     const rows = data?.content ?? [];
     const totalPages = data?.totalPages ?? 0;
 
     return (
-        <Card title="Activity log" icon="history">
+        <Card title={t('detail.activity.title')} icon="history">
             <Alert>{error}</Alert>
-            {!data && !error && <p className="text-sm text-on-surface-variant">Loading...</p>}
-            {data && rows.length === 0 && ( <EmptyState compact icon="history" title="No activity yet" text="Changes to this vault will be recorded here." /> )}
+            {!data && !error && <p className="text-sm text-on-surface-variant">{t('common.loading')}</p>}
+            {data && rows.length === 0 && (
+                <EmptyState compact icon="history" title={t('detail.activity.emptyTitle')} text={t('detail.activity.emptyText')} />
+            )}
             {rows.length > 0 && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="text-on-surface-variant">
-                        <tr><th className="py-2 pr-4">Time</th><th className="py-2 pr-4">Action</th><th className="py-2 pr-4">By</th><th className="py-2">Details</th></tr>
+                        <tr>
+                            <th className="py-2 pr-4">{t('detail.activity.timeCol')}</th>
+                            <th className="py-2 pr-4">{t('detail.activity.actionCol')}</th>
+                            <th className="py-2 pr-4">{t('detail.activity.byCol')}</th>
+                            <th className="py-2">{t('detail.activity.detailsCol')}</th>
+                        </tr>
                         </thead>
                         <tbody>
                         {rows.map((r) => (
@@ -716,9 +757,9 @@ function ActivitySection({ vaultId }) {
             )}
             {totalPages > 1 && (
                 <div className="flex justify-between items-center mt-4 text-sm">
-                    <button onClick={() => setPage((p) => p - 1)} disabled={page === 0} className="font-semibold text-secondary disabled:text-outline">← Previous</button>
-                    <span className="text-on-surface-variant">Page {page + 1} / {totalPages}</span>
-                    <button onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages} className="font-semibold text-secondary disabled:text-outline">Next →</button>
+                    <button onClick={() => setPage((p) => p - 1)} disabled={page === 0} className="font-semibold text-secondary disabled:text-outline">{t('detail.activity.previous')}</button>
+                    <span className="text-on-surface-variant">{t('detail.activity.pageInfo', { page: page + 1, total: totalPages })}</span>
+                    <button onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages} className="font-semibold text-secondary disabled:text-outline">{t('detail.activity.next')}</button>
                 </div>
             )}
         </Card>
@@ -727,6 +768,7 @@ function ActivitySection({ vaultId }) {
 
 /* ---------- Xoá vault ---------- */
 function DeleteSection({ vaultId }) {
+    const { t } = useTranslation('vault');
     const navigate = useNavigate();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -738,7 +780,7 @@ function DeleteSection({ vaultId }) {
             await ownerApi.deleteVault(vaultId);
             navigate('/owner/vaults');
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not delete the vault.'));
+            setError(getErrorMessage(err, t('detail.danger.deleteError')));
             setOpen(false);
         } finally {
             setLoading(false);
@@ -746,21 +788,21 @@ function DeleteSection({ vaultId }) {
     };
 
     return (
-        <Card title="Danger zone" icon="warning">
+        <Card title={t('detail.danger.title')} icon="warning">
             <Alert>{error}</Alert>
-            <p className="text-sm text-on-surface-variant mb-4">Delete this vault and all its assets and documents.</p>
-            <button onClick={() => setOpen(true)} className={btnDanger}><Icon name="delete" className="text-[18px]" /> Delete vault</button>
+            <p className="text-sm text-on-surface-variant mb-4">{t('detail.danger.description')}</p>
+            <button onClick={() => setOpen(true)} className={btnDanger}><Icon name="delete" className="text-[18px]" /> {t('detail.danger.deleteButton')}</button>
             <ConfirmDialog
                 open={open}
                 danger
-                title="Delete this vault?"
-                message="This cannot be undone."
-                confirmLabel="Delete"
+                title={t('detail.danger.confirmTitle')}
+                message={t('detail.danger.confirmMessage')}
+                confirmLabel={t('common.delete')}
                 busy={loading}
                 onConfirm={remove}
                 onCancel={() => setOpen(false)}
             />
-            <p className="mt-4 text-xs text-outline"><Link to="/owner/vaults" className="text-secondary font-semibold">← Back to my vaults</Link></p>
+            <p className="mt-4 text-xs text-outline"><Link to="/owner/vaults" className="text-secondary font-semibold">{t('detail.danger.backToVaults')}</Link></p>
         </Card>
     );
 }

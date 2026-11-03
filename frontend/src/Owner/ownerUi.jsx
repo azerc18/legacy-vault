@@ -1,35 +1,34 @@
 // Thành phần giao diện dùng chung cho các trang Vault Owner
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import ProtectionBanner from './ProtectionBanner.jsx';
-import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
+import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 
-
-export function Icon({name, className = ''}) {
+export function Icon({ name, className = '' }) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 }
 
 export { formatDate, humanize } from '../i18n/format.js';
 
-// "VAULT_CREATED" -> "Vault created"
 export const ASSET_TYPES = [
-    {value: 'BANK_ACCOUNT', label: 'Bank account'},
-    {value: 'CRYPTO_WALLET', label: 'Crypto wallet'},
-    {value: 'SOCIAL_MEDIA', label: 'Social media'},
-    {value: 'DOCUMENT', label: 'Document'},
-    {value: 'EXCHANGE_ACCOUNT', label: 'Exchange account'},
-    {value: 'E_WALLET', label: 'E-wallet'},
-    {value: 'EMAIL', label: 'Email account'},
-    {value: 'OTHER', label: 'Other'},
+    { value: 'BANK_ACCOUNT', label: 'Bank account' },
+    { value: 'CRYPTO_WALLET', label: 'Crypto wallet' },
+    { value: 'SOCIAL_MEDIA', label: 'Social media' },
+    { value: 'DOCUMENT', label: 'Document' },
+    { value: 'EXCHANGE_ACCOUNT', label: 'Exchange account' },
+    { value: 'E_WALLET', label: 'E-wallet' },
+    { value: 'EMAIL', label: 'Email account' },
+    { value: 'OTHER', label: 'Other' },
 ];
 
 export const DOCUMENT_TYPES = [
-    {value: 'WILL', label: 'Will'},
-    {value: 'OWNERSHIP_PAPER', label: 'Ownership paper'},
-    {value: 'IDENTITY_CARD', label: 'Identity card'},
-    {value: 'OTHER', label: 'Other'},
+    { value: 'WILL', label: 'Will' },
+    { value: 'OWNERSHIP_PAPER', label: 'Ownership paper' },
+    { value: 'IDENTITY_CARD', label: 'Identity card' },
+    { value: 'OTHER', label: 'Other' },
 ];
 
-export function Alert({type = 'error', children}) {
+export function Alert({ type = 'error', children }) {
     if (!children) return null;
     const cls = {
         error: 'bg-error-container text-on-error-container',
@@ -49,13 +48,13 @@ export const btnOutline =
 export const btnDanger =
     'h-11 px-5 rounded-xl bg-error-container text-on-error-container font-bold inline-flex items-center justify-center gap-2 hover:bg-error hover:text-on-error disabled:opacity-60 disabled:cursor-not-allowed';
 
-export function Card({title, icon, children, className = ''}) {
+export function Card({ title, icon, children, className = '' }) {
     return (
         <section
             className={`bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ${className}`}>
             {title && (
                 <h2 className="font-title-lg text-title-lg flex items-center gap-2 mb-4">
-                    {icon && <Icon name={icon} className="text-secondary"/>} {title}
+                    {icon && <Icon name={icon} className="text-secondary" />} {title}
                 </h2>
             )}
             {children}
@@ -64,7 +63,8 @@ export function Card({title, icon, children, className = ''}) {
 }
 
 // Hộp xác nhận (dùng cho thay thế người thụ hưởng / executor, xoá vault)
-export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', danger, busy, onConfirm, onCancel}) {
+export function ConfirmDialog({ open, title, message, confirmLabel, danger, busy, onConfirm, onCancel }) {
+    const { t } = useTranslation('vault');
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
@@ -73,9 +73,9 @@ export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', d
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
                 <div className="mt-6 flex justify-end gap-3">
-                    <button onClick={onCancel} className={btnOutline}>Cancel</button>
+                    <button onClick={onCancel} className={btnOutline}>{t('common.cancel')}</button>
                     <button onClick={onConfirm} disabled={busy} className={danger ? btnDanger : btnPrimary}>
-                        {busy ? 'Please wait...' : confirmLabel}
+                        {busy ? t('common.pleaseWait') : (confirmLabel || t('common.confirm'))}
                     </button>
                 </div>
             </div>
@@ -83,20 +83,20 @@ export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', d
     );
 }
 
-const NAV = [
-    {to: '/owner/vaults', label: 'My vaults', icon: 'inventory_2'},
-    {to: '/owner/dms', label: "Dead Man's Switch", icon: 'favorite'},
-    {to: '/owner/executors', label: 'Executors', icon: 'badge'},
-    {to: '/owner/activity', label: 'Activity', icon: 'history'},
-];
-
-export function OwnerLayout({title, subtitle, back, actions, children}) {
+export function OwnerLayout({ title, subtitle, back, actions, children }) {
+    const { t } = useTranslation('vault');
+    const nav = [
+        { to: '/owner/vaults', label: t('nav.myVaults'), icon: 'inventory_2' },
+        { to: '/owner/dms', label: t('nav.dms'), icon: 'favorite' },
+        { to: '/owner/executors', label: t('nav.executors'), icon: 'badge' },
+        { to: '/owner/activity', label: t('nav.activity'), icon: 'history' },
+    ];
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader nav={NAV}/>
+            <AppHeader nav={nav} />
             <main className={`${PAGE_WIDTH} py-10`}>
-                <ProtectionBanner/>
-                <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>
+                <ProtectionBanner />
+                <PageTitle back={back} title={title} subtitle={subtitle} right={actions} />
                 {children}
             </main>
         </div>
