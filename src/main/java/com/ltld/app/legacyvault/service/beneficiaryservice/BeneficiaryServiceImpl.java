@@ -19,6 +19,10 @@ import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldSpec;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
 import com.ltld.app.legacyvault.utility.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +66,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final String NO_SESSION_MSG = "No verification session. Please start a claim request first.";
     private static final String LOCKED_MSG = "Access is temporarily locked after too many failed verification attempts. Please try again in 24 hours or contact an admin for help.";
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final Set<String> DOSSIER_MASKED_KEYS = Set.of("accountNumber", "accountId");
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
     private static final String CONFIRM_REQUIRED_MSG = "Final confirmation is required to close the handover case.";
@@ -904,9 +909,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                         al.getMode(),
                         al.getSharePercent(),
                         al.getNote(),
-                        !al.getBeneficiary().getId().equals(me.getId())))
+                        !al.getBeneficiary().getId().equals(me.getId()),
+                        dossierFields(al.getAsset())))
                 .toList();
-
         // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
         List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vault.getId()).stream()
                 .map(d -> new InheritanceDossierData.DocumentLine(d.getFileName(), d.getDocumentType(), d.getUploadedAt()))
@@ -977,5 +982,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpCode(null);
         verification.setOtpSentAt(null);
         verification.setOtpExpiresAt(null);
+    }
+
+    private static Map<String, String> dossierFields(DigitalAsset asset) {
+        if (asset.getPublicFieldsJson() == null) return Map.of();
+        Map<String, String> raw = FlatJson.decode(asset.getPublicFieldsJson());
+        AssetSchema schema = AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        Map<String, String> out = new LinkedHashMap<>();
+        if (schema != null) {
+            for (AssetFieldSpec f : schema.fields()) {
+                String v = raw.get(f.key());
+                if (f.sensitive() || v == null || v.isBlank()) continue;
+                out.put(f.key(), mask(f.key(), v));
+            }
+        }
+        return out;
+    }
+
+    private static String mask(String key, String v) {
+        return DOSSIER_MASKED_KEYS.contains(key) && v.length() > 4 ? "****" + v.substring(v.length() - 4) : v;
     }
 }
