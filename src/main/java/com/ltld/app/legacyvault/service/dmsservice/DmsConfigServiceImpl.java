@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
@@ -20,6 +21,10 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -60,7 +65,27 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     @Override
     @Transactional(readOnly = true)
     public DmsConfigResponse getConfig(UUID ownerId) {
-        return toResponse(findConfig(ownerId));
+        // FR-03: chưa cấu hình không phải lỗi với màn hình trạng thái; các luồng khác vẫn 404 qua findConfig.
+        return dmsConfigRepository.findByOwnerId(ownerId)
+                .map(this::toResponse)
+                .orElseGet(() -> DmsConfigResponse.builder()
+                        .configured(false)
+                        // Cùng điều kiện bật DMS lần đầu của upsertConfig.
+                        .hasUsableExecutor(executorAssignmentRepository.findAllByOwnerId(ownerId).stream()
+                                .anyMatch(ExecutorActivationRule::isUsablePrimary))
+                        .build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<DmsCheckinResponse> getCheckins(UUID ownerId, Pageable pageable) {
+        // FR-03: mới nhất trước; id phá hòa để phân trang ổn định khi trùng occurredAt.
+        Pageable newestFirst = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                Sort.by(Sort.Order.desc("occurredAt"), Sort.Order.desc("id")));
+        return dmsConfigRepository.findByOwnerId(ownerId)
+                .map(config -> dmsCheckinRepository.findByDmsConfigId(config.getId(), newestFirst)
+                        .map(this::toCheckinResponse))
+                .orElseGet(() -> Page.empty(newestFirst));
     }
 
     // FR-03: READ_COMMITTED như FR-06. Với REPEATABLE READ, findByOwnerIdForUpdate trên dòng chưa có sẽ khóa gap
@@ -121,6 +146,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             }
             throw e;
         }
+        // FR-03: lưu cấu hình (tạo mới lẫn cập nhật) luôn bắt đầu chu kỳ mới như một lần check-in.
+        recordOwnerResponded(config, now);
 
         // Ghi audit SAU flush: audit vẫn được lưu khi rollback nên không được ghi cho thay đổi chưa chắc thành công.
         audit(AuditAction.DMS_CONFIGURED, owner, config, "created=" + created
@@ -134,7 +161,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     @Transactional
     public DmsConfigResponse checkIn(UUID ownerId) {
         DmsConfig config = findConfig(ownerId);
-        if (config.getStatus() != DmsStatus.ACTIVE) {
+        // [X2 / Sửa #5]: cho phép Owner check-in khi DMS đang ACTIVE hoặc đang chờ xác nhận chéo (PENDING_CONFIRMATION)
+        if (config.getStatus() != DmsStatus.ACTIVE && config.getStatus() != DmsStatus.PENDING_CONFIRMATION) {
             // TRIGGERED: SRS không cho Owner hủy quy trình bàn giao đã kích hoạt bằng check-in.
             // SUSPENDED (Q28): chỉ Admin gỡ được.
             throw new DmsException(switch (config.getStatus()) {
@@ -146,13 +174,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         assertScheduleComplete(config);
 
         LocalDateTime now = LocalDateTime.now();
+        config.setStatus(DmsStatus.ACTIVE);
         startNewCycle(config, now);
         config = dmsConfigRepository.saveAndFlush(config);
-        dmsCheckinRepository.saveAndFlush(DmsCheckin.builder()
-                .dmsConfig(config)
-                .checkinType(DmsCheckinType.OWNER_RESPONDED)
-                .occurredAt(now)
-                .build());
+        recordOwnerResponded(config, now);
 
         audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
                 "nextCheckinDueAt=" + config.getNextCheckinDueAt());
@@ -264,10 +289,21 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         DmsSchedule schedule = scheduleCalculator.calculate(now, config.getCheckinIntervalDays(),
                 config.getGracePeriodDays(), config.getReminderCount());
         config.setLastCheckinAt(now);
+        config.setCycleStartedAt(now);          // X2 (m3): mốc chu kỳ nhắc trùng lần check-in thật
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
+        config.setConfirmationDeferrals(0);     // X2 (m2): Owner tự check-in / lưu cấu hình thì đếm ALIVE lại từ 0
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
+    }
+
+    // occurredAt = mốc vừa truyền vào startNewCycle (= lastCheckinAt). Gọi sau khi đã lưu DmsConfig.
+    private void recordOwnerResponded(DmsConfig config, LocalDateTime now) {
+        dmsCheckinRepository.saveAndFlush(DmsCheckin.builder()
+                .dmsConfig(config)
+                .checkinType(DmsCheckinType.OWNER_RESPONDED)
+                .occurredAt(now)
+                .build());
     }
 
     // vaultId = null: DMS gắn với Owner, không với một Vault cụ thể.
@@ -295,6 +331,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 ? config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays())
                 : null;
         return DmsConfigResponse.builder()
+                .configured(true)
                 .status(config.getStatus())
                 .checkinIntervalDays(config.getCheckinIntervalDays())
                 .gracePeriodDays(config.getGracePeriodDays())
@@ -309,6 +346,14 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .hasUsableExecutor(config.getStatus() == DmsStatus.TRIGGERED
                         ? null
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
+                .build();
+    }
+
+    private DmsCheckinResponse toCheckinResponse(DmsCheckin checkin) {
+        return DmsCheckinResponse.builder()
+                .checkinType(checkin.getCheckinType())
+                .channel(checkin.getChannel())
+                .occurredAt(checkin.getOccurredAt())
                 .build();
     }
 }

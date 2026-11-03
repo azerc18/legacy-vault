@@ -1,1 +1,148 @@
-{}
+{
+  "workspace": "Quản trị",
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo" },
+  "loading": "Đang tải...",
+  "wait": "Vui lòng chờ...",
+  "search": "Tìm",
+  "reset": "Đặt lại",
+  "allStatuses": "Mọi trạng thái",
+  "actionFailed": "Thao tác thất bại.",
+  "dialog": { "reasonPlaceholder": "Lý do (không bắt buộc, tối đa 255 ký tự)" },
+  "pager": { "prev": "Trước", "next": "Sau", "page": "Trang {{page}} / {{total}}" },
+
+  "users": {
+    "title": "Người dùng",
+    "subtitle": "Quản lý tài khoản, quyền truy cập và tạm dừng Dead Man's Switch.",
+    "searchPlaceholder": "Tìm theo email hoặc tên",
+    "allRoles": "Mọi vai trò",
+    "loadError": "Không tải được danh sách người dùng.",
+    "empty": { "title": "Không tìm thấy người dùng", "text": "Kiểm tra lại chính tả hoặc bỏ bộ lọc vai trò và trạng thái." },
+    "cols": { "user": "Người dùng", "status": "Trạng thái", "roles": "Vai trò", "lastLogin": "Đăng nhập gần nhất", "actions": "Thao tác" },
+    "you": "bạn",
+    "joined": "Tham gia {{date}}",
+    "status": { "ACTIVE": "Hoạt động", "LOCKED": "Đã khoá", "PENDING": "Chờ xác minh" },
+    "dms": { "ACTIVE": "DMS đang chạy", "SUSPENDED": "DMS tạm dừng", "TRIGGERED": "DMS đã kích hoạt" },
+    "actions": {
+      "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",
+      "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản",
+      "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành"
+    },
+    "success": {
+      "lock": "Đã khoá {{email}}.",
+      "unlock": "Đã mở khoá {{email}}.",
+      "grant": "Đã cấp {{role}} cho {{email}}. Người dùng cần đăng nhập lại.",
+      "revoke": "Đã gỡ {{role}} khỏi {{email}}.",
+      "suspend": "Đã tạm dừng Dead Man's Switch của {{email}}.",
+      "resume": "Đã tiếp tục Dead Man's Switch của {{email}}.",
+      "rescue": "{{executor}} giờ là người thi hành của {{email}} và sẽ nhận email kích hoạt trong vài phút."
+    },
+    "dialog": {
+      "lock": { "title": "Khoá tài khoản này?", "message": "{{email}} sẽ không thể đăng nhập.", "confirm": "Khoá" },
+      "unlock": { "title": "Mở khoá tài khoản này?", "message": "{{email}} sẽ đăng nhập lại được.", "confirm": "Mở khoá" },
+      "grant": { "title": "Cấp vai trò {{role}}?", "message": "{{email}} sẽ có quyền {{role}} sau khi đăng nhập lại.", "confirm": "Cấp" },
+      "revoke": { "title": "Gỡ vai trò {{role}}?", "message": "{{email}} sẽ mất quyền {{role}}.", "confirm": "Gỡ" },
+      "suspend": { "title": "Tạm dừng Dead Man's Switch?", "message": "Bộ đếm của {{email}} sẽ dừng cho đến khi được tiếp tục. Chủ kho không thể tự tiếp tục.", "confirm": "Tạm dừng" },
+      "resume": { "title": "Tiếp tục Dead Man's Switch?", "message": "Bộ đếm của {{email}} sẽ chạy lại.", "confirm": "Tiếp tục" },
+      "rescue": { "title": "Chỉ định người thi hành khẩn cấp?", "message": "Dead Man's Switch của {{email}} đã kích hoạt nhưng không có người thi hành nào hoạt động được. Người bạn nhập sẽ trở thành người thi hành chính ngay lập tức và phải có tài khoản LegacyVault đã xác minh.", "confirm": "Chỉ định & kích hoạt" }
+    }
+  },
+
+  "roles": {
+    "title": "Vai trò & quyền",
+    "subtitle": "Tạo vai trò tuỳ chỉnh và chọn các quyền mà mỗi vai trò được cấp.",
+    "newRole": "Vai trò mới",
+    "system": "Hệ thống",
+    "edit": "Sửa",
+    "delete": "Xoá",
+    "cols": { "role": "Vai trò", "permissions": "Quyền", "actions": "Thao tác" },
+    "loadError": "Không tải được danh sách vai trò.",
+    "saveError": "Không lưu được vai trò.",
+    "deleteError": "Không xoá được vai trò.",
+    "created": "Đã tạo vai trò {{code}}.",
+    "updated": "Đã cập nhật vai trò {{code}}. Người dùng nhận quyền mới trong vòng 15 phút hoặc sau khi đăng nhập lại.",
+    "deleted": "Đã xoá vai trò {{code}}.",
+    "deleteDialog": { "title": "Xoá vai trò {{code}}?", "message": "Không thể hoàn tác. Hãy gỡ vai trò này khỏi mọi người dùng trước." },
+    "form": {
+      "editTitle": "Sửa {{code}}",
+      "code": "Mã", "codePlaceholder": "VD: AUDITOR",
+      "name": "Tên", "namePlaceholder": "VD: Kiểm toán viên",
+      "description": "Mô tả", "optional": "Không bắt buộc",
+      "codeError": "3–50 ký tự: A–Z, 0–9 hoặc _, bắt đầu bằng chữ cái.",
+      "nameError": "Vui lòng nhập tên.",
+      "authError": "Chọn ít nhất một quyền.",
+      "adminRequired": "Bắt buộc với vai trò ADMIN",
+      "create": "Tạo vai trò", "save": "Lưu thay đổi"
+    }
+  },
+
+  "vaults": {
+    "title": "Kho",
+    "subtitle": "Tất cả kho trong hệ thống. Nội dung tài sản không bao giờ hiển thị ở đây.",
+    "total_other": "{{count}} kho",
+    "loadError": "Không tải được danh sách kho.",
+    "openError": "Không mở được kho này.",
+    "empty": { "title": "Không có kho nào", "text": "Thử bộ lọc trạng thái khác." },
+    "status": { "ACTIVE": "Hoạt động", "UNLOCKED": "Đã mở khoá", "CLAIMED": "Đã nhận", "ARCHIVED_LOCKED": "Đã lưu trữ" },
+    "cols": { "vault": "Kho", "status": "Trạng thái", "created": "Ngày tạo", "updated": "Cập nhật" },
+    "details": "Chi tiết",
+    "detail": {
+      "owner": "Chủ kho: {{email}}",
+      "assetsDocs": "Tài sản / tài liệu",
+      "deadline": "Hạn nhận",
+      "extensionsUsed": "Số lần gia hạn",
+      "maxReached": "Thời hạn nhận đã được gia hạn {{max}} lần.",
+      "auditNote": "Việc admin xem kho được ghi vào nhật ký."
+    },
+    "extend": {
+      "title": "Gia hạn thời hạn nhận",
+      "hint": "Dùng khi người thụ hưởng cần thêm thời gian (VD: thủ tục pháp lý chậm). Chỉ người thụ hưởng chưa phản hồi mới nhận hạn mới.",
+      "days_other": "+{{count}} ngày",
+      "reasonPlaceholder": "Lý do (bắt buộc)",
+      "reasonRequired": "Vui lòng nhập lý do.",
+      "submit": "Gia hạn",
+      "success_other": "Đã gia hạn đến {{date}}. Còn {{count}} lần gia hạn.",
+      "error": "Không gia hạn được thời hạn nhận."
+    }
+  },
+
+  "audit": {
+    "title": "Nhật ký",
+    "subtitle": "Mọi thao tác liên quan bảo mật trong hệ thống. Mặc định hiển thị 30 ngày gần nhất.",
+    "allActions": "Mọi hành động",
+    "actorEmail": "Email người thực hiện",
+    "ip": "Địa chỉ IP",
+    "from": "Từ",
+    "to": "Đến",
+    "loadError": "Không tải được nhật ký.",
+    "empty": { "title": "Không có bản ghi nào khớp bộ lọc", "text": "Thử khoảng thời gian rộng hơn hoặc bỏ bộ lọc hành động và người dùng." },
+    "cols": { "time": "Thời gian", "action": "Hành động", "result": "Kết quả", "actor": "Người thực hiện", "detail": "Chi tiết" },
+    "result": { "SUCCESS": "Thành công", "FAILURE": "Thất bại" },
+    "system": "Hệ thống",
+    "expand": { "entity": "Đối tượng", "vault": "Kho", "actorId": "ID người thực hiện", "userAgent": "Trình duyệt" }
+  },
+
+  "alerts": {
+    "title": "Cảnh báo bảo mật",
+    "subtitle": "Hoạt động đáng ngờ được phát hiện từ nhật ký mỗi 5 phút. Cảnh báo CAO cũng được gửi email cho admin.",
+    "tabs": { "open": "Đang mở", "acknowledged": "Đã xử lý" },
+    "loadError": "Không tải được cảnh báo.",
+    "ackError": "Không xác nhận được cảnh báo.",
+    "acknowledgedMsg": "Đã xác nhận cảnh báo.",
+    "empty": {
+      "openTitle": "Không có gì bất thường", "openText": "Thông báo gửi lỗi và bàn giao bị kẹt sẽ hiện ở đây.",
+      "ackTitle": "Chưa có cảnh báo nào được xử lý", "ackText": "Cảnh báo bạn xác nhận sẽ được liệt kê ở đây."
+    },
+    "severity": { "HIGH": "CAO", "MEDIUM": "TRUNG BÌNH" },
+    "rules": {
+      "ACCOUNT_LOCKED": "Tài khoản bị khoá do đăng nhập sai nhiều lần",
+      "LOGIN_FAILURES_FROM_IP": "Nhiều lần đăng nhập sai từ một IP",
+      "REFRESH_TOKEN_REUSE": "Refresh token bị dùng lại (có thể bị đánh cắp)",
+      "MASS_DOWNLOAD": "Một người dùng tải xuống hàng loạt",
+      "ADMIN_ROLE_GRANTED": "Đã cấp vai trò ADMIN"
+    },
+    "meta_other": "{{count}} sự kiện · đầu tiên {{first}} · gần nhất {{last}}",
+    "acknowledgedAt": "xác nhận lúc {{date}}",
+    "viewLogs": "Xem nhật ký",
+    "acknowledge": "Xác nhận"
+  }
+}

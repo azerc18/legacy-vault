@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
@@ -15,6 +16,7 @@ const RESULT_CLS = {
 };
 
 export default function AdminAuditLogs() {
+    const { t } = useTranslation('admin');
     const [params] = useSearchParams();
     // Cho phép mở sẵn bộ lọc từ trang Alerts: /admin/audit-logs?ip=...&action=...
     const initial = {
@@ -38,8 +40,8 @@ export default function AdminAuditLogs() {
         setError('');
         adminApi.searchAuditLogs({ ...query, from: toIso(query.from), to: toIso(query.to), page, size: 50 })
             .then(setData)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load audit logs.')));
-    }, [query, page]);
+            .catch((e) => setError(getErrorMessage(e, t('audit.loadError'))));
+    }, [query, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { load(); }, [load]);
 
@@ -52,30 +54,30 @@ export default function AdminAuditLogs() {
     const rows = data?.content ?? [];
 
     return (
-        <AdminLayout title="Audit log" subtitle="Every security-relevant action in the system. Defaults to the last 30 days.">
+        <AdminLayout title={t('audit.title')} subtitle={t('audit.subtitle')}>
             <form onSubmit={search} className="grid gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-[200px_1fr_160px_190px_190px_auto]">
                 <select value={filters.action} onChange={set('action')} className={inputClass}>
-                    <option value="">All actions</option>
+                    <option value="">{t('audit.allActions')}</option>
                     {actions.map((a) => <option key={a} value={a}>{a}</option>)}
                 </select>
-                <input value={filters.actorEmail} onChange={set('actorEmail')} placeholder="Actor email" className={inputClass} />
-                <input value={filters.ip} onChange={set('ip')} placeholder="IP address" className={inputClass} />
-                <input type="datetime-local" value={filters.from} onChange={set('from')} className={inputClass} title="From" />
-                <input type="datetime-local" value={filters.to} onChange={set('to')} className={inputClass} title="To" />
+                <input value={filters.actorEmail} onChange={set('actorEmail')} placeholder={t('audit.actorEmail')} className={inputClass} />
+                <input value={filters.ip} onChange={set('ip')} placeholder={t('audit.ip')} className={inputClass} />
+                <input type="datetime-local" value={filters.from} onChange={set('from')} className={inputClass} title={t('audit.from')} />
+                <input type="datetime-local" value={filters.to} onChange={set('to')} className={inputClass} title={t('audit.to')} />
                 <div className="flex gap-2">
                     <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center gap-2">
-                        <Icon name="search" className="text-[18px]" /> Search
+                        <Icon name="search" className="text-[18px]" /> {t('search')}
                     </button>
-                    <button type="button" onClick={reset} className="h-11 px-3 rounded-xl border border-outline-variant text-sm font-semibold">Reset</button>
+                    <button type="button" onClick={reset} className="h-11 px-3 rounded-xl border border-outline-variant text-sm font-semibold">{t('reset')}</button>
                 </div>
             </form>
 
             <Alert>{error}</Alert>
 
-            {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
+            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
             {data && rows.length === 0 && (
-                <EmptyState bordered icon="manage_search" title="No log entries match these filters"
-                            text="Try a wider date range or clear the action and user filters." />
+                <EmptyState bordered icon="manage_search" title={t('audit.empty.title')}
+                            text={t('audit.empty.text')} />
             )}
 
             {rows.length > 0 && (
@@ -83,12 +85,12 @@ export default function AdminAuditLogs() {
                     <table className="w-full text-sm text-left">
                         <thead className="bg-surface-container-low text-on-surface-variant">
                         <tr>
-                            <th className="p-4">Time</th>
-                            <th className="p-4">Action</th>
-                            <th className="p-4">Result</th>
-                            <th className="p-4">Actor</th>
+                            <th className="p-4">{t('audit.cols.time')}</th>
+                            <th className="p-4">{t('audit.cols.action')}</th>
+                            <th className="p-4">{t('audit.cols.result')}</th>
+                            <th className="p-4">{t('audit.cols.actor')}</th>
                             <th className="p-4">IP</th>
-                            <th className="p-4">Detail</th>
+                            <th className="p-4">{t('audit.cols.detail')}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -100,10 +102,10 @@ export default function AdminAuditLogs() {
                                     <td className="p-4 font-mono text-xs font-semibold">{l.action}</td>
                                     <td className="p-4">
                                         {l.result && (
-                                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RESULT_CLS[l.result] || ''}`}>{l.result}</span>
+                                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RESULT_CLS[l.result] || ''}`}>{t(`audit.result.${l.result}`, { defaultValue: l.result })}</span>
                                         )}
                                     </td>
-                                    <td className="p-4">{l.actorEmail || <span className="text-outline">System</span>}</td>
+                                    <td className="p-4">{l.actorEmail || <span className="text-outline">{t('audit.system')}</span>}</td>
                                     <td className="p-4 font-mono text-xs">{l.ipAddress || '—'}</td>
                                     <td className="p-4 text-on-surface-variant max-w-xs truncate">{l.detail || '—'}</td>
                                 </tr>
@@ -111,11 +113,11 @@ export default function AdminAuditLogs() {
                                     <tr className="bg-surface-container-low">
                                         <td colSpan={6} className="px-4 pb-4 text-xs text-on-surface-variant">
                                             <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1">
-                                                <span><b>Detail:</b> {l.detail || '—'}</span>
-                                                <span><b>Entity:</b> {l.entityType ? `${l.entityType} ${l.entityId || ''}` : '—'}</span>
-                                                <span><b>Vault:</b> {l.vaultId || '—'}</span>
-                                                <span><b>Actor ID:</b> {l.actorId || '—'}</span>
-                                                <span className="sm:col-span-2 break-all"><b>User agent:</b> {l.userAgent || '—'}</span>
+                                                <span><b>{t('audit.cols.detail')}:</b> {l.detail || '—'}</span>
+                                                <span><b>{t('audit.expand.entity')}:</b> {l.entityType ? `${l.entityType} ${l.entityId || ''}` : '—'}</span>
+                                                <span><b>{t('audit.expand.vault')}:</b> {l.vaultId || '—'}</span>
+                                                <span><b>{t('audit.expand.actorId')}:</b> {l.actorId || '—'}</span>
+                                                <span className="sm:col-span-2 break-all"><b>{t('audit.expand.userAgent')}:</b> {l.userAgent || '—'}</span>
                                             </div>
                                         </td>
                                     </tr>

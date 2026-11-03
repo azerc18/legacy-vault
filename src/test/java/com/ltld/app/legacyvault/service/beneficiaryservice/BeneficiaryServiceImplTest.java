@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.ClaimProgressResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
@@ -25,6 +26,7 @@ import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
+import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -73,6 +75,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -129,6 +132,8 @@ public class BeneficiaryServiceImplTest {
     private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock
     private AssetAllocationRepository assetAllocationRepository;
+    @Mock
+    private JointConsensusService jointConsensusService;   // X1
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -1624,7 +1629,7 @@ public class BeneficiaryServiceImplTest {
     private void stubDownloadableDocument(UUID docId, String fileName) throws Exception {
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, fileName)));
         when(fileStorageService.readFile("uploads/stored.bin")).thenReturn(new byte[]{1, 2, 3});
         when(cryptoService.decryptBytes(any(byte[].class))).thenReturn("noi-dung-goc".getBytes(StandardCharsets.UTF_8));
@@ -1634,7 +1639,7 @@ public class BeneficiaryServiceImplTest {
     void getVaultDocuments_withViewSession_returnsSummariesWithoutDecrypting() {
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(
+        when(legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vaultId)).thenReturn(List.of(
                 legalDocument(UUID.randomUUID(), "di-chuc.pdf"),
                 legalDocument(UUID.randomUUID(), "so-do.png")));
 
@@ -1741,7 +1746,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.empty());
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId)).thenReturn(Optional.empty());
 
         expectError(HttpStatus.NOT_FOUND,
                 () -> beneficiaryService.downloadVaultDocument(vaultId, docId, currentUserId));
@@ -1756,7 +1761,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any())).thenThrow(new IOException("/secret/server/path"));
 
@@ -1777,7 +1782,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any()))
                 .thenThrow(new StorageUnavailableException("File storage is unavailable.", null));
@@ -1795,7 +1800,7 @@ public class BeneficiaryServiceImplTest {
         UUID docId = UUID.randomUUID();
         stubAccessibleVault();
         stubViewSession(true);
-        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId))
+        when(legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(docId, vaultId))
                 .thenReturn(Optional.of(legalDocument(docId, "di-chuc.pdf")));
         when(fileStorageService.readFile(any())).thenReturn(new byte[]{1});
         when(cryptoService.decryptBytes(any(byte[].class))).thenThrow(new RuntimeException("boom"));
@@ -2181,5 +2186,360 @@ public class BeneficiaryServiceImplTest {
         assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
         assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
         verify(vaultRepository, never()).save(any());
+    }
+
+
+    // ===================== X1: review PR #164 =====================
+
+    // Mục 1: joint chỉ kẹt khi còn ít hơn K người nhận được; còn đủ K thì không báo stalled
+    @Test
+    void declineClaim_jointAsset_enoughLeft_notStalled() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(jointConsensusService.isStalled(any())).thenReturn(false);
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getStalledAssets()).isZero();
+        assertThat(response.getReassignedAssets()).isZero();
+        verify(auditLogService, never()).log(eq(AuditAction.CLAIM_STALLED), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void declineClaim_jointAsset_tooFewLeft_isStalledAndAudited() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(jointConsensusService.isStalled(any())).thenReturn(true);
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getStalledAssets()).isEqualTo(1);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_STALLED), eq(AuditResult.FAILURE), eq(currentUserId),
+                any(), eq("Vault"), eq(vaultId.toString()), any());
+    }
+
+    // Mục 1: còn tài sản joint thiếu người thì vault không sang CLAIMED
+    @Test
+    void closeVault_jointStalled_vaultStaysUnlocked() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+        when(jointConsensusService.countStalledAssets(vaultId)).thenReturn(1L);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(vaultRepository, never()).save(any());
+    }
+
+    // Mục 2: đóng hồ sơ tự ghi nhận đồng ý với các tài sản joint đang giữ
+    @Test
+    void closeVault_autoApprovesHeldJointAssets_andAudits() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of());
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+        when(jointConsensusService.approveAllHeldBy(eq(vaultId), any())).thenReturn(2);
+
+        beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        verify(jointConsensusService).approveAllHeldBy(eq(vaultId), any());
+        verify(auditLogService).log(eq(AuditAction.ASSET_CONSENSUS_APPROVED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), eq("autoApprovedOnClose=2"));
+    }
+
+
+    // ===================== N2-access: chỉ thấy tài sản được phân bổ cho mình =====================
+
+    @Test
+    void getInheritedAssets_excludesAssetsAllocatedToOthers() {
+        stubAccessibleVault();
+        stubViewSession(true);
+        UUID mineId = UUID.randomUUID();
+        UUID othersId = UUID.randomUUID();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(mineId, "Vietcombank", AssetType.BANK_ACCOUNT),
+                asset(othersId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(othersId));
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Vietcombank");
+    }
+
+    @Test
+    void getInheritedAssetDetail_assetAllocatedToOther_throws403_andDoesNotDecrypt() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(assetId));
+
+        BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU);
+        verifyNoInteractions(cryptoService);
+        verify(assetAccessRecordRepository, never()).insertIfAbsent(any(), any(), any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void previewClose_countsOnlyAssetsHeldByMe() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset mine1 = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset mine2 = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(mine1, mine2, others));
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(mine2, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+
+        CloseVaultPreviewResponse preview = beneficiaryService.previewClose(vaultId, currentUserId);
+
+        assertThat(preview.getTotalAssets()).isEqualTo(2);
+        assertThat(preview.getViewedCount()).isEqualTo(1);
+        assertThat(preview.getUnviewedCount()).isEqualTo(1);
+        assertThat(preview.getUnviewedAssets()).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Gmail");
+    }
+
+    @Test
+    void closeVault_ignoresAssetsAllocatedToOthers_whenAllMyAssetsViewed() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        // Tài sản của người khác đương nhiên "chưa được claim này xem", nhưng không được tính vào phần của mình
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(others));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(response.getClaimStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()),
+                eq("unviewedCount=0, unviewedAssetIds=[]"));
+    }
+
+    @Test
+    void downloadInheritedAsset_assetAllocatedToOther_throws403_andDoesNotDecrypt() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(assetId));
+
+        BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU);
+        verifyNoInteractions(cryptoService);
+        verify(assetAccessRecordRepository, never()).insertIfAbsent(any(), any(), any(), any());
+        verifyNoInteractions(auditLogService);   // không ghi ASSET_DOWNLOADED
+    }
+
+    // Giữ cho phép trừ "- hidden.size()" ở closeVault: nếu bị gỡ nhầm thì ca này sẽ trả 409 thay vì 400
+    @Test
+    void closeVault_myAssetUnviewedAndOthersCounted_throws400_andChangesNothing() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset mine = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(mine, others));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+
+        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(ex.getMessage()).contains("at least one asset");
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    // Q47 phương án b: tài sản chưa có dòng phân bổ nào thì không bị ẩn
+    @Test
+    void getInheritedAssets_assetWithoutAllocation_isVisible() {
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(UUID.randomUUID(), "Sổ tiết kiệm", AssetType.BANK_ACCOUNT)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of());
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Sổ tiết kiệm");
+    }
+
+    @Test
+    void getInheritedAssetDetail_assetWithoutAllocation_isViewable() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubDecryptableAsset(assetId);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of());
+
+        InheritedAssetDetailResponse detail =
+                beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+
+        assertThat(detail.getId()).isEqualTo(assetId);
+        verify(assetAccessRecordRepository).insertIfAbsent(any(), any(), eq(assetId), any());
+    }
+
+
+    // ===================== N2-notify: tiến độ theo tài sản + thông báo fallback =====================
+
+    @Test
+    void getClaimProgress_listsOnlyMyAssets_withAllocationInfo() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset proportional = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset viaFallback = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        VaultBeneficiary declinedOne = otherRow(BeneficiaryInviteStatus.DECLINED);
+        AssetAllocation alProportional = AssetAllocation.builder().id(UUID.randomUUID()).asset(proportional)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("60.00")).build();
+        AssetAllocation alFallback = AssetAllocation.builder().id(UUID.randomUUID()).asset(viaFallback)
+                .beneficiary(declinedOne).contingentBeneficiary(beneficiaryRow)
+                .effectiveBeneficiary(beneficiaryRow).mode(AllocationMode.EXCLUSIVE).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(proportional, viaFallback, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(alProportional, alFallback));
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(viaFallback));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(declinedOne, beneficiaryRow));
+
+        ClaimProgressResponse response = beneficiaryService.getClaimProgress(vaultId, currentUserId);
+
+        assertThat(response.getTotalAssets()).isEqualTo(2);
+        assertThat(response.getViewedAssets()).isEqualTo(1);
+        assertThat(response.getTotalBeneficiaries()).isEqualTo(1);
+        assertThat(response.getDeclinedBeneficiaries()).isEqualTo(1);
+        assertThat(response.getAssets()).extracting(ClaimProgressResponse.AssetProgress::getAssetName)
+                .containsExactly("Vietcombank", "Gmail");
+        ClaimProgressResponse.AssetProgress first = response.getAssets().get(0);
+        assertThat(first.getAllocationMode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(first.getSharePercent()).isEqualByComparingTo("60.00");
+        assertThat(first.isReassignedToMe()).isFalse();
+        assertThat(first.isViewed()).isTrue();
+        ClaimProgressResponse.AssetProgress second = response.getAssets().get(1);
+        assertThat(second.isReassignedToMe()).isTrue();
+        assertThat(second.getSharePercent()).isNull();
+        assertThat(second.isViewed()).isFalse();
+    }
+
+    @Test
+    void getClaimProgress_noViewSession_throws403() {
+        stubClaimForClose();
+        stubViewSession(false);
+
+        expectError(HttpStatus.FORBIDDEN, () -> beneficiaryService.getClaimProgress(vaultId, currentUserId));
+
+        verify(digitalAssetRepository, never()).findByVaultIdAndStatus(any(), any());
+    }
+
+    @Test
+    void declineClaim_withContingent_notifiesReceiverInApp() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
+        AssetAllocation al = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification saved = captor.getValue();
+        assertThat(saved.getRecipient()).isSameAs(contingent.getUser());
+        assertThat(saved.getType()).isEqualTo(NotificationType.ASSET_REASSIGNED);
+        assertThat(saved.getChannel()).isEqualTo(NotificationChannel.IN_APP);
+        assertThat(saved.getReferenceId()).isEqualTo(vaultId);
+        assertThat(saved.getContent()).contains("1 asset(s)");
+    }
+
+    @Test
+    void declineClaim_twoAssetsToSameReceiver_sendsOneNotification() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
+        AssetAllocation al1 = allocation(beneficiaryRow, contingent);
+        AssetAllocation al2 = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al1, al2));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository, times(1)).save(captor.capture());
+        assertThat(captor.getValue().getContent()).contains("2 asset(s)");
+    }
+
+    @Test
+    void declineClaim_withoutContingent_sendsNoNotification() {
+        stubDeclinable();
+        AssetAllocation al = allocation(beneficiaryRow, null);
+        VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, other));
+
+        beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        verify(notificationRepository, never()).save(any(Notification.class));
+    }
+
+    @Test
+    void declineClaim_receiverWithoutAccount_isReassignedButNotNotified() {
+        stubDeclinable();
+        VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.PENDING_REGISTRATION);
+        contingent.setUser(null);   // chưa đăng ký: có phân bổ nhưng chưa có tài khoản để nhận thông báo
+        AssetAllocation al = allocation(beneficiaryRow, contingent);
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiaryRow, contingent));
+
+        DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
+
+        assertThat(response.getReassignedAssets()).isEqualTo(1);
+        verify(notificationRepository, never()).save(any(Notification.class));
     }
 }

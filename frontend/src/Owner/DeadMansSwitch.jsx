@@ -1,66 +1,95 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnPrimary } from './ownerUi.jsx';
+import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary } from './ownerUi.jsx';
 
-// Giới hạn khớp DmsConfigRequest của BE
+// Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
 const LIMITS = {
-    checkinIntervalDays: { min: 1, max: 365, label: 'Check-in every (days)', hint: 'How often you need to confirm you are okay.' },
-    gracePeriodDays: { min: 1, max: 90, label: 'Grace period (days)', hint: 'Extra time after a missed check-in before hand-over starts.' },
-    reminderCount: { min: 1, max: 10, label: 'Reminders', hint: 'Emails sent during the grace period.' },
+    checkinIntervalDays: { min: 1, max: 365 },
+    gracePeriodDays: { min: 1, max: 90 },
+    reminderCount: { min: 1, max: 10 },
 };
 
+// Nhãn trạng thái ở dms.status.<STATUS>
 const STATUS = {
-    ACTIVE: { label: 'Active', cls: 'bg-success-container text-on-success-container', icon: 'favorite' },
-    TRIGGERED: { label: 'Triggered', cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
-    SUSPENDED: { label: 'Suspended', cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
+    ACTIVE: { cls: 'bg-success-container text-on-success-container', icon: 'favorite' },
+    // X2: đang chờ người xác nhận chéo trả lời (tối đa 72 giờ)
+    PENDING_CONFIRMATION: { cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
+    TRIGGERED: { cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
+    SUSPENDED: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
 export default function DeadMansSwitch() {
+    const { t } = useTranslation('dms');
     const user = getUser();
-    const [config, setConfig] = useState(null);       // DmsConfigResponse | null (chưa cấu hình)
+    const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
+    const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
+    const [confirmerForm, setConfirmerForm] = useState({ name: '', email: '', relationship: '' });
+    const [addingConfirmer, setAddingConfirmer] = useState(false);
+    const [removingId, setRemovingId] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+    };
+
+    // X2: chỉ tải danh sách confirmer khi DMS đã cấu hình (chưa cấu hình thì BE không có DmsConfig để gắn)
+    const loadConfirmers = (c) => {
+        if (!c?.configured) return;
+        ownerApi.listDmsConfirmers()
+            .then(setConfirmers)
+            .catch(() => {});
     };
 
     useEffect(() => {
         ownerApi.getDms()
-            .then(applyConfig)
-            .catch((err) => { if (err.response?.status !== 404) setError(getErrorMessage(err, 'Could not load settings.')); })
+            .then((c) => {
+                applyConfig(c);
+                loadConfirmers(c);
+            })
+            .catch((err) => setError(getErrorMessage(err, t('dms.errors.load'))))
             .finally(() => setLoading(false));
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps -- t chỉ dùng cho thông báo lỗi
 
     if (!user) return <Navigate to="/login" replace />;
 
-    const locked = config && config.status !== 'ACTIVE'; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    const configured = config?.configured === true;
+    // X2: đang chờ xác nhận vẫn check-in / sửa cấu hình được (cả hai đều huỷ quy trình xác nhận)
+    const canCheckIn = configured && (config.status === 'ACTIVE' || config.status === 'PENDING_CONFIRMATION');
+    const locked = configured && !canCheckIn; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
+    const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
     const save = async (e) => {
         e.preventDefault();
         setError(''); setSuccess('');
         for (const [k, l] of Object.entries(LIMITS)) {
             const v = Number(form[k]);
-            if (!Number.isInteger(v) || v < l.min || v > l.max) return setError(`${l.label} must be between ${l.min} and ${l.max}.`);
+            if (!Number.isInteger(v) || v < l.min || v > l.max) {
+                return setError(t('dms.rangeError', { field: t(`dms.fields.${k}.label`), min: l.min, max: l.max }));
+            }
         }
         setSaving(true);
         try {
-            applyConfig(await ownerApi.saveDms({
+            const saved = await ownerApi.saveDms({
                 checkinIntervalDays: Number(form.checkinIntervalDays),
                 gracePeriodDays: Number(form.gracePeriodDays),
                 reminderCount: Number(form.reminderCount),
-            }));
-            setSuccess('Settings saved.');
+            });
+            applyConfig(saved);
+            loadConfirmers(saved);
+            setSuccess(t('dms.saved'));
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not save settings.'));
+            setError(getErrorMessage(err, t('dms.errors.save')));
         } finally {
             setSaving(false);
         }
@@ -70,86 +99,215 @@ export default function DeadMansSwitch() {
         setError(''); setSuccess(''); setChecking(true);
         try {
             applyConfig(await ownerApi.checkIn());
-            setSuccess("Checked in. We'll remind you before the next deadline.");
+            setSuccess(t('dms.checkedIn'));
         } catch (err) {
-            setError(getErrorMessage(err, 'Check-in failed.'));
+            setError(getErrorMessage(err, t('dms.errors.checkIn')));
         } finally {
             setChecking(false);
         }
     };
 
-    const s = config ? STATUS[config.status] || STATUS.ACTIVE : null;
-    const needVault = /Vault/i.test(error) && !config;
+    const handleAddConfirmer = async (e) => {
+        e.preventDefault();
+        setError(''); setSuccess('');
+        if (!confirmerForm.name.trim() || !confirmerForm.email.trim()) {
+            setError(t('dms.confirmers.missingFields'));
+            return;
+        }
+        setAddingConfirmer(true);
+        try {
+            const added = await ownerApi.addDmsConfirmer({
+                name: confirmerForm.name.trim(),
+                email: confirmerForm.email.trim(),
+                relationship: confirmerForm.relationship.trim() || null,
+            });
+            setConfirmers((prev) => [...prev, added]);
+            setConfirmerForm({ name: '', email: '', relationship: '' });
+            setSuccess(t('dms.confirmers.added'));
+        } catch (err) {
+            // PLAN_LIMIT_REACHED (gói FREE): getErrorMessage hiện câu đã dịch; PlanLimitUpgradeDialog chung (T1) tự mở
+            setError(getErrorMessage(err, t('dms.confirmers.addFailed')));
+        } finally {
+            setAddingConfirmer(false);
+        }
+    };
+
+    const handleRemoveConfirmer = async (id) => {
+        setError(''); setSuccess('');
+        setRemovingId(id);
+        try {
+            await ownerApi.removeDmsConfirmer(id);
+            setConfirmers((prev) => prev.filter((c) => c.id !== id));
+            setSuccess(t('dms.confirmers.removed'));
+        } catch (err) {
+            setError(getErrorMessage(err, t('dms.confirmers.removeFailed')));
+        } finally {
+            setRemovingId('');
+        }
+    };
+
+    const statusKey = configured && STATUS[config.status] ? config.status : 'ACTIVE';
+    const s = configured ? STATUS[statusKey] : null;
+    // Dựa vào câu lỗi của BE (mã CONFLICT, chưa có bản dịch nên giữ nguyên tiếng Anh) — giữ nguyên logic cũ
+    const needVault = /Vault/i.test(error) && !configured;
 
     return (
-        <OwnerLayout title="Dead Man's Switch" subtitle="If you stop checking in, your vaults are handed over to your Executor.">
+        <OwnerLayout title={t('dms.title')} subtitle={t('dms.subtitle')}>
             <Alert type="success">{success}</Alert>
             <Alert>{error}</Alert>
             {needVault && (
-                <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">Create a vault first →</Link></p>
+                <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">{t('dms.createVaultFirst')}</Link></p>
+            )}
+            {noExecutor && (
+                <Alert type="warning">
+                    {configured ? t('dms.noExecutor.configured') : t('dms.noExecutor.notConfigured')}{' '}
+                    <Link to="/owner/executors" className="font-semibold underline">{t('dms.manageExecutors')}</Link>
+                </Alert>
             )}
 
-            {loading ? <p className="text-on-surface-variant">Loading...</p> : (
+            {loading ? <p className="text-on-surface-variant">{t('dms.loading')}</p> : (
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
+                    <div className="space-y-6">
                     {/* Trạng thái + check-in */}
                     <Card>
-                        {!config ? (
+                        {!configured ? (
                             <div className="text-center py-6">
                                 <Icon name="heart_minus" className="text-[40px] text-outline" />
-                                <p className="mt-3 font-semibold">Not set up yet</p>
-                                <p className="text-sm text-on-surface-variant mt-1">Choose your schedule on the right and save to turn it on.</p>
+                                <p className="mt-3 font-semibold">{t('dms.notSetUp')}</p>
+                                <p className="text-sm text-on-surface-variant mt-1">{t('dms.notSetUpHint')}</p>
                             </div>
                         ) : (
                             <>
                                 <div className="flex items-center justify-between gap-3">
                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
-                                        <Icon name={s.icon} className="text-[18px]" /> {s.label}
+                                        <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
                                     </span>
-                                    {config.status === 'ACTIVE' && (
+                                    {canCheckIn && (
                                         <button onClick={checkIn} disabled={checking} className={btnPrimary}>
-                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? 'Checking in...' : "I'm okay — check in"}
+                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : t('dms.checkIn')}
                                         </button>
                                     )}
                                 </div>
 
+                                {config.status === 'PENDING_CONFIRMATION' && (
+                                    <p className="mt-4 text-sm text-on-surface-variant">
+                                        {t('dms.pending.body', { deadline: formatDate(config.triggerAt, true), button: t('dms.checkIn') })}
+                                    </p>
+                                )}
                                 {config.status === 'TRIGGERED' && (
                                     <p className="mt-4 text-sm text-on-surface-variant">
-                                        The hand-over was triggered on {formatDate(config.triggeredAt, true)}. Settings can no longer be changed.
+                                        {t('dms.triggeredNote', { date: formatDate(config.triggeredAt, true) })}
                                     </p>
                                 )}
                                 {config.status === 'SUSPENDED' && (
-                                    <p className="mt-4 text-sm text-on-surface-variant">Suspended by an administrator. Please contact support.</p>
+                                    <p className="mt-4 text-sm text-on-surface-variant">{t('dms.suspendedNote')}</p>
                                 )}
 
                                 <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
-                                    <Info label="Last check-in" value={formatDate(config.lastCheckinAt, true)} />
-                                    <Info label="Next check-in due" value={formatDate(config.checkinDueAt, true)} highlight />
-                                    <Info label="Hand-over starts if no check-in" value={formatDate(config.triggerAt, true)} />
-                                    <Info label="Next reminder" value={formatDate(config.nextReminderAt, true)} />
-                                    <Info label="Reminders sent" value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
-                                    <Info label="Notified by" value={config.notificationChannel || 'EMAIL'} />
+                                    <Info label={t('dms.info.lastCheckin')} value={formatDate(config.lastCheckinAt, true)} />
+                                    <Info label={t('dms.info.nextDue')} value={formatDate(config.checkinDueAt, true)} highlight />
+                                    <Info label={t('dms.info.triggerAt')} value={formatDate(config.triggerAt, true)} />
+                                    <Info label={t('dms.info.nextReminder')} value={formatDate(config.nextReminderAt, true)} />
+                                    <Info label={t('dms.info.remindersSent')} value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
+                                    <Info label={t('dms.info.notifiedBy')} value={channelLabel(t, config.notificationChannel || 'EMAIL')} />
                                 </dl>
                             </>
                         )}
                     </Card>
 
+                    {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
+                    {configured && (
+                        <Card title={t('dms.confirmers.title')} icon="verified_user">
+                            {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
+                            <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
+                            {confirmers.length === 0 ? (
+                                <p className="text-sm text-on-surface-variant">{t('dms.confirmers.empty')}</p>
+                            ) : (
+                                <div className="space-y-3 mb-5">
+                                    {confirmers.map((c) => (
+                                        <div
+                                            key={c.id}
+                                            className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between gap-3"
+                                        >
+                                            <div>
+                                                <p className="font-semibold text-sm text-on-surface">
+                                                    {c.name}{' '}
+                                                    {c.relationship && (
+                                                        <span className="text-xs font-normal text-on-surface-variant">
+                                                            ({c.relationship})
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                <p className="text-xs text-on-surface-variant">{c.email}</p>
+                                            </div>
+                                            {!locked && (
+                                                <button
+                                                    type="button"
+                                                    disabled={removingId === c.id}
+                                                    onClick={() => handleRemoveConfirmer(c.id)}
+                                                    className={btnOutline}
+                                                >
+                                                    <Icon name="delete" className="text-[16px]" />
+                                                    {t('dms.confirmers.remove')}
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {!locked && confirmers.length < 2 && (
+                                <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
+                                    <input
+                                        type="text"
+                                        placeholder={t('dms.confirmers.namePlaceholder')}
+                                        value={confirmerForm.name}
+                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
+                                        className={inputClass}
+                                    />
+                                    <input
+                                        type="email"
+                                        placeholder={t('dms.confirmers.emailPlaceholder')}
+                                        value={confirmerForm.email}
+                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
+                                        className={inputClass}
+                                    />
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder={t('dms.confirmers.relationshipPlaceholder')}
+                                            value={confirmerForm.relationship}
+                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
+                                            className={inputClass}
+                                        />
+                                        <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
+                                            <Icon name="person_add" className="text-[18px]" />
+                                            {t('dms.confirmers.add')}
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </Card>
+                    )}
+                    </div>
+
                     {/* Cấu hình */}
-                    <Card title="Schedule" icon="tune">
+                    <Card title={t('dms.schedule')} icon="tune">
                         <form onSubmit={save} className="space-y-4">
                             {Object.entries(LIMITS).map(([k, l]) => (
                                 <label key={k} className="block">
-                                    <span className="text-sm font-semibold text-on-surface-variant">{l.label}</span>
+                                    <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
                                     <input
                                         type="number" min={l.min} max={l.max} disabled={locked}
                                         value={form[k]}
                                         onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                                         className={`${inputClass} mt-1`}
                                     />
-                                    <span className="text-xs text-outline">{l.hint} ({l.min}–{l.max})</span>
+                                    <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
                                 </label>
                             ))}
                             <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
-                                {saving ? 'Saving...' : config ? 'Save changes' : 'Turn on'}
+                                {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
                             </button>
                         </form>
                     </Card>
@@ -158,6 +316,9 @@ export default function DeadMansSwitch() {
         </OwnerLayout>
     );
 }
+
+// Kênh chưa có bản dịch thì hiện nguyên giá trị enum như trước
+const channelLabel = (t, channel) => t(`dms.channel.${channel}`, { defaultValue: channel });
 
 function Info({ label, value, highlight }) {
     return (

@@ -111,14 +111,22 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // Lấy danh sách Vault của Owner (mới nhất xếp trước)
     List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
+    // T1 (m6): đếm vault của Owner để kiểm tra giới hạn gói, không nạp entity
+    long countByOwnerId(UUID ownerId);
+
     // Admin tìm kiếm và lọc Vault theo trạng thái
     Page<Vault> findByStatus(VaultStatus status, Pageable pageable);
 
-    // FR-06 (Q26): email này có đang là người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Vault nào của Owner không
+    // FR-06 (Q26): email này có đang là người thụ hưởng của BẤT KỲ Vault nào của Owner không (không phân biệt hoa thường).
+    // Xét vault_beneficiaries (đã liên kết tài khoản hoặc đang chờ theo email) và cột beneficiary / beneficiary_email cũ.
     @Query("""
            select count(v) > 0 from Vault v left join v.beneficiary b
            where v.owner.id = :ownerId
-             and (lower(b.email) = :email or lower(v.beneficiaryEmail) = :email)
+             and (lower(b.email) = lower(:email)
+                  or lower(v.beneficiaryEmail) = lower(:email)
+                  or exists (select 1 from VaultBeneficiary vb left join vb.user vbu
+                             where vb.vault = v
+                               and (lower(vb.email) = lower(:email) or lower(vbu.email) = lower(:email))))
            """)
     boolean existsBeneficiaryWithEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
 

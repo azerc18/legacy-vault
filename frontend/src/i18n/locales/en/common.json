@@ -6,5 +6,13 @@
     "progress": "Claim progress",
     "accepted": "{{accepted}}/{{required}} people accepted",
     "status": { "UNLOCKED": "Waiting for beneficiaries", "CLAIM_STALLED": "Stalled", "CLAIMED": "Completed", "EXPIRED": "Expired" }
+  },
+  "password": {
+    "rules": { "length": "8+ characters", "lower": "Lowercase letter", "upper": "Uppercase letter", "digit": "Number", "special": "Special character" },
+    "levels": ["Very weak", "Weak", "Medium", "Strong", "Very strong"]
+  },
+  "roles": {
+    "OWNER": "Vault Owner", "BENEFICIARY": "Beneficiary", "EXECUTOR": "Executor",
+    "LEGAL_VERIFIER": "Legal Verifier", "ADMIN": "Administrator"
   }
 }

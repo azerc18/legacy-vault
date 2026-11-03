@@ -12,8 +12,10 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorManagementException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -64,6 +66,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private final AuditLogService auditLogService;
     // Mail gửi qua ExecutorAssignmentMailListener ở AFTER_COMMIT: rollback thì không gửi.
     private final ApplicationEventPublisher eventPublisher;
+    // X2 (m1): chặn chỉ định Executor trùng người xác nhận chéo của Owner
+    private final DmsConfirmerRepository dmsConfirmerRepository;
 
     // READ_COMMITTED: MySQL chạy REPEATABLE READ nên các câu đọc thường sau khi giữ khóa User vẫn thấy snapshot
     // cũ; READ_COMMITTED để existsBy... và lần nạp roles thấy dữ liệu đã commit mới nhất.
@@ -89,10 +93,16 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
 
         // Q26: người thụ hưởng (đã liên kết hoặc đang chờ đăng ký) của Owner không được đồng thời là Executor.
         // Đặt trước nhánh "cùng người" để cả trường hợp Executor hiện tại vừa trở thành người thụ hưởng cũng bị chặn.
+        // existsBeneficiaryWithEmail xét mọi vault của Owner: vault_beneficiaries (đã liên kết / đang chờ theo email) và cột beneficiary cũ.
         if (vaultRepository.existsBeneficiaryWithEmail(ownerId, email)) {
-            throw new ExecutorManagementException(
-                    "This person is your beneficiary and cannot also be your Digital Executor.",
-                    HttpStatus.CONFLICT);
+            throw new ExecutorManagementException(ErrorCode.BENEFICIARY_CONFLICT,
+                    "This person is your beneficiary and cannot also be your Digital Executor.");
+        }
+
+        // X2 (m1): người xác nhận chéo DMS của Owner không được đồng thời là Executor (bấm UNREACHABLE sẽ tự kích hoạt mình).
+        if (dmsConfirmerRepository.existsByOwnerIdAndEmail(ownerId, email)) {
+            throw new ExecutorManagementException(ErrorCode.CONFLICT,
+                    "This person is your trusted confirmer and cannot also be your Digital Executor.");
         }
 
         ExecutorAssignment current = executorAssignmentRepository
@@ -247,7 +257,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                                                      Optional<DmsConfig> lockedDms) {
         List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
         boolean dmsActive = lockedDms.or(() -> dmsConfigRepository.findByOwnerId(ownerId))
-                .filter(c -> c.getStatus() == DmsStatus.ACTIVE)
+                .filter(c -> c.getStatus() == DmsStatus.ACTIVE || c.getStatus() == DmsStatus.PENDING_CONFIRMATION)
                 .isPresent();
         boolean othersLeft = executors.stream()
                 .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED);

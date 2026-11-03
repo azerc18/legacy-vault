@@ -1,5 +1,6 @@
 // Thành phần giao diện dùng chung cho các trang Vault Owner
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import ProtectionBanner from './ProtectionBanner.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 
@@ -64,7 +65,8 @@ export function Card({title, icon, children, className = ''}) {
 }
 
 // Hộp xác nhận (dùng cho thay thế người thụ hưởng / executor, xoá vault)
-export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', danger, busy, onConfirm, onCancel}) {
+export function ConfirmDialog({open, title, message, confirmLabel, danger, busy, onConfirm, onCancel}) {
+    const {t} = useTranslation(['vault', 'common']);
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
@@ -73,9 +75,9 @@ export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', d
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
                 <div className="mt-6 flex justify-end gap-3">
-                    <button onClick={onCancel} className={btnOutline}>Cancel</button>
+                    <button onClick={onCancel} className={btnOutline}>{t('common:actions.cancel')}</button>
                     <button onClick={onConfirm} disabled={busy} className={danger ? btnDanger : btnPrimary}>
-                        {busy ? 'Please wait...' : confirmLabel}
+                        {busy ? t('ui.pleaseWait') : (confirmLabel || t('common:actions.confirm'))}
                     </button>
                 </div>
             </div>
@@ -83,17 +85,18 @@ export function ConfirmDialog({open, title, message, confirmLabel = 'Confirm', d
     );
 }
 
-const NAV = [
-    {to: '/owner/vaults', label: 'My vaults', icon: 'inventory_2'},
-    {to: '/owner/dms', label: "Dead Man's Switch", icon: 'favorite'},
-    {to: '/owner/executors', label: 'Executors', icon: 'badge'},
-    {to: '/owner/activity', label: 'Activity', icon: 'history'},
-];
-
 export function OwnerLayout({title, subtitle, back, actions, children}) {
+    const {t} = useTranslation('vault');
+    const nav = [
+        {to: '/owner/vaults', label: t('nav.myVaults'), icon: 'inventory_2'},
+        {to: '/owner/dms', label: t('nav.dms'), icon: 'favorite'},
+        {to: '/owner/executors', label: t('nav.executors'), icon: 'badge'},
+        {to: '/owner/activity', label: t('nav.activity'), icon: 'history'},
+        {to: '/billing', label: t('nav.billing'), icon: 'workspace_premium'},
+    ];
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader nav={NAV}/>
+            <AppHeader nav={nav}/>
             <main className={`${PAGE_WIDTH} py-10`}>
                 <ProtectionBanner/>
                 <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>

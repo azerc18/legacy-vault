@@ -100,6 +100,23 @@ class DmsAutomationServiceImplTest {
     }
 
     @Test
+    @DisplayName("X2 (n10): quét PENDING_CONFIRMATION hết hạn, một config lỗi không chặn config khác")
+    void processOverdueDms_pendingConfirmation_oneFailureDoesNotStopOthers() {
+        DmsConfig other = DmsConfig.builder().id(UUID.randomUUID()).build();
+        when(dmsConfigRepository.findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.ACTIVE, now))
+                .thenReturn(Collections.emptyList());
+        when(dmsConfigRepository.findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.PENDING_CONFIRMATION, now))
+                .thenReturn(List.of(config, other));
+        doThrow(new IllegalStateException("db error")).when(processor).processExpiredConfirmation(config.getId(), now);
+
+        service.processOverdueDms(now);
+
+        verify(processor).processExpiredConfirmation(config.getId(), now);
+        verify(processor).processExpiredConfirmation(other.getId(), now);
+        verify(processor, never()).trigger(any(), any());
+    }
+
+    @Test
     @DisplayName("Leo thang chạy cho mọi DMS TRIGGERED, lỗi một cái không chặn cái khác")
     void escalateUnresponsivePrimaries_runsForEveryTriggeredConfig() {
         DmsConfig other = DmsConfig.builder().id(UUID.randomUUID()).build();

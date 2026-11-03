@@ -1,6 +1,7 @@
 // Cảnh báo khi Owner đã có vault nhưng kế hoạch bàn giao chưa đủ (thiếu Executor / chưa bật DMS / vault chưa có người thụ hưởng).
 // Hiện ở đầu mọi trang Owner (gắn trong OwnerLayout). Tự tải lại khi ownerApi báo dữ liệu bảo vệ vừa thay đổi.
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { ownerApi, PROTECTION_CHANGED } from '../api/ownerApi.js';
 
@@ -18,7 +19,7 @@ async function loadState() {
 }
 
 // Trả về danh sách bước còn thiếu, theo đúng thứ tự BE bắt buộc: Executor -> DMS. Rỗng = không cần banner.
-export function computeIssues({ vaults, executors, dms }) {
+export function computeIssues({ vaults, executors, dms }, t) {
     if (vaults.length === 0) return [];                  // chưa có gì để bảo vệ
     if (dms?.status === 'TRIGGERED') return [];          // bàn giao đã bắt đầu, banner không còn ý nghĩa
 
@@ -26,32 +27,35 @@ export function computeIssues({ vaults, executors, dms }) {
     const hasPrimary = executors.some((e) => e.executorType === 'PRIMARY' && e.status !== 'REVOKED');
 
     if (!hasPrimary) {
-        issues.push({ key: 'executor', critical: true, text: 'Assign a primary executor', cta: 'Assign executor', to: '/owner/executors' });
+        issues.push({ key: 'executor', critical: true, text: t('banner.issues.noPrimary'), cta: t('banner.issues.noPrimaryCta'), to: '/owner/executors' });
     } else if (dms && dms.hasUsableExecutor === false) {
-        issues.push({ key: 'executor', critical: true, text: 'None of your executors can be activated. Assign a new one', cta: 'Fix executors', to: '/owner/executors' });
+        issues.push({ key: 'executor', critical: true, text: t('banner.issues.unusableExecutor'), cta: t('banner.issues.unusableExecutorCta'), to: '/owner/executors' });
     }
     if (!dms) {
-        issues.push({ key: 'dms', critical: true, text: "Turn on the Dead Man's Switch", cta: 'Turn on', to: '/owner/dms', needs: hasPrimary ? null : 'executor' });
+        issues.push({ key: 'dms', critical: true, text: t('banner.issues.noDms'), cta: t('banner.issues.noDmsCta'), to: '/owner/dms', needs: hasPrimary ? null : 'executor' });
     } else if (dms.status === 'SUSPENDED') {
-        issues.push({ key: 'dms', critical: true, text: "Your Dead Man's Switch is paused by an administrator. Contact support to resume it", to: null });
+        issues.push({ key: 'dms', critical: true, text: t('banner.issues.dmsSuspended'), to: null });
     }
     const noBeneficiary = vaults.filter((v) => !v.beneficiaryEmail);
     if (noBeneficiary.length) {
         issues.push({
             key: 'beneficiary', critical: false,
-            text: noBeneficiary.length === 1 ? `"${noBeneficiary[0].name}" has no beneficiary` : `${noBeneficiary.length} vaults have no beneficiary`,
-            cta: 'Choose beneficiary', to: `/owner/vaults/${noBeneficiary[0].id}`,
+            text: noBeneficiary.length === 1
+                ? t('banner.issues.oneVaultNoBeneficiary', { name: noBeneficiary[0].name })
+                : t('banner.issues.manyVaultsNoBeneficiary', { count: noBeneficiary.length }),
+            cta: t('banner.issues.chooseBeneficiaryCta'), to: `/owner/vaults/${noBeneficiary[0].id}`,
         });
     }
     return issues;
 }
 
 export default function ProtectionBanner() {
-    const [issues, setIssues] = useState([]);
+    const { t } = useTranslation('vault');
+    const [state, setState] = useState(null);
     const { pathname } = useLocation();
 
     const refresh = useCallback(() => {
-        loadState().then((s) => setIssues(computeIssues(s))).catch(() => setIssues([])); // lỗi tải: im lặng, không chặn trang
+        loadState().then(setState).catch(() => setState(null)); // lỗi tải: im lặng, không chặn trang
     }, []);
 
     useEffect(() => {
@@ -60,6 +64,7 @@ export default function ProtectionBanner() {
         return () => window.removeEventListener(PROTECTION_CHANGED, refresh);
     }, [refresh]);
 
+    const issues = state ? computeIssues(state, t) : [];
     if (issues.length === 0) return null;
 
     const critical = issues.some((i) => i.critical);
@@ -75,12 +80,10 @@ export default function ProtectionBanner() {
                 <Icon name={critical ? 'gpp_bad' : 'gpp_maybe'} className="text-[28px] shrink-0" />
                 <div className="flex-1 min-w-[220px]">
                     <p className="font-bold">
-                        {critical ? 'Your vaults are not protected yet' : 'Almost done: finish your hand-over plan'}
+                        {critical ? t('banner.criticalTitle') : t('banner.warningTitle')}
                     </p>
                     <p className="mt-0.5 text-sm opacity-90">
-                        {critical
-                            ? 'If something happens to you, nobody will be notified and your vaults will never be handed over.'
-                            : 'Your vaults are protected, but some of them have nobody to receive them.'}
+                        {critical ? t('banner.criticalDesc') : t('banner.warningDesc')}
                     </p>
                     <ol className="mt-3 space-y-1.5 text-sm">
                         {issues.map((i, idx) => (
@@ -89,7 +92,7 @@ export default function ProtectionBanner() {
                                     {idx + 1}
                                 </span>
                                 <span className="flex flex-wrap items-baseline gap-x-2">
-                                    <span className={i.needs ? 'opacity-60' : ''}>{i.text}{i.needs ? ' (after step 1)' : ''}</span>
+                                    <span className={i.needs ? 'opacity-60' : ''}>{i.text}{i.needs ? t('banner.afterStep1') : ''}</span>
                                     {i.to && !i.needs && i !== next && pathname !== i.to && (
                                         <Link to={i.to} className="font-semibold underline underline-offset-2 whitespace-nowrap">{i.cta}</Link>
                                     )}

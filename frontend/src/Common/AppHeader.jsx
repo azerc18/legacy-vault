@@ -1,9 +1,10 @@
 // Header dùng chung cho mọi trang sau đăng nhập (Owner, Admin, Beneficiary, Executor, Verifier, /me, /home).
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
+import { paymentApi } from '../api/paymentApi.js';
 import UserAvatar from './UserAvatar.jsx';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
@@ -24,8 +25,48 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  */
 export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
     const { t } = useTranslation();
+    const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
     const user = getUser();
+    const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
+    const [vipStatus, setVipStatus] = useState(null);
+
+    useEffect(() => {
+        if (!isOwner) return;
+        let mounted = true;
+
+        // n3: cache /subscriptions/me trong sessionStorage 5 phút (try/catch)
+        try {
+            const cached = sessionStorage.getItem('lv_sub_cache');
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < 5 * 60 * 1000) {
+                    setVipStatus(data);
+                    return;
+                }
+            }
+        } catch {
+            // ignore sessionStorage error
+        }
+
+        paymentApi
+            .getMySubscription()
+            .then((data) => {
+                if (mounted && data) {
+                    setVipStatus(data);
+                    try {
+                        sessionStorage.setItem('lv_sub_cache', JSON.stringify({ data, timestamp: Date.now() }));
+                    } catch {
+                        // ignore
+                    }
+                }
+            })
+            .catch(() => {});
+        return () => {
+            mounted = false;
+        };
+    }, [isOwner]);
+
     const handleLogout = () => { logout(); navigate('/login'); };
 
     return (
@@ -44,6 +85,20 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                 </Link>
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {isOwner && (
+                        <Link
+                            to={vipStatus?.vip ? '/billing' : '/pricing'}
+                            title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
+                            className={`h-8 px-2.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
+                                vipStatus?.vip
+                                    ? 'bg-primary text-on-primary'
+                                    : 'bg-secondary-fixed text-on-secondary-fixed hover:bg-primary hover:text-on-primary'
+                            }`}
+                        >
+                            <Icon name="workspace_premium" className="text-[15px]" />
+                            <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
+                        </Link>
+                    )}
                     {userHome && (
                         <Link to="/home" title={t('header.userHome')}
                               className="h-10 px-2 sm:px-3 rounded-xl flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-low">

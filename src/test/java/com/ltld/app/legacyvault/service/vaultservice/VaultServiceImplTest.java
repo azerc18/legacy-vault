@@ -921,7 +921,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(legalDocumentRepository.countByVaultId(vId)).thenReturn(2L);
+        when(legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vId)).thenReturn(2L);
         when(digitalAssetRepository.countByVaultIdAndStatus(vId, AssetStatus.ACTIVE)).thenReturn(3L);
 
         VaultDetailResponse detail = vaultService.getVaultDetail(vId, ownerId);
@@ -938,7 +938,7 @@ class VaultServiceImplTest {
         Vault vault = activeVault();
         UUID vId = vault.getId();
         when(vaultRepository.findById(vId)).thenReturn(Optional.of(vault));
-        when(legalDocumentRepository.countByVaultId(vId)).thenReturn(0L);
+        when(legalDocumentRepository.countByVaultIdAndIsCurrentTrue(vId)).thenReturn(0L);
         when(digitalAssetRepository.countByVaultIdAndStatus(vId, AssetStatus.ACTIVE)).thenReturn(0L);
 
         UUID adminId = UUID.randomUUID();
