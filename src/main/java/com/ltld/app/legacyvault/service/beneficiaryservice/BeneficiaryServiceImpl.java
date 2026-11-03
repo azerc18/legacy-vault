@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.beneficiaryservice;
 
 import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AllocationMode;
@@ -10,6 +11,7 @@ import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -71,6 +73,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
     private static final String CONFIRM_REQUIRED_MSG = "Final confirmation is required to close the handover case.";
+    // N2-notify. Tham số: số tài sản, tên Vault, tên Owner
+    private static final String MSG_ASSETS_REASSIGNED =
+            "%d asset(s) in the vault \"%s\" of %s have been reassigned to you because another beneficiary declined their share.";
     // Dùng chung cho tên tệp và Content-Type; khớp các loại FR-04 cho phép (PDF, DOC/DOCX, JPG/PNG)
     private static final Map<String, String> DOCUMENT_TYPES = Map.of(
             "pdf", "application/pdf",
@@ -557,6 +562,75 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .build();
     }
 
+
+    // N2-notify: tiến độ theo từng tài sản của người này cho màn hình ClaimProgress. Không giải mã gì.
+    @Override
+    @Transactional(readOnly = true)
+    public ClaimProgressResponse getClaimProgress(UUID vaultId, UUID currentUserId) {
+        AccessContext ctx = loadAccessibleVault(vaultId, currentUserId);
+        Vault vault = ctx.vault();
+        assertNotLocked(vault.getId(), currentUserId);
+        assertViewSession(vault.getId(), currentUserId);
+
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+        // Cùng quy tắc N2-access: bỏ tài sản đã phân bổ cho người khác
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
+        Map<UUID, AssetAllocation> mine = new HashMap<>();
+        for (AssetAllocation al : assetAllocationRepository.findHeldBy(vault.getId(), me.getId())) {
+            mine.put(al.getAsset().getId(), al);
+        }
+        Set<UUID> unviewedIds = digitalAssetRepository.findUnaccessedAssets(vault.getId(), ctx.claim().getId()).stream()
+                .map(DigitalAsset::getId)
+                .collect(Collectors.toSet());
+
+        List<ClaimProgressResponse.AssetProgress> assets = digitalAssetRepository
+                .findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(a -> !hidden.contains(a.getId()))
+                .map(a -> {
+                    AssetAllocation al = mine.get(a.getId());
+                    boolean proportional = al != null && al.getMode() == AllocationMode.PROPORTIONAL;
+                    boolean viaFallback = al != null && al.getEffectiveBeneficiary() != null
+                            && !al.getBeneficiary().getId().equals(me.getId());
+                    return ClaimProgressResponse.AssetProgress.builder()
+                            .assetId(a.getId())
+                            .assetType(a.getAssetType())
+                            .assetName(a.getAssetName())
+                            .allocationMode(al != null ? al.getMode() : null)
+                            .sharePercent(proportional ? al.getSharePercent() : null)
+                            .reassignedToMe(viaFallback)
+                            .viewed(!unviewedIds.contains(a.getId()))
+                            .build();
+                })
+                .toList();
+
+        List<VaultBeneficiary> all = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vault.getId());
+        int declined = (int) all.stream()
+                .filter(b -> b.getStatus() == BeneficiaryInviteStatus.DECLINED
+                        || b.getStatus() == BeneficiaryInviteStatus.WAIVED)
+                .count();
+        int accepted = (int) all.stream()
+                .filter(b -> b.getStatus() == BeneficiaryInviteStatus.ACCEPTED)
+                .count();
+        int closed = (int) claimRepository.findAllByVaultId(vault.getId()).stream()
+                .filter(c -> c.getStatus() == ClaimStatus.CLAIMED)
+                .count();
+        int viewed = (int) assets.stream().filter(ClaimProgressResponse.AssetProgress::isViewed).count();
+
+        return ClaimProgressResponse.builder()
+                .vaultId(vault.getId())
+                .vaultStatus(vault.getStatus())
+                .myStatus(me.getStatus())
+                .claimDeadlineAt(ctx.claim().getClaimDeadlineAt())
+                .totalBeneficiaries(all.size() - declined)
+                .acceptedBeneficiaries(accepted)
+                .declinedBeneficiaries(declined)
+                .closedBeneficiaries(closed)
+                .totalAssets(assets.size())
+                .viewedAssets(viewed)
+                .assets(assets)
+                .build();
+    }
+
     @Override
     @Transactional
     public CloseVaultResponse closeVault(UUID vaultId, CloseVaultRequest request, UUID currentUserId) {
@@ -880,6 +954,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // Auto-fallback: chuyển từng phân bổ đang giữ sang người dự phòng còn nhận được
         int reassigned = 0;
         int stalled = 0;
+        // N2-notify: người nhận thay và số tài sản họ nhận thêm, để báo một lần cho mỗi người
+        Map<UUID, VaultBeneficiary> receivers = new LinkedHashMap<>();
+        Map<UUID, Integer> reassignedCounts = new LinkedHashMap<>();
         List<AssetAllocation> held = assetAllocationRepository.findHeldBy(vaultId, me.getId());
         for (AssetAllocation allocation : held) {
             if (allocation.getMode() == AllocationMode.JOINT_CONSENSUS) {
@@ -890,6 +967,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 allocation.setEffectiveBeneficiary(next);
                 assetAllocationRepository.save(allocation);
                 reassigned++;
+                receivers.put(next.getId(), next);
+                reassignedCounts.merge(next.getId(), 1, Integer::sum);
                 auditLogService.log(AuditAction.ASSET_ALLOCATION_FALLBACK, AuditResult.SUCCESS, currentUserId,
                         me.getEmail(), vaultId, "Asset", allocation.getAsset().getId().toString(),
                         "from=" + me.getId() + ", to=" + next.getId());
@@ -897,6 +976,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 stalled++;
             }
         }
+        // N2-notify: báo cho từng người nhận thay (cùng giao dịch với việc chuyển phân bổ)
+        reassignedCounts.forEach((receiverId, count) ->
+                notifyAssetsReassigned(vault, receivers.get(receiverId), count));
 
         // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
         stalled += (int) held.stream()
@@ -975,6 +1057,26 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             vault.setStatus(VaultStatus.CLAIMED);
             vaultRepository.save(vault);
         }
+    }
+
+    // N2-notify: thông báo trong app cho người nhận thay. Người chưa có tài khoản thì bỏ qua: phần này đã
+    // thuộc về họ (effective_beneficiary), họ sẽ nhận thông báo bàn giao thường khi đăng ký xong.
+    private void notifyAssetsReassigned(Vault vault, VaultBeneficiary receiver, int count) {
+        if (receiver == null || receiver.getUser() == null) {
+            return;
+        }
+        String ownerName = vault.getOwner() != null && vault.getOwner().getFullName() != null
+                ? vault.getOwner().getFullName() : "the owner";
+        notificationRepository.save(Notification.builder()
+                .recipient(receiver.getUser())
+                .type(NotificationType.ASSET_REASSIGNED)
+                .channel(NotificationChannel.IN_APP)
+                .referenceType(REF_VAULT)
+                .referenceId(vault.getId())
+                .content(String.format(MSG_ASSETS_REASSIGNED, count, vault.getName(), ownerName))
+                .status(NotificationStatus.SENT)
+                .sentAt(LocalDateTime.now())
+                .build());
     }
 
     // N2b: người dự phòng chỉ nhận được phần chuyển sang nếu chưa đóng / chưa hết hạn / chưa từ chối
