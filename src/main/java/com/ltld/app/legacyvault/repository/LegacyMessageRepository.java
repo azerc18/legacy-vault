@@ -36,6 +36,10 @@ public interface LegacyMessageRepository extends JpaRepository<LegacyMessage, UU
             LegacyMessageDeliveryTrigger trigger,
             LocalDate date);
 
+    // T1 (m7): tổng dung lượng đính kèm lời nhắn của mọi vault thuộc Owner, cộng vào quota gói cùng tài liệu
+    @Query("SELECT COALESCE(SUM(m.attachmentSize), 0) FROM LegacyMessage m WHERE m.vault.owner.id = :ownerId")
+    long sumAttachmentSizeByOwnerId(@Param("ownerId") UUID ownerId);
+
     List<LegacyMessage> findByVaultIdAndStatus(UUID vaultId, LegacyMessageStatus status);
 
     @Query("SELECT m FROM LegacyMessage m JOIN FETCH m.vault v " +
