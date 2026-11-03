@@ -4,17 +4,24 @@ import com.ltld.app.legacyvault.dto.messagedto.CreateLegacyMessageRequest;
 import com.ltld.app.legacyvault.dto.messagedto.LegacyMessageResponse;
 import com.ltld.app.legacyvault.dto.messagedto.UpdateLegacyMessageRequest;
 import com.ltld.app.legacyvault.entity.LegacyMessage;
+import com.ltld.app.legacyvault.entity.Notification;
+import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.LegacyMessageDeliveryTrigger;
 import com.ltld.app.legacyvault.enums.LegacyMessageRecipientType;
 import com.ltld.app.legacyvault.enums.LegacyMessageStatus;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -22,6 +29,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
+import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -31,7 +39,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -40,6 +50,7 @@ import java.util.UUID;
 public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     private static final long MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024L; // 10MB
+    private static final Set<VaultStatus> HANDOVER_VAULT_STATUSES = Set.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED);
 
     private final LegacyMessageRepository legacyMessageRepository;
     private final VaultRepository vaultRepository;
@@ -49,6 +60,8 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     private final EntitlementService entitlementService;
     private final VaultModificationGuard vaultModificationGuard;
     private final AuditLogService auditLogService;
+    private final NotificationRepository notificationRepository;
+    private final EmailSender emailSender;
 
     @Override
     @Transactional
@@ -204,11 +217,10 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public List<LegacyMessageResponse> getMessagesForBeneficiary(UUID userId, UUID vaultId) {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
 
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
@@ -226,11 +238,10 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public LegacyMessageResponse getMessageDetailForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
 
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
@@ -254,11 +265,10 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public DecryptedAttachment getAttachmentForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
 
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
@@ -282,6 +292,135 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         byte[] cipherBytes = fileStorageService.readFile(message.getAttachmentPath());
         byte[] plainBytes = cryptoService.decryptBytes(cipherBytes);
         return new DecryptedAttachment(message.getAttachmentName(), message.getAttachmentType(), plainBytes);
+    }
+
+    // F4b: Khi Vault được mở khóa (hoặc nhận bàn giao), phát tất cả lời nhắn ON_CLAIM và các lời nhắn SPECIFIC_DATE đã tới hạn
+    @Override
+    @Transactional
+    public int deliverOnClaimMessages(UUID vaultId) {
+        Vault vault = vaultRepository.findById(vaultId).orElse(null);
+        if (vault == null || !HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+        List<LegacyMessage> activeMessages = legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE);
+
+        int deliveredCount = 0;
+        for (LegacyMessage message : activeMessages) {
+            if (isMessageUnlocked(message, today)) {
+                deliverSingleMessage(message, vault, now);
+                deliveredCount++;
+            }
+        }
+        return deliveredCount;
+    }
+
+    // F4b: Scheduler hằng ngày quét và gửi các lời nhắn đến hạn (deliver_date <= hôm nay) hoặc ON_CLAIM chưa gửi trong các Vault đã mở
+    @Override
+    @Transactional
+    public int deliverDueScheduledMessages(LocalDate today) {
+        LocalDate effectiveDate = today != null ? today : LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
+
+        List<LegacyMessage> dueMessages = legacyMessageRepository.findDueMessagesForUnlockedVaults(
+                LegacyMessageStatus.ACTIVE,
+                HANDOVER_VAULT_STATUSES,
+                LegacyMessageDeliveryTrigger.ON_CLAIM,
+                LegacyMessageDeliveryTrigger.SPECIFIC_DATE,
+                effectiveDate);
+
+        int deliveredCount = 0;
+        for (LegacyMessage message : dueMessages) {
+            Vault vault = message.getVault();
+            if (vault != null && HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
+                deliverSingleMessage(message, vault, now);
+                deliveredCount++;
+            }
+        }
+        return deliveredCount;
+    }
+
+    private void deliverSingleMessage(LegacyMessage message, Vault vault, LocalDateTime now) {
+        message.setStatus(LegacyMessageStatus.DELIVERED);
+        message.setDeliveredAt(now);
+        legacyMessageRepository.save(message);
+
+        List<VaultBeneficiary> recipients = resolveRecipientsForDelivery(message, vault.getId());
+        User owner = vault.getOwner();
+        String ownerName = (owner != null && owner.getFullName() != null && !owner.getFullName().isBlank())
+                ? owner.getFullName()
+                : (owner != null && owner.getEmail() != null ? owner.getEmail() : "the vault owner");
+
+        for (VaultBeneficiary vb : recipients) {
+            notifyBeneficiaryOfMessage(vb, vault, message, ownerName, now);
+        }
+
+        auditLogService.log(AuditAction.BENEFICIARY_NOTIFIED, AuditResult.SUCCESS, null, null,
+                vault.getId(), "LegacyMessage", message.getId().toString(),
+                "Delivered legacy message: " + message.getTitle() + " (recipients=" + recipients.size() + ")");
+    }
+
+    private List<VaultBeneficiary> resolveRecipientsForDelivery(LegacyMessage message, UUID vaultId) {
+        if (message.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY) {
+            VaultBeneficiary target = message.getRecipientBeneficiary();
+            if (target != null && isEligibleRecipient(target)) {
+                return List.of(target);
+            }
+            return List.of();
+        }
+        return vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId).stream()
+                .filter(this::isEligibleRecipient)
+                .toList();
+    }
+
+    private boolean isEligibleRecipient(VaultBeneficiary vb) {
+        return vb.getStatus() != BeneficiaryInviteStatus.DECLINED
+                && vb.getStatus() != BeneficiaryInviteStatus.WAIVED;
+    }
+
+    private void notifyBeneficiaryOfMessage(VaultBeneficiary vb, Vault vault, LegacyMessage message,
+                                            String ownerName, LocalDateTime now) {
+        if (vb.getUser() != null && notificationRepository != null) {
+            try {
+                String content = String.format(
+                        "Legacy message \"%s\" from %s is now available in vault \"%s\".",
+                        message.getTitle(), ownerName, vault.getName());
+                notificationRepository.save(Notification.builder()
+                        .recipient(vb.getUser())
+                        .type(NotificationType.VAULT_UNLOCKED)
+                        .channel(NotificationChannel.IN_APP)
+                        .referenceType("Vault")
+                        .referenceId(vault.getId())
+                        .content(content)
+                        .status(NotificationStatus.SENT)
+                        .sentAt(now)
+                        .build());
+            } catch (RuntimeException e) {
+                log.warn("F4b: failed to save in-app notification for message {} to beneficiary {}: {}",
+                        message.getId(), vb.getId(), e.getMessage());
+            }
+        }
+
+        if (vb.getEmail() != null && !vb.getEmail().isBlank() && emailSender != null) {
+            try {
+                emailSender.sendLegacyMessageDeliveredNotification(
+                        vb.getEmail(), vb.getFullName(), ownerName, vault.getName(), message.getTitle(), vault.getId());
+            } catch (RuntimeException e) {
+                log.warn("F4b: failed to send legacy message email for message {} to {}: {}",
+                        message.getId(), vb.getEmail(), e.getMessage());
+            }
+        }
+    }
+
+    private VaultBeneficiary requireActiveBeneficiary(UUID vaultId, UUID userId) {
+        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
+        if (!isEligibleRecipient(beneficiary)) {
+            throw new BusinessException(ErrorCode.CLAIM_ALREADY_RESPONDED, "You have declined this inheritance");
+        }
+        return beneficiary;
     }
 
     private boolean isMessageUnlocked(LegacyMessage m, LocalDate today) {

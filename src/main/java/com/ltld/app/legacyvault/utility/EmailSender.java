@@ -148,6 +148,24 @@ public class EmailSender {
         sendWithoutOtpFooter(email, "Reminder: assets waiting for you - LegacyVault", body.toString());
     }
 
+    // F4b: thông báo khi lời nhắn di nguyện / Time-Capsule đến hạn mở cho người thụ hưởng
+    @Async
+    public void sendLegacyMessageDeliveredNotification(String email, String fullName, String ownerName,
+                                                       String vaultName, String messageTitle, UUID vaultId) {
+        StringBuilder body = new StringBuilder()
+                .append("Hello ").append(fullName == null || fullName.isBlank() ? "" : fullName).append(",\n\n")
+                .append("A legacy message titled \"").append(messageTitle).append("\" from ").append(ownerName)
+                .append(" in vault \"").append(vaultName).append("\" is now open for you on LegacyVault.\n\n");
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            body.append("Read your message: ").append(link).append("\n\n");
+        }
+        body.append("Sign in to your LegacyVault account and open the vault to read the message and download any attached media.\n\n")
+                .append("Please do not share this email with anyone.");
+
+        sendWithoutOtpFooter(email, "A legacy message for you - LegacyVault", body.toString());
+    }
+
     public void sendVerificationRequestNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
                 "New verification request - LegacyVault",

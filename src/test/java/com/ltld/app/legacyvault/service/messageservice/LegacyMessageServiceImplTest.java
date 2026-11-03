@@ -2,17 +2,19 @@ package com.ltld.app.legacyvault.service.messageservice;
 
 import com.ltld.app.legacyvault.dto.messagedto.CreateLegacyMessageRequest;
 import com.ltld.app.legacyvault.dto.messagedto.LegacyMessageResponse;
-import com.ltld.app.legacyvault.dto.messagedto.UpdateLegacyMessageRequest;
 import com.ltld.app.legacyvault.entity.LegacyMessage;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.LegacyMessageDeliveryTrigger;
 import com.ltld.app.legacyvault.enums.LegacyMessageRecipientType;
 import com.ltld.app.legacyvault.enums.LegacyMessageStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -20,6 +22,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
+import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -59,6 +62,10 @@ class LegacyMessageServiceImplTest {
     private VaultModificationGuard vaultModificationGuard;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private NotificationRepository notificationRepository;
+    @Mock
+    private EmailSender emailSender;
 
     @InjectMocks
     private LegacyMessageServiceImpl messageService;
@@ -76,7 +83,7 @@ class LegacyMessageServiceImplTest {
         vaultId = UUID.randomUUID();
         beneficiaryId = UUID.randomUUID();
 
-        owner = User.builder().id(ownerId).email("owner@test.com").build();
+        owner = User.builder().id(ownerId).email("owner@test.com").fullName("Tran Chu So Huu").build();
         vault = Vault.builder()
                 .id(vaultId)
                 .owner(owner)
@@ -89,6 +96,7 @@ class LegacyMessageServiceImplTest {
                 .vault(vault)
                 .email("child@test.com")
                 .fullName("Nguyen Van Con")
+                .status(BeneficiaryInviteStatus.INVITED)
                 .build();
     }
 
@@ -331,5 +339,139 @@ class LegacyMessageServiceImplTest {
         assertThat(result.get(0).isUnlocked()).isFalse();
         assertThat(result.get(0).getContent()).isNull(); // Content hidden!
     }
-}
 
+    @Test
+    @DisplayName("F4b: Khi Vault mở khóa, phát các lời nhắn ON_CLAIM và gửi thông báo cho Beneficiary đủ điều kiện")
+    void deliverOnClaimMessages_UnlockedVault_DeliversOnClaimAndNotifiesBeneficiaries() {
+        vault.setStatus(VaultStatus.UNLOCKED);
+        User beneficiaryUser = User.builder().id(UUID.randomUUID()).email("child@test.com").fullName("Nguyen Van Con").build();
+        beneficiary.setUser(beneficiaryUser);
+
+        VaultBeneficiary declinedBeneficiary = VaultBeneficiary.builder()
+                .id(UUID.randomUUID())
+                .vault(vault)
+                .email("declined@test.com")
+                .status(BeneficiaryInviteStatus.DECLINED)
+                .build();
+
+        LegacyMessage onClaimMsg = LegacyMessage.builder()
+                .id(UUID.randomUUID())
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .title("Farewell Letter")
+                .content("enc:Goodbye")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.ON_CLAIM)
+                .status(LegacyMessageStatus.ACTIVE)
+                .build();
+
+        LegacyMessage futureMsg = LegacyMessage.builder()
+                .id(UUID.randomUUID())
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .title("Future Capsule")
+                .content("enc:Wait")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.SPECIFIC_DATE)
+                .deliverDate(LocalDate.now().plusDays(30))
+                .status(LegacyMessageStatus.ACTIVE)
+                .build();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE))
+                .thenReturn(List.of(onClaimMsg, futureMsg));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(beneficiary, declinedBeneficiary));
+
+        int count = messageService.deliverOnClaimMessages(vaultId);
+
+        assertThat(count).isEqualTo(1);
+        assertThat(onClaimMsg.getStatus()).isEqualTo(LegacyMessageStatus.DELIVERED);
+        assertThat(onClaimMsg.getDeliveredAt()).isNotNull();
+        assertThat(futureMsg.getStatus()).isEqualTo(LegacyMessageStatus.ACTIVE);
+
+        verify(notificationRepository, times(1)).save(any(Notification.class));
+        verify(emailSender, times(1)).sendLegacyMessageDeliveredNotification(
+                eq("child@test.com"), eq("Nguyen Van Con"), eq("Tran Chu So Huu"),
+                eq("Family Vault"), eq("Farewell Letter"), eq(vaultId));
+    }
+
+    @Test
+    @DisplayName("F4b: Scheduler gửi lời nhắn hẹn giờ SPECIFIC_DATE đến hạn cho người nhận cụ thể")
+    void deliverDueScheduledMessages_DueDate_DeliversAndNotifiesSpecificRecipient() {
+        vault.setStatus(VaultStatus.CLAIMED);
+        User beneficiaryUser = User.builder().id(UUID.randomUUID()).email("child@test.com").fullName("Nguyen Van Con").build();
+        beneficiary.setUser(beneficiaryUser);
+
+        LocalDate today = LocalDate.now();
+        LegacyMessage dueCapsule = LegacyMessage.builder()
+                .id(UUID.randomUUID())
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.SPECIFIC_BENEFICIARY)
+                .recipientBeneficiary(beneficiary)
+                .title("18th Birthday Letter")
+                .content("enc:Happy Birthday")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.SPECIFIC_DATE)
+                .deliverDate(today)
+                .status(LegacyMessageStatus.ACTIVE)
+                .build();
+
+        when(legacyMessageRepository.findDueMessagesForUnlockedVaults(
+                eq(LegacyMessageStatus.ACTIVE), any(),
+                eq(LegacyMessageDeliveryTrigger.ON_CLAIM),
+                eq(LegacyMessageDeliveryTrigger.SPECIFIC_DATE),
+                eq(today)))
+                .thenReturn(List.of(dueCapsule));
+
+        int delivered = messageService.deliverDueScheduledMessages(today);
+
+        assertThat(delivered).isEqualTo(1);
+        assertThat(dueCapsule.getStatus()).isEqualTo(LegacyMessageStatus.DELIVERED);
+        assertThat(dueCapsule.getDeliveredAt()).isNotNull();
+        verify(legacyMessageRepository).save(dueCapsule);
+        verify(notificationRepository).save(any(Notification.class));
+        verify(emailSender).sendLegacyMessageDeliveredNotification(
+                eq("child@test.com"), eq("Nguyen Van Con"), eq("Tran Chu So Huu"),
+                eq("Family Vault"), eq("18th Birthday Letter"), eq(vaultId));
+    }
+
+    @Test
+    @DisplayName("F4b: Beneficiary đã từ chối nhận di sản (DECLINED) không xem được lời nhắn")
+    void getMessagesForBeneficiary_DeclinedBeneficiary_Throws() {
+        UUID userId = UUID.randomUUID();
+        vault.setStatus(VaultStatus.UNLOCKED);
+        beneficiary.setStatus(BeneficiaryInviteStatus.DECLINED);
+        when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId))
+                .thenReturn(Optional.of(beneficiary));
+
+        assertThatThrownBy(() -> messageService.getMessagesForBeneficiary(userId, vaultId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("You have declined this inheritance");
+    }
+
+    @Test
+    @DisplayName("F4b: Beneficiary cố đọc chi tiết Time-Capsule chưa đến ngày mở nhận lỗi 403 FORBIDDEN")
+    void getMessageDetailForBeneficiary_FutureCapsule_ThrowsForbidden() {
+        UUID userId = UUID.randomUUID();
+        UUID msgId = UUID.randomUUID();
+        vault.setStatus(VaultStatus.UNLOCKED);
+        when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId))
+                .thenReturn(Optional.of(beneficiary));
+
+        LegacyMessage futureCapsule = LegacyMessage.builder()
+                .id(msgId)
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .title("Locked Capsule")
+                .content("enc:Secret")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.SPECIFIC_DATE)
+                .deliverDate(LocalDate.now().plusDays(10))
+                .status(LegacyMessageStatus.ACTIVE)
+                .build();
+
+        when(legacyMessageRepository.findByIdAndVaultId(msgId, vaultId))
+                .thenReturn(Optional.of(futureCapsule));
+
+        assertThatThrownBy(() -> messageService.getMessageDetailForBeneficiary(userId, vaultId, msgId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("This time-capsule message is scheduled for");
+    }
+}
