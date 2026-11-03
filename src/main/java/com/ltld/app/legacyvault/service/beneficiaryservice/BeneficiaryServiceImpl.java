@@ -654,7 +654,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assetAccessRecordRepository.insertIfAbsent(UUID.randomUUID(), claimId, assetId, LocalDateTime.now());
     }
 
-
     // N2-access: id các tài sản ACTIVE đã phân bổ cho người khác (người này không được xem/tải/đếm).
     // Tính theo effective_beneficiary nên tự đúng sau fallback của N2b. Tài sản chưa có phân bổ thì không bị ẩn (Q47 b).
     private Set<UUID> hiddenAssetIds(UUID vaultId, UUID currentUserId) {
