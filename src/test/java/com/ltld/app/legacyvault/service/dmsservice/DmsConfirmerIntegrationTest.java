@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.entity.*;
+import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
@@ -12,13 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -40,16 +36,11 @@ import static org.mockito.Mockito.*;
         "app.security.crypto.master-key=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
         "spring.mail.username=test@example.com",
         "spring.mail.password=test",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.hibernate.ddl-auto=create",
         "app.dms.scheduler.enabled=false"
 })
-@Testcontainers(disabledWithoutDocker = true)
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class DmsConfirmerIntegrationTest {
-
-    @Container
-    @ServiceConnection
-    static MySQLContainer mysql = new MySQLContainer("mysql:8.4");
+// n9: dùng container MySQL chung (MySqlTestContainer) như các integration test khác
+class DmsConfirmerIntegrationTest extends MySqlTestContainer {
 
     @MockitoBean
     private EmailSender emailSender;                                     // không gửi mail thật

@@ -135,11 +135,9 @@ class DmsConfirmTokenSecurityTest {
         verify(dmsConfirmerRepository).findById(confirmerId);
     }
 
-    // SecurityConfig trên main chưa permitAll POST /api/dms/confirm (PR #147 + X2 sẽ thêm), nên gửi kèm access token
-    // để request tới được controller; header không ảnh hưởng việc kiểm token trong body.
+    // M4: POST /api/dms/confirm đã permitAll nên gửi KHÔNG có Bearer, đúng như người xác nhận chéo (ẩn danh)
     private MockHttpServletRequestBuilder confirm(String token, String decision) {
         return post("/api/dms/confirm")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"token\":\"" + token + "\",\"decision\":\"" + decision + "\"}");
     }

@@ -143,7 +143,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     @Override
     @Transactional
     public DmsConfirmerResponse addConfirmer(UUID ownerId, DmsConfirmerRequest request) {
-        // m4: mọi lỗi dùng ErrorCode có sẵn đúng nghĩa (CONFLICT / BAD_REQUEST / DATA_CONFLICT)
+        // m4: mọi lỗi dùng ErrorCode có sẵn đúng nghĩa (CONFLICT / BAD_REQUEST); n7: trùng email dùng CONFLICT để FE hiện câu cụ thể của BE
         DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
                 .orElseThrow(() -> new DmsException(ErrorCode.CONFLICT,
                         "Configure and enable the Dead Man's Switch before adding trusted confirmers."));
@@ -175,7 +175,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         }
 
         if (dmsConfirmerRepository.existsByDmsConfigIdAndEmailIgnoreCase(config.getId(), normalizedEmail)) {
-            throw new DmsException(ErrorCode.DATA_CONFLICT, "This email is already added as a trusted confirmer.");
+            throw new DmsException(ErrorCode.CONFLICT, "This email is already added as a trusted confirmer.");
         }
 
         DmsConfirmer confirmer = DmsConfirmer.builder()

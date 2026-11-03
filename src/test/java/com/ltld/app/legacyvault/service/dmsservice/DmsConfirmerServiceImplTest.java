@@ -394,7 +394,7 @@ class DmsConfirmerServiceImplTest {
     }
 
     @Test
-    @DisplayName("X2 m4: đủ 2 người -> CONFLICT; trùng email -> DATA_CONFLICT; DMS chưa cấu hình -> CONFLICT")
+    @DisplayName("X2 m4: đủ 2 người -> CONFLICT; trùng email -> CONFLICT (n7); DMS chưa cấu hình -> CONFLICT")
     void addConfirmer_limitDuplicateNotConfigured_useExistingCodes() {
         when(dmsConfirmerRepository.countByDmsConfigId(config.getId())).thenReturn(2L);
         assertEquals(ErrorCode.CONFLICT, assertThrows(BusinessException.class,
@@ -402,7 +402,7 @@ class DmsConfirmerServiceImplTest {
 
         when(dmsConfirmerRepository.countByDmsConfigId(config.getId())).thenReturn(1L);
         when(dmsConfirmerRepository.existsByDmsConfigIdAndEmailIgnoreCase(config.getId(), "c@example.com")).thenReturn(true);
-        assertEquals(ErrorCode.DATA_CONFLICT, assertThrows(BusinessException.class,
+        assertEquals(ErrorCode.CONFLICT, assertThrows(BusinessException.class,
                 () -> confirmerService.addConfirmer(owner.getId(), request("c@example.com"))).getErrorCode());
 
         UUID otherOwner = UUID.randomUUID();

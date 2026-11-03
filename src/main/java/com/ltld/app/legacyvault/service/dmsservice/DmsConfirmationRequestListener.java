@@ -5,6 +5,9 @@ import com.ltld.app.legacyvault.service.dmsservice.DmsConfirmerService.Confirmer
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -30,6 +33,19 @@ public class DmsConfirmationRequestListener {
     private final DmsActivationProcessor dmsActivationProcessor;
     private final EmailSender emailSender;
 
+    @Value("${app.frontend.base-url:}")
+    private String frontendBaseUrl;
+
+    // m9: báo sớm lúc khởi động (giống VnpayProperties của T1): thiếu FRONTEND_BASE_URL thì mọi mail xác nhận đều lỗi
+    // và DMS có confirmer sẽ kích hoạt thẳng, không hỏi xác nhận.
+    @EventListener(ApplicationReadyEvent.class)
+    public void warnIfFrontendBaseUrlMissing() {
+        if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
+            log.warn("X2: app.frontend.base-url (FRONTEND_BASE_URL) is empty; trusted confirmer emails cannot be sent "
+                    + "and DMS will activate without cross-confirmation.");
+        }
+    }
+
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onConfirmationRequested(DmsConfirmationRequestedEvent event) {
         ConfirmationMails mails = dmsConfirmerService.prepareConfirmationMails(event.configId(), event.deadlineAt());
@@ -50,7 +66,8 @@ public class DmsConfirmationRequestListener {
         }
 
         if (notifiedNames.isEmpty()) {
-            log.warn("X2: no trusted confirmer could be emailed for dmsConfig {}; triggering as usual", event.configId());
+            // m9: không gửi được cho ai là sự cố vận hành (SMTP, thiếu app.frontend.base-url), không phải cảnh báo thường
+            log.error("X2: no trusted confirmer could be emailed for dmsConfig {}; triggering as usual", event.configId());
             dmsActivationProcessor.activateBecauseConfirmersUnreached(event.configId(), event.deadlineAt(),
                     LocalDateTime.now());
             return;

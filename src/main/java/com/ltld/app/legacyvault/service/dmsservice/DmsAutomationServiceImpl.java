@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -41,23 +40,17 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
     // một Owner lỗi chỉ bị log, không chặn các Owner còn lại.
     @Override
     public void processOverdueDms(LocalDateTime now) {
-        List<DmsConfig> activeDue = dmsConfigRepository
-                .findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.ACTIVE, now);
-        if (activeDue != null) {
-            for (DmsConfig config : activeDue) {
-                UUID configId = config.getId();
-                runIsolated("trigger", configId, () -> processor.trigger(configId, now));
-            }
+        for (DmsConfig config : dmsConfigRepository
+                .findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.ACTIVE, now)) {
+            UUID configId = config.getId();
+            runIsolated("trigger", configId, () -> processor.trigger(configId, now));
         }
 
         // [X2 / Sửa #5]: quét thêm các DMS đang chờ xác nhận chéo (PENDING_CONFIRMATION) đã quá hạn 72 giờ
-        List<DmsConfig> pendingExpired = dmsConfigRepository
-                .findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.PENDING_CONFIRMATION, now);
-        if (pendingExpired != null) {
-            for (DmsConfig config : pendingExpired) {
-                UUID configId = config.getId();
-                runIsolated("confirm-timeout", configId, () -> processor.processExpiredConfirmation(configId, now));
-            }
+        for (DmsConfig config : dmsConfigRepository
+                .findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.PENDING_CONFIRMATION, now)) {
+            UUID configId = config.getId();
+            runIsolated("confirm-timeout", configId, () -> processor.processExpiredConfirmation(configId, now));
         }
     }
 
