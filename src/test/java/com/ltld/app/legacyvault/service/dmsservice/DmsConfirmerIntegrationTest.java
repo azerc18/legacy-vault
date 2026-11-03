@@ -4,17 +4,20 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.integration.MySqlTestContainer;
+import com.ltld.app.legacyvault.service.paymentservice.EntitlementServiceImpl;
 import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -46,6 +49,9 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
     private EmailSender emailSender;                                     // không gửi mail thật
     @MockitoBean
     private ExecutorNotificationService executorNotificationService;   // không gửi mail thật
+    // T1 đã merge: thêm người xác nhận là tính năng VIP; test này về luồng xác nhận, không về gói (gói có test riêng)
+    @MockitoSpyBean
+    private EntitlementServiceImpl entitlementService;
 
     @Autowired private DmsConfigService dmsConfigService;
     @Autowired private DmsConfirmerService dmsConfirmerService;
@@ -66,6 +72,11 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
 
     private final List<UUID> ownerIds = new ArrayList<>();
     private final List<UUID> userIds = new ArrayList<>();
+
+    @BeforeEach
+    void ownersAreVip() {
+        doNothing().when(entitlementService).assertCanUseTrustedConfirmers(any());
+    }
 
     @AfterEach
     void cleanUp() {
