@@ -29,8 +29,10 @@ public class AuditDescriptionBuilder {
             AuditAction.ASSET_VIEWED,
             AuditAction.ASSET_DOWNLOADED,
             AuditAction.LEGAL_DOCUMENT_VIEWED,
-            AuditAction.VERIFICATION_ATTACHMENT_VIEWED,
-            AuditAction.DOSSIER_DOWNLOADED
+            AuditAction.DOSSIER_DOWNLOADED,
+            // M2: lượt Owner tự tải đã bị query loại (M1), nên chỉ còn Beneficiary
+            AuditAction.DOCUMENT_DOWNLOADED,
+            AuditAction.EXECUTOR_VAULT_VIEWED
     ));
 
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
@@ -86,6 +88,7 @@ public class AuditDescriptionBuilder {
             case DOCUMENT_UPLOADED -> "Uploaded a new document.";
             case DOCUMENT_DELETED -> "Deleted a document.";
             case ADMIN_VAULT_VIEWED -> "An administrator viewed the vault details.";
+            case EXECUTOR_VAULT_VIEWED -> "Your executor viewed the vault's asset list.";
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
             case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
             case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";

@@ -42,6 +42,8 @@ public enum AuditAction {
     DOCUMENT_DELETED,
     // FR-20: Admin xem chi tiết Két sắt
     ADMIN_VAULT_VIEWED,
+    // F6 (M2): Executor xem danh sách tài sản của vault; Owner thấy trong tab "Ai đã xem"
+    EXECUTOR_VAULT_VIEWED,
     // BR-05: xóa vĩnh viễn Vault sau 2 năm lưu trữ
     VAULT_PURGED,
     // O5: Admin tạm dừng / mở lại DMS

@@ -83,13 +83,21 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
     @org.springframework.data.jpa.repository.Query(
         value = "SELECT a FROM AuditLog a " +
                 "LEFT JOIN FETCH a.actor " +
-                "WHERE a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                // M3: LEGAL_DOCUMENT_VIEWED ghi vaultId null (một hồ sơ gồm nhiều vault), nên khớp theo hồ sơ của Owner
+                "WHERE (a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                "       OR (a.entityType = 'LegalVerificationRequest' " +
+                "           AND a.entityId IN (SELECT r.id FROM LegalVerificationRequest r WHERE r.owner.id = :ownerId))) " +
+                // M1: chỉ lượt truy cập của người khác Owner; actor null (hệ thống) vẫn hiện
+                "AND (a.actor IS NULL OR a.actor.id <> :ownerId) " +
                 "AND a.action IN :accessActions " +
                 "AND a.createdAt >= :startDate " +
                 "AND a.createdAt <= :endDate " +
                 "ORDER BY a.createdAt DESC, a.id DESC",
         countQuery = "SELECT COUNT(a) FROM AuditLog a " +
-                     "WHERE a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                     "WHERE (a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                     "       OR (a.entityType = 'LegalVerificationRequest' " +
+                     "           AND a.entityId IN (SELECT r.id FROM LegalVerificationRequest r WHERE r.owner.id = :ownerId))) " +
+                     "AND (a.actor IS NULL OR a.actor.id <> :ownerId) " +
                      "AND a.action IN :accessActions " +
                      "AND a.createdAt >= :startDate " +
                      "AND a.createdAt <= :endDate"

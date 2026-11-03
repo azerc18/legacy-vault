@@ -195,8 +195,9 @@ class OwnerActivityLogServiceImplTest {
                 AuditAction.ASSET_VIEWED,
                 AuditAction.ASSET_DOWNLOADED,
                 AuditAction.LEGAL_DOCUMENT_VIEWED,
-                AuditAction.VERIFICATION_ATTACHMENT_VIEWED,
-                AuditAction.DOSSIER_DOWNLOADED
+                AuditAction.DOSSIER_DOWNLOADED,
+                AuditAction.DOCUMENT_DOWNLOADED,
+                AuditAction.EXECUTOR_VAULT_VIEWED
         );
         assertThatThrownBy(() -> AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS.add(AuditAction.VAULT_CREATED))
                 .isInstanceOf(UnsupportedOperationException.class);
