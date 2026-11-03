@@ -36,12 +36,15 @@ public class InheritanceDossierPdfService {
     private static final Color MUTED = new Color(0x5F, 0x63, 0x68);
     private static final Color HEAD_BG = new Color(0xE8, 0xED, 0xF7);
 
-    private static final Map<AssetType, String> ASSET_TYPE = Map.of(
-            AssetType.BANK_ACCOUNT, "Tài khoản ngân hàng",
-            AssetType.CRYPTO_WALLET, "Ví tiền mã hoá",
-            AssetType.SOCIAL_MEDIA, "Mạng xã hội",
-            AssetType.DOCUMENT, "Tài liệu",
-            AssetType.OTHER, "Khác");
+    private static final Map<AssetType, String> ASSET_TYPE = Map.ofEntries(
+            Map.entry(AssetType.BANK_ACCOUNT, "Tài khoản ngân hàng"),
+            Map.entry(AssetType.EXCHANGE_ACCOUNT, "Tài khoản sàn giao dịch"),
+            Map.entry(AssetType.CRYPTO_WALLET, "Ví tiền mã hoá"),
+            Map.entry(AssetType.E_WALLET, "Ví điện tử"),
+            Map.entry(AssetType.SOCIAL_MEDIA, "Mạng xã hội"),
+            Map.entry(AssetType.EMAIL, "Email"),
+            Map.entry(AssetType.DOCUMENT, "Tài liệu"),
+            Map.entry(AssetType.OTHER, "Khác"));
     private static final Map<TransferMechanism, String> MECHANISM = Map.of(
             TransferMechanism.LEGAL_CLAIM_DOSSIER, "Hồ sơ khai nhận pháp lý",
             TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY, "Chuyển giao khoá mật mã",
@@ -55,8 +58,38 @@ public class InheritanceDossierPdfService {
             DocumentType.OWNERSHIP_PAPER, "Giấy tờ sở hữu",
             DocumentType.IDENTITY_CARD, "Giấy tờ tuỳ thân",
             DocumentType.OTHER, "Khác");
+    private static final Map<String, String> FIELD_LABEL = Map.ofEntries(
+            // Ngân hàng / sàn
+            Map.entry("institutionName", "Ngân hàng / sàn"),
+            Map.entry("branchName", "Chi nhánh"),
+            Map.entry("accountNumber", "Số tài khoản"),
+            Map.entry("accountId", "Mã tài khoản"),
+            Map.entry("estimatedValue", "Giá trị ước tính"),
+            Map.entry("currency", "Tiền tệ"),
+            Map.entry("legalInstruction", "Hướng dẫn của chủ di sản"),
+            // Tài liệu
+            Map.entry("documentTitle", "Tên tài liệu"),
+            Map.entry("issuer", "Cơ quan cấp"),
+            Map.entry("location", "Nơi cất bản gốc"),
+            // Ví crypto
+            Map.entry("walletProvider", "Ví"),
+            Map.entry("blockchainNetwork", "Mạng blockchain"),
+            Map.entry("walletAddress", "Địa chỉ ví"),
+            // MXH / email / ví điện tử
+            Map.entry("platform", "Nền tảng"),
+            Map.entry("usernameOrHandle", "Tên tài khoản"),
+            Map.entry("wish", "Di nguyện"),
+            Map.entry("deviceOrSimLocation", "Nơi cất điện thoại / SIM / thiết bị 2FA"),
+            // Khác
+            Map.entry("title", "Tiêu đề"),
+            Map.entry("description", "Mô tả"));
 
+    private static final Map<String, String> VALUE_LABEL = Map.of(
+            "MEMORIALIZE", "Chuyển sang trang tưởng niệm",
+            "DELETE", "Xoá tài khoản",
+            "TRANSFER_DATA", "Tải dữ liệu và chuyển giao");
     // Hướng dẫn thủ tục theo cơ chế (tham khảo, không thay thế tư vấn pháp lý)
+
     private static final Map<TransferMechanism, List<String>> PROCEDURE = Map.of(
             TransferMechanism.LEGAL_CLAIM_DOSSIER, List.of(
                     "Chuẩn bị: bản sao trích lục khai tử của người để lại di sản; di chúc (nếu có); giấy tờ tuỳ thân của người thụ hưởng; giấy tờ chứng minh quan hệ với người để lại di sản (khai sinh, đăng ký kết hôn...).",
@@ -129,14 +162,20 @@ public class InheritanceDossierPdfService {
         if (d.assets().isEmpty()) {
             doc.add(note("Không có tài sản nào đang được phân bổ cho bạn trong kho di sản này."));
         } else {
-            PdfPTable t = table(new float[]{5, 27, 17, 21, 14, 16});
+            PdfPTable t = table(new float[]{5, 37, 14, 18, 13, 13});
             for (String h : List.of("#", "Tài sản", "Loại", "Cơ chế chuyển giao", "Hình thức", "Tỷ lệ")) header(t, h);
             int i = 1;
             for (AssetLine a : d.assets()) {
                 t.addCell(cell(String.valueOf(i++), regular, 9));
-                String name = a.assetName() + (a.viaFallback() ? "\n(nhận thay người thụ hưởng chính)" : "")
-                        + (a.note() == null || a.note().isBlank() ? "" : "\nGhi chú: " + a.note());
-                t.addCell(cell(name, regular, 9));
+                StringBuilder name = new StringBuilder(a.assetName());
+                if (a.publicFields() != null) {
+                    a.publicFields().forEach((k, v) -> name.append("\n")
+                            .append(FIELD_LABEL.getOrDefault(k, k)).append(": ")
+                            .append(displayValue(k, v)));
+                }
+                if (a.viaFallback()) name.append("\n(nhận thay người thụ hưởng chính)");
+                if (a.note() != null && !a.note().isBlank()) name.append("\nGhi chú: ").append(a.note());
+                t.addCell(cell(name.toString(), regular, 9));
                 t.addCell(cell(ASSET_TYPE.getOrDefault(a.type(), String.valueOf(a.type())), regular, 9));
                 t.addCell(cell(MECHANISM.getOrDefault(a.mechanism(), String.valueOf(a.mechanism())), regular, 9));
                 t.addCell(cell(MODE.getOrDefault(a.mode(), String.valueOf(a.mode())), regular, 9));
@@ -259,5 +298,17 @@ public class InheritanceDossierPdfService {
                     new Phrase("LegacyVault · Trang " + writer.getPageNumber(), font(regular, 8, MUTED)),
                     (document.left() + document.right()) / 2, document.bottom() - 24, 0);
         }
+    }
+
+    private static String displayValue(String key, String v) {
+        if ("estimatedValue".equals(key)) {
+            try {
+                return java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("vi-VN"))
+                        .format(new java.math.BigDecimal(v));   // 150000000 -> 150.000.000
+            } catch (NumberFormatException e) {
+                return v;
+            }
+        }
+        return VALUE_LABEL.getOrDefault(v, v);
     }
 }
