@@ -456,7 +456,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
 }
 
 
-/* ---------- FR-04: tài liệu pháp lý ---------- */
+/* ---------- FR-04 & X5: tài liệu pháp lý + quản lý phiên bản ---------- */
 const ALLOWED = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
 const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -467,6 +467,11 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [deleting, setDeleting] = useState(null);
+    const [updatingDoc, setUpdatingDoc] = useState(null);
+    const [newVersionFile, setNewVersionFile] = useState(null);
+    const [historyDoc, setHistoryDoc] = useState(null);
+    const [versions, setVersions] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     const load = useCallback(() => {
         ownerApi.listDocuments(vaultId).then(setDocs).catch((e) => setError(getErrorMessage(e, 'Could not load documents.')));
@@ -474,12 +479,18 @@ function DocumentSection({ vaultId, editable, onChanged }) {
 
     useEffect(() => { load(); }, [load]);
 
+    const validateFile = (f) => {
+        if (!f) return 'Please choose a file.';
+        if (!ALLOWED.some((ext) => f.name.toLowerCase().endsWith(ext))) return 'Only PDF, DOC/DOCX, JPG/PNG are allowed.';
+        if (f.size > MAX_SIZE) return 'File exceeds the 10MB limit.';
+        return '';
+    };
+
     const upload = async (e) => {
         e.preventDefault();
         setError('');
-        if (!file) return setError('Please choose a file.');
-        if (!ALLOWED.some((ext) => file.name.toLowerCase().endsWith(ext))) return setError('Only PDF, DOC/DOCX, JPG/PNG are allowed.');
-        if (file.size > MAX_SIZE) return setError('File exceeds the 10MB limit.');
+        const msg = validateFile(file);
+        if (msg) return setError(msg);
         setLoading(true);
         try {
             await ownerApi.uploadDocument(vaultId, type, file);
@@ -489,6 +500,41 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             setError(getErrorMessage(err, 'Upload failed.'));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const uploadNewVersion = async (e) => {
+        e.preventDefault();
+        if (!updatingDoc) return;
+        setError('');
+        const msg = validateFile(newVersionFile);
+        if (msg) return setError(msg);
+        setLoading(true);
+        try {
+            await ownerApi.uploadDocument(vaultId, updatingDoc.documentType, newVersionFile, updatingDoc.documentGroupId);
+            setUpdatingDoc(null);
+            setNewVersionFile(null);
+            load(); onChanged();
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not upload new version.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openHistory = async (d) => {
+        setError('');
+        setHistoryDoc(d);
+        setVersions([]);
+        setHistoryLoading(true);
+        try {
+            const list = await ownerApi.getDocumentVersions(vaultId, d.documentGroupId);
+            setVersions(list);
+        } catch (err) {
+            setError(getErrorMessage(err, 'Could not load version history.'));
+            setHistoryDoc(null);
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -518,17 +564,34 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             {docs.length > 0 && (
                 <ul className="divide-y divide-outline-variant/30 mb-5">
                     {docs.map((d) => (
-                        <li key={d.id} className="py-3 flex items-center gap-3 text-sm">
+                        <li key={d.id} className="py-3 flex flex-wrap items-center gap-3 text-sm">
                             <Icon name="description" className="text-secondary" />
                             <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{d.fileName}</p>
+                                <div className="flex items-center gap-2">
+                                    <p className="font-semibold truncate">{d.fileName}</p>
+                                    {d.totalVersions > 1 && (
+                                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed shrink-0">
+                                            v{d.version}
+                                        </span>
+                                    )}
+                                </div>
                                 <p className="text-xs text-outline">{humanize(d.documentType)} · {formatDate(d.uploadedAt, true)}</p>
                             </div>
-                            <button onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1">
+                            <button type="button" onClick={() => download(d)} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1" title="Download">
                                 <Icon name="download" className="text-[18px]" />
                             </button>
+                            {d.documentGroupId && (
+                                <button type="button" onClick={() => openHistory(d)} className="h-9 px-3 rounded-lg font-semibold text-secondary hover:bg-surface-container-low">
+                                    History
+                                </button>
+                            )}
+                            {editable && d.documentGroupId && (
+                                <button type="button" onClick={() => { setUpdatingDoc(d); setNewVersionFile(null); setError(''); }} className="h-9 px-3 rounded-lg font-semibold text-primary hover:bg-surface-container-low">
+                                    Upload new version
+                                </button>
+                            )}
                             {editable && (
-                                <button onClick={() => setDeleting(d)} className="h-9 px-3 rounded-lg font-semibold text-error hover:bg-error-container">Delete</button>
+                                <button type="button" onClick={() => setDeleting(d)} className="h-9 px-3 rounded-lg font-semibold text-error hover:bg-error-container">Delete</button>
                             )}
                         </li>
                     ))}
@@ -545,6 +608,57 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Uploading...' : 'Upload'}</button>
                     </form>
                 </>
+            )}
+            {updatingDoc && (
+                <Modal onClose={() => { setUpdatingDoc(null); setNewVersionFile(null); }}>
+                    <h3 className="font-title-lg text-title-lg mb-2">Upload new version</h3>
+                    <p className="text-sm text-on-surface-variant mb-4">
+                        Replacing <b>{updatingDoc.fileName}</b> ({humanize(updatingDoc.documentType)}, current v{updatingDoc.version || 1}). Previous versions remain in history.
+                    </p>
+                    <form onSubmit={uploadNewVersion} className="space-y-4">
+                        <FilePicker file={newVersionFile} onChange={setNewVersionFile} accept={ALLOWED.join(',')} disabled={loading} />
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>Cancel</button>
+                            <button type="submit" disabled={loading || !newVersionFile} className={btnPrimary}>
+                                {loading ? 'Uploading...' : `Upload v${(updatingDoc.version || 1) + 1}`}
+                            </button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+            {historyDoc && (
+                <Modal onClose={() => setHistoryDoc(null)}>
+                    <h3 className="font-title-lg text-title-lg mb-1">Version history</h3>
+                    <p className="text-xs text-outline mb-4">{humanize(historyDoc.documentType)}</p>
+                    {historyLoading ? (
+                        <p className="text-sm text-on-surface-variant">Loading...</p>
+                    ) : (
+                        <ul className="divide-y divide-outline-variant/30 mb-4 max-h-72 overflow-y-auto">
+                            {versions.map((v) => (
+                                <li key={v.id} className="py-2.5 flex items-center justify-between gap-3 text-sm">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold">v{v.version}</span>
+                                            <span className="truncate">{v.fileName}</span>
+                                            {v.isCurrent && (
+                                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                                                    Current
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-outline">{formatDate(v.uploadedAt, true)}</p>
+                                    </div>
+                                    <button type="button" onClick={() => download(v)} className="h-8 px-2.5 rounded-lg font-semibold text-primary hover:bg-surface-container-low flex items-center gap-1 shrink-0">
+                                        <Icon name="download" className="text-[18px]" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <div className="flex justify-end">
+                        <button type="button" onClick={() => setHistoryDoc(null)} className={btnOutline}>Close</button>
+                    </div>
+                </Modal>
             )}
             <ConfirmDialog
                 open={!!deleting}

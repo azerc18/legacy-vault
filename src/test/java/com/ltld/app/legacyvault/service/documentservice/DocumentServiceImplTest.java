@@ -212,7 +212,7 @@ class DocumentServiceImplTest {
                 .build();
 
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
-        when(legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vaultId))
+        when(legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vaultId))
                 .thenReturn(List.of(doc));
 
         List<DocumentResponse> result = documentService.getDocumentsByVault(vaultId, ownerId);
@@ -411,5 +411,251 @@ class DocumentServiceImplTest {
 
         verify(fileStorageService, never()).deleteFile(any());
         verify(legalDocumentRepository, never()).delete(any());
+    }
+
+    // =========================================================================
+    // X5: Versioning Tests
+    // =========================================================================
+
+    @Test
+    @DisplayName("X5: uploadDocument bản đầu tiên (documentGroupId null) -> sinh group mới, version = 1, isCurrent = true")
+    void uploadDocument_FirstVersion_Success() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "dichuc_v1.pdf", "application/pdf", "noi dung di chuc v1".getBytes());
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(cryptoService.encryptBytes(any())).thenReturn("encrypted_v1".getBytes());
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/storage/dichuc_v1.pdf");
+        when(legalDocumentRepository.save(any(LegalDocument.class))).thenAnswer(invocation -> {
+            LegalDocument d = invocation.getArgument(0);
+            d.setId(UUID.randomUUID());
+            return d;
+        });
+
+        LegalDocument result = documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, file);
+
+        assertThat(result.getVersion()).isEqualTo(1);
+        assertThat(result.isCurrent()).isTrue();
+        assertThat(result.getDocumentGroupId()).isNotNull();
+        verify(legalDocumentRepository).save(any(LegalDocument.class));
+    }
+
+    @Test
+    @DisplayName("X5 (m2): uploadDocument phiên bản mới (v2) cùng documentGroupId -> version = 2, giữ loại tài liệu của nhóm, bản cũ chuyển isCurrent = false")
+    void uploadDocument_NewVersion_Success() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        LegalDocument v1Doc = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v1.pdf")
+                .version(1)
+                .isCurrent(true)
+                .build();
+
+        MockMultipartFile file = new MockMultipartFile("file", "dichuc_v2.pdf", "application/pdf", "noi dung di chuc v2 sua doi".getBytes());
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByDocumentGroupIdOrderByVersionDesc(groupId)).thenReturn(List.of(v1Doc));
+        when(cryptoService.encryptBytes(any())).thenReturn("encrypted_v2".getBytes());
+        when(fileStorageService.storeFile(any(), any())).thenReturn("/storage/dichuc_v2.pdf");
+        when(legalDocumentRepository.save(any(LegalDocument.class))).thenAnswer(invocation -> {
+            LegalDocument d = invocation.getArgument(0);
+            if (d.getId() == null) d.setId(UUID.randomUUID());
+            return d;
+        });
+
+        // Gửi kèm IDENTITY_CARD nhưng nhóm gốc là WILL -> phải giữ WILL theo m2
+        LegalDocument result = documentService.uploadDocument(ownerId, vaultId, DocumentType.IDENTITY_CARD, file, groupId);
+
+        assertThat(result.getVersion()).isEqualTo(2);
+        assertThat(result.isCurrent()).isTrue();
+        assertThat(result.getDocumentGroupId()).isEqualTo(groupId);
+        assertThat(result.getDocumentType()).isEqualTo(DocumentType.WILL);
+        assertThat(v1Doc.isCurrent()).isFalse();
+    }
+
+    @Test
+    @DisplayName("X5: uploadDocument bản mới với groupId không tồn tại -> Báo lỗi 404 NOT_FOUND")
+    void uploadDocument_NewVersion_GroupNotFound_Throws404() {
+        UUID nonExistentGroupId = UUID.randomUUID();
+        MockMultipartFile file = new MockMultipartFile("file", "dichuc_v2.pdf", "application/pdf", "content".getBytes());
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByDocumentGroupIdOrderByVersionDesc(nonExistentGroupId)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> documentService.uploadDocument(ownerId, vaultId, DocumentType.WILL, file, nonExistentGroupId))
+                .isInstanceOf(VaultException.class)
+                .extracting("status").isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("X5 (m3): getDocumentsByVault lấy bản hiện hành và đếm phiên bản bằng 1 query gom nhóm")
+    void getDocumentsByVault_AggregatesVersionCountsInOneQuery() {
+        UUID groupId = UUID.randomUUID();
+        LegalDocument v2 = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v2.pdf")
+                .version(2)
+                .isCurrent(true)
+                .uploadedAt(LocalDateTime.now())
+                .build();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vaultId))
+                .thenReturn(List.of(v2));
+        when(legalDocumentRepository.countVersionsByGroup(vaultId))
+                .thenReturn(List.<Object[]>of(new Object[]{groupId, 2L}));
+
+        List<DocumentResponse> result = documentService.getDocumentsByVault(vaultId, ownerId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getVersion()).isEqualTo(2);
+        assertThat(result.get(0).getTotalVersions()).isEqualTo(2L);
+        verify(legalDocumentRepository, never()).countByDocumentGroupId(any());
+    }
+
+    @Test
+    @DisplayName("X5: getDocumentVersions -> Trả về danh sách tất cả các phiên bản của nhóm")
+    void getDocumentVersions_Success() {
+        UUID groupId = UUID.randomUUID();
+        LegalDocument v2 = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v2.pdf")
+                .version(2)
+                .isCurrent(true)
+                .uploadedAt(LocalDateTime.now())
+                .build();
+        LegalDocument v1 = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v1.pdf")
+                .version(1)
+                .isCurrent(false)
+                .uploadedAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(mockVault));
+        when(legalDocumentRepository.findByDocumentGroupIdOrderByVersionDesc(groupId)).thenReturn(List.of(v2, v1));
+
+        List<DocumentResponse> versions = documentService.getDocumentVersions(vaultId, groupId, ownerId);
+
+        assertThat(versions).hasSize(2);
+        assertThat(versions.get(0).getVersion()).isEqualTo(2);
+        assertThat(versions.get(0).isCurrent()).isTrue();
+        assertThat(versions.get(1).getVersion()).isEqualTo(1);
+        assertThat(versions.get(1).isCurrent()).isFalse();
+    }
+
+    @Test
+    @DisplayName("X5: deleteDocument bản v2 (current) -> Bản v1 còn lại được tự động thăng hạng lên isCurrent = true")
+    void deleteDocument_CurrentVersion_PromotesPreviousVersion() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        UUID v2Id = UUID.randomUUID();
+        LegalDocument v2 = LegalDocument.builder()
+                .id(v2Id)
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v2.pdf")
+                .version(2)
+                .isCurrent(true)
+                .fileUrlEncrypted("/storage/v2.pdf")
+                .build();
+
+        LegalDocument v1 = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v1.pdf")
+                .version(1)
+                .isCurrent(false)
+                .fileUrlEncrypted("/storage/v1.pdf")
+                .build();
+
+        when(legalDocumentRepository.findById(v2Id)).thenReturn(Optional.of(v2));
+        when(legalDocumentRepository.findFirstByDocumentGroupIdOrderByVersionDesc(groupId)).thenReturn(Optional.of(v1));
+
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            documentService.deleteDocument(v2Id, ownerId);
+            verify(legalDocumentRepository).delete(v2);
+            assertThat(v1.isCurrent()).isTrue();
+            verify(legalDocumentRepository).saveAndFlush(v1);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    @DisplayName("X5 (m5): toResponse lấy totalVersions thực tế từ DB khi bản cũ đã bị xóa")
+    void toResponse_UsesActualRemainingVersionCount() {
+        UUID groupId = UUID.randomUUID();
+        LegalDocument v2Only = LegalDocument.builder()
+                .id(UUID.randomUUID())
+                .vault(mockVault)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v2.pdf")
+                .version(2)
+                .isCurrent(true)
+                .build();
+
+        when(legalDocumentRepository.countByDocumentGroupId(groupId)).thenReturn(1L);
+
+        DocumentResponse response = documentService.toResponse(v2Only);
+
+        assertThat(response.getVersion()).isEqualTo(2);
+        assertThat(response.getTotalVersions()).isEqualTo(1L);
+        assertThat(response.isCurrent()).isTrue();
+    }
+
+    @Test
+    @DisplayName("X5 (M1): LegalDocument tạo trực tiếp không qua service -> @PrePersist tự gán documentGroupId và version = 1")
+    void legalDocument_PrePersist_SetsDefaultGroupAndVersion() throws Exception {
+        LegalDocument doc = LegalDocument.builder()
+                .vault(mockVault)
+                .documentType(DocumentType.WILL)
+                .fileName("test.pdf")
+                .fileUrlEncrypted("uploads/test.bin")
+                .build();
+
+        assertThat(doc.getDocumentGroupId()).isNull();
+        var method = LegalDocument.class.getDeclaredMethod("defaultDocumentGroup");
+        method.setAccessible(true);
+        method.invoke(doc);
+
+        assertThat(doc.getDocumentGroupId()).isNotNull();
+        assertThat(doc.getVersion()).isEqualTo(1);
+        assertThat(doc.isCurrent()).isTrue();
+    }
+
+    @Test
+    @DisplayName("X5: Các phương thức derived query trong LegalDocumentRepository khớp hoàn toàn với thuộc tính của LegalDocument")
+    void repositoryDerivedQueries_MatchEntityProperties() {
+        List<String> derivedMethods = List.of(
+                "findByVaultId",
+                "findByIdAndVaultId",
+                "findByIdAndVaultIdAndIsCurrentTrue",
+                "findByVaultIdOrderByUploadedAtDescIdDesc",
+                "findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc",
+                "findByDocumentGroupIdOrderByVersionDesc",
+                "findFirstByDocumentGroupIdOrderByVersionDesc",
+                "countByDocumentGroupId",
+                "countByVaultId",
+                "countByVaultIdAndIsCurrentTrue"
+        );
+        for (String name : derivedMethods) {
+            org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+                    () -> new org.springframework.data.repository.query.parser.PartTree(name, LegalDocument.class),
+                    "Invalid derived query method: " + name
+            );
+        }
     }
 }

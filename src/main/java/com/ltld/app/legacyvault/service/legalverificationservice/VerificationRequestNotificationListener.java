@@ -1,10 +1,13 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.event.VerificationMessagePostedEvent;
 import com.ltld.app.legacyvault.event.VerificationRequestSubmittedEvent;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +29,8 @@ public class VerificationRequestNotificationListener {
 
     private final UserRepository userRepository;
     private final EmailSender emailSender;
+    private final VaultBeneficiaryRepository beneficiaryRepository;
+    private final ExecutorAssignmentRepository executorAssignmentRepository;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -57,6 +62,17 @@ public class VerificationRequestNotificationListener {
         for (User verifier : recipients) {
             if (verifier.getId().equals(ownerId) || verifier.getId().equals(executorId)) {
                 continue;
+            }
+            // N2-verifier: không báo hồ sơ cho Verifier là Executor của Owner hoặc beneficiary của vault trong hồ sơ
+            try {
+                if (executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                        ownerId, verifier.getId(), ExecutorStatus.REVOKED)
+                        || beneficiaryRepository.isBeneficiaryOfRequest(requestId, verifier.getId())) {
+                    continue;
+                }
+            } catch (RuntimeException e) {
+                log.warn("Cannot check conflict of interest for verifier {} on request {}", verifier.getId(), requestId, e);
+                continue;   // không chắc chắn thì không gửi, tránh lộ hồ sơ cho người có thể xung đột
             }
             try {
                 send.accept(verifier.getEmail());

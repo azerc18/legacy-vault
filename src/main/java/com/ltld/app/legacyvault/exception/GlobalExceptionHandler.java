@@ -45,6 +45,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(e.getErrorCode(), e.getMessage()));
     }
 
+    // T1: FE cần biết tính năng nào chạm giới hạn gói FREE để hiện đúng lời mời nâng cấp
+    @ExceptionHandler(PlanLimitReachedException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handlePlanLimitReached(PlanLimitReachedException e) {
+        return ResponseEntity.status(e.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(ErrorCode.PLAN_LIMIT_REACHED, e.getMessage(),
+                        Map.of("feature", e.getFeature().name())));
+    }
+
     @ExceptionHandler(TooManyOtpRequestsException.class)
     public ResponseEntity<ApiResponse<Map<String, Long>>> handleTooManyOtpRequest(TooManyOtpRequestsException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

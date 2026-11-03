@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { userApi } from '../api/userApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, inputClass, btnPrimary, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
 
 // H4: bật/tắt xác thực 2 lớp (TOTP) + mã dự phòng
 export default function TwoFactorCard({ profile, onChanged }) {
+    const { t } = useTranslation('profile');
     const [setup, setSetup] = useState(null);          // { secret, qrDataUri } khi đang thiết lập
     const [backupCodes, setBackupCodes] = useState(null);
     const [disabling, setDisabling] = useState(false);
@@ -14,7 +16,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
 
     const run = async (fn) => {
         setError(''); setBusy(true);
-        try { await fn(); } catch (e) { setError(getErrorMessage(e, 'Something went wrong.')); }
+        try { await fn(); } catch (e) { setError(getErrorMessage(e, t('mfa.failed'))); }
         finally { setBusy(false); }
     };
 
@@ -40,7 +42,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
     };
 
     const downloadCodes = () => {
-        const text = `LegacyVault backup codes (${profile.email})\nEach code can be used once.\n\n${backupCodes.join('\n')}\n`;
+        const text = `${t('mfa.fileHeader', { email: profile.email })}\n\n${backupCodes.join('\n')}\n`;
         const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
         const a = Object.assign(document.createElement('a'), { href: url, download: 'legacyvault-backup-codes.txt' });
         a.click();
@@ -55,10 +57,8 @@ export default function TwoFactorCard({ profile, onChanged }) {
     // --- Vừa bật: hiện mã dự phòng đúng 1 lần ---
     if (backupCodes) {
         return (
-            <Card title="Save your backup codes" icon="key">
-                <Alert type="warning">
-                    Store these codes somewhere safe. Each code works once if you lose your phone. They will not be shown again.
-                </Alert>
+            <Card title={t('mfa.backupTitle')} icon="key">
+                <Alert type="warning">{t('mfa.backupWarning')}</Alert>
                 <div className="grid grid-cols-2 gap-2 font-mono text-center my-4">
                     {backupCodes.map((c) => (
                         <span key={c} className="py-2 rounded-lg bg-surface-container-low">{c}</span>
@@ -66,10 +66,10 @@ export default function TwoFactorCard({ profile, onChanged }) {
                 </div>
                 <div className="flex flex-wrap justify-end gap-3">
                     <button type="button" onClick={downloadCodes} className={btnOutline}>
-                        <Icon name="download" /> Download
+                        <Icon name="download" /> {t('mfa.download')}
                     </button>
                     <button type="button" onClick={() => setBackupCodes(null)} className={btnPrimary}>
-                        I have saved them
+                        {t('mfa.saved')}
                     </button>
                 </div>
             </Card>
@@ -77,17 +77,15 @@ export default function TwoFactorCard({ profile, onChanged }) {
     }
 
     return (
-        <Card title="Two-factor authentication" icon="phonelink_lock">
+        <Card title={t('mfa.title')} icon="phonelink_lock">
             <Alert>{error}</Alert>
 
             <div className="flex items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-on-surface-variant">
-                    Require a code from an authenticator app (Google Authenticator, Microsoft Authenticator…) when you sign in.
-                </p>
+                <p className="text-sm text-on-surface-variant">{t('mfa.description')}</p>
                 <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${profile.mfaEnabled
                     ? 'bg-success-container text-on-success-container'
                     : 'bg-surface-container text-on-surface-variant'}`}>
-                    {profile.mfaEnabled ? 'On' : 'Off'}
+                    {profile.mfaEnabled ? t('mfa.on') : t('mfa.off')}
                 </span>
             </div>
 
@@ -95,7 +93,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
             {!profile.mfaEnabled && !setup && (
                 <div className="flex justify-end">
                     <button type="button" onClick={startSetup} disabled={busy} className={btnPrimary}>
-                        {busy ? 'Please wait...' : 'Turn on'}
+                        {busy ? t('mfa.wait') : t('mfa.turnOn')}
                     </button>
                 </div>
             )}
@@ -104,21 +102,23 @@ export default function TwoFactorCard({ profile, onChanged }) {
             {!profile.mfaEnabled && setup && (
                 <form onSubmit={confirmEnable} className="space-y-4">
                     <ol className="text-sm list-decimal pl-5 space-y-1">
-                        <li>Scan this QR code with your authenticator app.</li>
-                        <li>Enter the 6-digit code the app shows.</li>
+                        <li>{t('mfa.step1')}</li>
+                        <li>{t('mfa.step2')}</li>
                     </ol>
                     <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <img src={setup.qrDataUri} alt="2FA QR code" className="w-44 h-44 rounded-xl border border-outline-variant bg-white p-2" />
+                        <img src={setup.qrDataUri} alt={t('mfa.qrAlt')} className="w-44 h-44 rounded-xl border border-outline-variant bg-white p-2" />
                         <div className="text-sm min-w-0">
-                            <p className="text-on-surface-variant">Can't scan? Enter this key manually:</p>
+                            <p className="text-on-surface-variant">{t('mfa.manualKey')}</p>
                             <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
                         </div>
                     </div>
                     {codeInput('123456')}
                     <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>Cancel</button>
+                        <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
+                            {t('common:actions.cancel')}
+                        </button>
                         <button type="submit" disabled={busy || code.trim().length !== 6} className={btnPrimary}>
-                            {busy ? 'Verifying...' : 'Verify and turn on'}
+                            {busy ? t('mfa.verifying') : t('mfa.verifyOn')}
                         </button>
                     </div>
                 </form>
@@ -128,18 +128,20 @@ export default function TwoFactorCard({ profile, onChanged }) {
             {profile.mfaEnabled && !disabling && (
                 <div className="flex justify-end">
                     <button type="button" onClick={() => { setDisabling(true); setCode(''); setError(''); }} className={btnDanger}>
-                        Turn off
+                        {t('mfa.turnOff')}
                     </button>
                 </div>
             )}
             {profile.mfaEnabled && disabling && (
                 <form onSubmit={confirmDisable} className="space-y-4">
-                    <p className="text-sm">Enter a code from your authenticator app or one of your backup codes to turn off 2FA.</p>
-                    {codeInput('123456 or XXXX-XXXX')}
+                    <p className="text-sm">{t('mfa.disableHint')}</p>
+                    {codeInput(t('mfa.disablePlaceholder'))}
                     <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>Cancel</button>
+                        <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>
+                            {t('common:actions.cancel')}
+                        </button>
                         <button type="submit" disabled={busy || !code.trim()} className={btnDanger}>
-                            {busy ? 'Please wait...' : 'Turn off 2FA'}
+                            {busy ? t('mfa.wait') : t('mfa.confirmOff')}
                         </button>
                     </div>
                 </form>

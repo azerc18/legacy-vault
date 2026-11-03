@@ -5,7 +5,10 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.exception.NotAssignedVerifierException;
 import com.ltld.app.legacyvault.exception.VerificationRequestNotFoundException;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +28,12 @@ public class VerifierAccessGuardTest {
 
     @Mock
     private LegalVerificationRequestRepository requestRepository;
+
+    @Mock
+    private VaultBeneficiaryRepository beneficiaryRepository;
+
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;
 
     @InjectMocks
     private VerifierAccessGuard guard;
@@ -72,6 +81,35 @@ public class VerifierAccessGuardTest {
 
         assertThatThrownBy(() -> guard.requireReadable(requestId, executorId))
                 .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    // N2: verifier là beneficiary (kể cả người thứ 2) của vault trong hồ sơ -> 404 như Owner/Executor
+    @Test
+    void verifierIsBeneficiaryOfAnyVault_throwsNotFound() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(beneficiaryRepository.isBeneficiaryOfRequest(requestId, verifierId)).thenReturn(true);
+
+        assertThatThrownBy(() -> guard.requireReadable(requestId, verifierId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+    }
+
+    @Test
+    void verifierIsOtherExecutorOfOwner_requestIsNotFound() {
+        when(requestRepository.findById(requestId)).thenReturn(Optional.of(request));
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                ownerId, verifierId, ExecutorStatus.REVOKED)).thenReturn(true);
+
+        assertThatThrownBy(() -> guard.requireReadable(requestId, verifierId))
+                .isInstanceOf(VerificationRequestNotFoundException.class);
+        assertThat(guard.hasRelationshipConflict(request, verifierId)).isTrue();
+    }
+
+    @Test
+    void hasBeneficiaryConflict_delegatesToRepository() {
+        when(beneficiaryRepository.isBeneficiaryOfRequest(requestId, verifierId)).thenReturn(true);
+
+        assertThat(guard.hasBeneficiaryConflict(requestId, verifierId)).isTrue();
+        assertThat(guard.hasBeneficiaryConflict(requestId, ownerId)).isFalse();
     }
 
     @Test
