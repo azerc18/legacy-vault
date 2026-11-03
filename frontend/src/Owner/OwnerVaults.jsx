@@ -20,7 +20,7 @@ export default function OwnerVaults() {
             .then(setVaults)
             .catch((e) => setError(getErrorMessage(e, t('list.loadError'))))
             .finally(() => setLoading(false));
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [t]);
 
     if (!user) return <Navigate to="/login" replace />;
 
@@ -39,7 +39,7 @@ export default function OwnerVaults() {
             <EstateReadinessCard />
 
             {loading ? (
-                <p className="text-on-surface-variant">{t('common.loading')}</p>
+                <p className="text-on-surface-variant">{t('ui.loading')}</p>
             ) : vaults.length === 0 ? (
                 <EmptyState bordered icon="inventory_2" title={t('list.emptyTitle')}
                             text={t('list.emptyText')}

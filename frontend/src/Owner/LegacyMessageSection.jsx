@@ -9,7 +9,7 @@ import EmptyState from '../Common/EmptyState.jsx';
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 
 export default function LegacyMessageSection({ vaultId, beneficiaries = [], editable }) {
-    const { t } = useTranslation('vault');
+    const { t } = useTranslation(['vault', 'common']);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -173,11 +173,11 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 <p className="text-xs text-on-surface-variant truncate mt-1 max-w-lg">{m.content || t('detail.messages.encryptedFallback')}</p>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                                <button onClick={() => setViewing(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('common.view')}</button>
+                                <button onClick={() => setViewing(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.view')}</button>
                                 {editable && (
                                     <>
-                                        <button onClick={() => openEdit(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('common.edit')}</button>
-                                        <button onClick={() => setDeleting(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">{t('common.delete')}</button>
+                                        <button onClick={() => openEdit(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.edit')}</button>
+                                        <button onClick={() => setDeleting(m)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">{t('ui.delete')}</button>
                                     </>
                                 )}
                             </div>
@@ -281,9 +281,9 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
-                                <button type="button" onClick={() => setFormOpen(false)} className={btnOutline}>{t('common.cancel')}</button>
+                                <button type="button" onClick={() => setFormOpen(false)} className={btnOutline}>{t('common:actions.cancel')}</button>
                                 <button type="submit" disabled={submitting} className={btnPrimary}>
-                                    {submitting ? t('common.saving') : t('detail.messages.saveButton')}
+                                    {submitting ? t('ui.saving') : t('detail.messages.saveButton')}
                                 </button>
                             </div>
                         </form>
@@ -331,12 +331,12 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 </div>
                                 <button onClick={() => ownerApi.downloadLegacyMessageAttachment(vaultId, viewing.id, viewing.attachmentName)}
                                     className="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-semibold hover:bg-primary-container">
-                                    {t('common.download')}
+                                    {t('ui.download')}
                                 </button>
                             </div>
                         )}
                         <div className="flex justify-end pt-2">
-                            <button onClick={() => setViewing(null)} className={btnOutline}>{t('common.close')}</button>
+                            <button onClick={() => setViewing(null)} className={btnOutline}>{t('ui.close')}</button>
                         </div>
                     </div>
                 </div>
@@ -348,7 +348,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                 danger
                 title={t('detail.messages.deleteTitle')}
                 message={t('detail.messages.deleteMessage', { title: deleting?.title })}
-                confirmLabel={t('common.delete')}
+                confirmLabel={t('ui.delete')}
                 busy={submitting}
                 onConfirm={handleDelete}
                 onCancel={() => setDeleting(null)}

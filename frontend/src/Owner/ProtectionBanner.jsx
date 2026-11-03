@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { ownerApi, PROTECTION_CHANGED } from '../api/ownerApi.js';
-import i18n from '../i18n/index.js';
 
 // Không import Icon từ ownerUi.jsx để tránh vòng import (ownerUi.jsx import file này)
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -20,11 +19,10 @@ async function loadState() {
 }
 
 // Trả về danh sách bước còn thiếu, theo đúng thứ tự BE bắt buộc: Executor -> DMS. Rỗng = không cần banner.
-export function computeIssues({ vaults, executors, dms }) {
+export function computeIssues({ vaults, executors, dms }, t) {
     if (vaults.length === 0) return [];                  // chưa có gì để bảo vệ
     if (dms?.status === 'TRIGGERED') return [];          // bàn giao đã bắt đầu, banner không còn ý nghĩa
 
-    const t = i18n.getFixedT(null, 'vault');
     const issues = [];
     const hasPrimary = executors.some((e) => e.executorType === 'PRIMARY' && e.status !== 'REVOKED');
 
@@ -52,12 +50,12 @@ export function computeIssues({ vaults, executors, dms }) {
 }
 
 export default function ProtectionBanner() {
-    const { t, i18n: i18nInstance } = useTranslation('vault');
-    const [stateData, setStateData] = useState(null);
+    const { t } = useTranslation('vault');
+    const [state, setState] = useState(null);
     const { pathname } = useLocation();
 
     const refresh = useCallback(() => {
-        loadState().then(setStateData).catch(() => setStateData(null)); // lỗi tải: im lặng, không chặn trang
+        loadState().then(setState).catch(() => setState(null)); // lỗi tải: im lặng, không chặn trang
     }, []);
 
     useEffect(() => {
@@ -66,10 +64,7 @@ export default function ProtectionBanner() {
         return () => window.removeEventListener(PROTECTION_CHANGED, refresh);
     }, [refresh]);
 
-    // Tính lại khi đổi ngôn ngữ
-    const issues = stateData ? computeIssues(stateData) : [];
-    void i18nInstance.language;
-
+    const issues = state ? computeIssues(state, t) : [];
     if (issues.length === 0) return null;
 
     const critical = issues.some((i) => i.critical);

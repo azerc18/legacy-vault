@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate } from 'react-router-dom';
-import { getUser } from '../auth/auth.js';
-import { ownerApi } from '../api/ownerApi.js';
-import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
+import React, {useState} from 'react';
+import {useTranslation} from 'react-i18next';
+import {Navigate, useNavigate} from 'react-router-dom';
+import {getUser} from '../auth/auth.js';
+import {ownerApi} from '../api/ownerApi.js';
+import {getErrorMessage} from '../api/http.js';
+import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline} from './ownerUi.jsx';
 
-const emptyAsset = () => ({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '' });
-const emptyBeneficiary = () => ({ email: '', fullName: '', relationship: '' });
+const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: ''});
+const emptyBeneficiary = () => ({email: '', fullName: '', relationship: ''});
 
 export default function CreateVault() {
-    const { t } = useTranslation(['vault', 'enums']);
+    const {t} = useTranslation(['vault', 'enums', 'common']);
     const user = getUser();
     const navigate = useNavigate();
     const [name, setName] = useState('');
@@ -21,13 +21,13 @@ export default function CreateVault() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    if (!user) return <Navigate to="/login" replace />;
+    if (!user) return <Navigate to="/login" replace/>;
 
     const updateAsset = (i, field, value) =>
-        setAssets((list) => list.map((a, idx) => (idx === i ? { ...a, [field]: value } : a)));
+        setAssets((list) => list.map((a, idx) => (idx === i ? {...a, [field]: value} : a)));
     const removeAsset = (i) => setAssets((list) => list.filter((_, idx) => idx !== i));
     const updateBeneficiary = (i, field, value) =>
-        setBeneficiaries((list) => list.map((b, idx) => (idx === i ? { ...b, [field]: value } : b)));
+        setBeneficiaries((list) => list.map((b, idx) => (idx === i ? {...b, [field]: value} : b)));
     const removeBeneficiaryRow = (i) => setBeneficiaries((list) => list.filter((_, idx) => idx !== i));
 
     const handleSubmit = async (e) => {
@@ -63,7 +63,7 @@ export default function CreateVault() {
                     notes: a.notes.trim() || null,
                 })),
             });
-            navigate(`/owner/vaults/${vault.id}`, { state: { created: true } });
+            navigate(`/owner/vaults/${vault.id}`, {state: {created: true}});
         } catch (err) {
             setError(getErrorMessage(err, t('create.errors.createFailed')));
         } finally {
@@ -81,26 +81,26 @@ export default function CreateVault() {
                         <label className="block">
                             <span className="text-sm font-semibold text-on-surface-variant">{t('create.nameLabel')}</span>
                             <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)}
-                                   placeholder={t('create.namePlaceholder')} className={`${inputClass} mt-1`} />
+                                   placeholder={t('create.namePlaceholder')} className={`${inputClass} mt-1`}/>
                         </label>
                         <label className="block">
                             <span className="text-sm font-semibold text-on-surface-variant">{t('create.descriptionLabel')}</span>
                             <textarea rows={2} maxLength={500} value={description}
                                       onChange={(e) => setDescription(e.target.value)}
-                                      className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
+                                      className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"/>
                         </label>
                     </div>
                 </Card>
 
-                <Card title={t('create.beneficiariesTitle', { count: beneficiaries.length })} icon="family_restroom">
+                <Card title={t('create.beneficiariesTitle', {count: beneficiaries.length})} icon="family_restroom">
                     <div className="space-y-4">
                         {beneficiaries.map((b, i) => (
                             <div key={i} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-outline">{t('create.beneficiaryItem', { index: i + 1 })}</span>
+                                    <span className="text-sm font-semibold text-outline">{t('create.beneficiaryItem', {index: i + 1})}</span>
                                     {beneficiaries.length > 1 && (
                                         <button type="button" onClick={() => removeBeneficiaryRow(i)} className="text-sm text-error font-semibold flex items-center gap-1">
-                                            <Icon name="delete" className="text-[18px]" /> {t('common.remove')}
+                                            <Icon name="delete" className="text-[18px]" /> {t('ui.remove')}
                                         </button>
                                     )}
                                 </div>
@@ -120,16 +120,16 @@ export default function CreateVault() {
                     </div>
                 </Card>
 
-                <Card title={t('create.assetsTitle', { count: assets.length })} icon="key">
+                <Card title={t('create.assetsTitle', {count: assets.length})} icon="key">
                     <div className="space-y-4">
                         {assets.map((a, i) => (
                             <div key={i} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
                                 <div className="flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-outline">{t('create.assetItem', { index: i + 1 })}</span>
+                                    <span className="text-sm font-semibold text-outline">{t('create.assetItem', {index: i + 1})}</span>
                                     {assets.length > 1 && (
                                         <button type="button" onClick={() => removeAsset(i)}
                                                 className="text-sm text-error font-semibold flex items-center gap-1">
-                                            <Icon name="delete" className="text-[18px]" /> {t('common.remove')}
+                                            <Icon name="delete" className="text-[18px]"/> {t('ui.remove')}
                                         </button>
                                     )}
                                 </div>
@@ -137,15 +137,12 @@ export default function CreateVault() {
                                     <select value={a.assetType}
                                             onChange={(e) => updateAsset(i, 'assetType', e.target.value)}
                                             className={inputClass}>
-                                        {ASSET_TYPES.map((typeItem) => (
-                                            <option key={typeItem.value} value={typeItem.value}>
-                                                {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
-                                            </option>
-                                        ))}
+                                        {ASSET_TYPES.map((typeItem) => <option key={typeItem.value}
+                                                                               value={typeItem.value}>{t(`enums:assetType.${typeItem.value}`, {defaultValue: typeItem.label})}</option>)}
                                     </select>
                                     <input value={a.assetName} maxLength={200}
                                            onChange={(e) => updateAsset(i, 'assetName', e.target.value)}
-                                           placeholder={t('create.assetNamePlaceholder')} className={inputClass} />
+                                           placeholder={t('create.assetNamePlaceholder')} className={inputClass}/>
                                 </div>
                                 <div className="relative">
                                     <input
@@ -157,27 +154,27 @@ export default function CreateVault() {
                                         className={`${inputClass} pr-12`}
                                         autoComplete="new-password"
                                     />
-                                    <button type="button" onClick={() => setShowSecret((s) => ({ ...s, [i]: !s[i] }))}
+                                    <button type="button" onClick={() => setShowSecret((s) => ({...s, [i]: !s[i]}))}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
                                         <Icon name={showSecret[i] ? 'visibility_off' : 'visibility'}
-                                              className="text-[20px]" />
+                                              className="text-[20px]"/>
                                     </button>
                                 </div>
                                 <input value={a.notes} maxLength={2000}
                                        onChange={(e) => updateAsset(i, 'notes', e.target.value)}
-                                       placeholder={t('create.notesPlaceholder')} className={inputClass} />
+                                       placeholder={t('create.notesPlaceholder')} className={inputClass}/>
                             </div>
                         ))}
                         <button type="button" disabled={assets.length >= 50}
                                 onClick={() => setAssets((l) => [...l, emptyAsset()])} className={btnOutline}>
-                            <Icon name="add" className="text-[18px]" /> {t('create.addAsset')}
+                            <Icon name="add" className="text-[18px]"/> {t('create.addAsset')}
                         </button>
                     </div>
                 </Card>
 
                 <div className="flex justify-end gap-3">
                     <button type="button" onClick={() => navigate('/owner/vaults')} className={btnOutline}>
-                        {t('common.cancel')}
+                        {t('common:actions.cancel')}
                     </button>
                     <button type="submit" disabled={loading} className={btnPrimary}>
                         {loading ? t('create.creating') : t('create.submit')}

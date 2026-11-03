@@ -6,12 +6,9 @@
     "activity": "Nhật ký hoạt động",
     "billing": "Gói thuê bao & VIP"
   },
-  "common": {
+  "ui": {
     "loading": "Đang tải...",
     "saving": "Đang lưu...",
-    "save": "Lưu",
-    "cancel": "Huỷ",
-    "confirm": "Xác nhận",
     "delete": "Xoá",
     "remove": "Gỡ bỏ",
     "edit": "Sửa",
@@ -263,6 +260,34 @@
       "MEMORIALIZE": "Chuyển sang chế độ tưởng niệm",
       "DELETE": "Yêu cầu xoá tài khoản",
       "TRANSFER_DATA": "Tải dữ liệu kỷ niệm giao cho gia đình"
+    },
+    "labels": {
+      "institutionName": "Tên tổ chức / ngân hàng",
+      "accountNumber": "Số tài khoản",
+      "branchName": "Chi nhánh",
+      "estimatedValue": "Giá trị ước tính",
+      "currency": "Loại tiền tệ",
+      "legalInstruction": "Hướng dẫn làm thủ tục nhận tài khoản",
+      "pinOrPasswordNote": "Ghi chú mã PIN / mật khẩu",
+      "accountId": "Mã tài khoản (Account ID)",
+      "documentTitle": "Tên giấy tờ / tài liệu",
+      "issuer": "Nơi cấp",
+      "location": "Nơi cất giữ bản gốc",
+      "walletProvider": "Ví lưu trữ (MetaMask, Ledger...)",
+      "blockchainNetwork": "Mạng lưới (Network)",
+      "walletAddress": "Địa chỉ ví",
+      "seedPhrase": "Cụm từ khôi phục (12 hoặc 24 từ)",
+      "privateKey": "Khoá riêng tư (Private key)",
+      "passphrase": "Mật khẩu phụ (Passphrase)",
+      "platform": "Nền tảng / nhà cung cấp",
+      "usernameOrHandle": "Tên đăng nhập / ID",
+      "wish": "Di nguyện xử lý tài khoản",
+      "deviceOrSimLocation": "Nơi cất điện thoại / SIM / thiết bị 2FA",
+      "password": "Mật khẩu",
+      "twoFactorRecoveryCodes": "Mã khôi phục 2FA",
+      "title": "Tiêu đề",
+      "description": "Mô tả",
+      "secret": "Thông tin bí mật"
     },
     "keepCurrentPlaceholder": "Để trống nếu giữ nguyên giá trị hiện tại",
     "errors": {

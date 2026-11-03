@@ -46,8 +46,9 @@ export function validateFields(schema, values, isEdit) {
     }
     for (const f of schema.fields) {
         const v = (values[f.key] || '').trim();
-        if (!v && f.required && !(isEdit && f.sensitive)) return t('assetFields.errors.fieldRequired', { label: f.label });
-        if (v && f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label: f.label });
+        const fieldLabel = t(`assetFields.labels.${f.key}`, { defaultValue: f.label });
+        if (!v && f.required && !(isEdit && f.sensitive)) return t('assetFields.errors.fieldRequired', { label: fieldLabel });
+        if (v && f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label: fieldLabel });
     }
     return '';
 }
@@ -70,7 +71,8 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
                 </p>
             )}
             {schema.fields.map((f) => {
-                const label = `${f.label}${f.required ? ' *' : ''}`;
+                const translatedLabel = t(`assetFields.labels.${f.key}`, { defaultValue: f.label });
+                const label = `${translatedLabel}${f.required ? ' *' : ''}`;
                 const set = (e) => onChange(f.key, e.target.value);
                 const v = values[f.key] || '';
                 return (
@@ -78,7 +80,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit }) {
                         <span className="text-sm font-semibold text-on-surface-variant">{label}</span>
                         {f.type === 'SELECT' && (
                             <select value={v} onChange={set} className={inputClass}>
-                                <option value="">{t('common.select')}</option>
+                                <option value="">{t('ui.select')}</option>
                                 {f.options.map((o) => (
                                     <option key={o} value={o}>
                                         {t(`assetFields.options.${o}`, { defaultValue: OPTION_LABEL[o] || o })}
@@ -119,7 +121,9 @@ export function AssetFieldsView({ schema, fields }) {
         <div className="mt-4 space-y-3">
             {schema.fields.filter((f) => fields[f.key]).map((f) => (
                 <div key={f.key}>
-                    <p className="text-sm font-semibold text-on-surface-variant">{f.label}</p>
+                    <p className="text-sm font-semibold text-on-surface-variant">
+                        {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
+                    </p>
                     {f.type === 'SECRET' ? (
                         <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
                             <span className="flex-1">{shown[f.key] ? fields[f.key] : '••••••••••••'}</span>

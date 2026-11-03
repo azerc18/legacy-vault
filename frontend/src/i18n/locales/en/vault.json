@@ -6,12 +6,9 @@
     "activity": "Activity",
     "billing": "Billing & VIP"
   },
-  "common": {
+  "ui": {
     "loading": "Loading...",
     "saving": "Saving...",
-    "save": "Save",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
     "delete": "Delete",
     "remove": "Remove",
     "edit": "Edit",
@@ -263,6 +260,34 @@
       "MEMORIALIZE": "Memorialize the account",
       "DELETE": "Delete the account",
       "TRANSFER_DATA": "Download data for the family"
+    },
+    "labels": {
+      "institutionName": "Institution / bank name",
+      "accountNumber": "Account number",
+      "branchName": "Branch",
+      "estimatedValue": "Estimated value",
+      "currency": "Currency",
+      "legalInstruction": "Instructions for settling the account",
+      "pinOrPasswordNote": "PIN / password note",
+      "accountId": "Account ID",
+      "documentTitle": "Document title",
+      "issuer": "Issuer",
+      "location": "Where the original is kept",
+      "walletProvider": "Wallet (MetaMask, Ledger...)",
+      "blockchainNetwork": "Network",
+      "walletAddress": "Wallet address",
+      "seedPhrase": "Seed phrase (12 or 24 words)",
+      "privateKey": "Private key",
+      "passphrase": "Passphrase",
+      "platform": "Platform / provider",
+      "usernameOrHandle": "Username / handle",
+      "wish": "What should happen to it",
+      "deviceOrSimLocation": "Where the phone / SIM / 2FA device is kept",
+      "password": "Password",
+      "twoFactorRecoveryCodes": "2FA recovery codes",
+      "title": "Title",
+      "description": "Description",
+      "secret": "Secret"
     },
     "keepCurrentPlaceholder": "Leave empty to keep current",
     "errors": {
