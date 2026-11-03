@@ -452,7 +452,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
-        return legalDocumentRepository.findByVaultIdOrderByUploadedAtDescIdDesc(vault.getId()).stream()
+        return legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vault.getId()).stream()
                 .map(doc -> LegalDocumentSummaryResponse.builder()
                         .id(doc.getId())
                         .documentType(doc.getDocumentType())
@@ -472,7 +472,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertViewSession(vault.getId(), currentUserId);
 
         // Bắt buộc thuộc đúng vault, không thì 404 để không lộ tài liệu của vault khác
-        LegalDocument document = legalDocumentRepository.findByIdAndVaultId(documentId, vault.getId())
+        LegalDocument document = legalDocumentRepository.findByIdAndVaultIdAndIsCurrentTrue(documentId, vault.getId())
                 .orElseThrow(() -> new BeneficiaryException("Document not found.", HttpStatus.NOT_FOUND));
 
         byte[] plain;
@@ -907,8 +907,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                         !al.getBeneficiary().getId().equals(me.getId())))
                 .toList();
 
-        // X5 chưa merge: lấy toàn bộ tài liệu. Sau X5: chỉ bản is_current
-        List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultId(vault.getId()).stream()
+        // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
+        List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vault.getId()).stream()
                 .map(d -> new InheritanceDossierData.DocumentLine(d.getFileName(), d.getDocumentType(), d.getUploadedAt()))
                 .toList();
 
