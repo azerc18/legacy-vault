@@ -2182,4 +2182,162 @@ public class BeneficiaryServiceImplTest {
         assertThat(response.getVaultStatus()).isEqualTo(VaultStatus.UNLOCKED);
         verify(vaultRepository, never()).save(any());
     }
+
+
+    // ===================== N2-access: chỉ thấy tài sản được phân bổ cho mình =====================
+
+    @Test
+    void getInheritedAssets_excludesAssetsAllocatedToOthers() {
+        stubAccessibleVault();
+        stubViewSession(true);
+        UUID mineId = UUID.randomUUID();
+        UUID othersId = UUID.randomUUID();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(mineId, "Vietcombank", AssetType.BANK_ACCOUNT),
+                asset(othersId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(othersId));
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Vietcombank");
+    }
+
+    @Test
+    void getInheritedAssetDetail_assetAllocatedToOther_throws403_andDoesNotDecrypt() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(assetId));
+
+        BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU);
+        verifyNoInteractions(cryptoService);
+        verify(assetAccessRecordRepository, never()).insertIfAbsent(any(), any(), any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void previewClose_countsOnlyAssetsHeldByMe() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset mine1 = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset mine2 = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(mine1, mine2, others));
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(mine2, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+
+        CloseVaultPreviewResponse preview = beneficiaryService.previewClose(vaultId, currentUserId);
+
+        assertThat(preview.getTotalAssets()).isEqualTo(2);
+        assertThat(preview.getViewedCount()).isEqualTo(1);
+        assertThat(preview.getUnviewedCount()).isEqualTo(1);
+        assertThat(preview.getUnviewedAssets()).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Gmail");
+    }
+
+    @Test
+    void closeVault_ignoresAssetsAllocatedToOthers_whenAllMyAssetsViewed() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        // Tài sản của người khác đương nhiên "chưa được claim này xem", nhưng không được tính vào phần của mình
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId())).thenReturn(List.of(others));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(claimRepository.markClaimed(eq(claim.getId()), any(LocalDateTime.class))).thenReturn(1);
+
+        CloseVaultResponse response = beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId);
+
+        assertThat(response.getClaimStatus()).isEqualTo(ClaimStatus.CLAIMED);
+        verify(auditLogService).log(eq(AuditAction.CLAIM_COMPLETED), eq(AuditResult.SUCCESS),
+                eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()),
+                eq("unviewedCount=0, unviewedAssetIds=[]"));
+    }
+
+    @Test
+    void downloadInheritedAsset_assetAllocatedToOther_throws403_andDoesNotDecrypt() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByIdAndVaultIdAndStatus(assetId, vaultId, AssetStatus.ACTIVE))
+                .thenReturn(Optional.of(asset(assetId, "Ví Binance", AssetType.CRYPTO_WALLET)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(assetId));
+
+        BeneficiaryException ex = expectError(HttpStatus.FORBIDDEN,
+                () -> beneficiaryService.downloadInheritedAsset(vaultId, assetId, currentUserId));
+
+        assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ASSET_NOT_ALLOCATED_TO_YOU);
+        verifyNoInteractions(cryptoService);
+        verify(assetAccessRecordRepository, never()).insertIfAbsent(any(), any(), any(), any());
+        verifyNoInteractions(auditLogService);   // không ghi ASSET_DOWNLOADED
+    }
+
+    // Giữ cho phép trừ "- hidden.size()" ở closeVault: nếu bị gỡ nhầm thì ca này sẽ trả 409 thay vì 400
+    @Test
+    void closeVault_myAssetUnviewedAndOthersCounted_throws400_andChangesNothing() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset mine = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        when(digitalAssetRepository.findUnaccessedAssets(vaultId, claim.getId()))
+                .thenReturn(List.of(mine, others));
+        when(digitalAssetRepository.countByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(2L);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+
+        BeneficiaryException ex = expectError(HttpStatus.BAD_REQUEST,
+                () -> beneficiaryService.closeVault(vaultId, closeRequest(true), currentUserId));
+
+        assertThat(ex.getMessage()).contains("at least one asset");
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        assertThat(unlockedVault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        verify(claimRepository, never()).markClaimed(any(), any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    // Q47 phương án b: tài sản chưa có dòng phân bổ nào thì không bị ẩn
+    @Test
+    void getInheritedAssets_assetWithoutAllocation_isVisible() {
+        stubAccessibleVault();
+        stubViewSession(true);
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(UUID.randomUUID(), "Sổ tiết kiệm", AssetType.BANK_ACCOUNT)));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of());
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getAssetName)
+                .containsExactly("Sổ tiết kiệm");
+    }
+
+    @Test
+    void getInheritedAssetDetail_assetWithoutAllocation_isViewable() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        stubAccessibleVault();
+        stubDecryptableAsset(assetId);
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of());
+
+        InheritedAssetDetailResponse detail =
+                beneficiaryService.getInheritedAssetDetail(vaultId, assetId, currentUserId);
+
+        assertThat(detail.getId()).isEqualTo(assetId);
+        verify(assetAccessRecordRepository).insertIfAbsent(any(), any(), eq(assetId), any());
+    }
 }
