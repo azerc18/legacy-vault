@@ -57,5 +57,7 @@ public enum AuditAction {
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi
     BENEFICIARY_REMINDER_SENT,
     // T1: Thanh toán VNPay & gói VIP
-    PAYMENT_SUCCEEDED, PAYMENT_FAILED
+    PAYMENT_SUCCEEDED, PAYMENT_FAILED,
+    // X1: người thụ hưởng đồng ý mở tài sản JOINT_CONSENSUS
+    ASSET_CONSENSUS_APPROVED
 }
