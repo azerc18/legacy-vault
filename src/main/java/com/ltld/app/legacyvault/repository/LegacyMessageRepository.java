@@ -6,11 +6,13 @@ import com.ltld.app.legacyvault.enums.LegacyMessageRecipientType;
 import com.ltld.app.legacyvault.enums.LegacyMessageStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -31,11 +33,6 @@ public interface LegacyMessageRepository extends JpaRepository<LegacyMessage, UU
             @Param("beneficiaryId") UUID beneficiaryId,
             @Param("allType") LegacyMessageRecipientType allType);
 
-    List<LegacyMessage> findByStatusAndDeliveryTriggerAndDeliverDateLessThanEqual(
-            LegacyMessageStatus status,
-            LegacyMessageDeliveryTrigger trigger,
-            LocalDate date);
-
     // T1 (m7): tổng dung lượng đính kèm lời nhắn của mọi vault thuộc Owner, cộng vào quota gói cùng tài liệu
     @Query("SELECT COALESCE(SUM(m.attachmentSize), 0) FROM LegacyMessage m WHERE m.vault.owner.id = :ownerId")
     long sumAttachmentSizeByOwnerId(@Param("ownerId") UUID ownerId);
@@ -51,4 +48,13 @@ public interface LegacyMessageRepository extends JpaRepository<LegacyMessage, UU
             @Param("onClaimTrigger") LegacyMessageDeliveryTrigger onClaimTrigger,
             @Param("specificDateTrigger") LegacyMessageDeliveryTrigger specificDateTrigger,
             @Param("today") LocalDate today);
+
+    // F4b: Chuyển trạng thái ACTIVE -> DELIVERED nguyên tử để ngăn race condition giữa Listener và Scheduler
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            UPDATE LegacyMessage m
+            SET m.status = com.ltld.app.legacyvault.enums.LegacyMessageStatus.DELIVERED, m.deliveredAt = :now
+            WHERE m.id = :id AND m.status = com.ltld.app.legacyvault.enums.LegacyMessageStatus.ACTIVE
+            """)
+    int markDelivered(@Param("id") UUID id, @Param("now") LocalDateTime now);
 }

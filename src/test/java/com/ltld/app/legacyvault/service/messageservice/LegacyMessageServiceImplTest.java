@@ -441,6 +441,8 @@ class LegacyMessageServiceImplTest {
                 .thenReturn(List.of(onClaimMsg, futureMsg));
         when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
                 .thenReturn(List.of(beneficiary, declinedBeneficiary));
+        when(legacyMessageRepository.markDelivered(eq(onClaimMsg.getId()), any(LocalDateTime.class)))
+                .thenReturn(1);
 
         int count = messageService.deliverOnClaimMessages(vaultId);
 
@@ -453,6 +455,37 @@ class LegacyMessageServiceImplTest {
         verify(emailSender, times(1)).sendLegacyMessageDeliveredNotification(
                 eq("child@test.com"), eq("Nguyen Van Con"), eq("Tran Chu So Huu"),
                 eq("Family Vault"), eq("Farewell Letter"), eq(vaultId));
+    }
+
+    @Test
+    @DisplayName("F4b: Chống gửi trùng - Nếu lời nhắn đã được gửi hoặc race condition (markDelivered=0) thì không gửi mail")
+    void deliverOnClaimMessages_ConcurrentOrSecondCall_DoesNotDuplicate() {
+        vault.setStatus(VaultStatus.UNLOCKED);
+        User beneficiaryUser = User.builder().id(UUID.randomUUID()).email("child@test.com").fullName("Nguyen Van Con").build();
+        beneficiary.setUser(beneficiaryUser);
+
+        LegacyMessage onClaimMsg = LegacyMessage.builder()
+                .id(UUID.randomUUID())
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .title("Farewell Letter")
+                .content("enc:Goodbye")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.ON_CLAIM)
+                .status(LegacyMessageStatus.ACTIVE)
+                .build();
+
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+        when(legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE))
+                .thenReturn(List.of(onClaimMsg));
+        when(legacyMessageRepository.markDelivered(eq(onClaimMsg.getId()), any(LocalDateTime.class)))
+                .thenReturn(0);
+
+        int count = messageService.deliverOnClaimMessages(vaultId);
+
+        assertThat(count).isEqualTo(0);
+        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(emailSender, never()).sendLegacyMessageDeliveredNotification(
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -481,13 +514,15 @@ class LegacyMessageServiceImplTest {
                 eq(LegacyMessageDeliveryTrigger.SPECIFIC_DATE),
                 eq(today)))
                 .thenReturn(List.of(dueCapsule));
+        when(legacyMessageRepository.markDelivered(eq(dueCapsule.getId()), any(LocalDateTime.class)))
+                .thenReturn(1);
 
         int delivered = messageService.deliverDueScheduledMessages(today);
 
         assertThat(delivered).isEqualTo(1);
         assertThat(dueCapsule.getStatus()).isEqualTo(LegacyMessageStatus.DELIVERED);
         assertThat(dueCapsule.getDeliveredAt()).isNotNull();
-        verify(legacyMessageRepository).save(dueCapsule);
+        verify(legacyMessageRepository).markDelivered(eq(dueCapsule.getId()), any(LocalDateTime.class));
         verify(notificationRepository).save(any(Notification.class));
         verify(emailSender).sendLegacyMessageDeliveredNotification(
                 eq("child@test.com"), eq("Nguyen Van Con"), eq("Tran Chu So Huu"),

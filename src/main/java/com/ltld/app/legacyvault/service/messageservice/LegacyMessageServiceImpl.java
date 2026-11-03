@@ -30,27 +30,33 @@ import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
 import com.ltld.app.legacyvault.utility.EmailSender;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     private static final long MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024L; // 10MB
     private static final Set<VaultStatus> HANDOVER_VAULT_STATUSES = Set.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED);
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final LegacyMessageRepository legacyMessageRepository;
     private final VaultRepository vaultRepository;
@@ -62,6 +68,61 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     private final AuditLogService auditLogService;
     private final NotificationRepository notificationRepository;
     private final EmailSender emailSender;
+    private final TransactionTemplate requiresNewTx;
+
+    public LegacyMessageServiceImpl(
+            LegacyMessageRepository legacyMessageRepository,
+            VaultRepository vaultRepository,
+            VaultBeneficiaryRepository vaultBeneficiaryRepository,
+            CryptoService cryptoService,
+            FileStorageService fileStorageService,
+            EntitlementService entitlementService,
+            VaultModificationGuard vaultModificationGuard,
+            AuditLogService auditLogService,
+            NotificationRepository notificationRepository,
+            EmailSender emailSender) {
+        this(legacyMessageRepository, vaultRepository, vaultBeneficiaryRepository,
+                cryptoService, fileStorageService, entitlementService,
+                vaultModificationGuard, auditLogService, notificationRepository, emailSender, null);
+    }
+
+    @Autowired
+    public LegacyMessageServiceImpl(
+            LegacyMessageRepository legacyMessageRepository,
+            VaultRepository vaultRepository,
+            VaultBeneficiaryRepository vaultBeneficiaryRepository,
+            CryptoService cryptoService,
+            FileStorageService fileStorageService,
+            EntitlementService entitlementService,
+            VaultModificationGuard vaultModificationGuard,
+            AuditLogService auditLogService,
+            NotificationRepository notificationRepository,
+            EmailSender emailSender,
+            @Autowired(required = false) PlatformTransactionManager transactionManager) {
+        this.legacyMessageRepository = legacyMessageRepository;
+        this.vaultRepository = vaultRepository;
+        this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
+        this.cryptoService = cryptoService;
+        this.fileStorageService = fileStorageService;
+        this.entitlementService = entitlementService;
+        this.vaultModificationGuard = vaultModificationGuard;
+        this.auditLogService = auditLogService;
+        this.notificationRepository = notificationRepository;
+        this.emailSender = emailSender;
+        if (transactionManager != null) {
+            this.requiresNewTx = new TransactionTemplate(transactionManager);
+            this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        } else {
+            this.requiresNewTx = null;
+        }
+    }
+
+    private <T> T executeInNewTransaction(TransactionCallback<T> action) {
+        if (requiresNewTx != null) {
+            return requiresNewTx.execute(action);
+        }
+        return action.doInTransaction(new SimpleTransactionStatus());
+    }
 
     @Override
     @Transactional
@@ -232,7 +293,7 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         List<LegacyMessage> messages = legacyMessageRepository.findForBeneficiary(
                 vaultId, beneficiary.getId(), LegacyMessageRecipientType.ALL_BENEFICIARIES);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(VN_ZONE);
         return messages.stream().map(m -> {
             boolean isUnlocked = isMessageUnlocked(m, today);
             String content = isUnlocked ? decryptContentSafely(m.getContent()) : null;
@@ -258,7 +319,7 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This message is not addressed to you");
         }
 
-        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now());
+        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now(VN_ZONE));
         if (!isUnlocked) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This time-capsule message is scheduled for " + message.getDeliverDate());
         }
@@ -285,7 +346,7 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This message is not addressed to you");
         }
 
-        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now());
+        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now(VN_ZONE));
         if (!isUnlocked) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This time-capsule message is scheduled for " + message.getDeliverDate());
         }
@@ -301,22 +362,22 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     // F4b: Khi Vault được mở khóa (hoặc nhận bàn giao), phát tất cả lời nhắn ON_CLAIM và các lời nhắn SPECIFIC_DATE đã tới hạn
     @Override
-    @Transactional
     public int deliverOnClaimMessages(UUID vaultId) {
         Vault vault = vaultRepository.findById(vaultId).orElse(null);
         if (vault == null || !HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             return 0;
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(VN_ZONE);
         LocalDateTime now = LocalDateTime.now();
         List<LegacyMessage> activeMessages = legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE);
 
         int deliveredCount = 0;
         for (LegacyMessage message : activeMessages) {
             if (isMessageUnlocked(message, today)) {
-                deliverSingleMessage(message, vault, now);
-                deliveredCount++;
+                if (deliverSingleMessage(message, vault, now)) {
+                    deliveredCount++;
+                }
             }
         }
         return deliveredCount;
@@ -324,47 +385,107 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     // F4b: Scheduler hằng ngày quét và gửi các lời nhắn đến hạn (deliver_date <= hôm nay) hoặc ON_CLAIM chưa gửi trong các Vault đã mở
     @Override
-    @Transactional
     public int deliverDueScheduledMessages(LocalDate today) {
-        LocalDate effectiveDate = today != null ? today : LocalDate.now();
+        LocalDate effectiveDate = today != null ? today : LocalDate.now(VN_ZONE);
         LocalDateTime now = LocalDateTime.now();
 
         List<LegacyMessage> dueMessages = legacyMessageRepository.findDueMessagesForUnlockedVaults(
-                LegacyMessageStatus.ACTIVE,
-                HANDOVER_VAULT_STATUSES,
-                LegacyMessageDeliveryTrigger.ON_CLAIM,
-                LegacyMessageDeliveryTrigger.SPECIFIC_DATE,
-                effectiveDate);
+            LegacyMessageStatus.ACTIVE,
+            HANDOVER_VAULT_STATUSES,
+            LegacyMessageDeliveryTrigger.ON_CLAIM,
+            LegacyMessageDeliveryTrigger.SPECIFIC_DATE,
+            effectiveDate);
 
         int deliveredCount = 0;
         for (LegacyMessage message : dueMessages) {
             Vault vault = message.getVault();
             if (vault != null && HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
-                deliverSingleMessage(message, vault, now);
-                deliveredCount++;
+                if (deliverSingleMessage(message, vault, now)) {
+                    deliveredCount++;
+                }
             }
         }
         return deliveredCount;
     }
 
-    private void deliverSingleMessage(LegacyMessage message, Vault vault, LocalDateTime now) {
-        message.setStatus(LegacyMessageStatus.DELIVERED);
-        message.setDeliveredAt(now);
-        legacyMessageRepository.save(message);
+    private record DeliveryPlan(
+            LegacyMessage message,
+            Vault vault,
+            String ownerName,
+            List<VaultBeneficiary> recipients
+    ) {}
 
-        List<VaultBeneficiary> recipients = resolveRecipientsForDelivery(message, vault.getId());
-        User owner = vault.getOwner();
-        String ownerName = (owner != null && owner.getFullName() != null && !owner.getFullName().isBlank())
-                ? owner.getFullName()
-                : (owner != null && owner.getEmail() != null ? owner.getEmail() : "the vault owner");
+    private boolean deliverSingleMessage(LegacyMessage message, Vault vault, LocalDateTime now) {
+        DeliveryPlan plan;
+        try {
+            plan = executeInNewTransaction(status -> {
+                // F4b: Chuyển trạng thái ACTIVE -> DELIVERED nguyên tử để ngăn race condition giữa Listener và Scheduler
+                int updated = legacyMessageRepository.markDelivered(message.getId(), now);
+                if (updated == 0) {
+                    return null;
+                }
+                message.setStatus(LegacyMessageStatus.DELIVERED);
+                message.setDeliveredAt(now);
 
-        for (VaultBeneficiary vb : recipients) {
-            notifyBeneficiaryOfMessage(vb, vault, message, ownerName, now);
+                List<VaultBeneficiary> recipients = resolveRecipientsForDelivery(message, vault.getId());
+                User owner = vault.getOwner();
+                String ownerName = (owner != null && owner.getFullName() != null && !owner.getFullName().isBlank())
+                        ? owner.getFullName()
+                        : (owner != null && owner.getEmail() != null ? owner.getEmail() : "the vault owner");
+
+                for (VaultBeneficiary vb : recipients) {
+                    if (vb.getUser() != null) {
+                        try {
+                            String content = String.format(
+                                    "Legacy message \"%s\" from %s is now available in vault \"%s\".",
+                                    message.getTitle(), ownerName, vault.getName());
+                            notificationRepository.save(Notification.builder()
+                                    .recipient(vb.getUser())
+                                    .type(NotificationType.VAULT_UNLOCKED)
+                                    .channel(NotificationChannel.IN_APP)
+                                    .referenceType("Vault")
+                                    .referenceId(vault.getId())
+                                    .content(content)
+                                    .status(NotificationStatus.SENT)
+                                    .sentAt(now)
+                                    .build());
+                        } catch (RuntimeException e) {
+                            log.warn("F4b: failed to save in-app notification for message {} to beneficiary {}: {}",
+                                    message.getId(), vb.getId(), e.getMessage());
+                        }
+                    }
+                }
+
+                // Ghi audit không chứa tiêu đề riêng tư của lời nhắn
+                auditLogService.log(AuditAction.BENEFICIARY_NOTIFIED, AuditResult.SUCCESS, null, null,
+                        vault.getId(), "LegacyMessage", message.getId().toString(),
+                        "Delivered legacy message (id=" + message.getId() + ", recipients=" + recipients.size() + ")");
+
+                return new DeliveryPlan(message, vault, ownerName, recipients);
+            });
+        } catch (RuntimeException e) {
+            log.error("F4b: failed to deliver message {} in vault {}: {}", message.getId(), vault.getId(), e.getMessage(), e);
+            return false;
         }
 
-        auditLogService.log(AuditAction.BENEFICIARY_NOTIFIED, AuditResult.SUCCESS, null, null,
-                vault.getId(), "LegacyMessage", message.getId().toString(),
-                "Delivered legacy message: " + message.getTitle() + " (recipients=" + recipients.size() + ")");
+        if (plan == null) {
+            return false;
+        }
+
+        // Giao dịch DB đã commit thành công: gửi mail sau commit
+        for (VaultBeneficiary vb : plan.recipients()) {
+            if (vb.getEmail() != null && !vb.getEmail().isBlank()) {
+                try {
+                    emailSender.sendLegacyMessageDeliveredNotification(
+                            vb.getEmail(), vb.getFullName(), plan.ownerName(), plan.vault().getName(),
+                            plan.message().getTitle(), plan.vault().getId());
+                } catch (RuntimeException e) {
+                    log.warn("F4b: failed to send legacy message email for message {} to {}: {}",
+                            plan.message().getId(), vb.getEmail(), e.getMessage());
+                }
+            }
+        }
+        return true;
     }
 
     private List<VaultBeneficiary> resolveRecipientsForDelivery(LegacyMessage message, UUID vaultId) {
@@ -383,40 +504,6 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     private boolean isEligibleRecipient(VaultBeneficiary vb) {
         return vb.getStatus() != BeneficiaryInviteStatus.DECLINED
                 && vb.getStatus() != BeneficiaryInviteStatus.WAIVED;
-    }
-
-    private void notifyBeneficiaryOfMessage(VaultBeneficiary vb, Vault vault, LegacyMessage message,
-                                            String ownerName, LocalDateTime now) {
-        if (vb.getUser() != null && notificationRepository != null) {
-            try {
-                String content = String.format(
-                        "Legacy message \"%s\" from %s is now available in vault \"%s\".",
-                        message.getTitle(), ownerName, vault.getName());
-                notificationRepository.save(Notification.builder()
-                        .recipient(vb.getUser())
-                        .type(NotificationType.VAULT_UNLOCKED)
-                        .channel(NotificationChannel.IN_APP)
-                        .referenceType("Vault")
-                        .referenceId(vault.getId())
-                        .content(content)
-                        .status(NotificationStatus.SENT)
-                        .sentAt(now)
-                        .build());
-            } catch (RuntimeException e) {
-                log.warn("F4b: failed to save in-app notification for message {} to beneficiary {}: {}",
-                        message.getId(), vb.getId(), e.getMessage());
-            }
-        }
-
-        if (vb.getEmail() != null && !vb.getEmail().isBlank() && emailSender != null) {
-            try {
-                emailSender.sendLegacyMessageDeliveredNotification(
-                        vb.getEmail(), vb.getFullName(), ownerName, vault.getName(), message.getTitle(), vault.getId());
-            } catch (RuntimeException e) {
-                log.warn("F4b: failed to send legacy message email for message {} to {}: {}",
-                        message.getId(), vb.getEmail(), e.getMessage());
-            }
-        }
     }
 
     private VaultBeneficiary requireActiveBeneficiary(UUID vaultId, UUID userId) {
@@ -467,7 +554,7 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
             if (deliverDate == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "deliverDate is required when deliveryTrigger is SPECIFIC_DATE");
             }
-            if (deliverDate.isBefore(LocalDate.now())) {
+            if (deliverDate.isBefore(LocalDate.now(VN_ZONE))) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "deliverDate cannot be in the past");
             }
         }

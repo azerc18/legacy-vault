@@ -7,6 +7,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * F4b: Scheduler quét định kỳ các lời nhắn hẹn giờ tương lai (Time-Capsule: SPECIFIC_DATE có deliver_date <= hôm nay)
@@ -19,11 +20,13 @@ import java.time.LocalDate;
 @ConditionalOnProperty(name = "app.legacy-message.scheduler.enabled", havingValue = "true", matchIfMissing = true)
 public class LegacyMessageDeliveryScheduler {
 
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
     private final LegacyMessageService legacyMessageService;
 
     @Scheduled(fixedDelayString = "${app.legacy-message.delivery-scan-delay:PT1H}")
     public void scanAndDeliverDueMessages() {
-        deliverDueMessages(LocalDate.now());
+        deliverDueMessages(LocalDate.now(VN_ZONE));
     }
 
     public int deliverDueMessages(LocalDate today) {
@@ -34,9 +37,8 @@ public class LegacyMessageDeliveryScheduler {
             }
             return count;
         } catch (RuntimeException e) {
-            log.error("F4b: scheduler failed to deliver due legacy messages for date {}: {}", today, e.getMessage());
+            log.error("F4b: scheduler failed to deliver due legacy messages for date {}: {}", today, e.getMessage(), e);
             return 0;
         }
     }
 }
-
