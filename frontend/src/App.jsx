@@ -22,6 +22,9 @@ import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 import OwnerActivity from './Owner/OwnerActivity.jsx';
+import PricingPage from './Owner/PricingPage.jsx';
+import BillingPage from './Owner/BillingPage.jsx';
+import PaymentResultPage from './Owner/PaymentResultPage.jsx';
 import CheckinDonePage from './Owner/CheckinDonePage.jsx';
 import CheckinConfirmPage from './Owner/CheckinConfirmPage.jsx';
 import AdminUsers from './Admin/AdminUsers.jsx';
@@ -33,6 +36,7 @@ import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
+import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -56,6 +60,7 @@ function App() {
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/forgot-password" element={<ForgotPassword />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/payment/result" element={<PaymentResultPage />} />
                 <Route path="/dms/checkin" element={<CheckinConfirmPage />} />
                 <Route path="/dms/checkin-done" element={<CheckinDonePage />} />
 
@@ -69,6 +74,8 @@ function App() {
                 <Route path="/owner/dms" element={guard(OWNER, <DeadMansSwitch />)} />
                 <Route path="/owner/executors" element={guard(OWNER, <OwnerExecutors />)} />
                 <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
+                <Route path="/pricing" element={guard(OWNER, <PricingPage />)} />
+                <Route path="/billing" element={guard(OWNER, <BillingPage />)} />
 
                 {/* Beneficiary */}
                 <Route path="/beneficiary" element={guard(BENEFICIARY, <BeneficiaryVaults />)} />
@@ -100,6 +107,7 @@ function App() {
                 <Route path="*" element={<NotFound />} />
             </Routes>
             <AssistantWidget />
+            <PlanLimitUpgradeDialog />
         </BrowserRouter>
     );
 }

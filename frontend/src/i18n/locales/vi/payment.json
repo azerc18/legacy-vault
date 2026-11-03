@@ -1,1 +1,122 @@
-{}
+{
+  "header": {
+    "vip": "VIP",
+    "upgrade": "Nâng cấp",
+    "vipActive": "Gói VIP đang kích hoạt",
+    "upgradeToVip": "Nâng cấp lên VIP"
+  },
+  "pricing": {
+    "title": "Gói dịch vụ & Bảng giá",
+    "subtitle": "Bảo vệ di sản số của bạn với nhiều két chuyên biệt, người thụ hưởng dự phòng, phân chia theo tỷ lệ (%) và 5 GB lưu trữ mã hoá.",
+    "back": "Gói thuê bao & Thanh toán",
+    "currentPlan": "Gói hiện tại:",
+    "expires": "Hết hạn ngày {{date}}",
+    "viewBilling": "Xem lịch sử thanh toán",
+    "loading": "Đang tải danh sách gói...",
+    "retry": "Thử lại",
+    "savePercent": "Tiết kiệm {{percent}}%",
+    "free": "Miễn phí",
+    "perDays": "/ {{days}} ngày",
+    "features": {
+      "oneMasterVault": "1 Két sắt di sản chính",
+      "upToVaults": "Tối đa {{count}} két sắt chuyên biệt",
+      "upToBeneficiaries": "Tối đa {{count}} người thụ hưởng / két",
+      "advancedAllocationIncluded": "Người thụ hưởng dự phòng & Chia tỷ lệ % (Đã bao gồm)",
+      "advancedAllocationVipOnly": "Người thụ hưởng dự phòng & Chia tỷ lệ % (Chỉ dành cho VIP)",
+      "storage": "{{size}} dung lượng lưu trữ mã hoá"
+    },
+    "buttons": {
+      "currentPlan": "Gói hiện tại",
+      "included": "Mặc định có sẵn",
+      "redirecting": "Đang chuyển hướng sang VNPay...",
+      "extend": "Gia hạn qua VNPay",
+      "upgrade": "Nâng cấp qua VNPay"
+    },
+    "errors": {
+      "loadFailed": "Không thể tải danh sách gói thuê bao.",
+      "noPlans": "Hiện chưa có gói thuê bao nào.",
+      "checkoutFailed": "Không thể khởi tạo thanh toán VNPay."
+    }
+  },
+  "billing": {
+    "title": "Gói thuê bao & Thanh toán",
+    "subtitle": "Quản lý gói LegacyVault, quyền lợi và lịch sử thanh toán VNPay của bạn.",
+    "extendVip": "Gia hạn VIP",
+    "upgradeToVip": "Nâng cấp lên VIP",
+    "loading": "Đang tải thông tin thanh toán...",
+    "current": {
+      "title": "Gói thuê bao hiện tại",
+      "plan": "Gói",
+      "vip": "VIP",
+      "statusExpiry": "Trạng thái / Hết hạn",
+      "expires": "Hết hạn ngày {{date}}",
+      "expiredOn": "Gói VIP đã hết hạn ngày {{date}}",
+      "limits": "Giới hạn Két & Người thụ hưởng",
+      "vaultsAndBens": "{{vaults}} két sắt · {{beneficiaries}} người thụ hưởng/két",
+      "storage": "Lưu trữ mã hoá & Tin nhắn di nguyện",
+      "storageDetail": "{{storage}} · {{media}}",
+      "mediaEnabled": "Hỗ trợ tin nhắn đa phương tiện",
+      "noMedia": "Chưa hỗ trợ tin nhắn đa phương tiện"
+    },
+    "history": {
+      "title": "Lịch sử giao dịch",
+      "empty": "Chưa có giao dịch thanh toán nào.",
+      "date": "Ngày",
+      "plan": "Gói",
+      "amount": "Số tiền",
+      "status": "Trạng thái",
+      "ref": "Mã giao dịch VNPay"
+    },
+    "errors": {
+      "loadFailed": "Không thể tải thông tin thanh toán."
+    }
+  },
+  "result": {
+    "successTitle": "Thanh toán thành công",
+    "failedTitle": "Thanh toán thất bại",
+    "confirmingTitle": "Đang xác nhận thanh toán",
+    "successSubtitle": "Gói VIP của bạn đã được kích hoạt.",
+    "failedSubtitle": "Giao dịch VNPay của bạn không thể hoàn tất.",
+    "confirmingSubtitle": "Vui lòng đợi giây lát trong khi chúng tôi xác nhận giao dịch với VNPay.",
+    "successHeading": "Chào mừng bạn đến với LegacyVault VIP!",
+    "confirmingHeading": "Đang kiểm tra trạng thái kích hoạt...",
+    "failedHeading": "Không thể xác nhận thanh toán",
+    "confirmingMessage": "Hệ thống đang kiểm tra với cổng thanh toán (lần thử {{attempt}}/{{maxAttempts}}). Quyền lợi VIP sẽ sớm có hiệu lực.",
+    "successDesc": "Bạn hiện có quyền truy cập tối đa {{vaults}} két sắt, {{beneficiaries}} người thụ hưởng mỗi két, {{storage}} dung lượng lưu trữ mã hoá{{media}}.",
+    "withMedia": " và tin nhắn di nguyện âm thanh/hình ảnh",
+    "failedDefault": "Giao dịch bị huỷ hoặc bị từ chối bởi cổng thanh toán.",
+    "reason": "Lý do: {{code}}",
+    "txId": "Mã giao dịch: {{id}}",
+    "viewBilling": "Xem lịch sử thanh toán",
+    "myVaults": "Đến danh sách Két sắt",
+    "tryAgain": "Thử lại",
+    "processingTitle": "Đã nhận thanh toán",
+    "processingSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "processingHeading": "Đang xử lý kích hoạt gói VIP",
+    "processingMessage": "Việc này có thể mất vài phút. Bạn hãy xem lại trang Thanh toán sau ít phút, không cần thanh toán lại.",
+    "loginRequiredTitle": "Thanh toán thành công",
+    "loginRequiredSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "loginRequiredHeading": "Đăng nhập để xem gói của bạn",
+    "loginRequiredMessage": "Thanh toán thành công, đăng nhập để xem gói.",
+    "login": "Đăng nhập"
+  },
+  "upgradeDialog": {
+    "title": "Nâng cấp lên VIP",
+    "defaultMessage": "Bạn đã đạt giới hạn của gói Miễn phí. Nâng cấp lên VIP để mở khoá tối đa {{vaults}} két sắt, {{beneficiaries}} người thụ hưởng mỗi két, {{storage}} lưu trữ mã hoá và tin nhắn di nguyện.",
+    "features": {
+      "vaults": "Tối đa {{vaults}} két sắt & {{beneficiaries}} người thụ hưởng mỗi két",
+      "storage": "{{storage}} dung lượng lưu trữ đám mây mã hoá",
+      "media": "Tin nhắn di nguyện âm thanh & video"
+    },
+    "notNow": "Để sau",
+    "viewPlans": "Xem các gói VIP",
+    "feature": {
+      "MULTIPLE_VAULTS": "Bạn đã đạt giới hạn két sắt của gói Miễn phí. Nâng cấp lên VIP để tạo tối đa {{vaults}} két.",
+      "BENEFICIARY_LIMIT": "Bạn đã đạt giới hạn người thụ hưởng của gói Miễn phí. Nâng cấp lên VIP để có tối đa {{beneficiaries}} người mỗi két.",
+      "ADVANCED_ALLOCATION": "Chia theo tỷ lệ và người thụ hưởng dự phòng là tính năng của gói VIP.",
+      "TRUSTED_CONFIRMERS": "Người xác nhận chéo cho Dead Man's Switch là tính năng của gói VIP.",
+      "LEGACY_MESSAGES": "Tin nhắn di nguyện là tính năng của gói VIP.",
+      "STORAGE": "Bạn đã dùng hết dung lượng của gói Miễn phí. Nâng cấp lên VIP để có {{storage}} lưu trữ mã hoá."
+    }
+  }
+}

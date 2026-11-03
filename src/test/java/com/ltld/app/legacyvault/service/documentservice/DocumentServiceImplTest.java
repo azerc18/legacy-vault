@@ -45,6 +45,7 @@ class DocumentServiceImplTest {
     @Mock private FileStorageService fileStorageService;
     @Mock private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
     @Mock private com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard vaultModificationGuard;
+    @Mock private com.ltld.app.legacyvault.service.paymentservice.EntitlementService entitlementService;
 
     @InjectMocks private DocumentServiceImpl documentService;
 
