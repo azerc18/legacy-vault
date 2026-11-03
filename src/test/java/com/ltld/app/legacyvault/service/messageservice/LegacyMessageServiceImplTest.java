@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.messageservice;
 
 import com.ltld.app.legacyvault.dto.messagedto.CreateLegacyMessageRequest;
 import com.ltld.app.legacyvault.dto.messagedto.LegacyMessageResponse;
+import com.ltld.app.legacyvault.dto.messagedto.UpdateLegacyMessageRequest;
 import com.ltld.app.legacyvault.entity.LegacyMessage;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
