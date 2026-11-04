@@ -139,12 +139,12 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
         assertThat(config(ownerId).getNextReminderAt()).isNull();
         assertThat(config(ownerId).getRemindersSent()).isEqualTo(REMINDERS);
         for (int i = 1; i <= REMINDERS; i++) {
-            verify(emailSender).sendDmsCheckinReminder(eq(ownerEmail), any(), eq(deadline), eq(i), eq(REMINDERS));
+            verify(emailSender).sendDmsCheckinReminder(eq(ownerEmail), any(), eq(deadline), eq(i), eq(REMINDERS), anyString());
         }
 
         // Quét lại sát hạn: không gửi thêm (không nhắc lặp).
         dmsReminderService.sendDueReminders(deadline.minusMinutes(1));
-        verify(emailSender, times(REMINDERS)).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        verify(emailSender, times(REMINDERS)).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), anyString());
 
         // m2: hết hạn mới mà Owner vẫn im lặng -> kích hoạt luôn, KHÔNG hỏi xác nhận lần 2.
         dmsAutomationService.processOverdueDms(deadline.plusMinutes(1));

@@ -30,6 +30,7 @@
   "action": {
     "DMS_CONFIGURED": "Lưu cấu hình Dead Man's Switch",
     "DMS_CHECKIN": "Check-in",
+    "DMS_CHECKIN_ONE_CLICK": "Check-in từ link trong email",
     "DMS_TRIGGERED": "Dead Man's Switch đã kích hoạt",
     "DMS_TRIGGER_DEFERRED": "Hoãn kích hoạt Dead Man's Switch",
     "DMS_TRIGGERED_NO_EXECUTOR": "Kích hoạt nhưng không có người thi hành",

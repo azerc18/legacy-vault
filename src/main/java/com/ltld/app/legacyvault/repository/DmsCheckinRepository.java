@@ -15,4 +15,6 @@ public interface DmsCheckinRepository extends JpaRepository<DmsCheckin, UUID> {
 
     // FR-03: lịch sử check-in của Owner, thứ tự do Pageable quyết định.
     Page<DmsCheckin> findByDmsConfigId(UUID dmsConfigId, Pageable pageable);
+
+    boolean existsByTokenJti(String tokenJti);
 }
