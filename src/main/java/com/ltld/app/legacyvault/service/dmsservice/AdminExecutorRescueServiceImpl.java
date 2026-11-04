@@ -107,7 +107,16 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         // FR-07: KHÔNG gửi mail trong transaction. Lưu Notification FAILED, attemptCount = 0; job
         // escalateUnresponsivePrimaries (mỗi 5 phút) gửi qua retryFailedNotification và đặt sentAt,
         // nên đồng hồ BR-03 và cơ chế gửi lại dùng đúng logic hiện có.
-        notificationRepository.save(Notification.builder().recipient(candidate).type(NotificationType.EXECUTOR_ACTIVATED).channel(NotificationChannel.EMAIL).referenceType(DmsActivationProcessor.ENTITY_DMS_CONFIG).referenceId(config.getId()).content(DmsActivationProcessor.activationMessage(owner, saved)).status(NotificationStatus.FAILED).attemptCount(0).build());
+        notificationRepository.save(Notification.builder()
+                .recipient(candidate)
+                .type(NotificationType.EXECUTOR_ACTIVATED)
+                .channel(NotificationChannel.EMAIL)
+                .referenceType(DmsActivationProcessor.ENTITY_DMS_CONFIG)
+                .referenceId(config.getId())
+                .content(DmsActivationProcessor.activationMessage(owner, saved, config.getBackupActivationWaitDays()))
+                .status(NotificationStatus.FAILED)
+                .attemptCount(0)
+                .build());
 
         // Mail "Admin đã thay bạn" cho mọi người bị thay, gửi sau commit qua listener có sẵn
         List<ExecutorMail> mails = new ArrayList<>();
