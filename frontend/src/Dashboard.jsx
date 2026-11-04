@@ -267,21 +267,50 @@ export default function Dashboard() {
             </section>
 
             {/* FOOTER */}
-            <footer data-mode="dark" className="relative z-10 text-white px-5 pt-14 pb-8 overflow-hidden">
+            <footer data-mode="dark" className="relative z-10 text-white px-5 pt-14 pb-8 overflow-hidden border-t border-white/10">
                 <div className="max-w-6xl mx-auto">
-                    <div className="flex flex-col md:flex-row gap-6 justify-between text-sm text-white/65">
-                        <span className="flex items-center gap-2 font-bold tracking-[0.18em] text-white"><Icon name="lock" className="text-[22px]" />LEGACYVAULT</span>
-                        <div className="flex gap-6">
-                            <a href="#" className="hover:text-white">{t('footer.privacy')}</a>
-                            <a href="#" className="hover:text-white">{t('footer.terms')}</a>
-                            <a href="#faq" className="hover:text-white">{t('footer.support')}</a>
+                    <div className="flex flex-wrap gap-12 justify-between">
+                        <div className="flex-[1_1_280px] max-w-[360px] flex flex-col gap-4">
+                            <span className="flex items-center gap-2.5 font-bold tracking-[0.14em] text-lg"><Icon name="lock" className="text-[28px]" />LEGACYVAULT</span>
+                            <p className="text-white/70 leading-relaxed">{t('footerNav.tagline')}</p>
+                        </div>
+                        <div className="flex-[2_1_520px] flex flex-wrap gap-9">
+                        <div className="flex flex-col gap-3.5 min-w-[150px]">
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.product')}</div>
+                            <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.features')}</a>
+                            <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.how')}</a>
+                            <a href="#security" className="text-white/70 hover:text-white">{t('footerNav.security')}</a>
+                            <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
+                        </div>
+                        <div className="flex flex-col gap-3.5 min-w-[150px]">
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.forWho')}</div>
+                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.owner')}</Link>
+                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.beneficiary')}</Link>
+                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.executor')}</Link>
+                            <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.verifier')}</a>
+                        </div>
+                        <div className="flex flex-col gap-3.5 min-w-[150px]">
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.account')}</div>
+                            <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
+                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.signUp')}</Link>
+                            <Link to="/forgot-password" className="text-white/70 hover:text-white">{t('footerNav.forgot')}</Link>
+                        </div>
+                        <div className="flex flex-col gap-3.5 min-w-[150px]">
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.project')}</div>
+                            <span className="text-white/70">SWP391, FPT University</span>
+                            <a href="https://github.com/azerc18/legacy-vault" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">GitHub</a>
+                            <a href="#faq" className="text-white/70 hover:text-white">{t('footerNav.contact')}</a>
+                        </div>
                         </div>
                     </div>
-                    <div aria-hidden="true" className="mt-10 font-headline-lg font-bold select-none whitespace-nowrap text-center"
-                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', backgroundImage: 'linear-gradient(180deg,#ffffff 0%,#7f9dff 70%,rgba(127,157,255,.25) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                    <div aria-hidden="true" className="mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
+                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em', backgroundImage: 'linear-gradient(180deg,rgba(255,255,255,0.20),rgba(255,255,255,0))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
                         LEGACYVAULT
                     </div>
-                    <p className="mt-2 text-center text-xs text-white/50">{t('footer.rights')}</p>
+                    <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/50">
+                        <span>{t('footerNav.legal1')}</span>
+                        <span>{t('footerNav.legal2')}</span>
+                    </div>
                 </div>
             </footer>
         </div>
