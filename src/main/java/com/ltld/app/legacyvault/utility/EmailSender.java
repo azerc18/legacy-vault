@@ -182,12 +182,27 @@ public class EmailSender {
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
+        sendDmsCheckinReminder(email, checkinDueAt, triggerAt, reminderNumber, reminderCount, null);
+    }
+
+    /**
+     * F2: nhắc Owner check-in kèm link một chạm tới trang FE /dms/checkin; mở link chỉ hiện trang,
+     * Owner bấm nút "I'm OK" thì mới check-in. checkinToken null/rỗng -> mail như cũ, không kèm link.
+     */
+    public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
+                                       int reminderNumber, int reminderCount, String checkinToken) {
+        String base = frontendBase();
+        String linkSection = (base != null && checkinToken != null && !checkinToken.isBlank())
+                ? "\n\nStill here? Open this link and press \"I'm OK\" to check in without signing in: "
+                        + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8)
+                : "";
         sendWithoutOtpFooter(email,
                 "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
                 "You have not checked in to your Dead Man's Switch on LegacyVault."
                         + "\nCheck-in deadline: " + formatDeadline(checkinDueAt) + " (Vietnam time)"
                         + "\nIf you do not respond, the system will start the handover process at "
                         + formatDeadline(triggerAt) + " (Vietnam time) and notify your Digital Executor."
+                        + linkSection
                         + "\n\nTo check in, sign in to LegacyVault and choose \"Check-in\" in the Dead Man's Switch settings."
                         + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
     }

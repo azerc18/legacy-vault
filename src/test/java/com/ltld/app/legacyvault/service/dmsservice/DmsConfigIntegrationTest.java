@@ -230,7 +230,8 @@ class DmsConfigIntegrationTest {
             assertThat(config.getNextReminderAt()).as("lần nhắc kế sau lần %d", i + 1)
                     .isEqualTo(i + 1 < REMINDERS ? reminderTimes.get(i + 1) : null);
             assertThat(config.getNextCheckinDueAt()).isEqualTo(triggerAt);   // nhắc không lùi hạn chót
-            verify(emailSender).sendDmsCheckinReminder(s.ownerEmail, due, triggerAt, i + 1, REMINDERS);
+            verify(emailSender).sendDmsCheckinReminder(eq(s.ownerEmail), eq(due), eq(triggerAt), eq(i + 1),
+                    eq(REMINDERS), oneClickCheckinLink());
             assertThat(reminderCheckins(s)).hasSize(i + 1);
         }
 
@@ -242,7 +243,7 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getNextReminderAt()).isNull();
         assertThat(reminderCheckins(s)).hasSize(REMINDERS)
                 .allSatisfy(c -> assertThat(c.getChannel()).isEqualTo(NotificationChannel.EMAIL));
-        verify(emailSender, times(REMINDERS)).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        verify(emailSender, times(REMINDERS)).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
     }
 
     @Test
@@ -252,7 +253,7 @@ class DmsConfigIntegrationTest {
         LocalDateTime due = config(s).getLastCheckinAt().plusDays(INTERVAL_DAYS);
         LocalDateTime triggerAt = due.plusDays(GRACE_DAYS);
         doThrow(new MailSendException("SMTP down")).doNothing().when(emailSender)
-                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
 
         // Lượt 1: gửi lỗi -> trả lại lần nhắc, không ghi REMINDER_SENT.
         dmsReminderService.sendDueReminders(due);
@@ -268,7 +269,8 @@ class DmsConfigIntegrationTest {
         assertThat(config.getRemindersSent()).isEqualTo(1);
         assertThat(config.getNextReminderAt()).isEqualTo(due.plusHours(56));
         assertThat(reminderCheckins(s)).hasSize(1);
-        verify(emailSender, times(2)).sendDmsCheckinReminder(s.ownerEmail, due, triggerAt, 1, REMINDERS);
+        verify(emailSender, times(2)).sendDmsCheckinReminder(eq(s.ownerEmail), eq(due), eq(triggerAt), eq(1),
+                eq(REMINDERS), oneClickCheckinLink());
     }
 
     // ---------- 3. Check-in cứu DMS ----------
@@ -335,7 +337,7 @@ class DmsConfigIntegrationTest {
         Seed s = seed(true, true);
         dmsConfigService.upsertConfig(s.ownerId, request());
         doThrow(new MailSendException("SMTP down")).when(emailSender)
-                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
         LocalDateTime deadline = config(s).getNextCheckinDueAt();
 
         for (int i = 1; i <= 3; i++) {
@@ -352,7 +354,7 @@ class DmsConfigIntegrationTest {
             // Lần nhắc bù được thử với hạn mới nhưng vẫn lỗi -> remindersSent giữ 0.
             dmsReminderService.sendDueReminders(scan);
             verify(emailSender).sendDmsCheckinReminder(eq(s.ownerEmail), any(), eq(deadline),
-                    anyInt(), anyInt());
+                    anyInt(), anyInt(), oneClickCheckinLink());
             assertThat(config(s).getRemindersSent()).isZero();
         }
 
@@ -545,7 +547,7 @@ class DmsConfigIntegrationTest {
                 .containsExactly(DmsCheckinType.OWNER_RESPONDED);
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
-        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
         verify(executorNotificationService, never()).send(anyString(), anyString());
     }
 
@@ -580,7 +582,7 @@ class DmsConfigIntegrationTest {
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
         verify(executorNotificationService, never()).send(anyString(), anyString());
-        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt());
+        verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
         assertThat(auditLogRepository.findByActor_IdOrderByCreatedAtDesc(adminId, Pageable.unpaged()))
                 .extracting(AuditLog::getAction)
                 .containsExactlyInAnyOrder(AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED);
@@ -666,6 +668,11 @@ class DmsConfigIntegrationTest {
         request.setGracePeriodDays(GRACE_DAYS);
         request.setReminderCount(REMINDERS);
         return request;
+    }
+
+    // F2: mail nhắc check-in kèm token check-in một chạm (JWT 3 phần) do DmsOneClickCheckinService sinh.
+    private static String oneClickCheckinLink() {
+        return argThat(token -> token != null && token.split("\\.").length == 3);
     }
 
     private DmsConfig config(Seed s) {

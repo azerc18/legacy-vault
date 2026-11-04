@@ -30,6 +30,7 @@
   "action": {
     "DMS_CONFIGURED": "Dead Man's Switch configured",
     "DMS_CHECKIN": "Check-in",
+    "DMS_CHECKIN_ONE_CLICK": "Check-in from email link",
     "DMS_TRIGGERED": "Dead Man's Switch triggered",
     "DMS_TRIGGER_DEFERRED": "Dead Man's Switch activation postponed",
     "DMS_TRIGGERED_NO_EXECUTOR": "Triggered with no executor",

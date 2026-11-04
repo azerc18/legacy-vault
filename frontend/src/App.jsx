@@ -27,6 +27,8 @@ import DmsConfirmPage from './Owner/DmsConfirmPage.jsx';
 import PricingPage from './Owner/PricingPage.jsx';
 import BillingPage from './Owner/BillingPage.jsx';
 import PaymentResultPage from './Owner/PaymentResultPage.jsx';
+import CheckinDonePage from './Owner/CheckinDonePage.jsx';
+import CheckinConfirmPage from './Owner/CheckinConfirmPage.jsx';
 import AdminUsers from './Admin/AdminUsers.jsx';
 import AdminVaults from './Admin/AdminVaults.jsx';
 import RequireRole from './Common/RequireRole.jsx';
@@ -63,6 +65,8 @@ function App() {
                 <Route path="/dms/confirm-done" element={<DmsConfirmationResultPage />} />
                 <Route path="/dms/confirm" element={<DmsConfirmPage />} />
                 <Route path="/payment/result" element={<PaymentResultPage />} />
+                <Route path="/dms/checkin" element={<CheckinConfirmPage />} />
+                <Route path="/dms/checkin-done" element={<CheckinDonePage />} />
 
                 {/* Đã đăng nhập */}
                 <Route path="/home" element={guard(null, <UserHome />)} />

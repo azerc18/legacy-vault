@@ -109,6 +109,7 @@ public class AuditDescriptionBuilder {
             // FR-03 / FR-06 / FR-07: nhật ký cấp Owner; detail chứa ownerId và id nội bộ nên không nối
             case DMS_CONFIGURED -> "Saved the Dead Man's Switch configuration.";
             case DMS_CHECKIN -> "Checked in to confirm still active.";
+            case DMS_CHECKIN_ONE_CLICK -> "Checked in from the link in the reminder email.";
             case DMS_CONFIRMER_ADDED -> "Added a trusted social confirmer for the Dead Man's Switch.";
             case DMS_CONFIRMER_REMOVED -> "Removed a trusted social confirmer from the Dead Man's Switch.";
             case DMS_CONFIRMATION_REQUESTED -> "Requested cross-confirmation from trusted confirmers before triggering the Dead Man's Switch.";

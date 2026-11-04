@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.exception.DmsCheckinLinkException;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
@@ -32,7 +33,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -182,6 +185,70 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
                 "nextCheckinDueAt=" + config.getNextCheckinDueAt());
         return toResponse(config);
+    }
+
+    // F2: READ_COMMITTED để existsByTokenJti sau khi khóa thấy dòng của request cùng token vừa commit (m1),
+    // và cùng lý do khóa gap với upsertConfig.
+    @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public DmsConfigResponse checkInFromEmailLink(UUID ownerId, String tokenJti, Long tokenCycle) {
+        // Khóa trước rồi mới kiểm jti: bấm đúp / trình quét + người bấm cùng lúc thì request sau chờ khóa,
+        // thấy jti đã dùng và không reset chu kỳ lần nữa.
+        DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
+                .orElseThrow(() -> new DmsCheckinLinkException(DmsCheckinLinkException.Reason.NOT_CONFIGURED,
+                        "The Dead Man's Switch has not been configured."));
+        if (dmsCheckinRepository.existsByTokenJti(tokenJti)) {
+            throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TOKEN_INVALID,
+                    "This check-in link has already been used.");
+        }
+        // m7: token chỉ dùng trong chu kỳ đã sinh ra nó; Owner đã check-in (app hoặc link khác) thì link cũ hết hiệu lực.
+        if (!Objects.equals(tokenCycle, checkinCycleOf(config))) {
+            throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TOKEN_INVALID,
+                    "This check-in link belongs to an earlier check-in cycle.");
+        }
+        // Cùng luật trạng thái với checkIn(): ACTIVE hoặc đang chờ xác nhận chéo (X2 PENDING_CONFIRMATION).
+        switch (config.getStatus()) {
+            case ACTIVE, PENDING_CONFIRMATION -> { }
+            case TRIGGERED -> throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TRIGGERED,
+                    "The Dead Man's Switch has been triggered; check-in is no longer possible.");
+            case SUSPENDED -> throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.SUSPENDED,
+                    SUSPENDED_MESSAGE);
+            default -> throw new DmsException("The Dead Man's Switch is not active.", HttpStatus.CONFLICT);
+        }
+        if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
+                || config.getReminderCount() == null) {
+            throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.NOT_CONFIGURED, INCOMPLETE_CONFIG_MESSAGE);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        config.setStatus(DmsStatus.ACTIVE);   // như checkIn(): Owner tự xác nhận thì thoát PENDING_CONFIRMATION
+        startNewCycle(config, now);
+        config = dmsConfigRepository.saveAndFlush(config);
+        try {
+            dmsCheckinRepository.saveAndFlush(DmsCheckin.builder()
+                    .dmsConfig(config)
+                    .checkinType(DmsCheckinType.OWNER_RESPONDED)
+                    .channel(NotificationChannel.EMAIL)
+                    .tokenJti(tokenJti)
+                    .occurredAt(now)
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            // Lớp chặn cuối: UNIQUE token_jti
+            throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.TOKEN_INVALID,
+                    "This check-in link has already been used.");
+        }
+
+        audit(AuditAction.DMS_CHECKIN_ONE_CLICK, config.getOwner(), config,
+                "nextCheckinDueAt=" + config.getNextCheckinDueAt());
+        return toResponse(config);
+    }
+
+    /**
+     * F2 (m7): mốc chu kỳ check-in đưa vào token (claim cyc) = lastCheckinAt, epoch giây UTC; null nếu chưa có.
+     * Cả lúc sinh token và lúc dùng đều đọc lastCheckinAt từ DB, nên so sánh ổn định.
+     */
+    public static Long checkinCycleOf(DmsConfig config) {
+        return config.getLastCheckinAt() == null ? null : config.getLastCheckinAt().toEpochSecond(ZoneOffset.UTC);
     }
 
     @Override
