@@ -1,3 +1,4 @@
+import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -32,10 +33,10 @@ export default function ForgotPassword() {
     };
 
     return (
-        <div className="relative bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4">
+        <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
-            <div className="mb-8 text-center">
+            <div className="mb-8 text-center lv-auth-logo">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
                     <span className="material-symbols-outlined text-[28px]">lock_reset</span>
                 </div>
@@ -68,7 +69,7 @@ export default function ForgotPassword() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 lv-pill"
                     >
                         <span className="material-symbols-outlined text-[18px]">send</span>
                         {loading ? t('forgot.submitting') : t('forgot.submit')}
@@ -81,6 +82,6 @@ export default function ForgotPassword() {
                     </Link>
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }

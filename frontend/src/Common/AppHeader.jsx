@@ -2,7 +2,7 @@
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
 import React, { useEffect, useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import { paymentApi } from '../api/paymentApi.js';
 import UserAvatar from './UserAvatar.jsx';
@@ -11,6 +11,41 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
+// Menu mặc định khi trang không tự truyền nav: theo khu vực của URL, còn /me và /home thì theo vai trò chính của user
+const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
+function roleItems(role) {
+    switch (role) {
+        case 'ADMIN': return [{ to: '/admin/users', key: 'admin', icon: 'admin_panel_settings' }];
+        case 'OWNER': return [
+            { to: '/owner/vaults', key: 'myVaults', icon: 'inventory_2' },
+            { to: '/owner/dms', key: 'dms', icon: 'favorite' },
+            { to: '/owner/executors', key: 'executors', icon: 'badge' },
+            { to: '/owner/activity', key: 'activity', icon: 'history' },
+            { to: '/billing', key: 'billing', icon: 'workspace_premium' },
+        ];
+        case 'EXECUTOR': return [{ to: '/executor/home', key: 'estates', icon: 'badge' }];
+        case 'LEGAL_VERIFIER': return [
+            { to: '/verifier', key: 'requests', icon: 'gavel', end: true },
+            { to: '/verifier/history', key: 'history', icon: 'history' },
+        ];
+        case 'BENEFICIARY': return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }];
+        default: return [];
+    }
+}
+function defaultNav(pathname, roles) {
+    const home = { to: '/home', key: 'home', icon: 'home', end: true };
+    const profile = { to: '/me', key: 'profile', icon: 'person' };
+    if (pathname.startsWith('/executor')) return [{ to: '/executor/home', key: 'estates', icon: 'badge' }, profile];
+    if (pathname.startsWith('/verifier')) {
+        return [{ to: '/verifier/home', key: 'home', icon: 'home', end: true }, ...roleItems('LEGAL_VERIFIER'), profile];
+    }
+    if (pathname.startsWith('/beneficiary')) {
+        return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }, { to: '/beneficiary/guide', key: 'guide', icon: 'menu_book' }, profile];
+    }
+    const main = ROLE_ORDER.find((r) => roles.includes(r));
+    return [home, ...roleItems(main), profile];
+}
+
 export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
 
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -23,11 +58,15 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  * @param extra      phần tử thêm bên phải, trước avatar (vd. NotificationBell)
  * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
  */
-export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
+export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav: navProp, extra, userHome = false }) {
+    const { pathname } = useLocation();
     const { t } = useTranslation();
+    const user = getUser();
+    const nav = navProp && navProp.length > 0
+        ? navProp
+        : defaultNav(pathname, Array.isArray(user?.roles) ? user.roles : []).map(({ key, ...n }) => ({ ...n, label: t(`nav.${key}`) }));
     const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
-    const user = getUser();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
     const [vipStatus, setVipStatus] = useState(null);
 
@@ -69,65 +108,36 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
+    // Thanh bên trái (desktop) / thanh trên cùng (điện thoại). Nội dung trang được đẩy sang phải nhờ class lv-has-side (xem index.css).
+    useEffect(() => {
+        document.body.classList.add('lv-has-side');
+        return () => document.body.classList.remove('lv-has-side');
+    }, []);
+
+    const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-xl text-[15px] font-semibold whitespace-nowrap transition-colors';
     return (
-        <header className="sticky top-0 z-20 bg-surface-container-lowest/95 backdrop-blur-sm border-b border-outline-variant/30">
-            <div className={`${PAGE_WIDTH} h-16 flex items-center justify-between gap-3`}>
-                <Link to={home} className="flex items-center gap-2 min-w-0">
-                    <span className="w-9 h-9 shrink-0 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                        <Icon name={icon} className="text-[20px]" />
-                    </span>
+        <header className="lv-side bg-primary text-white">
+            <div className="lv-side-top">
+                <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
+                    <Icon name={icon === 'shield_locked' ? 'lock' : icon} className="text-[26px]" />
                     <span className="min-w-0">
-                        <span className="font-headline-sm text-primary font-bold text-xl block leading-tight">LegacyVault</span>
+                        <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (
-                            <span className="text-[11px] text-secondary font-semibold tracking-wide uppercase block truncate">{workspace}</span>
+                            <span className="text-[11px] text-white/60 font-semibold tracking-wide uppercase block truncate">{workspace}</span>
                         )}
                     </span>
                 </Link>
-
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    {isOwner && (
-                        <Link
-                            to={vipStatus?.vip ? '/billing' : '/pricing'}
-                            title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
-                            className={`h-8 px-2.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
-                                vipStatus?.vip
-                                    ? 'bg-primary text-on-primary'
-                                    : 'bg-secondary-fixed text-on-secondary-fixed hover:bg-primary hover:text-on-primary'
-                            }`}
-                        >
-                            <Icon name="workspace_premium" className="text-[15px]" />
-                            <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
-                        </Link>
-                    )}
-                    {userHome && (
-                        <Link to="/home" title={t('header.userHome')}
-                              className="h-10 px-2 sm:px-3 rounded-xl flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-low">
-                            <Icon name="swap_horiz" className="text-[18px]" /><span className="hidden md:inline">{t('header.userHome')}</span>                        </Link>
-                    )}
-                    <LanguageSwitch />
-                    {extra}
-                    <Link to="/me" title={user?.email}
-                          className="flex items-center gap-2 h-10 pl-1 pr-1 md:pr-3 rounded-xl hover:bg-surface-container-low">
-                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                        <span className="hidden md:block text-sm font-semibold text-on-surface max-w-[160px] truncate">{user?.name}</span>
-                    </Link>
-                    <button type="button" onClick={handleLogout} title={t('header.logout')}
-                            className="h-10 px-3 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-1.5 hover:bg-surface-container-low">
-                        <Icon name="logout" className="text-[18px]" /><span className="hidden sm:inline">{t('header.logout')}</span>
-                    </button>
-                </div>
             </div>
 
             {nav?.length > 0 && (
-                <nav className={`${PAGE_WIDTH} flex gap-1 overflow-x-auto`}>
+                <nav className="lv-side-nav">
                     {nav.map((n) => (
-                        <NavLink key={n.to} to={n.to}
+                        <NavLink key={n.to} to={n.to} end={n.end}
                                  className={({ isActive }) =>
-                                     `flex items-center gap-1.5 px-3 py-3 text-sm font-semibold border-b-2 whitespace-nowrap ${
-                                         isActive ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-primary'}`}>
-                            <Icon name={n.icon} className="text-[18px]" /> {n.label}
+                                     `${linkBase} ${isActive ? 'bg-primary-container text-white' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={n.icon} className="text-[20px]" /> {n.label}
                             {n.badge > 0 && (
-                                <span className="ml-1 min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
+                                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
                                     {n.badge}
                                 </span>
                             )}
@@ -135,6 +145,41 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                     ))}
                 </nav>
             )}
+
+            <div className="lv-side-bottom">
+                {isOwner && (
+                    <Link
+                        to={vipStatus?.vip ? '/billing' : '/pricing'}
+                        title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
+                        className={`h-9 px-3 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                            vipStatus?.vip ? 'bg-white text-primary' : 'bg-white/10 text-white hover:bg-white hover:text-primary'
+                        }`}
+                    >
+                        <Icon name="workspace_premium" className="text-[16px]" />
+                        <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
+                    </Link>
+                )}
+                {userHome && (
+                    <Link to="/home" title={t('header.userHome')}
+                          className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold text-white/75 hover:text-white hover:bg-white/10">
+                        <Icon name="swap_horiz" className="text-[16px]" /><span>{t('header.userHome')}</span>
+                    </Link>
+                )}
+                <div className="flex items-center gap-2">
+                    <LanguageSwitch variant="dark" />
+                    {extra}
+                </div>
+                <div className="flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
+                    <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1">
+                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
+                        <span className="text-sm font-semibold text-white truncate">{user?.name}</span>
+                    </Link>
+                    <button type="button" onClick={handleLogout} title={t('header.logout')} aria-label={t('header.logout')}
+                            className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10">
+                        <Icon name="logout" className="text-[18px]" />
+                    </button>
+                </div>
+            </div>
         </header>
     );
 }
@@ -154,7 +199,7 @@ export function PageTitle({ back, title, subtitle, right, className = 'mb-8' ,})
             )}
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <h1 className="font-headline-md text-headline-md break-words">{title}</h1>
+                    <h1 className="font-headline-md text-[30px] md:text-[34px] leading-tight font-bold tracking-tight break-words">{title}</h1>
                     {subtitle && <p className="mt-1 text-on-surface-variant">{subtitle}</p>}
                 </div>
                 {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}

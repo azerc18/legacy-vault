@@ -96,7 +96,7 @@ export default function AdminUsers() {
                     <option value="">{t('allStatuses')}</option>
                     {STATUSES.map((s) => <option key={s} value={s}>{t(`users.status.${s}`)}</option>)}
                 </select>
-                <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2">
+                <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 lv-pill">
                     <Icon name="search" className="text-[18px]" /> {t('search')}
                 </button>
             </form>

@@ -1,5 +1,10 @@
 {
-  "nav": { "how": "Cách hoạt động", "security": "Bảo mật", "roles": "Vai trò", "faq": "Hỏi đáp" },
+  "nav": {
+    "how": "Cách hoạt động",
+    "security": "Bảo mật",
+    "roles": "Vai trò",
+    "faq": "Hỏi đáp"
+  },
   "signIn": "Đăng nhập",
   "getStarted": "Bắt đầu",
   "hero": {
@@ -18,10 +23,22 @@
     "eyebrow": "Vấn đề",
     "title": "Tài sản số của bạn sẽ ra sao khi bạn không còn?",
     "items": {
-      "day1": { "when": "Ngày đầu tiên", "text": "Gia đình không tìm thấy tài khoản hay mật khẩu của bạn." },
-      "month1": { "when": "Sau 1 tháng", "text": "Ngân hàng và các nền tảng khoá truy cập vì thiếu giấy tờ chứng minh." },
-      "month6": { "when": "Sau 6 tháng", "text": "Các gói dịch vụ vẫn tự trừ tiền, dữ liệu bắt đầu hết hạn." },
-      "forever": { "when": "Mãi mãi", "text": "Ảnh, giấy tờ và kỷ niệm bị mất đi." }
+      "day1": {
+        "when": "Ngày đầu tiên",
+        "text": "Gia đình không tìm thấy tài khoản hay mật khẩu của bạn."
+      },
+      "month1": {
+        "when": "Sau 1 tháng",
+        "text": "Ngân hàng và các nền tảng khoá truy cập vì thiếu giấy tờ chứng minh."
+      },
+      "month6": {
+        "when": "Sau 6 tháng",
+        "text": "Các gói dịch vụ vẫn tự trừ tiền, dữ liệu bắt đầu hết hạn."
+      },
+      "forever": {
+        "when": "Mãi mãi",
+        "text": "Ảnh, giấy tờ và kỷ niệm bị mất đi."
+      }
     }
   },
   "how": {
@@ -29,27 +46,52 @@
     "title": "Bốn bước. Sau đó hệ thống tự chạy âm thầm.",
     "step": "Bước {{n}}",
     "items": {
-      "create": { "title": "Tạo kho di sản", "text": "Lưu tài sản và giấy tờ pháp lý, được mã hoá trước khi lưu." },
-      "people": { "title": "Chọn người liên quan", "text": "Chọn Người thi hành và những Người thụ hưởng sẽ nhận từng tài sản." },
-      "checkin": { "title": "Check-in định kỳ", "text": "Dead Man's Switch chỉ bắt đầu đếm khi bạn ngừng check-in." },
-      "handover": { "title": "Bàn giao có xác minh", "text": "Người xác minh pháp lý xem xét hồ sơ trước khi kho được mở." }
+      "create": {
+        "title": "Tạo kho di sản",
+        "text": "Lưu tài sản và giấy tờ pháp lý, được mã hoá trước khi lưu."
+      },
+      "people": {
+        "title": "Chọn người liên quan",
+        "text": "Chọn Người thi hành và những Người thụ hưởng sẽ nhận từng tài sản."
+      },
+      "checkin": {
+        "title": "Check-in định kỳ",
+        "text": "Dead Man's Switch chỉ bắt đầu đếm khi bạn ngừng check-in."
+      },
+      "handover": {
+        "title": "Bàn giao có xác minh",
+        "text": "Người xác minh pháp lý xem xét hồ sơ trước khi kho được mở."
+      }
     }
   },
   "security": {
     "eyebrow": "Bảo mật",
     "title": "Được thiết kế để không ai mở được trước thời điểm.",
     "items": {
-      "encrypted": { "title": "Mã hoá khi lưu trữ", "text": "Mọi tài sản và giấy tờ được mã hoá bằng khoá chính, cơ sở dữ liệu không bao giờ thấy bản rõ." },
-      "noFalseAlarm": { "title": "Không báo động nhầm", "text": "Hệ thống gửi nhắc nhở trước khi kích hoạt, nên lỡ một lần check-in không mở được gì." },
-      "human": { "title": "Có con người xác minh", "text": "Muốn mở kho phải có Người xác minh pháp lý phê duyệt và ký bằng mã dùng một lần." }
+      "encrypted": {
+        "title": "Mã hoá khi lưu trữ",
+        "text": "Mọi tài sản và giấy tờ được mã hoá bằng khoá chính, cơ sở dữ liệu không bao giờ thấy bản rõ."
+      },
+      "noFalseAlarm": {
+        "title": "Không báo động nhầm",
+        "text": "Hệ thống gửi nhắc nhở trước khi kích hoạt, nên lỡ một lần check-in không mở được gì."
+      },
+      "human": {
+        "title": "Có con người xác minh",
+        "text": "Muốn mở kho phải có Người xác minh pháp lý phê duyệt và ký bằng mã dùng một lần."
+      }
     }
   },
   "assets": {
     "eyebrow": "Kho của bạn",
     "title": "Những gì bạn có thể lưu",
     "items": {
-      "passwords": "Mật khẩu", "banks": "Tài khoản ngân hàng", "crypto": "Ví tiền mã hoá",
-      "legal": "Giấy tờ pháp lý", "notes": "Ghi chú riêng tư", "files": "Tệp & hình ảnh"
+      "passwords": "Mật khẩu",
+      "banks": "Tài khoản ngân hàng",
+      "crypto": "Ví tiền mã hoá",
+      "legal": "Giấy tờ pháp lý",
+      "notes": "Ghi chú riêng tư",
+      "files": "Tệp & hình ảnh"
     }
   },
   "rolesSection": {
@@ -66,10 +108,22 @@
     "eyebrow": "Hỏi đáp",
     "title": "Câu hỏi thường gặp",
     "items": {
-      "staff": { "q": "Nhân viên LegacyVault có đọc được tài sản của tôi không?", "a": "Không. Tài sản được mã hoá trước khi lưu và chỉ được giải mã cho đúng người thụ hưởng sau khi xác minh." },
-      "forget": { "q": "Nếu tôi quên check-in thì sao?", "a": "Bạn sẽ nhận nhắc nhở trước hạn. Switch chỉ kích hoạt khi đã hết toàn bộ thời gian gia hạn." },
-      "unlock": { "q": "Ai quyết định khi nào kho được mở?", "a": "Người xác minh pháp lý phải phê duyệt và ký. Riêng switch không thể mở tài sản của bạn." },
-      "change": { "q": "Sau này tôi có đổi người thụ hưởng được không?", "a": "Được. Khi kho còn hoạt động, bạn có thể cập nhật người nhận và tài sản bất cứ lúc nào." }
+      "staff": {
+        "q": "Nhân viên LegacyVault có đọc được tài sản của tôi không?",
+        "a": "Không. Tài sản được mã hoá trước khi lưu và chỉ được giải mã cho đúng người thụ hưởng sau khi xác minh."
+      },
+      "forget": {
+        "q": "Nếu tôi quên check-in thì sao?",
+        "a": "Bạn sẽ nhận nhắc nhở trước hạn. Switch chỉ kích hoạt khi đã hết toàn bộ thời gian gia hạn."
+      },
+      "unlock": {
+        "q": "Ai quyết định khi nào kho được mở?",
+        "a": "Người xác minh pháp lý phải phê duyệt và ký. Riêng switch không thể mở tài sản của bạn."
+      },
+      "change": {
+        "q": "Sau này tôi có đổi người thụ hưởng được không?",
+        "a": "Được. Khi kho còn hoạt động, bạn có thể cập nhật người nhận và tài sản bất cứ lúc nào."
+      }
     }
   },
   "closing": {
@@ -82,5 +136,26 @@
     "privacy": "Chính sách bảo mật",
     "terms": "Điều khoản sử dụng",
     "support": "Hỗ trợ"
+  },
+  "preview": {"eyebrow": "Xem trước", "title": "Mọi thứ về di sản số, trong một màn hình", "text": "Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập."},
+  "footerNav": {
+    "tagline": "Giữ trọn di sản số, trao đúng người, đúng lúc.",
+    "product": "SẢN PHẨM",
+    "features": "Tính năng",
+    "how": "Cách hoạt động",
+    "security": "Bảo mật",
+    "forWho": "DÀNH CHO",
+    "owner": "Chủ két",
+    "beneficiary": "Người thụ hưởng",
+    "executor": "Người thi hành",
+    "verifier": "Người xác minh",
+    "account": "TÀI KHOẢN",
+    "signIn": "Đăng nhập",
+    "signUp": "Đăng ký",
+    "forgot": "Quên mật khẩu",
+    "project": "DỰ ÁN",
+    "contact": "Liên hệ nhóm",
+    "legal1": "© 2026 LegacyVault · Dự án SWP391, FPT University",
+    "legal2": "Đây là sản phẩm học tập, không thay thế tư vấn pháp lý."
   }
 }
