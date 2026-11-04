@@ -97,4 +97,19 @@ class AssetsReassignedNotificationListenerTest {
 
         verify(notificationRepository, never()).save(any(Notification.class));
     }
+
+
+    @Test
+    void noResponseReason_usesNoResponseMessage() {
+        User a = user();
+        when(userRepository.findById(a.getId())).thenReturn(Optional.of(a));
+
+        listener.onAssetsReassigned(new AssetsReassignedEvent(vaultId, "Gia đình", "Bình",
+                List.of(new AssetsReassignedEvent.Receiver(a.getId(), 1)),
+                AssetsReassignedEvent.Reason.NO_RESPONSE));
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getContent()).contains("did not respond in time");
+    }
 }

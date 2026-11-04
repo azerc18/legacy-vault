@@ -70,6 +70,26 @@ public class EmailSender {
                 ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
     }
 
+    /**
+     * N2-notify: báo cho người nhận thay khi một phần tài sản được chuyển sang họ
+     * (người chính từ chối hoặc không phản hồi kịp). Không nêu danh tính người kia.
+     */
+    @Async
+    public void sendAssetsReassignedNotice(String email, String fullName, String ownerName, String vaultName,
+                                           int assetCount, boolean noResponse, UUID vaultId) {
+        StringBuilder body = new StringBuilder()
+                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
+                .append(assetCount).append(" asset(s) in the vault \"").append(vaultName).append("\" of ")
+                .append(ownerName).append(" have been reassigned to you because another beneficiary ")
+                .append(noResponse ? "did not respond in time" : "declined their share").append(".\n\n");
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            body.append("Open the vault: ").append(link).append("\n\n");
+        }
+        body.append("Please sign in, verify your identity, then view and confirm receipt of the assets allocated to you.");
+        sendWithoutOtpFooter(email, "Assets reassigned to you - LegacyVault", body.toString());
+    }
+
     // FR-02 (bước 7): xác nhận cho Owner
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
