@@ -65,5 +65,7 @@ public enum AuditAction {
     // T1: Thanh toán VNPay & gói VIP
     PAYMENT_SUCCEEDED, PAYMENT_FAILED,
     // X1: người thụ hưởng đồng ý mở tài sản JOINT_CONSENSUS
-    ASSET_CONSENSUS_APPROVED
+    ASSET_CONSENSUS_APPROVED,
+    // F5: Executor cập nhật checklist xử lý tài khoản số
+    EXECUTOR_TASK_UPDATED
 }

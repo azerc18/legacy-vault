@@ -81,4 +81,9 @@ export const beneficiaryApi = {
 
     // N2-notify: tiến độ theo từng tài sản của mình (BE trả 409 sau khi đã đóng hồ sơ)
     getProgress: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/progress`).then(unwrap),
+
+    // F5: Executor xử lý tài khoản số theo di nguyện (chỉ xem)
+    // -> [{ id, platform, accountHandle, wish, status, note, updatedAt, completedAt }]
+    listExecutorTasks: (vaultId) =>
+        http.get(`/beneficiaries/vaults/${vaultId}/executor-tasks`).then((r) => r.data?.data ?? []),
 };

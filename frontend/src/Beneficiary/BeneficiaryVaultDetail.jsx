@@ -143,6 +143,8 @@ export default function BeneficiaryVaultDetail() {
                     />
                 </>
             )}
+
+            {vault && !['loading', 'error'].includes(stage) && <ExecutorTasksCard vaultId={vaultId} />}
         </BeneficiaryLayout>
     );
 }
@@ -457,6 +459,55 @@ function DocumentList({ vaultId, documents, onError }) {
                     ))}
                 </ul>
             )}
+        </section>
+    );
+}
+
+// F5: theo dõi Executor xử lý tài khoản số (MXH / email / ví điện tử) theo di nguyện, chỉ xem
+const WISH_LABEL = {
+    MEMORIALIZE: 'Memorialize the account',
+    DELETE: 'Delete the account',
+    TRANSFER_DATA: 'Download data for the family',
+};
+const TASK_STATUS = {
+    TODO: { label: 'Not started', cls: 'bg-surface-container text-on-surface-variant' },
+    DOING: { label: 'In progress', cls: 'bg-warning-container text-on-warning-container' },
+    DONE: { label: 'Done', cls: 'bg-success-container text-on-success-container' },
+};
+
+function ExecutorTasksCard({ vaultId }) {
+    const [tasks, setTasks] = useState([]);
+
+    // Không có task hoặc lỗi thì ẩn khối này, không chặn phần còn lại của trang
+    useEffect(() => {
+        beneficiaryApi.listExecutorTasks(vaultId).then(setTasks).catch(() => setTasks([]));
+    }, [vaultId]);
+
+    if (tasks.length === 0) return null;
+    const done = tasks.filter((t) => t.status === 'DONE').length;
+    return (
+        <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 mt-6">
+            <h2 className="font-title-lg text-title-lg flex items-center gap-2">
+                <Icon name="checklist" className="text-secondary" /> Executor progress on online accounts
+            </h2>
+            <p className="mt-1 text-sm text-on-surface-variant">
+                The executor handles these accounts following the owner's wishes: {done}/{tasks.length} done.
+            </p>
+            <ul className="mt-4 divide-y divide-outline-variant/20">
+                {tasks.map((t) => {
+                    const s = TASK_STATUS[t.status] || {};
+                    return (
+                        <li key={t.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-semibold">{t.platform || 'Account'}{t.accountHandle && ` · ${t.accountHandle}`}</p>
+                                <p className="text-sm text-on-surface-variant">{WISH_LABEL[t.wish] || t.wish}</p>
+                                {t.note && <p className="text-sm text-on-surface-variant mt-1">Executor note: {t.note}</p>}
+                            </div>
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${s.cls}`}>{s.label || t.status}</span>
+                        </li>
+                    );
+                })}
+            </ul>
         </section>
     );
 }
