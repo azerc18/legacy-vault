@@ -53,14 +53,21 @@ public class AuditDescriptionBuilder {
 
         boolean isAdmin = false;
         boolean isExecutor = false;
+        // F6 (m1): Owner cần biết ai đã xem; Verifier giữ ẩn danh như Admin
+        boolean isVerifier = false;
+        boolean isBeneficiary = false;
         if (actor.getRoles() != null) {
             for (Role role : actor.getRoles()) {
                 if ("ADMIN".equals(role.getCode())) isAdmin = true;
                 if ("EXECUTOR".equals(role.getCode())) isExecutor = true;
+                if ("LEGAL_VERIFIER".equals(role.getCode())) isVerifier = true;
+                if ("BENEFICIARY".equals(role.getCode())) isBeneficiary = true;
             }
         }
         if (isAdmin) return "System administrator";
+        if (isVerifier) return "Legal verifier";
         if (isExecutor) return "Executor: " + actor.getFullName();
+        if (isBeneficiary) return actor.getFullName() != null ? "Beneficiary: " + actor.getFullName() : "Beneficiary";
         return "Another user";
     }
 
@@ -106,7 +113,10 @@ public class AuditDescriptionBuilder {
             case ASSET_UPDATED -> "Updated a digital asset.";
             case ASSET_DELETED -> "Deleted a digital asset.";
             case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Document download failed." : "Downloaded a document.";
-            case LEGAL_DOCUMENT_VIEWED -> "A legal verifier viewed the uploaded legal document.";
+            // F6 (n2): dòng FAILURE là lần đọc / giải mã lỗi, không phải lượt xem thành công
+            case LEGAL_DOCUMENT_VIEWED -> isFailure(log)
+                    ? "A legal verifier could not open the uploaded legal document."
+                    : "A legal verifier viewed the uploaded legal document.";
             case VERIFICATION_ATTACHMENT_VIEWED -> "Viewed a verification message attachment.";
             case DOSSIER_DOWNLOADED -> "The beneficiary downloaded the inheritance dossier.";
             case LEGAL_VERIFICATION_REQUESTED -> "Submitted a legal verification request.";

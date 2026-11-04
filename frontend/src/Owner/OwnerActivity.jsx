@@ -41,6 +41,7 @@ export default function OwnerActivity() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        let cancelled = false; // F6 (m4): đổi tab / trang nhanh thì bỏ kết quả của request cũ
         setError('');
         setData(null);
         const range = {};
@@ -51,8 +52,9 @@ export default function OwnerActivity() {
         }
         const fetcher = tab === 'access' ? ownerApi.getEstateAccessLogs : ownerApi.getOwnerActivityLogs;
         fetcher({ ...range, page, size: 20 })
-            .then(setData)
-            .catch((e) => setError(getErrorMessage(e, t('errors.load'))));
+            .then((res) => { if (!cancelled) setData(res); })
+            .catch((e) => { if (!cancelled) setError(getErrorMessage(e, t('errors.load'))); });
+        return () => { cancelled = true; };
     }, [tab, days, page]);
 
     const rows = data?.content ?? [];
