@@ -12,6 +12,7 @@ import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import LegacyMessageSection from './LegacyMessageSection.jsx';
 import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
+import { AllocationFields, allocationBody, allocationFromAsset, allocationSummary, emptyAllocation, validateAllocation } from './AllocationFields.jsx';
 
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 
@@ -60,7 +61,7 @@ export default function OwnerVaultDetail() {
             {vault && (
                 <div className="space-y-6">
                     <DetailsSection vault={vault} editable={editable} onSaved={reload} />
-                    <AssetSection vaultId={vaultId} editable={editable} onChanged={reload} />
+                    <AssetSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onChanged={reload} />
                     <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
                     <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
                     <LegacyMessageSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} />
@@ -135,7 +136,7 @@ function DetailsSection({ vault, editable, onSaved }) {
 }
 
 /* ---------- Tài sản số (FR-27) ---------- */
-function AssetSection({ vaultId, editable, onChanged }) {
+function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
     const { t } = useTranslation(['vault', 'enums', 'common']);
     const schemas = useAssetSchemas();
     const [assets, setAssets] = useState([]);
@@ -173,7 +174,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
                 const sec = new Set((schemaOf(schemas, d.assetType)?.fields || []).filter((x) => x.sensitive).map((x) => x.key));
                 fields = Object.fromEntries(Object.entries(d.fields).filter(([k]) => !sec.has(k)));
             }
-            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '', fields });
+            setForm({ id: a.id, assetType: d.assetType, assetName: d.assetName, secret: '', notes: d.notes || '', fields, allocation: allocationFromAsset(a) });
         } catch (e) {
             setError(getErrorMessage(e, t('detail.assets.errors.open')));
         }
@@ -207,6 +208,9 @@ function AssetSection({ vaultId, editable, onChanged }) {
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold truncate">{a.assetName}</p>
                                 <p className="text-xs text-outline">{getAssetLabel(a.assetType)} · {t('detail.assets.updatedOn', { date: formatDate(a.updatedAt) })}</p>
+                                {beneficiaries.length >= 2 && (
+                                    <p className="text-xs text-on-surface-variant">{allocationSummary(a, beneficiaries, t)}</p>
+                                )}
                             </div>
                             <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.view')}</button>
                             {editable && (
@@ -220,7 +224,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
                 </ul>
             )}
             {editable && (
-                <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {} })} className={btnOutline}>
+                <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation() })} className={btnOutline}>
                     <Icon name="add" className="text-[18px]" /> {t('detail.assets.addAsset')}
                 </button>
             )}
@@ -229,6 +233,7 @@ function AssetSection({ vaultId, editable, onChanged }) {
             {form && (
                 <AssetFormModal
                     vaultId={vaultId}
+                    beneficiaries={beneficiaries}
                     initial={form}
                     schemas={schemas}
                     onClose={() => setForm(null)}
@@ -295,7 +300,7 @@ function AssetViewModal({ asset, schemas, onClose }) {
     );
 }
 
-function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
+function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onSaved }) {
     const { t } = useTranslation(['vault', 'enums', 'common']);
     const isEdit = !!initial.id;
     const [f, setF] = useState(initial);
@@ -308,6 +313,8 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
     const dynamic = !!schema && (!isEdit || initial.fields != null);
     // Sửa tài sản đã theo schema mà không tải được schema -> báo lỗi, không rơi về form cũ (sẽ làm hỏng dữ liệu)
     const schemaMissing = isEdit && initial.fields != null && !schema;
+    const showAllocation = beneficiaries.length >= 2;
+    const allowProportional = schema?.mechanism === 'LEGAL_CLAIM_DOSSIER';   // BE chỉ cho chia % với tài sản cần hồ sơ pháp lý
     const changeType = (e) => setF((x) => ({ ...x, assetType: e.target.value, fields: {} }));
     const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
 
@@ -321,6 +328,11 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
             if (msg) return setError(msg);
         } else if (!isEdit && !f.secret.trim()) return setError(t('detail.assets.errors.secretRequired'));
         setLoading(true);
+        if (showAllocation) {
+            const allocMsg = validateAllocation(f.allocation, allowProportional, t);
+            if (allocMsg) return setError(allocMsg);
+        }
+        setLoading(true);
         try {
             const body = {
                 assetType: f.assetType,
@@ -329,6 +341,10 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
             };
             if (dynamic) body.fields = cleanFields(f.fields || {});
             else body.secret = f.secret ? f.secret : null;     // sửa: để trống = giữ nguyên secret cũ
+            if (showAllocation) {
+                const allocation = allocationBody(f.allocation, initial.allocation, isEdit);
+                if (allocation) body.allocation = allocation;   // không gửi = BE giữ nguyên phân bổ cũ
+            }
             if (isEdit) await ownerApi.updateAsset(vaultId, f.id, body);
             else await ownerApi.addAsset(vaultId, body);
             onSaved();
@@ -366,6 +382,14 @@ function AssetFormModal({ vaultId, initial, schemas, onClose, onSaved }) {
                     </div>
                 )}
                 <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={textareaCls} />
+                {showAllocation && (
+                    <AllocationFields
+                        beneficiaries={beneficiaries}
+                        value={f.allocation}
+                        onChange={(allocation) => setF((x) => ({ ...x, allocation }))}
+                        allowProportional={allowProportional}
+                    />
+                )}
                 <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={onClose} className={btnOutline}>{t('common:actions.cancel')}</button>
                     <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.saving') : t('common:actions.save')}</button>

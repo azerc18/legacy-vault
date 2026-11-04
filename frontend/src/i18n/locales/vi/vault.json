@@ -125,6 +125,46 @@
       "auditNotice": "Mọi lượt xem đều được ghi lại trong nhật ký hoạt động của két sắt.",
       "deleteTitle": "Xoá tài sản này?",
       "deleteMessage": "\"{{name}}\" sẽ bị xoá vĩnh viễn.",
+      "allocation": {
+        "title": "Phân bổ cho người thụ hưởng",
+        "mode": {
+          "ALL": "Tất cả người thụ hưởng",
+          "EXCLUSIVE": "Một người nhận",
+          "PROPORTIONAL": "Chia theo tỷ lệ %",
+          "JOINT_CONSENSUS": "Đồng thuận K trên N người"
+        },
+        "modeHint": {
+          "ALL": "Mọi người thụ hưởng trong két sắt đều thấy tài sản này (mặc định).",
+          "EXCLUSIVE": "Chỉ một người nhận tài sản này. Có thể chọn người dự phòng nhận thay nếu người đó từ chối.",
+          "PROPORTIONAL": "Chia cho nhiều người theo tỷ lệ %, tổng phải bằng 100%. Chỉ dùng cho tài sản cần hồ sơ pháp lý.",
+          "JOINT_CONSENSUS": "Tài sản chỉ mở khi đủ số người trong nhóm được chọn cùng đồng ý."
+        },
+        "recipientPlaceholder": "Chọn người nhận",
+        "contingent": "Người dự phòng (không bắt buộc)",
+        "contingentNone": "Không có",
+        "share": "Tỷ lệ (%)",
+        "total": "Tổng: {{total}}% / 100%",
+        "thresholdPlaceholder": "Số người cần đồng ý",
+        "thresholdOption": "{{k}} trên {{n}} người",
+        "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
+        "vipNote": "Chia theo tỷ lệ %, người dự phòng và đồng thuận cần gói VIP.",
+        "summary": {
+          "ALL": "Tất cả người thụ hưởng",
+          "EXCLUSIVE": "Chỉ {{name}}",
+          "EXCLUSIVE_BACKUP": "Chỉ {{name}} (dự phòng: {{backup}})",
+          "PROPORTIONAL": "Chia tỷ lệ: {{list}}",
+          "JOINT_CONSENSUS": "Đồng thuận {{k}}/{{n}}: {{list}}"
+        },
+        "errors": {
+          "pickOne": "Chọn đúng một người nhận.",
+          "pickTwo": "Chọn ít nhất hai người nhận.",
+          "backupSame": "Người dự phòng phải khác người nhận chính.",
+          "shareInvalid": "Mỗi tỷ lệ phải lớn hơn 0 và tối đa 2 chữ số thập phân.",
+          "shareTotal": "Tổng tỷ lệ phải bằng 100%.",
+          "proportionalNotAllowed": "Loại tài sản này không chia theo tỷ lệ %. Chọn cách phân bổ khác.",
+          "thresholdInvalid": "Số người cần đồng ý phải từ 2 đến số người nhận."
+        }
+      },
       "errors": {
         "load": "Không thể tải danh sách tài sản.",
         "open": "Không thể mở tài sản này.",

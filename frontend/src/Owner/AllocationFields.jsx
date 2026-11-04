@@ -1,0 +1,217 @@
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { inputClass } from './ownerUi.jsx';
+
+// N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
+export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL', 'JOINT_CONSENSUS'];
+
+const textareaCls = 'w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
+const SHARE_RE = /^\d{1,3}(\.\d{1,2})?$/;                    // tối đa 2 chữ số thập phân (cột decimal(5,2))
+const cents = (s) => Math.round(parseFloat(s) * 100);         // so sánh bằng số nguyên để khỏi sai số số thực
+
+export const emptyAllocation = () => ({ mode: 'ALL', selected: [], shares: {}, contingentId: '', threshold: '', note: '' });
+
+// Dựng form từ tài sản trong danh sách (DigitalAssetResponse.allocations; rỗng = mặc định thuộc tất cả)
+export function allocationFromAsset(asset) {
+    const rows = asset?.allocations || [];
+    if (rows.length === 0) return emptyAllocation();
+    const first = rows[0];
+    return {
+        mode: first.mode,
+        selected: rows.map((r) => r.beneficiaryId),
+        shares: Object.fromEntries(rows.map((r) => [r.beneficiaryId, r.sharePercent != null ? String(r.sharePercent) : ''])),
+        contingentId: first.contingentBeneficiaryId || '',
+        threshold: first.consensusThreshold != null ? String(first.consensusThreshold) : '',
+        note: first.note || '',
+    };
+}
+
+// Chỉ giữ phần có nghĩa với mode đang chọn, để so sánh "có đổi không"
+const norm = (a) => {
+    const ids = [...a.selected].sort();
+    return {
+        mode: a.mode,
+        selected: ids,
+        shares: a.mode === 'PROPORTIONAL' ? Object.fromEntries(ids.map((id) => [id, Number(a.shares[id])])) : null,
+        contingentId: a.mode === 'EXCLUSIVE' ? a.contingentId : '',
+        threshold: a.mode === 'JOINT_CONSENSUS' ? String(a.threshold) : '',
+        note: (a.note || '').trim(),
+    };
+};
+
+// Trả về thông báo lỗi đầu tiên hoặc ''
+export function validateAllocation(a, allowProportional, t) {
+    const err = (key) => t(`detail.assets.allocation.errors.${key}`);
+    const n = a.selected.length;
+    switch (a.mode) {
+        case 'EXCLUSIVE':
+            if (n !== 1) return err('pickOne');
+            if (a.contingentId && a.contingentId === a.selected[0]) return err('backupSame');
+            return '';
+        case 'PROPORTIONAL': {
+            if (!allowProportional) return err('proportionalNotAllowed');
+            if (n < 2) return err('pickTwo');
+            let total = 0;
+            for (const id of a.selected) {
+                const s = (a.shares[id] || '').trim();
+                if (!SHARE_RE.test(s) || cents(s) <= 0 || cents(s) > 10000) return err('shareInvalid');
+                total += cents(s);
+            }
+            return total === 10000 ? '' : err('shareTotal');
+        }
+        case 'JOINT_CONSENSUS': {
+            if (n < 2) return err('pickTwo');
+            const th = Number(a.threshold);
+            return Number.isInteger(th) && th >= 2 && th <= n ? '' : err('thresholdInvalid');
+        }
+        default:
+            return '';
+    }
+}
+
+// Body gửi BE; undefined = không gửi (tạo mới mặc định "tất cả", hoặc sửa mà không đổi phân bổ -> BE giữ nguyên)
+export function allocationBody(a, initial, isEdit) {
+    if (!isEdit && a.mode === 'ALL') return undefined;
+    if (isEdit && JSON.stringify(norm(a)) === JSON.stringify(norm(initial))) return undefined;
+    if (a.mode === 'ALL') return { recipients: [] };           // recipients rỗng = xoá phân bổ riêng
+    return {
+        mode: a.mode,
+        recipients: a.selected.map((id) => ({
+            beneficiaryId: id,
+            ...(a.mode === 'PROPORTIONAL' ? { sharePercent: cents(a.shares[id]) / 100 } : {}),
+            ...(a.mode === 'EXCLUSIVE' && a.contingentId ? { contingentBeneficiaryId: a.contingentId } : {}),
+        })),
+        note: a.note.trim() || null,
+        ...(a.mode === 'JOINT_CONSENSUS' ? { threshold: Number(a.threshold) } : {}),
+    };
+}
+
+// Một dòng mô tả phân bổ trong danh sách tài sản
+export function allocationSummary(asset, beneficiaries, t) {
+    const s = (key, opts) => t(`detail.assets.allocation.summary.${key}`, opts);
+    const rows = asset?.allocations || [];
+    if (rows.length === 0) return s('ALL');
+    const nameOf = (id) => {
+        const b = beneficiaries.find((x) => x.id === id);
+        return b ? (b.fullName || b.email) : '?';
+    };
+    const first = rows[0];
+    switch (first.mode) {
+        case 'EXCLUSIVE':
+            return first.contingentBeneficiaryId
+                ? s('EXCLUSIVE_BACKUP', { name: nameOf(first.beneficiaryId), backup: nameOf(first.contingentBeneficiaryId) })
+                : s('EXCLUSIVE', { name: nameOf(first.beneficiaryId) });
+        case 'PROPORTIONAL':
+            return s('PROPORTIONAL', { list: rows.map((r) => `${nameOf(r.beneficiaryId)} ${r.sharePercent}%`).join(', ') });
+        case 'JOINT_CONSENSUS':
+            return s('JOINT_CONSENSUS', { k: first.consensusThreshold, n: rows.length, list: rows.map((r) => nameOf(r.beneficiaryId)).join(', ') });
+        default:
+            return '';
+    }
+}
+
+export function AllocationFields({ beneficiaries, value, onChange, allowProportional }) {
+    const { t } = useTranslation(['vault']);
+    const tt = (key, opts) => t(`detail.assets.allocation.${key}`, opts);
+    const set = (patch) => onChange({ ...value, ...patch });
+    const nameOf = (b) => b.fullName || b.email;
+    const n = value.selected.length;
+
+    const setMode = (mode) => set({
+        mode,
+        selected: mode === 'ALL' ? [] : mode === 'EXCLUSIVE' ? value.selected.slice(0, 1) : value.selected,
+        contingentId: '',
+        threshold: '',
+    });
+    const toggle = (id) => {
+        const selected = value.selected.includes(id) ? value.selected.filter((x) => x !== id) : [...value.selected, id];
+        // threshold không được vượt số người nhận
+        set({ selected, threshold: Number(value.threshold) > selected.length ? '' : value.threshold });
+    };
+    const total = value.selected.reduce((sum, id) => {
+        const s = (value.shares[id] || '').trim();
+        return sum + (SHARE_RE.test(s) ? cents(s) : 0);
+    }, 0);
+    const needsVip = value.mode === 'PROPORTIONAL' || value.mode === 'JOINT_CONSENSUS'
+        || (value.mode === 'EXCLUSIVE' && !!value.contingentId);
+
+    return (
+        <fieldset className="rounded-xl border border-outline-variant/50 p-4 space-y-3">
+            <legend className="px-2 text-sm font-semibold">{tt('title')}</legend>
+            <select value={value.mode} onChange={(e) => setMode(e.target.value)} className={inputClass}>
+                {MODES.map((m) => (
+                    <option key={m} value={m} disabled={m === 'PROPORTIONAL' && !allowProportional}>{tt(`mode.${m}`)}</option>
+                ))}
+            </select>
+            <p className="text-xs text-on-surface-variant">{tt(`modeHint.${value.mode}`)}</p>
+
+            {value.mode === 'EXCLUSIVE' && (
+                <>
+                    <select
+                        value={value.selected[0] || ''} className={inputClass}
+                        onChange={(e) => set({
+                            selected: e.target.value ? [e.target.value] : [],
+                            contingentId: value.contingentId === e.target.value ? '' : value.contingentId,
+                        })}
+                    >
+                        <option value="">{tt('recipientPlaceholder')}</option>
+                        {beneficiaries.map((b) => <option key={b.id} value={b.id}>{nameOf(b)}</option>)}
+                    </select>
+                    <label className="block text-xs font-semibold">{tt('contingent')}</label>
+                    <select value={value.contingentId} onChange={(e) => set({ contingentId: e.target.value })} className={inputClass}>
+                        <option value="">{tt('contingentNone')}</option>
+                        {beneficiaries.filter((b) => b.id !== value.selected[0]).map((b) => (
+                            <option key={b.id} value={b.id}>{nameOf(b)}</option>
+                        ))}
+                    </select>
+                </>
+            )}
+
+            {(value.mode === 'PROPORTIONAL' || value.mode === 'JOINT_CONSENSUS') && (
+                <ul className="space-y-2">
+                    {beneficiaries.map((b) => {
+                        const on = value.selected.includes(b.id);
+                        return (
+                            <li key={b.id} className="flex items-center gap-3">
+                                <label className="flex items-center gap-2 text-sm flex-1 min-w-0">
+                                    <input type="checkbox" checked={on} onChange={() => toggle(b.id)} />
+                                    <span className="truncate">{nameOf(b)}</span>
+                                </label>
+                                {value.mode === 'PROPORTIONAL' && on && (
+                                    <input
+                                        inputMode="decimal" value={value.shares[b.id] || ''} placeholder="%" style={{ width: '6rem' }}
+                                        aria-label={tt('share')} className={inputClass}
+                                        onChange={(e) => set({ shares: { ...value.shares, [b.id]: e.target.value } })}
+                                    />
+                                )}
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
+
+            {value.mode === 'PROPORTIONAL' && (
+                <p className={`text-xs font-semibold ${total === 10000 ? 'text-primary' : 'text-outline'}`}>
+                    {tt('total', { total: (total / 100).toFixed(2) })}
+                </p>
+            )}
+
+            {value.mode === 'JOINT_CONSENSUS' && (
+                <select value={value.threshold} onChange={(e) => set({ threshold: e.target.value })} disabled={n < 2} className={inputClass}>
+                    <option value="">{tt('thresholdPlaceholder')}</option>
+                    {Array.from({ length: Math.max(0, n - 1) }, (_, i) => i + 2).map((k) => (
+                        <option key={k} value={k}>{tt('thresholdOption', { k, n })}</option>
+                    ))}
+                </select>
+            )}
+
+            {value.mode !== 'ALL' && (
+                <textarea
+                    rows={2} maxLength={1000} value={value.note} onChange={(e) => set({ note: e.target.value })}
+                    placeholder={tt('notePlaceholder')} className={textareaCls}
+                />
+            )}
+            {needsVip && <p className="text-xs text-outline">{tt('vipNote')}</p>}
+        </fieldset>
+    );
+}
