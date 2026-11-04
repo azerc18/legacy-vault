@@ -6,28 +6,35 @@ import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.ExecutorTask;
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ExecutorTaskStatus;
 import com.ltld.app.legacyvault.enums.ExecutorTaskWish;
 import com.ltld.app.legacyvault.enums.TransferMechanism;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorTaskRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +42,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ExecutorTaskServiceImpl implements ExecutorTaskService {
 
     private static final String TASK_NOT_FOUND = "Không tìm thấy việc cần xử lý.";
@@ -65,10 +71,33 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
     private final DigitalAssetRepository digitalAssetRepository;
     private final VaultRepository vaultRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    private final AssetAllocationRepository assetAllocationRepository;
     private final AuditLogService auditLogService;
+    // Mỗi bước chạy transaction riêng (REQUIRES_NEW): task vừa sinh đã commit thì bước đọc sau mới thấy
+    // (MySQL REPEATABLE READ), và lỗi trùng của một task không làm hỏng cả request.
+    private final TransactionTemplate newTx;
 
+    public ExecutorTaskServiceImpl(ExecutorAccessGuard executorAccessGuard,
+                                   ExecutorTaskRepository executorTaskRepository,
+                                   DigitalAssetRepository digitalAssetRepository,
+                                   VaultRepository vaultRepository,
+                                   VaultBeneficiaryRepository vaultBeneficiaryRepository,
+                                   AssetAllocationRepository assetAllocationRepository,
+                                   AuditLogService auditLogService,
+                                   PlatformTransactionManager transactionManager) {
+        this.executorAccessGuard = executorAccessGuard;
+        this.executorTaskRepository = executorTaskRepository;
+        this.digitalAssetRepository = digitalAssetRepository;
+        this.vaultRepository = vaultRepository;
+        this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
+        this.assetAllocationRepository = assetAllocationRepository;
+        this.auditLogService = auditLogService;
+        this.newTx = new TransactionTemplate(transactionManager);
+        this.newTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    // Không @Transactional: mỗi task được ghi trong transaction riêng (insertIgnoringDuplicate)
     @Override
-    @Transactional
     public int generateForVaults(Collection<UUID> vaultIds) {
         if (vaultIds == null || vaultIds.isEmpty()) {
             return 0;
@@ -94,33 +123,53 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
                 log.warn("F5: asset {} has no valid wish, skipping executor task", asset.getId());
                 continue;
             }
-            executorTaskRepository.save(ExecutorTask.builder()
+            boolean inserted = insertIgnoringDuplicate(ExecutorTask.builder()
                     .vault(asset.getVault())
                     .asset(asset)
                     .platform(fields.get("platform"))
                     .accountHandle(fields.get("usernameOrHandle"))
                     .wish(wish)
                     .build());
-            created++;
+            if (inserted) {
+                created++;
+            }
         }
         return created;
     }
 
+    /**
+     * Ghi một task; nếu request / listener khác vừa ghi task cho cùng tài sản (unique uk_executor_task_asset)
+     * thì bỏ qua, vì task đã có là đúng ý. Ví dụ: React StrictMode gửi 2 GET cùng lúc, hoặc trùng với listener mở khóa.
+     */
+    boolean insertIgnoringDuplicate(ExecutorTask task) {
+        try {
+            newTx.executeWithoutResult(status -> executorTaskRepository.saveAndFlush(task));
+            return true;
+        } catch (DataIntegrityViolationException e) {
+            log.debug("F5: task for asset {} already exists, skipping", task.getAsset().getId());
+            return false;
+        }
+    }
+
+    // Không @Transactional: kiểm quyền, sinh task và đọc lại là 3 transaction riêng (xem newTx)
     @Override
-    @Transactional
     public List<ExecutorTaskResponse> listForExecutor(UUID assignmentId, String executorLogin) {
-        ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
-        List<UUID> vaultIds = vaultRepository.findByOwnerIdOrderByCreatedAtDesc(assignment.getOwner().getId())
-                .stream()
-                .filter(v -> v.getStatus() != VaultStatus.ACTIVE)
-                .map(Vault::getId)
-                .toList();
-        if (vaultIds.isEmpty()) {
+        List<UUID> vaultIds = newTx.execute(status -> {
+            ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
+            return vaultRepository.findByOwnerIdOrderByCreatedAtDesc(assignment.getOwner().getId())
+                    .stream()
+                    .filter(v -> v.getStatus() != VaultStatus.ACTIVE)
+                    .map(Vault::getId)
+                    .toList();
+        });
+        if (vaultIds == null || vaultIds.isEmpty()) {
             return List.of();
         }
         // Vault mở khóa trước khi có F5 (hoặc listener lỗi) vẫn có checklist khi Executor mở ra
         generateForVaults(vaultIds);
-        return executorTaskRepository.findByVaultIds(vaultIds).stream().map(ExecutorTaskServiceImpl::toResponse).toList();
+        return newTx.execute(status -> executorTaskRepository.findByVaultIds(vaultIds).stream()
+                .map(ExecutorTaskServiceImpl::toResponse)
+                .toList());
     }
 
     @Override
@@ -128,6 +177,7 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
     public ExecutorTaskResponse update(UUID assignmentId, UUID taskId, UpdateExecutorTaskRequest request,
                                        String executorLogin) {
         ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
+        // Controller đã @Valid; kiểm lại để service an toàn khi được gọi từ nơi khác
         if (request == null || request.getStatus() == null) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Vui lòng chọn trạng thái.");
         }
@@ -167,9 +217,17 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
         // Không phải người thụ hưởng của Vault, hoặc Vault chưa bàn giao: 404 để không lộ Vault có tồn tại
         Vault vault = vaultRepository.findById(vaultId)
                 .filter(v -> v.getStatus() != VaultStatus.ACTIVE)
-                .filter(v -> vaultBeneficiaryRepository.findByVaultIdAndUserId(v.getId(), currentUserId).isPresent())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, VAULT_NOT_FOUND));
+        VaultBeneficiary me = vaultBeneficiaryRepository.findByVaultIdAndUserId(vault.getId(), currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, VAULT_NOT_FOUND));
+        // Như các API Beneficiary khác: đã từ chối / từ bỏ thì không xem nữa
+        if (me.getStatus() == BeneficiaryInviteStatus.DECLINED || me.getStatus() == BeneficiaryInviteStatus.WAIVED) {
+            throw new BusinessException(ErrorCode.CLAIM_ALREADY_RESPONDED, "Bạn đã từ chối nhận di sản này.");
+        }
+        // N2-access: bỏ tài sản đã phân bổ cho người khác; tài sản chưa phân bổ thì ai cũng thấy
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
         return executorTaskRepository.findByVaultIds(List.of(vault.getId())).stream()
+                .filter(t -> !hidden.contains(t.getAsset().getId()))
                 .map(ExecutorTaskServiceImpl::toResponse)
                 .toList();
     }

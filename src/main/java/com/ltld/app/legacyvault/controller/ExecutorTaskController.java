@@ -27,6 +27,8 @@ public class ExecutorTaskController {
 
     private final ExecutorTaskService executorTaskService;
 
+    // Endpoint Executor không dùng @PreAuthorize: ExecutorAccessGuard (trong service) so người đăng nhập với
+    // assignment và trả 404 nếu không phải của họ, giống các endpoint khác của ExecutorController.
     @GetMapping("/api/executor-assignments/{assignmentId}/tasks")
     public ResponseEntity<ApiResponse<List<ExecutorTaskResponse>>> listTasks(
             @PathVariable UUID assignmentId, Principal principal) {

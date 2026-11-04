@@ -74,6 +74,14 @@ export const beneficiaryApi = {
     closeVault: (vaultId, acknowledgeUnviewed) =>
         http.post(`/beneficiaries/vaults/${vaultId}/close`, { confirmed: true, acknowledgeUnviewed }).then(unwrap),
 
+    // N2b: phản hồi phần được chia (cần phiên xem còn hiệu lực). Decline không đảo ngược được
+    acceptClaim: (vaultId) => http.post(`/beneficiaries/vaults/${vaultId}/accept`).then(unwrap),
+    declineClaim: (vaultId, reason) =>
+        http.post(`/beneficiaries/vaults/${vaultId}/decline`, reason ? { reason } : {}).then(unwrap),
+
+    // N2-notify: tiến độ theo từng tài sản của mình (BE trả 409 sau khi đã đóng hồ sơ)
+    getProgress: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/progress`).then(unwrap),
+
     // F5: Executor xử lý tài khoản số theo di nguyện (chỉ xem)
     // -> [{ id, platform, accountHandle, wish, status, note, updatedAt, completedAt }]
     listExecutorTasks: (vaultId) =>

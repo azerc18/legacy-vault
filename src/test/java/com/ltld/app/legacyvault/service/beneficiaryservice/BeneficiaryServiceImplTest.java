@@ -40,6 +40,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
@@ -70,6 +71,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -134,6 +136,8 @@ public class BeneficiaryServiceImplTest {
     private AssetAllocationRepository assetAllocationRepository;
     @Mock
     private JointConsensusService jointConsensusService;   // X1
+    @Mock
+    private ApplicationEventPublisher eventPublisher;   // N2-notify
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -2463,6 +2467,8 @@ public class BeneficiaryServiceImplTest {
         assertThat(second.isReassignedToMe()).isTrue();
         assertThat(second.getSharePercent()).isNull();
         assertThat(second.isViewed()).isFalse();
+        // Góp ý review: chỉ kiểm tra người thụ hưởng một lần (loadAccessibleVault), không gọi lại
+        verify(vaultBeneficiaryRepository, times(1)).findByVaultIdAndUserId(vaultId, currentUserId);
     }
 
     @Test
@@ -2476,7 +2482,7 @@ public class BeneficiaryServiceImplTest {
     }
 
     @Test
-    void declineClaim_withContingent_notifiesReceiverInApp() {
+    void declineClaim_withContingent_publishesReassignedEvent() {
         stubDeclinable();
         VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
         AssetAllocation al = allocation(beneficiaryRow, contingent);
@@ -2486,18 +2492,19 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(captor.capture());
-        Notification saved = captor.getValue();
-        assertThat(saved.getRecipient()).isSameAs(contingent.getUser());
-        assertThat(saved.getType()).isEqualTo(NotificationType.ASSET_REASSIGNED);
-        assertThat(saved.getChannel()).isEqualTo(NotificationChannel.IN_APP);
-        assertThat(saved.getReferenceId()).isEqualTo(vaultId);
-        assertThat(saved.getContent()).contains("1 asset(s)");
+        ArgumentCaptor<AssetsReassignedEvent> captor = ArgumentCaptor.forClass(AssetsReassignedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        AssetsReassignedEvent event = captor.getValue();
+        assertThat(event.vaultId()).isEqualTo(vaultId);
+        assertThat(event.receivers()).hasSize(1);
+        assertThat(event.receivers().get(0).userId()).isEqualTo(contingent.getUser().getId());
+        assertThat(event.receivers().get(0).assetCount()).isEqualTo(1);
+        // Thông báo được lưu ở listener sau commit, không còn trong giao dịch decline
+        verify(notificationRepository, never()).save(any(Notification.class));
     }
 
     @Test
-    void declineClaim_twoAssetsToSameReceiver_sendsOneNotification() {
+    void declineClaim_twoAssetsToSameReceiver_publishesOneEventWithTotalCount() {
         stubDeclinable();
         VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
         AssetAllocation al1 = allocation(beneficiaryRow, contingent);
@@ -2508,13 +2515,14 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository, times(1)).save(captor.capture());
-        assertThat(captor.getValue().getContent()).contains("2 asset(s)");
+        ArgumentCaptor<AssetsReassignedEvent> captor = ArgumentCaptor.forClass(AssetsReassignedEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        assertThat(captor.getValue().receivers()).hasSize(1);
+        assertThat(captor.getValue().receivers().get(0).assetCount()).isEqualTo(2);
     }
 
     @Test
-    void declineClaim_withoutContingent_sendsNoNotification() {
+    void declineClaim_withoutContingent_publishesNoEvent() {
         stubDeclinable();
         AssetAllocation al = allocation(beneficiaryRow, null);
         VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
@@ -2524,7 +2532,7 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(eventPublisher, never()).publishEvent(any(AssetsReassignedEvent.class));
     }
 
     @Test
@@ -2540,6 +2548,6 @@ public class BeneficiaryServiceImplTest {
         DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
         assertThat(response.getReassignedAssets()).isEqualTo(1);
-        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(eventPublisher, never()).publishEvent(any(AssetsReassignedEvent.class));
     }
 }
