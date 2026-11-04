@@ -69,6 +69,8 @@ class DmsActivationProcessorTest {
     @Mock private ExecutorNotificationService executorNotificationService;
     @Mock private UserRepository userRepository;
     @Mock private ApplicationEventPublisher eventPublisher;
+    // X2 (m6): tham số constructor mới; mock trả false (chưa có confirmer) nên luồng kích hoạt cũ giữ nguyên.
+    @Mock private DmsConfirmerService dmsConfirmerService;
 
     private DmsActivationProcessor processor;
 
@@ -86,7 +88,7 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService, userRepository, eventPublisher);
+                auditLogService, executorNotificationService, userRepository, eventPublisher, dmsConfirmerService);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();

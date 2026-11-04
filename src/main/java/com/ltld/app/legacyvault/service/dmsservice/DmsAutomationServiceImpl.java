@@ -45,6 +45,13 @@ public class DmsAutomationServiceImpl implements DmsAutomationService {
             UUID configId = config.getId();
             runIsolated("trigger", configId, () -> processor.trigger(configId, now));
         }
+
+        // [X2 / Sửa #5]: quét thêm các DMS đang chờ xác nhận chéo (PENDING_CONFIRMATION) đã quá hạn 72 giờ
+        for (DmsConfig config : dmsConfigRepository
+                .findAllByStatusAndNextCheckinDueAtBefore(DmsStatus.PENDING_CONFIRMATION, now)) {
+            UUID configId = config.getId();
+            runIsolated("confirm-timeout", configId, () -> processor.processExpiredConfirmation(configId, now));
+        }
     }
 
     @Override

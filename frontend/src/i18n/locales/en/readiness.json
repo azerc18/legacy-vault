@@ -1,0 +1,29 @@
+{
+    "title": "Estate Readiness Score",
+    "outOf": "/ {{max}}",
+    "grade": {
+        "EXCELLENT": "Excellent Protection",
+        "GOOD": "Good Readiness",
+        "FAIR": "Needs Attention",
+        "AT_RISK": "Estate At Risk"
+    },
+    "progress_one": "{{completed}} of {{count}} protection milestone completed.",
+    "progress_other": "{{completed}} of {{count}} protection milestones completed.",
+    "pendingHint": "Complete the remaining steps below so your family can claim your digital estate smoothly.",
+    "doneHint": "Your digital estate is fully prepared for seamless inheritance.",
+    "showFewer": "Show fewer items",
+    "viewAll_one": "View all {{count}} criterion",
+    "viewAll_other": "View all {{count}} criteria",
+    "points_one": "+{{count}} pt",
+    "points_other": "+{{count}} pts",
+    "fixNow": "Fix now",
+    "items": {
+        "masterVaultAndAsset": "Create Master Estate Vault and add at least 1 digital asset",
+        "assetBeneficiaryAllocated": "Choose who receives each digital asset",
+        "legalWillDocument": "Upload a Legal Will for banking & legal claim assets",
+        "executorsAssigned": "Assign both a Primary Executor and a Backup Executor",
+        "dmsActive": "Activate your Dead Man's Switch",
+        "safetyNetConfigured": "Add a contingent beneficiary or DMS trusted confirmers",
+        "recentReview": "Review or check in on your estate within the last 6 months"
+    }
+}

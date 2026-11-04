@@ -1,8 +1,11 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.event.VerificationRequestSubmittedEvent;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,8 @@ class VerificationRequestNotificationListenerTest {
 
     @Mock private UserRepository userRepository;
     @Mock private EmailSender emailSender;
+    @Mock private VaultBeneficiaryRepository beneficiaryRepository;
+    @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @InjectMocks private VerificationRequestNotificationListener listener;
 
     private final UUID requestId = UUID.randomUUID();
@@ -84,6 +89,28 @@ class VerificationRequestNotificationListenerTest {
 
         verify(emailSender, never()).sendVerificationRequestNotification(eq("owner@mail.com"), any());
         verify(emailSender, never()).sendVerificationRequestNotification(eq("executor@mail.com"), any());
+        verify(emailSender).sendVerificationRequestNotification("other@mail.com", requestId);
+    }
+
+    @Test
+    @DisplayName("N2-verifier: verifier who is a beneficiary or another executor of the owner is not notified")
+    void skipsConflictingVerifiers() {
+        User beneficiary = user(UUID.randomUUID(), "ben@mail.com");
+        User otherExecutor = user(UUID.randomUUID(), "exec2@mail.com");
+        User other = user(UUID.randomUUID(), "other@mail.com");
+        when(userRepository.findActiveByRoleCode("LEGAL_VERIFIER")).thenReturn(List.of(beneficiary, otherExecutor, other));
+        // Mặc định không xung đột; chỉ 2 người dưới đây xung đột (stub cụ thể ghi đè stub mặc định)
+        when(beneficiaryRepository.isBeneficiaryOfRequest(eq(requestId), any())).thenReturn(false);
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                eq(ownerId), any(), eq(ExecutorStatus.REVOKED))).thenReturn(false);
+        when(beneficiaryRepository.isBeneficiaryOfRequest(requestId, beneficiary.getId())).thenReturn(true);
+        when(executorAssignmentRepository.existsByOwnerIdAndExecutorUserIdAndStatusNot(
+                ownerId, otherExecutor.getId(), ExecutorStatus.REVOKED)).thenReturn(true);
+
+        listener.onSubmitted(event);
+
+        verify(emailSender, never()).sendVerificationRequestNotification(eq("ben@mail.com"), any());
+        verify(emailSender, never()).sendVerificationRequestNotification(eq("exec2@mail.com"), any());
         verify(emailSender).sendVerificationRequestNotification("other@mail.com", requestId);
     }
 

@@ -1,5 +1,5 @@
 // API cho Vault Owner — khớp VaultController, DigitalAssetController, DocumentController, VaultActivityLogController,
-// DmsController, OwnerExecutorController. Dùng http.js chung (tự gắn token + refresh).
+// DmsController, DmsConfirmerController, OwnerExecutorController, OwnerReadinessController. Dùng http.js chung (tự gắn token + refresh).
 import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
@@ -72,18 +72,31 @@ export const ownerApi = {
     removeBeneficiaryById: (vaultId, beneficiaryId) =>
         http.delete(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`).then(changed),
 
-    // FR-04: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
+    // FR-04 & X5: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
-    uploadDocument: (vaultId, type, file) => {
+    // documentGroupId (tùy chọn): gửi kèm để tạo phiên bản mới (v2, v3...) cho nhóm tài liệu đã có
+    uploadDocument: (vaultId, type, file, documentGroupId) => {
         const form = new FormData();
         form.append('vaultId', vaultId);
         form.append('type', type);
         form.append('file', file);
+        if (documentGroupId) form.append('documentGroupId', documentGroupId);
         return http.post('/documents/upload', form).then(unwrap);
     },
-    // -> [{ id, vaultId, documentType, fileName, uploadedAt }]
+    // -> [{ id, vaultId, documentGroupId, documentType, fileName, uploadedAt, version, isCurrent, totalVersions, archived }]
     listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
+    // X5: lịch sử các phiên bản của một nhóm tài liệu (bản hiện hành có isCurrent = true)
+    getDocumentVersions: (vaultId, groupId) =>
+        http.get(`/documents/vault/${vaultId}/groups/${groupId}/versions`).then((r) => unwrap(r) ?? []),
     downloadDocument: (docId, fileName) => saveBlob(`/documents/${docId}/download`, fileName || 'document'),
+    // F4a: Lời nhắn di nguyện & Hẹn giờ tương lai
+    listLegacyMessages: (vaultId) => http.get(`/vaults/${vaultId}/messages`).then((r) => unwrap(r) ?? []),
+    getLegacyMessage: (vaultId, messageId) => http.get(`/vaults/${vaultId}/messages/${messageId}`).then(unwrap),
+    createLegacyMessage: (vaultId, formData) => http.post(`/vaults/${vaultId}/messages`, formData).then(unwrap),
+    updateLegacyMessage: (vaultId, messageId, formData) => http.put(`/vaults/${vaultId}/messages/${messageId}`, formData).then(unwrap),
+    deleteLegacyMessage: (vaultId, messageId) => http.delete(`/vaults/${vaultId}/messages/${messageId}`),
+    downloadLegacyMessageAttachment: (vaultId, messageId, fileName) =>
+        saveBlob(`/vaults/${vaultId}/messages/${messageId}/attachment`, fileName || 'attachment'),
     // 409 nếu tài liệu đang nằm trong hồ sơ xác minh
     deleteDocument: (docId) => http.delete(`/documents/${docId}`),
 
@@ -104,12 +117,22 @@ export const ownerApi = {
         return http.get('/owner/activity-logs', { params }).then(unwrap);
     },
 
-    /* ---------- Dead Man's Switch (FR-03) ---------- */
-    // 404 = chưa cấu hình
+    /* ---------- Dead Man's Switch (FR-03 & X2) ---------- */
+    // configured=false = chưa cấu hình (chỉ có hasUsableExecutor, các trường khác null)
     getDms: () => http.get('/dms').then(unwrap),
     // { checkinIntervalDays 1-365, gracePeriodDays 1-90, reminderCount 1-10 }
     saveDms: (config) => http.put('/dms', config).then(unwrap).then(changed),
     checkIn: () => http.post('/dms/check-in').then(unwrap),
+    // Lịch sử check-in, mới nhất trước: Page { content[{ checkinType, channel, occurredAt }], totalPages, totalElements, number, size }
+    getDmsCheckins: ({ page = 0, size = 20 } = {}) =>
+        http.get('/dms/check-ins', { params: { page, size } }).then(unwrap),
+
+    // X2: Trusted Social Confirmers (tối đa 2 người)
+    listDmsConfirmers: () => http.get('/dms/confirmers').then((r) => unwrap(r) ?? []),
+    addDmsConfirmer: ({ name, email, relationship }) =>
+        http.post('/dms/confirmers', { name, email, relationship }).then(unwrap).then(changed),
+    removeDmsConfirmer: (confirmerId) =>
+        http.delete(`/dms/confirmers/${confirmerId}`).then(unwrap).then(changed),
 
     /* ---------- Executor (FR-06) ---------- */
     // Danh sách vị trí (gồm cả đã thu hồi)
@@ -118,6 +141,9 @@ export const ownerApi = {
     assignExecutor: (type, email, confirmReplace = false) =>
         http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap).then(changed),
     revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap).then(changed),
+
+    /* ---------- Estate Readiness Score (F1) ---------- */
+    getReadiness: () => http.get('/owner/readiness').then(unwrap),
 };
 
 // BE báo "đã có người, gửi lại với confirmReplace=true" bằng 409 + message chứa "confirmReplace"

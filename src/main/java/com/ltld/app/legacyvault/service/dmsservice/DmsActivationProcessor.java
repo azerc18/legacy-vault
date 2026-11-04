@@ -24,17 +24,19 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -45,7 +47,6 @@ import java.util.UUID;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class DmsActivationProcessor {
 
     // Tên class làm loại thực thể, dùng chung cho Notification.referenceType và audit targetType.
@@ -74,6 +75,9 @@ public class DmsActivationProcessor {
     static final int MAX_TRIGGER_DEFERRALS = 3;
     static final Duration TRIGGER_DEFERRAL = Duration.ofHours(24);
 
+    // X2 (m2): mỗi đợt quá hạn, người xác nhận chéo chỉ được bấm ALIVE (hoãn) 1 lần; Owner check-in mới đếm lại.
+    static final int MAX_CONFIRMATION_DEFERRALS = 1;
+
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
@@ -83,8 +87,33 @@ public class DmsActivationProcessor {
     private final ExecutorNotificationService executorNotificationService;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
+    // [X2 / Sửa #5] (m6): inject qua constructor; @Lazy cắt vòng phụ thuộc với DmsConfirmerServiceImpl
+    // (service đó gọi activateConfirmedDms). Thiếu bean thì app báo lỗi khi khởi động, không tắt X2 im lặng.
+    private final DmsConfirmerService dmsConfirmerService;
 
-    /** Bước 1-3 của FR-07: DMS quá hạn -> TRIGGERED -> kích hoạt và báo Primary Executor. */
+    public DmsActivationProcessor(DmsConfigRepository dmsConfigRepository,
+                                  DmsCheckinRepository dmsCheckinRepository,
+                                  ExecutorAssignmentRepository executorAssignmentRepository,
+                                  NotificationRepository notificationRepository,
+                                  ExecutorRoleManager executorRoleManager,
+                                  AuditLogService auditLogService,
+                                  ExecutorNotificationService executorNotificationService,
+                                  UserRepository userRepository,
+                                  ApplicationEventPublisher eventPublisher,
+                                  @Lazy DmsConfirmerService dmsConfirmerService) {
+        this.dmsConfigRepository = dmsConfigRepository;
+        this.dmsCheckinRepository = dmsCheckinRepository;
+        this.executorAssignmentRepository = executorAssignmentRepository;
+        this.notificationRepository = notificationRepository;
+        this.executorRoleManager = executorRoleManager;
+        this.auditLogService = auditLogService;
+        this.executorNotificationService = executorNotificationService;
+        this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
+        this.dmsConfirmerService = dmsConfirmerService;
+    }
+
+    /** Bước 1-3 của FR-07: DMS quá hạn -> (nếu có X2 confirmer thì chuyển PENDING_CONFIRMATION 72h) -> TRIGGERED -> kích hoạt Executor. */
     @Transactional
     public void trigger(UUID configId, LocalDateTime now) {
         DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
@@ -94,12 +123,68 @@ public class DmsActivationProcessor {
             return;
         }
 
-        UUID ownerId = config.getOwner().getId();
         if (config.getRemindersSent() == 0 && config.getTriggerDeferrals() < MAX_TRIGGER_DEFERRALS
                 && hasReminderSchedule(config)) {
             defer(config, now);
             return;
         }
+
+        // [X2 / Sửa #5]: Nếu Owner đã cấu hình Trusted Social Confirmers, chuyển sang PENDING_CONFIRMATION 72h trước.
+        // m2: đợt này đã được confirmer bấm ALIVE hoãn 1 lần mà Owner vẫn chưa check-in thì kích hoạt luôn, không hỏi lại.
+        if (config.getConfirmationDeferrals() >= MAX_CONFIRMATION_DEFERRALS) {
+            log.info("X2: dmsConfig {} already postponed by a confirmer in this cycle; triggering without asking again",
+                    config.getId());
+        } else if (dmsConfirmerService.initiatePendingConfirmationIfConfigured(config, now)) {
+            return;
+        }
+
+        activateConfirmedDms(config, now);
+    }
+
+    /**
+     * [X2 / Sửa #5]: Quá 72 giờ kể từ khi chuyển sang PENDING_CONFIRMATION mà không có confirmer nào phản hồi
+     * -> tự động chuyển sang TRIGGERED và kích hoạt Executor như luồng chuẩn.
+     */
+    @Transactional
+    public void processExpiredConfirmation(UUID configId, LocalDateTime now) {
+        DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
+        if (config == null || config.getStatus() != DmsStatus.PENDING_CONFIRMATION
+                || config.getNextCheckinDueAt() == null || !config.getNextCheckinDueAt().isBefore(now)) {
+            return;
+        }
+        UUID ownerId = config.getOwner().getId();
+        audit(AuditAction.DMS_CONFIRMATION_TIMEOUT, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
+        activateConfirmedDms(config, now);
+    }
+
+    /**
+     * X2 (M3): mail hỏi xác nhận gửi sau commit; nếu KHÔNG gửi được cho confirmer nào thì không chờ 72h vô ích
+     * mà kích hoạt như luồng cũ (có audit lý do). Chạy sau commit nên cần transaction mới (REQUIRES_NEW).
+     * Chỉ xử lý đúng đợt đã yêu cầu (hạn chờ trùng requestedDeadlineAt): Owner vừa check-in / lưu cấu hình,
+     * hay đợt khác đã bắt đầu thì bỏ qua.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void activateBecauseConfirmersUnreached(UUID configId, LocalDateTime requestedDeadlineAt, LocalDateTime now) {
+        DmsConfig config = dmsConfigRepository.findById(configId).orElse(null);
+        if (config == null || config.getStatus() != DmsStatus.PENDING_CONFIRMATION
+                || config.getNextCheckinDueAt() == null || requestedDeadlineAt == null
+                || !config.getNextCheckinDueAt().truncatedTo(ChronoUnit.SECONDS)
+                        .equals(requestedDeadlineAt.truncatedTo(ChronoUnit.SECONDS))) {
+            return;
+        }
+        audit(AuditAction.DMS_CONFIRMATION_UNDELIVERED, ENTITY_DMS_CONFIG, config.getId(),
+                ownerDetail(config.getOwner().getId()) + ", reason=NO_CONFIRMATION_EMAIL_SENT");
+        activateConfirmedDms(config, now);
+    }
+
+    /**
+     * Thực thi kích hoạt DMS sang TRIGGERED và thông báo Primary/Backup Executor.
+     * Được gọi từ trigger() (khi không có confirmer), từ DmsConfirmerService (khi confirmer báo UNREACHABLE),
+     * hoặc từ processExpiredConfirmation() (khi quá 72 giờ không ai phản hồi).
+     */
+    @Transactional
+    public void activateConfirmedDms(DmsConfig config, LocalDateTime now) {
+        UUID ownerId = config.getOwner().getId();
         config.setStatus(DmsStatus.TRIGGERED);
         config.setTriggeredAt(now);
         dmsConfigRepository.save(config);
@@ -250,8 +335,9 @@ public class DmsActivationProcessor {
 
     // Cùng điều kiện với DmsReminderProcessor.prepareReminder: thiếu lịch (dòng tạo trước FR-03) thì không bao giờ
     // gửi được lần nhắc nào, hoãn chỉ làm chậm bàn giao 3 ngày.
+    // X2 (m3): đọc mốc chu kỳ cycle_started_at (rỗng thì lastCheckinAt), giống DmsReminderProcessor.
     private static boolean hasReminderSchedule(DmsConfig config) {
-        return config.getLastCheckinAt() != null && config.getCheckinIntervalDays() != null
+        return DmsReminderProcessor.cycleAnchor(config) != null && config.getCheckinIntervalDays() != null
                 && config.getGracePeriodDays() != null && config.getReminderCount() != null;
     }
 

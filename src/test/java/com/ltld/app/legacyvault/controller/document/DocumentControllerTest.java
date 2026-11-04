@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.controller.document;
 
 import com.ltld.app.legacyvault.controller.DocumentController;
+import com.ltld.app.legacyvault.dto.documentdto.DocumentResponse;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.DocumentType;
@@ -13,6 +14,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -20,6 +22,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -84,5 +87,32 @@ public class DocumentControllerTest {
                 .andExpect(status().isPayloadTooLarge())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("File exceeds the allowed size (10MB)."));
+    }
+
+    @Test
+    void getDocumentVersions_SerializesIsCurrentField() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+
+        DocumentResponse v2 = DocumentResponse.builder()
+                .id(UUID.randomUUID())
+                .vaultId(vaultId)
+                .documentGroupId(groupId)
+                .documentType(DocumentType.WILL)
+                .fileName("dichuc_v2.pdf")
+                .version(2)
+                .current(true)
+                .totalVersions(2)
+                .build();
+
+        when(documentService.getDocumentVersions(vaultId, groupId, ownerId)).thenReturn(List.of(v2));
+
+        mockMvc.perform(get("/api/documents/vault/{vaultId}/groups/{groupId}/versions", vaultId, groupId)
+                        .principal(() -> ownerId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].version").value(2))
+                .andExpect(jsonPath("$.data[0].isCurrent").value(true))
+                .andExpect(jsonPath("$.data[0].current").doesNotExist());
     }
 }

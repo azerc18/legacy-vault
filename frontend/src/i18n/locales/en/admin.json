@@ -1,1 +1,152 @@
-{}
+{
+  "workspace": "Administration",
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts" },
+  "loading": "Loading...",
+  "wait": "Please wait...",
+  "search": "Search",
+  "reset": "Reset",
+  "allStatuses": "All statuses",
+  "actionFailed": "Action failed.",
+  "dialog": { "reasonPlaceholder": "Reason (optional, max 255 characters)" },
+  "pager": { "prev": "Previous", "next": "Next", "page": "Page {{page}} / {{total}}" },
+
+  "users": {
+    "title": "Users",
+    "subtitle": "Manage accounts, role access and Dead Man's Switch holds.",
+    "searchPlaceholder": "Search by email or name",
+    "allRoles": "All roles",
+    "loadError": "Could not load users.",
+    "empty": { "title": "No users found", "text": "Check the spelling, or clear the role and status filters." },
+    "cols": { "user": "User", "status": "Status", "roles": "Roles", "lastLogin": "Last login", "actions": "Actions" },
+    "you": "you",
+    "joined": "Joined {{date}}",
+    "status": { "ACTIVE": "Active", "LOCKED": "Locked", "PENDING": "Pending" },
+    "dms": { "ACTIVE": "DMS active", "SUSPENDED": "DMS suspended", "TRIGGERED": "DMS triggered" },
+    "actions": {
+      "grant": "Make {{role}}", "revoke": "Remove {{role}}",
+      "lock": "Lock account", "unlock": "Unlock account",
+      "suspend": "Suspend DMS", "resume": "Resume DMS", "rescue": "Assign executor"
+    },
+    "success": {
+      "lock": "{{email}} has been locked.",
+      "unlock": "{{email}} has been unlocked.",
+      "grant": "{{role}} granted to {{email}}. They need to sign in again.",
+      "revoke": "{{role}} removed from {{email}}.",
+      "suspend": "Dead Man's Switch of {{email}} suspended.",
+      "resume": "Dead Man's Switch of {{email}} resumed.",
+      "rescue": "{{executor}} is now the executor of {{email}} and will receive an activation email within a few minutes."
+    },
+    "dialog": {
+      "lock": { "title": "Lock this account?", "message": "{{email}} will not be able to sign in.", "confirm": "Lock" },
+      "unlock": { "title": "Unlock this account?", "message": "{{email}} will be able to sign in again.", "confirm": "Unlock" },
+      "grant": { "title": "Grant {{role}}?", "message": "{{email}} will get {{role}} access after signing in again.", "confirm": "Grant" },
+      "revoke": { "title": "Remove {{role}}?", "message": "{{email}} will lose {{role}} access.", "confirm": "Remove" },
+      "suspend": { "title": "Suspend Dead Man's Switch?", "message": "The switch of {{email}} will stop counting until resumed. The owner cannot resume it.", "confirm": "Suspend" },
+      "resume": { "title": "Resume Dead Man's Switch?", "message": "The switch of {{email}} will start counting again.", "confirm": "Resume" },
+      "rescue": { "title": "Assign an emergency executor?", "message": "The Dead Man's Switch of {{email}} has been triggered, but no executor can act. The person you enter becomes the primary executor immediately and must have a verified LegacyVault account.", "confirm": "Assign & activate" }
+    }
+  },
+
+  "roles": {
+    "title": "Roles & permissions",
+    "subtitle": "Create custom roles and choose which permissions each role grants.",
+    "newRole": "New role",
+    "system": "System",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cols": { "role": "Role", "permissions": "Permissions", "actions": "Actions" },
+    "loadError": "Could not load roles.",
+    "saveError": "Could not save role.",
+    "deleteError": "Could not delete role.",
+    "created": "Role {{code}} created.",
+    "updated": "Role {{code}} updated. Users get the new permissions within 15 minutes or after signing in again.",
+    "deleted": "Role {{code}} deleted.",
+    "deleteDialog": { "title": "Delete role {{code}}?", "message": "This cannot be undone. Remove the role from all users first." },
+    "form": {
+      "editTitle": "Edit {{code}}",
+      "code": "Code", "codePlaceholder": "e.g. AUDITOR",
+      "name": "Name", "namePlaceholder": "e.g. Auditor",
+      "description": "Description", "optional": "Optional",
+      "codeError": "3–50 characters: A–Z, 0–9 or _, starting with a letter.",
+      "nameError": "Name is required.",
+      "authError": "Select at least one permission.",
+      "adminRequired": "Required for the ADMIN role",
+      "create": "Create role", "save": "Save changes"
+    }
+  },
+
+  "vaults": {
+    "title": "Vaults",
+    "subtitle": "All vaults in the system. Asset contents are never shown here.",
+    "total_one": "{{count}} vault",
+    "total_other": "{{count}} vaults",
+    "loadError": "Could not load vaults.",
+    "openError": "Could not open this vault.",
+    "empty": { "title": "No vaults found", "text": "Try another status filter." },
+    "status": { "ACTIVE": "Active", "UNLOCKED": "Unlocked", "CLAIMED": "Claimed", "ARCHIVED_LOCKED": "Archived" },
+    "cols": { "vault": "Vault", "status": "Status", "created": "Created", "updated": "Updated" },
+    "details": "Details",
+    "detail": {
+      "owner": "Owner: {{email}}",
+      "assetsDocs": "Assets / documents",
+      "deadline": "Claim deadline",
+      "extensionsUsed": "Extensions used",
+      "maxReached": "The claim period has already been extended {{max}} times.",
+      "auditNote": "Viewing a vault as admin is recorded in the audit log."
+    },
+    "extend": {
+      "title": "Extend claim period",
+      "hint": "Use when a beneficiary needs more time (e.g. slow legal paperwork). Only beneficiaries who have not responded get the new deadline.",
+      "days_one": "+{{count}} day",
+      "days_other": "+{{count}} days",
+      "reasonPlaceholder": "Reason (required)",
+      "reasonRequired": "Please enter a reason.",
+      "submit": "Extend",
+      "success_one": "Extended to {{date}}. {{count}} extension left.",
+      "success_other": "Extended to {{date}}. {{count}} extensions left.",
+      "error": "Could not extend the claim period."
+    }
+  },
+
+  "audit": {
+    "title": "Audit log",
+    "subtitle": "Every security-relevant action in the system. Defaults to the last 30 days.",
+    "allActions": "All actions",
+    "actorEmail": "Actor email",
+    "ip": "IP address",
+    "from": "From",
+    "to": "To",
+    "loadError": "Could not load audit logs.",
+    "empty": { "title": "No log entries match these filters", "text": "Try a wider date range or clear the action and user filters." },
+    "cols": { "time": "Time", "action": "Action", "result": "Result", "actor": "Actor", "detail": "Detail" },
+    "result": { "SUCCESS": "Success", "FAILURE": "Failure" },
+    "system": "System",
+    "expand": { "entity": "Entity", "vault": "Vault", "actorId": "Actor ID", "userAgent": "User agent" }
+  },
+
+  "alerts": {
+    "title": "Security alerts",
+    "subtitle": "Suspicious activity detected from the audit log every 5 minutes. HIGH alerts are also emailed to admins.",
+    "tabs": { "open": "Open", "acknowledged": "Acknowledged" },
+    "loadError": "Could not load alerts.",
+    "ackError": "Could not acknowledge alert.",
+    "acknowledgedMsg": "Alert acknowledged.",
+    "empty": {
+      "openTitle": "All clear", "openText": "Failed notifications and stuck hand-overs will show up here.",
+      "ackTitle": "No acknowledged alerts yet", "ackText": "Alerts you acknowledge will be listed here."
+    },
+    "severity": { "HIGH": "HIGH", "MEDIUM": "MEDIUM" },
+    "rules": {
+      "ACCOUNT_LOCKED": "Account locked after failed logins",
+      "LOGIN_FAILURES_FROM_IP": "Many failed logins from one IP",
+      "REFRESH_TOKEN_REUSE": "Refresh token reused (possible theft)",
+      "MASS_DOWNLOAD": "Mass download by one user",
+      "ADMIN_ROLE_GRANTED": "ADMIN role granted"
+    },
+    "meta_one": "{{count}} event · first {{first}} · last {{last}}",
+    "meta_other": "{{count}} events · first {{first}} · last {{last}}",
+    "acknowledgedAt": "acknowledged {{date}}",
+    "viewLogs": "View logs",
+    "acknowledge": "Acknowledge"
+  }
+}

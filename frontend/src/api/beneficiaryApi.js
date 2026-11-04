@@ -56,6 +56,10 @@ export const beneficiaryApi = {
     downloadAsset: (vaultId, assetId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/download`, `${name || 'asset'}.txt`),
 
+    // X1: đồng thuận K-of-N cho tài sản JOINT_CONSENSUS
+    getConsensus: (vaultId, assetId) => http.get(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus`).then(unwrap),
+    approveConsensus: (vaultId, assetId) => http.post(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus/approve`).then(unwrap),
+
     // FR-18 (phần 2): tài liệu pháp lý
     listDocuments: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/documents`).then(unwrap),
     downloadDocument: (vaultId, docId, name) =>
@@ -69,4 +73,17 @@ export const beneficiaryApi = {
     closePreview: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/close-preview`).then(unwrap),
     closeVault: (vaultId, acknowledgeUnviewed) =>
         http.post(`/beneficiaries/vaults/${vaultId}/close`, { confirmed: true, acknowledgeUnviewed }).then(unwrap),
+
+    // N2b: phản hồi phần được chia (cần phiên xem còn hiệu lực). Decline không đảo ngược được
+    acceptClaim: (vaultId) => http.post(`/beneficiaries/vaults/${vaultId}/accept`).then(unwrap),
+    declineClaim: (vaultId, reason) =>
+        http.post(`/beneficiaries/vaults/${vaultId}/decline`, reason ? { reason } : {}).then(unwrap),
+
+    // N2-notify: tiến độ theo từng tài sản của mình (BE trả 409 sau khi đã đóng hồ sơ)
+    getProgress: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/progress`).then(unwrap),
+
+    // F5: Executor xử lý tài khoản số theo di nguyện (chỉ xem)
+    // -> [{ id, platform, accountHandle, wish, status, note, updatedAt, completedAt }]
+    listExecutorTasks: (vaultId) =>
+        http.get(`/beneficiaries/vaults/${vaultId}/executor-tasks`).then((r) => r.data?.data ?? []),
 };

@@ -1,0 +1,50 @@
+{
+  "title": "Nhật ký hoạt động",
+  "subtitle": "Sự kiện về Dead Man's Switch và người thi hành. Sự kiện riêng của từng két nằm ở trang của két đó.",
+  "loading": "Đang tải...",
+  "range": {
+    "all": "Toàn bộ thời gian",
+    "days30": "30 ngày qua",
+    "days90": "90 ngày qua",
+    "months12": "12 tháng qua"
+  },
+  "empty": {
+    "periodTitle": "Không có hoạt động nào trong khoảng này",
+    "periodText": "Chọn khoảng thời gian dài hơn ở trên để xem sự kiện cũ hơn.",
+    "noneTitle": "Chưa có hoạt động nào",
+    "noneText": "Các lần check-in, thay đổi Dead Man's Switch và sự kiện của người thi hành sẽ hiện ở đây."
+  },
+  "columns": {
+    "time": "Thời gian",
+    "action": "Hành động",
+    "by": "Người thực hiện",
+    "details": "Chi tiết"
+  },
+  "actor": {
+    "system": "Hệ thống",
+    "you": "Bạn",
+    "admin": "Quản trị viên hệ thống",
+    "otherUser": "Người dùng khác",
+    "executor": "Người thi hành: {{name}}"
+  },
+  "action": {
+    "DMS_CONFIGURED": "Lưu cấu hình Dead Man's Switch",
+    "DMS_CHECKIN": "Check-in",
+    "DMS_CHECKIN_ONE_CLICK": "Check-in từ link trong email",
+    "DMS_TRIGGERED": "Dead Man's Switch đã kích hoạt",
+    "DMS_TRIGGER_DEFERRED": "Hoãn kích hoạt Dead Man's Switch",
+    "DMS_TRIGGERED_NO_EXECUTOR": "Kích hoạt nhưng không có người thi hành",
+    "EXECUTOR_ASSIGNED": "Chỉ định người thi hành",
+    "EXECUTOR_REPLACED": "Thay người thi hành",
+    "EXECUTOR_REVOKE": "Thu hồi người thi hành",
+    "EXECUTOR_ACTIVATED": "Kích hoạt người thi hành",
+    "EXECUTOR_ACKNOWLEDGED": "Người thi hành đã xác nhận",
+    "VAULT_DELETED": "Xoá két"
+  },
+  "prev": "← Trước",
+  "next": "Sau →",
+  "page": "Trang {{page}} / {{total}}",
+  "errors": {
+    "load": "Không tải được nhật ký hoạt động."
+  }
+}

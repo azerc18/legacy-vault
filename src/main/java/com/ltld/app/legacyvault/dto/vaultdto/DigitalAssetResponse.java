@@ -40,5 +40,6 @@ public class DigitalAssetResponse {
         private final AllocationMode mode;
         private final BigDecimal sharePercent;
         private final String note;
+        private final Integer consensusThreshold;   // X1: chỉ có với JOINT_CONSENSUS
     }
 }

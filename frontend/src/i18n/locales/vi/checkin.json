@@ -1,0 +1,27 @@
+{
+  "confirm": {
+    "title": "Xác nhận bạn vẫn an toàn",
+    "intro": "Bấm nút bên dưới để check-in Dead Man's Switch. Thao tác này bắt đầu chu kỳ check-in mới, giống như check-in trong ứng dụng. Bạn không cần đăng nhập.",
+    "button": "Tôi vẫn an toàn — check-in ngay",
+    "submitting": "Đang check-in…",
+    "missingToken": "Trang này cần link check-in trong email nhắc. Hãy mở lại link trong email, hoặc đăng nhập để check-in thủ công.",
+    "hint": "Mở trang này chưa check-in cho bạn. Chỉ khi bấm nút thì mới check-in.",
+    "submitFailed": "Chưa check-in được lúc này. Vui lòng thử lại."
+  },
+  "done": {
+    "successTitle": "Bạn đã check-in — Dead Man's Switch đã được đặt lại",
+    "successBody": "Chúng tôi đã xác nhận bạn vẫn an toàn. Bộ đếm Dead Man's Switch đã được đặt lại cho chu kỳ mới.",
+    "errorTitle": "Không thể xác minh liên kết check-in",
+    "errorGeneric": "Liên kết check-in này không còn hợp lệ.",
+    "errorHint": "Vui lòng đăng nhập LegacyVault để check-in thủ công.",
+    "reason": {
+      "TOKEN_INVALID": "Liên kết check-in không hợp lệ, đã hết hạn, đã được dùng hoặc thuộc chu kỳ nhắc trước.",
+      "TRIGGERED": "Dead Man's Switch đã bắt đầu quy trình bàn giao nên không thể check-in nữa.",
+      "SUSPENDED": "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ quản trị viên.",
+      "NOT_CONFIGURED": "Dead Man's Switch chưa được thiết lập nên không có gì để check-in. Vui lòng đăng nhập và lưu cấu hình."
+    },
+    "nextDue": "Hạn check-in tiếp theo:",
+    "openDms": "Mở Dead Man's Switch",
+    "backHome": "Về trang chủ"
+  }
+}

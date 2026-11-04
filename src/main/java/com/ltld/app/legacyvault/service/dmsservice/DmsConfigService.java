@@ -1,20 +1,40 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.UUID;
 
 public interface DmsConfigService {
 
-    /** Cấu hình DMS của Owner (FR-03); chưa có thì 404. */
+    /**
+     * Cấu hình DMS của Owner (FR-03). Chưa có thì không lỗi: configured = false, hasUsableExecutor = có Executor
+     * chính chưa REVOKED (điều kiện bật DMS lần đầu), các trường khác null.
+     */
     DmsConfigResponse getConfig(UUID ownerId);
+
+    /**
+     * Lịch sử check-in của Owner (FR-03), mới nhất trước; thứ tự do hàm quyết định, sort trong pageable bị bỏ qua.
+     * Chưa cấu hình -> trang rỗng.
+     */
+    Page<DmsCheckinResponse> getCheckins(UUID ownerId, Pageable pageable);
 
     /** Tạo mới hoặc cập nhật cấu hình DMS và bắt đầu chu kỳ mới tính từ lúc lưu (FR-03). */
     UpsertResult upsertConfig(UUID ownerId, DmsConfigRequest request);
 
     /** Owner xác nhận còn sống: bắt đầu chu kỳ mới, lùi hạn trigger (FR-03). */
     DmsConfigResponse checkIn(UUID ownerId);
+
+    /**
+     * F2: Owner check-in từ link trong email nhắc (không đăng nhập); cùng luật chu kỳ với {@link #checkIn(UUID)}.
+     * Khóa DmsConfig rồi mới kiểm tokenJti chưa dùng và token thuộc chu kỳ hiện tại
+     * ({@code tokenCycle} = lastCheckinAt lúc sinh token, epoch giây UTC; null = chưa từng check-in).
+     * Lỗi -> {@link com.ltld.app.legacyvault.exception.DmsCheckinLinkException} kèm reason cho trang FE.
+     */
+    DmsConfigResponse checkInFromEmailLink(UUID ownerId, String tokenJti, Long tokenCycle);
 
     /**
      * Chặn thao tác của Owner khi DMS đã kích hoạt quy trình bàn giao (TRIGGERED) -> DmsException 409.

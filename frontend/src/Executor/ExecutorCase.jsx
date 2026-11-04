@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
-import { executorApi, caseStep, HANDOVER_LABEL } from '../api/executorApi.js';
+import { executorApi, caseStep, HANDOVER_LABEL, CLAIM_PROGRESS_LABEL } from '../api/executorApi.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
@@ -13,6 +14,13 @@ import EmptyState from "../Common/EmptyState.jsx";
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
+// F5: di nguyện của Owner và trạng thái checklist
+const WISH_LABEL = {
+    MEMORIALIZE: 'Memorialize the account',
+    DELETE: 'Delete the account',
+    TRANSFER_DATA: 'Download data for the family',
+};
+const TASK_STATUS_LABEL = { TODO: 'Not started', DOING: 'In progress', DONE: 'Done' };
 
 /* =====================================================================
    Route: /executor/cases/:assignmentId
@@ -67,7 +75,7 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome/>
+            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle
@@ -114,6 +122,10 @@ export default function ExecutorCase() {
                         )}
 
                         <ProgressSection progress={progress} />
+
+                        <BeneficiaryClaimsSection assignmentId={assignmentId} progress={progress} />
+
+                        <AccountTasksSection assignmentId={assignmentId} progress={progress} />
 
                         <MessagesSection assignmentId={assignmentId} progress={progress} />
                     </>
@@ -271,6 +283,172 @@ function ProgressSection({ progress }) {
                 </table>
             </div>
         </Card>
+    );
+}
+
+/* ---------- N2-exec: người thụ hưởng đã nhận tài sản chưa + nhắc nhở ---------- */
+function BeneficiaryClaimsSection({ assignmentId, progress }) {
+    // Chỉ vault đã mở khoá trở đi mới có người thụ hưởng phản hồi
+    const vaults = [...new Map(progress
+        .filter((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus))
+        .map((p) => [p.vaultId, p])).values()];
+    if (vaults.length === 0) return null;
+    return (
+        <Card title="Beneficiary claims" icon="group">
+            <div className="space-y-6">
+                {vaults.map((p) => <VaultClaims key={p.vaultId} assignmentId={assignmentId} vault={p} />)}
+            </div>
+        </Card>
+    );
+}
+
+function VaultClaims({ assignmentId, vault }) {
+    const [rows, setRows] = useState(null);
+    const [error, setError] = useState('');
+    const [notice, setNotice] = useState('');
+    const [busyId, setBusyId] = useState(null);
+
+    useEffect(() => {
+        executorApi.getBeneficiaryProgress(assignmentId, vault.vaultId)
+            .then(setRows)
+            .catch((e) => { setError(getErrorMessage(e, 'Could not load beneficiaries.')); setRows([]); });
+    }, [assignmentId, vault.vaultId]);
+
+    const remind = async (row) => {
+        setBusyId(row.vaultBeneficiaryId); setError(''); setNotice('');
+        try {
+            const updated = await executorApi.remindBeneficiary(assignmentId, vault.vaultId, row.vaultBeneficiaryId);
+            setRows((prev) => prev.map((r) => (r.vaultBeneficiaryId === updated.vaultBeneficiaryId ? updated : r)));
+            setNotice(`Reminder sent to ${row.fullName || row.maskedEmail}.`);
+        } catch (e) {
+            setError(getErrorMessage(e, 'Could not send the reminder.'));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    return (
+        <div>
+            <h3 className="font-semibold mb-2">{vault.vaultName}</h3>
+            <Alert>{error}</Alert>
+            {notice && <Alert type="info">{notice}</Alert>}
+            {rows === null && <p className="text-sm text-on-surface-variant">Loading...</p>}
+            {rows?.length === 0 && !error && <p className="text-sm text-on-surface-variant">No beneficiaries.</p>}
+            {rows?.length > 0 && (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-on-surface-variant">
+                            <tr><th className="py-2 pr-4">Beneficiary</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Responded</th><th className="py-2">Reminder</th></tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((r) => {
+                                const b = CLAIM_PROGRESS_LABEL[r.status] || {};
+                                return (
+                                    <tr key={r.vaultBeneficiaryId} className="border-t border-outline-variant/20">
+                                        <td className="py-2 pr-4">
+                                            <p className="font-semibold">{r.fullName || '—'}</p>
+                                            <p className="text-xs text-on-surface-variant">{r.maskedEmail}{r.relationship && ` · ${r.relationship}`}</p>
+                                        </td>
+                                        <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${b.cls}`}>{b.label || r.status}</span></td>
+                                        <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.claimedAt || r.respondedAt)}</td>
+                                        <td className="py-2">
+                                            {r.canRemind && (
+                                                <button type="button" onClick={() => remind(r)} disabled={busyId === r.vaultBeneficiaryId} className={btnOutline}>
+                                                    <Icon name="notifications_active" className="text-[18px]" /> {busyId === r.vaultBeneficiaryId ? 'Sending...' : 'Send reminder'}
+                                                </button>
+                                            )}
+                                            {!r.canRemind && r.nextReminderAllowedAt && (
+                                                <span className="text-xs text-on-surface-variant">Reminded · next after {formatDate(r.nextReminderAllowedAt, true)}</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+/* ---------- F5: checklist xử lý tài khoản số theo di nguyện ---------- */
+function AccountTasksSection({ assignmentId, progress }) {
+    const [tasks, setTasks] = useState(null);
+    const [error, setError] = useState('');
+    // Checklist chỉ có sau khi có vault đã mở khoá
+    const handedOver = progress.some((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus));
+
+    useEffect(() => {
+        if (!handedOver) return;
+        executorApi.getTasks(assignmentId)
+            .then(setTasks)
+            .catch((e) => { setError(getErrorMessage(e, 'Could not load the account checklist.')); setTasks([]); });
+    }, [assignmentId, handedOver]);
+
+    if (!handedOver || (tasks?.length === 0 && !error)) return null;
+    const done = (tasks || []).filter((t) => t.status === 'DONE').length;
+    return (
+        <Card title="Online accounts checklist" icon="checklist">
+            <p className="text-sm text-on-surface-variant mb-4">
+                Handle each account following the owner's wish, then update its status. Beneficiaries can follow this progress.
+                {tasks && ` ${done}/${tasks.length} done.`}
+            </p>
+            <Alert>{error}</Alert>
+            {tasks === null && <p className="text-sm text-on-surface-variant">Loading...</p>}
+            <div className="space-y-4">
+                {(tasks || []).map((t) => (
+                    <AccountTaskRow key={t.id} assignmentId={assignmentId} task={t}
+                                    onSaved={(u) => setTasks((prev) => prev.map((x) => (x.id === u.id ? u : x)))} />
+                ))}
+            </div>
+        </Card>
+    );
+}
+
+function AccountTaskRow({ assignmentId, task, onSaved }) {
+    const [status, setStatus] = useState(task.status);
+    const [note, setNote] = useState(task.note || '');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const dirty = status !== task.status || note !== (task.note || '');
+
+    const save = async () => {
+        setBusy(true); setError('');
+        try {
+            onSaved(await executorApi.updateTask(assignmentId, task.id, { status, note }));
+        } catch (e) {
+            setError(getErrorMessage(e, 'Could not save.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="rounded-xl border border-outline-variant/30 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="font-semibold">{task.platform || assetLabel(task.assetType)}{task.accountHandle && ` · ${task.accountHandle}`}</p>
+                    <p className="text-sm text-on-surface-variant">{task.vaultName} · Wish: <span className="font-semibold">{WISH_LABEL[task.wish] || task.wish}</span></p>
+                    {task.helpUrl && (
+                        <a href={task.helpUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary font-semibold inline-flex items-center gap-1 mt-1">
+                            <Icon name="open_in_new" className="text-[16px]" /> Official help page
+                        </a>
+                    )}
+                </div>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} w-auto`}>
+                    {Object.entries(TASK_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+            </div>
+            <textarea rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)}
+                      placeholder="Note for the family (e.g. request number sent to the provider)" className={`${inputClass} mt-3`} />
+            <Alert>{error}</Alert>
+            <div className="flex justify-end mt-2">
+                <button type="button" onClick={save} disabled={!dirty || busy} className={btnPrimary}>
+                    <Icon name="save" className="text-[18px]" /> {busy ? 'Saving...' : 'Save'}
+                </button>
+            </div>
+        </div>
     );
 }
 

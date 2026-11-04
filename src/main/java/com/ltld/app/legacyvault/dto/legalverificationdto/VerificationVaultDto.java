@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Vault sẽ được mở khóa — kèm tên để verifier nhận ra (không chỉ UUID). */
@@ -15,4 +16,6 @@ import java.util.UUID;
 public class VerificationVaultDto {
     private UUID id;
     private String name;
+    /** N2: email beneficiary đã che (vd. a***@gmail.com), để verifier thấy ai nhận vault. */
+    private List<String> beneficiaries;
 }

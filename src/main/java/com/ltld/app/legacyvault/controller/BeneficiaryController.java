@@ -117,6 +117,30 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(detail));
     }
 
+    // X1: tiến độ đồng thuận K-of-N của tài sản JOINT_CONSENSUS
+    @PreAuthorize("hasRole('BENEFICIARY')")
+    @GetMapping("/vaults/{vaultId}/assets/{assetId}/consensus")
+    public ResponseEntity<ApiResponse<ConsensusStatusResponse>> getConsensusStatus(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        return ResponseEntity.ok(ApiResponse.success(
+                beneficiaryService.getConsensusStatus(vaultId, assetId, currentUserId(principal))));
+    }
+
+    // X1: đồng ý mở tài sản JOINT_CONSENSUS (đủ K người đồng ý thì tất cả người nhận xem được)
+    @PreAuthorize("hasRole('BENEFICIARY')")
+    @PostMapping("/vaults/{vaultId}/assets/{assetId}/consensus/approve")
+    public ResponseEntity<ApiResponse<ConsensusStatusResponse>> approveConsensus(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID assetId) {
+
+        return ResponseEntity.ok(ApiResponse.success("Your approval has been recorded.",
+                beneficiaryService.approveConsensus(vaultId, assetId, currentUserId(principal))));
+    }
+
     // FR-18: Tải xuống thông tin tài sản đã giải mã dưới dạng tệp. Không cho cache dữ liệu nhạy cảm.
     @PreAuthorize("hasRole('BENEFICIARY') and hasAuthority('ASSET_DOWNLOAD')")
     @GetMapping(value = "/vaults/{vaultId}/assets/{assetId}/download",
@@ -147,6 +171,18 @@ public class BeneficiaryController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(beneficiaryService.previewClose(vaultId, currentUserId(principal))));
+    }
+
+
+    // N2-notify: tiến độ theo từng tài sản của người này (cho ClaimProgress), không giải mã gì
+    @GetMapping("/vaults/{vaultId}/progress")
+    public ResponseEntity<ApiResponse<ClaimProgressResponse>> getClaimProgress(
+            Principal principal,
+            @PathVariable UUID vaultId) {
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(beneficiaryService.getClaimProgress(vaultId, currentUserId(principal))));
     }
 
     // FR-19: Beneficiary xác nhận đã nhận bàn giao để đóng hồ sơ Vault

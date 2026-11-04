@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
@@ -10,15 +11,9 @@ const SEVERITY_CLS = {
     HIGH: 'bg-error-container text-on-error-container',
     MEDIUM: 'bg-warning-container text-on-warning-container',
 };
-const RULE_LABEL = {
-    ACCOUNT_LOCKED: 'Account locked after failed logins',
-    LOGIN_FAILURES_FROM_IP: 'Many failed logins from one IP',
-    REFRESH_TOKEN_REUSE: 'Refresh token reused (possible theft)',
-    MASS_DOWNLOAD: 'Mass download by one user',
-    ADMIN_ROLE_GRANTED: 'ADMIN role granted',
-};
 
 export default function AdminAlerts() {
+    const { t } = useTranslation('admin');
     const [status, setStatus] = useState('OPEN');
     const [page, setPage] = useState(0);
     const [data, setData] = useState(null);
@@ -30,8 +25,8 @@ export default function AdminAlerts() {
         setError('');
         adminApi.listAlerts({ status, page })
             .then(setData)
-            .catch((e) => setError(getErrorMessage(e, 'Could not load alerts.')));
-    }, [status, page]);
+            .catch((e) => setError(getErrorMessage(e, t('alerts.loadError'))));
+    }, [status, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { load(); }, [load]);
 
@@ -42,9 +37,9 @@ export default function AdminAlerts() {
         try {
             await adminApi.acknowledgeAlert(alert.id);
             setData((d) => d && { ...d, content: d.content.filter((a) => a.id !== alert.id) });
-            setSuccess('Alert acknowledged.');
+            setSuccess(t('alerts.acknowledgedMsg'));
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not acknowledge alert.'));
+            setError(getErrorMessage(e, t('alerts.ackError')));
             load();
         } finally {
             setBusyId(null);
@@ -60,20 +55,20 @@ export default function AdminAlerts() {
     );
 
     return (
-        <AdminLayout title="Security alerts" subtitle="Suspicious activity detected from the audit log every 5 minutes. HIGH alerts are also emailed to admins.">
+        <AdminLayout title={t('alerts.title')} subtitle={t('alerts.subtitle')}>
             <div className="flex gap-2 mb-6">
-                {tab('OPEN', 'Open')}
-                {tab('ACKNOWLEDGED', 'Acknowledged')}
+                {tab('OPEN', t('alerts.tabs.open'))}
+                {tab('ACKNOWLEDGED', t('alerts.tabs.acknowledged'))}
             </div>
 
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
 
-            {!data && !error && <p className="text-on-surface-variant">Loading...</p>}
+            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon={status === 'OPEN' ? 'verified' : 'notifications_off'}
-                            title={status === 'OPEN' ? 'All clear' : 'No acknowledged alerts yet'}
-                            text={status === 'OPEN' ? 'Failed notifications and stuck hand-overs will show up here.' : 'Alerts you acknowledge will be listed here.'} />
+                            title={status === 'OPEN' ? t('alerts.empty.openTitle') : t('alerts.empty.ackTitle')}
+                            text={status === 'OPEN' ? t('alerts.empty.openText') : t('alerts.empty.ackText')} />
             )}
 
             <div className="space-y-3">
@@ -82,26 +77,26 @@ export default function AdminAlerts() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SEVERITY_CLS[a.severity] || ''}`}>{a.severity}</span>
-                                    <span className="font-semibold">{RULE_LABEL[a.rule] || a.rule}</span>
+                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SEVERITY_CLS[a.severity] || ''}`}>{t(`alerts.severity.${a.severity}`, { defaultValue: a.severity })}</span>
+                                    <span className="font-semibold">{t(`alerts.rules.${a.rule}`, { defaultValue: a.rule })}</span>
                                 </div>
                                 <p className="mt-2 text-sm">{a.message}</p>
                                 <p className="mt-2 text-xs text-outline">
-                                    {a.eventCount} event(s) · first {formatDate(a.firstSeenAt, true)} · last {formatDate(a.lastSeenAt, true)}
-                                    {a.acknowledgedAt && <> · acknowledged {formatDate(a.acknowledgedAt, true)}</>}
+                                    {t('alerts.meta', { count: a.eventCount, first: formatDate(a.firstSeenAt, true), last: formatDate(a.lastSeenAt, true) })}
+                                    {a.acknowledgedAt && <> · {t('alerts.acknowledgedAt', { date: formatDate(a.acknowledgedAt, true) })}</>}
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
                                 {a.rule === 'LOGIN_FAILURES_FROM_IP' && (
                                     <Link to={`/admin/audit-logs?action=LOGIN_FAILED&ip=${encodeURIComponent(a.subject)}`}
                                           className="text-xs font-semibold text-secondary hover:text-primary inline-flex items-center gap-1">
-                                        <Icon name="history" className="text-[16px]" /> View logs
+                                        <Icon name="history" className="text-[16px]" /> {t('alerts.viewLogs')}
                                     </Link>
                                 )}
                                 {a.status === 'OPEN' && (
                                     <button onClick={() => acknowledge(a)} disabled={busyId === a.id}
                                             className="h-9 px-4 rounded-xl border border-outline-variant text-sm font-semibold hover:bg-surface-container-low disabled:opacity-60">
-                                        {busyId === a.id ? 'Please wait...' : 'Acknowledge'}
+                                        {busyId === a.id ? t('wait') : t('alerts.acknowledge')}
                                     </button>
                                 )}
                             </div>

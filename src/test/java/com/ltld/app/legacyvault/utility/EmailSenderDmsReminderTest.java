@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.TimeZone;
@@ -73,5 +74,27 @@ class EmailSenderDmsReminderTest {
         assertThatThrownBy(() -> emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3))
                 .isInstanceOf(MailSendException.class);
+    }
+
+    @Test
+    @DisplayName("F2: mail nhắc kèm link tới trang FE /dms/checkin (không phải API), token được URL-encode")
+    void checkinReminder_withToken_linksToFrontendConfirmPage() {
+        ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://legacyvault.test/");
+
+        emailSender.sendDmsCheckinReminder("owner@example.com",
+                LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3, "a.b+c/d");
+
+        String text = sentMessage().getText();
+        assertThat(text).contains("https://legacyvault.test/dms/checkin?token=a.b%2Bc%2Fd");
+        assertThat(text).doesNotContain("/api/");
+    }
+
+    @Test
+    @DisplayName("F2: không có token hoặc chưa cấu hình FRONTEND_BASE_URL -> mail như cũ, không kèm link")
+    void checkinReminder_withoutTokenOrBase_hasNoLink() {
+        emailSender.sendDmsCheckinReminder("owner@example.com",
+                LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3, "token");
+
+        assertThat(sentMessage().getText()).doesNotContain("/dms/checkin");
     }
 }
