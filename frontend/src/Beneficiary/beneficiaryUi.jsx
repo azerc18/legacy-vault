@@ -30,7 +30,7 @@ export function StatusBadge({ vaultStatus, claimStatus, myStatus }) {
     let label = 'Ready to claim';
     let cls = 'bg-secondary-fixed text-on-secondary-fixed';
     if (myStatus === 'DECLINED' || myStatus === 'WAIVED') {
-        label = 'Declined'; cls = 'bg-surface-container text-outline';
+        label = myStatus === 'WAIVED' ? 'Waived' : 'Declined'; cls = 'bg-surface-container text-outline';
     } else if (vaultStatus === 'CLAIMED' || claimStatus === 'CLAIMED') {
         label = 'Claimed'; cls = 'bg-success-container text-on-success-container';
     } else if (vaultStatus === 'ARCHIVED_LOCKED' || claimStatus === 'EXPIRED') {

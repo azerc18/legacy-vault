@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
+import ClaimProgress from '../Common/ClaimProgress.jsx';
 import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
     ASSET_TYPE, DOCUMENT_TYPE, inputClass, btnPrimary, btnOutline,
@@ -100,7 +101,10 @@ export default function BeneficiaryVaultDetail() {
             )}
             {stage === 'declined' && (
                 <Alert type="info">
-                    You declined your share of this vault. Its content is no longer available to you.
+                    {vault?.myStatus === 'WAIVED'
+                        ? 'Your share of this vault was waived by an administrator.'
+                        : 'You declined your share of this vault.'}
+                    {' '}Its content is no longer available to you.
                 </Alert>
             )}
 
