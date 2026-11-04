@@ -2,7 +2,7 @@
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
 import React, { useEffect, useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import { paymentApi } from '../api/paymentApi.js';
 import UserAvatar from './UserAvatar.jsx';
@@ -11,6 +11,29 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
+// Menu mặc định theo khu vực khi trang không tự truyền nav
+function defaultNav(pathname) {
+    const profile = { to: '/me', label: 'Profile', icon: 'person' };
+    if (pathname.startsWith('/executor')) return [{ to: '/executor/home', label: 'Estates', icon: 'badge' }, profile];
+    if (pathname.startsWith('/verifier') || pathname === '/home') {
+        if (pathname === '/home') return [{ to: '/home', label: 'Home', icon: 'home' }, profile];
+        return [
+            { to: '/verifier/home', label: 'Home', icon: 'home' },
+            { to: '/verifier', label: 'Requests', icon: 'gavel' },
+            { to: '/verifier/history', label: 'History', icon: 'history' },
+            profile,
+        ];
+    }
+    if (pathname.startsWith('/beneficiary')) {
+        return [
+            { to: '/beneficiary', label: 'My vaults', icon: 'inventory_2' },
+            { to: '/beneficiary/guide', label: 'Guide', icon: 'menu_book' },
+            profile,
+        ];
+    }
+    return [{ to: '/home', label: 'Home', icon: 'home' }, profile];
+}
+
 export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
 
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -23,7 +46,9 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  * @param extra      phần tử thêm bên phải, trước avatar (vd. NotificationBell)
  * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
  */
-export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav, extra, userHome = false }) {
+export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav: navProp, extra, userHome = false }) {
+    const { pathname } = useLocation();
+    const nav = navProp && navProp.length > 0 ? navProp : defaultNav(pathname);
     const { t } = useTranslation();
     const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
