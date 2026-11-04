@@ -1129,17 +1129,32 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
 
         // 2. Chỉ tài sản người này đang giữ (người chính, hoặc nhận thay do người chính từ chối)
-        List<InheritanceDossierData.AssetLine> assets = assetAllocationRepository.findHeldBy(vault.getId(), me.getId()).stream()
-                .filter(al -> al.getAsset().getStatus() == AssetStatus.ACTIVE)
-                .map(al -> new InheritanceDossierData.AssetLine(
-                        al.getAsset().getAssetName(),
-                        al.getAsset().getAssetType(),
-                        TransferMechanisms.resolve(al.getAsset().getTransferMechanism(), al.getAsset().getAssetType()),
-                        al.getMode(),
-                        al.getSharePercent(),
-                        al.getNote(),
-                        !al.getBeneficiary().getId().equals(me.getId()),
-                        dossierFields(al.getAsset())))
+        // Q47 (b): cùng quy tắc với getInheritedAssets / getClaimProgress:
+        // ẩn tài sản đã phân bổ cho người khác; tài sản chưa có dòng phân bổ nào thì ai cũng thấy.
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
+        Map<UUID, AssetAllocation> mine = new HashMap<>();
+        for (AssetAllocation al : assetAllocationRepository.findHeldBy(vault.getId(), me.getId())) {
+            mine.putIfAbsent(al.getAsset().getId(), al);
+        }
+        List<InheritanceDossierData.AssetLine> assets = digitalAssetRepository
+                .findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(a -> !hidden.contains(a.getId()))
+                // Thứ tự cố định giữa các lần tải PDF (findByVaultIdAndStatus không có ORDER BY)
+                .sorted(Comparator.comparing(DigitalAsset::getAssetName,
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(DigitalAsset::getId))
+                .map(a -> {
+                    AssetAllocation al = mine.get(a.getId());   // null = chưa phân bổ riêng
+                    return new InheritanceDossierData.AssetLine(
+                            a.getAssetName(),
+                            a.getAssetType(),
+                            TransferMechanisms.resolve(a.getTransferMechanism(), a.getAssetType()),
+                            al != null ? al.getMode() : null,
+                            al != null ? al.getSharePercent() : null,
+                            al != null ? al.getNote() : null,
+                            al != null && !al.getBeneficiary().getId().equals(me.getId()),
+                            dossierFields(a));
+                })
                 .toList();
         // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
         List<InheritanceDossierData.DocumentLine> documents = legalDocumentRepository.findByVaultIdAndIsCurrentTrueOrderByUploadedAtDescIdDesc(vault.getId()).stream()
