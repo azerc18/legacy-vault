@@ -65,7 +65,7 @@ export default function Login() {
             }
             await finishLogin(res.accessToken);
         } catch (err) {
-            getErrorMessage(err, t('login.errors.failed'));
+            setError(getErrorMessage(err, t('login.errors.failed')));
             // 403 = chưa xác thực email hoặc tài khoản bị khoá
             if (err.response?.status === 403) setNeedVerify(true);
         } finally {
