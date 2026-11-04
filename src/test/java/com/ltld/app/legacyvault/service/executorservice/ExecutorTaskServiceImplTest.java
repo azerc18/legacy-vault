@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorTaskStatus;
 import com.ltld.app.legacyvault.enums.ExecutorTaskWish;
@@ -20,6 +21,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
+import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.ExecutorTaskRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
@@ -32,6 +34,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,7 +67,10 @@ class ExecutorTaskServiceImplTest {
     @Mock private DigitalAssetRepository digitalAssetRepository;
     @Mock private VaultRepository vaultRepository;
     @Mock private VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    @Mock private AssetAllocationRepository assetAllocationRepository;
     @Mock private AuditLogService auditLogService;
+    // Mock: TransactionTemplate gọi thẳng callback, đủ cho unit test
+    @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private ExecutorTaskServiceImpl service;
 
     private final UUID assignmentId = UUID.randomUUID();
@@ -115,7 +122,7 @@ class ExecutorTaskServiceImplTest {
 
         assertEquals(1, created);
         ArgumentCaptor<ExecutorTask> saved = ArgumentCaptor.forClass(ExecutorTask.class);
-        verify(executorTaskRepository).save(saved.capture());
+        verify(executorTaskRepository).saveAndFlush(saved.capture());
         assertEquals("Facebook", saved.getValue().getPlatform());
         assertEquals("owner.fb", saved.getValue().getAccountHandle());
         assertEquals(ExecutorTaskWish.MEMORIALIZE, saved.getValue().getWish());
@@ -129,7 +136,18 @@ class ExecutorTaskServiceImplTest {
         when(executorTaskRepository.findAssetIdsWithTask(anyCollection())).thenReturn(Set.of(social.getId()));
 
         assertEquals(0, service.generateForVaults(List.of(vault.getId())));
-        verify(executorTaskRepository, never()).save(any());
+        verify(executorTaskRepository, never()).saveAndFlush(any());
+    }
+
+    // Review F5 #1: request khác vừa ghi task cho cùng tài sản (unique) -> bỏ qua, không ném lỗi 500
+    @Test
+    void generate_concurrentInsertHitsUniqueConstraint_isSkippedWithoutError() {
+        DigitalAsset social = asset(TransferMechanism.EXECUTOR_DISPOSITION, "{\"wish\":\"DELETE\"}");
+        when(digitalAssetRepository.findByVaultIdInAndStatus(any(), eq(AssetStatus.ACTIVE))).thenReturn(List.of(social));
+        when(executorTaskRepository.findAssetIdsWithTask(anyCollection())).thenReturn(Set.of());
+        when(executorTaskRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uk_executor_task_asset"));
+
+        assertEquals(0, service.generateForVaults(List.of(vault.getId())));
     }
 
     @Test
@@ -297,10 +315,44 @@ class ExecutorTaskServiceImplTest {
         UUID userId = UUID.randomUUID();
         when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
         when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vault.getId(), userId))
-                .thenReturn(Optional.of(VaultBeneficiary.builder().build()));
+                .thenReturn(Optional.of(VaultBeneficiary.builder().id(UUID.randomUUID()).status(BeneficiaryInviteStatus.ACCEPTED).build()));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(eq(vault.getId()), any())).thenReturn(List.of());
         when(executorTaskRepository.findByVaultIds(List.of(vault.getId()))).thenReturn(List.of(task(ExecutorTaskStatus.DONE)));
 
         assertThat(service.listForBeneficiary(vault.getId(), userId)).hasSize(1);
+    }
+
+    // Review F5 #2: chỉ thấy task của tài sản phân bổ cho mình (hoặc chưa phân bổ), như N2-access
+    @Test
+    void listForBeneficiary_hidesTasksOfAssetsAllocatedToOthers() {
+        UUID userId = UUID.randomUUID();
+        UUID meId = UUID.randomUUID();
+        ExecutorTask mine = task(ExecutorTaskStatus.TODO);
+        ExecutorTask others = task(ExecutorTaskStatus.DOING);
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vault.getId(), userId))
+                .thenReturn(Optional.of(VaultBeneficiary.builder().id(meId).status(BeneficiaryInviteStatus.VERIFIED).build()));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), meId)).thenReturn(List.of(others.getAsset().getId()));
+        when(executorTaskRepository.findByVaultIds(List.of(vault.getId()))).thenReturn(List.of(mine, others));
+
+        assertThat(service.listForBeneficiary(vault.getId(), userId))
+                .extracting(ExecutorTaskResponse::getId).containsExactly(mine.getId());
+    }
+
+    // Review F5 #2: đã từ chối / từ bỏ thì 409 như các API Beneficiary khác
+    @Test
+    void listForBeneficiary_declinedOrWaived_throws409() {
+        UUID userId = UUID.randomUUID();
+        when(vaultRepository.findById(vault.getId())).thenReturn(Optional.of(vault));
+        for (BeneficiaryInviteStatus status : List.of(BeneficiaryInviteStatus.DECLINED, BeneficiaryInviteStatus.WAIVED)) {
+            when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vault.getId(), userId))
+                    .thenReturn(Optional.of(VaultBeneficiary.builder().id(UUID.randomUUID()).status(status).build()));
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> service.listForBeneficiary(vault.getId(), userId));
+            assertEquals(ErrorCode.CLAIM_ALREADY_RESPONDED, ex.getErrorCode());
+        }
+        verifyNoInteractions(executorTaskRepository, assetAllocationRepository);
     }
 
     @Test

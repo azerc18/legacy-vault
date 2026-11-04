@@ -14,9 +14,9 @@ import java.util.UUID;
 @Repository
 public interface ExecutorTaskRepository extends JpaRepository<ExecutorTask, UUID> {
 
-    // Kèm vault để trả tên vault mà không N+1
+    // Kèm vault + asset (tên vault, loại tài sản) để không N+1 và đọc được sau khi transaction đóng
     @Query("""
-            SELECT t FROM ExecutorTask t JOIN FETCH t.vault
+            SELECT t FROM ExecutorTask t JOIN FETCH t.vault JOIN FETCH t.asset
             WHERE t.vault.id IN :vaultIds
             ORDER BY t.vault.name ASC, t.createdAt ASC, t.id ASC
             """)
