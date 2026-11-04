@@ -69,65 +69,36 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
+    // Thanh bên trái (desktop) / thanh trên cùng (điện thoại). Nội dung trang được đẩy sang phải nhờ class lv-has-side (xem index.css).
+    useEffect(() => {
+        document.body.classList.add('lv-has-side');
+        return () => document.body.classList.remove('lv-has-side');
+    }, []);
+
+    const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-xl text-[15px] font-semibold whitespace-nowrap transition-colors';
     return (
-        <header className="sticky top-0 z-20 bg-surface-container-lowest/85 backdrop-blur-md border-b border-outline-variant/40">
-            <div className={`${PAGE_WIDTH} h-16 flex items-center justify-between gap-3`}>
-                <Link to={home} className="flex items-center gap-2 min-w-0">
-                    <span className="w-9 h-9 shrink-0 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                        <Icon name={icon} className="text-[20px]" />
-                    </span>
+        <header className="lv-side bg-primary text-white">
+            <div className="lv-side-top">
+                <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
+                    <Icon name={icon === 'shield_locked' ? 'lock' : icon} className="text-[26px]" />
                     <span className="min-w-0">
-                        <span className="font-headline-sm text-primary font-bold text-base tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
+                        <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (
-                            <span className="text-[11px] text-secondary font-semibold tracking-wide uppercase block truncate">{workspace}</span>
+                            <span className="text-[11px] text-white/60 font-semibold tracking-wide uppercase block truncate">{workspace}</span>
                         )}
                     </span>
                 </Link>
-
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    {isOwner && (
-                        <Link
-                            to={vipStatus?.vip ? '/billing' : '/pricing'}
-                            title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
-                            className={`h-8 px-2.5 rounded-full text-xs font-bold inline-flex items-center gap-1 ${
-                                vipStatus?.vip
-                                    ? 'bg-primary text-on-primary'
-                                    : 'bg-secondary-fixed text-on-secondary-fixed hover:bg-primary hover:text-on-primary'
-                            }`}
-                        >
-                            <Icon name="workspace_premium" className="text-[15px]" />
-                            <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
-                        </Link>
-                    )}
-                    {userHome && (
-                        <Link to="/home" title={t('header.userHome')}
-                              className="h-10 px-2 sm:px-3 rounded-xl flex items-center gap-1 text-sm font-semibold text-on-surface-variant hover:text-primary hover:bg-surface-container-low">
-                            <Icon name="swap_horiz" className="text-[18px]" /><span className="hidden md:inline">{t('header.userHome')}</span>                        </Link>
-                    )}
-                    <LanguageSwitch />
-                    {extra}
-                    <Link to="/me" title={user?.email}
-                          className="flex items-center gap-2 h-10 pl-1 pr-1 md:pr-3 rounded-xl hover:bg-surface-container-low">
-                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                        <span className="hidden md:block text-sm font-semibold text-on-surface max-w-[160px] truncate">{user?.name}</span>
-                    </Link>
-                    <button type="button" onClick={handleLogout} title={t('header.logout')}
-                            className="h-10 px-3 rounded-xl border border-outline-variant text-sm font-semibold flex items-center gap-1.5 hover:bg-surface-container-low">
-                        <Icon name="logout" className="text-[18px]" /><span className="hidden sm:inline">{t('header.logout')}</span>
-                    </button>
-                </div>
             </div>
 
             {nav?.length > 0 && (
-                <nav className={`${PAGE_WIDTH} flex gap-1 overflow-x-auto`}>
+                <nav className="lv-side-nav">
                     {nav.map((n) => (
                         <NavLink key={n.to} to={n.to}
                                  className={({ isActive }) =>
-                                     `flex items-center gap-1.5 px-3 py-3 text-sm font-semibold border-b-2 whitespace-nowrap ${
-                                         isActive ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-primary'}`}>
-                            <Icon name={n.icon} className="text-[18px]" /> {n.label}
+                                     `${linkBase} ${isActive ? 'bg-primary-container text-white' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={n.icon} className="text-[20px]" /> {n.label}
                             {n.badge > 0 && (
-                                <span className="ml-1 min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
+                                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
                                     {n.badge}
                                 </span>
                             )}
@@ -135,6 +106,41 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                     ))}
                 </nav>
             )}
+
+            <div className="lv-side-bottom">
+                {isOwner && (
+                    <Link
+                        to={vipStatus?.vip ? '/billing' : '/pricing'}
+                        title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
+                        className={`h-9 px-3 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
+                            vipStatus?.vip ? 'bg-white text-primary' : 'bg-white/10 text-white hover:bg-white hover:text-primary'
+                        }`}
+                    >
+                        <Icon name="workspace_premium" className="text-[16px]" />
+                        <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
+                    </Link>
+                )}
+                {userHome && (
+                    <Link to="/home" title={t('header.userHome')}
+                          className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold text-white/75 hover:text-white hover:bg-white/10">
+                        <Icon name="swap_horiz" className="text-[16px]" /><span>{t('header.userHome')}</span>
+                    </Link>
+                )}
+                <div className="flex items-center gap-2">
+                    <LanguageSwitch />
+                    {extra}
+                </div>
+                <div className="flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
+                    <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1">
+                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
+                        <span className="text-sm font-semibold text-white truncate">{user?.name}</span>
+                    </Link>
+                    <button type="button" onClick={handleLogout} title={t('header.logout')}
+                            className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10">
+                        <Icon name="logout" className="text-[18px]" />
+                    </button>
+                </div>
+            </div>
         </header>
     );
 }

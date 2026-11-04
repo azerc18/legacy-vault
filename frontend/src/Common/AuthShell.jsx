@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 export default function AuthShell({ children, className = '' }) {
-    const { t } = useTranslation();
+    const { t } = useTranslation('auth');
     return (
         <div className="min-h-screen font-body-md text-on-surface antialiased lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
             <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary text-white p-12">

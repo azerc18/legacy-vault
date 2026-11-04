@@ -27,5 +27,23 @@ button.bg-secondary.rounded-xl {
 
 /* Trang auth: trên màn rộng, logo đã nằm ở panel trái nên ẩn khối logo trùng bên phải */
 @media (min-width: 1024px) {
-  .lv-auth-form > div.mb-8.text-center:first-of-type { display: none; }
+  .lv-auth-form > div.mb-8.text-center { display: none; }
+}
+
+/* Thanh bên (AppHeader). Desktop: cố định bên trái 248px. Điện thoại: thanh ngang phía trên. */
+.lv-side { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; }
+.lv-side-top { padding: 4px 8px 12px; }
+.lv-side-nav { display: flex; flex-direction: column; gap: 4px; }
+.lv-side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.lv-side-bottom .material-symbols-outlined { color: inherit; }
+@media (min-width: 1024px) {
+  .lv-side { position: fixed; z-index: 30; top: 0; left: 0; bottom: 0; width: 248px; overflow-y: auto; }
+  body.lv-has-side #root { padding-left: 248px; }
+}
+@media (max-width: 1023px) {
+  .lv-side { position: sticky; top: 0; z-index: 30; gap: 6px; padding: 10px 14px; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .lv-side-top { padding: 0; }
+  .lv-side-nav { flex-direction: row; overflow-x: auto; order: 3; width: 100%; }
+  .lv-side-bottom { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; padding-top: 0; }
+  .lv-side-bottom > div:last-child { border-top: 0; padding-top: 0; }
 }
