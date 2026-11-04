@@ -1139,6 +1139,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         List<InheritanceDossierData.AssetLine> assets = digitalAssetRepository
                 .findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
                 .filter(a -> !hidden.contains(a.getId()))
+                // Thứ tự cố định giữa các lần tải PDF (findByVaultIdAndStatus không có ORDER BY)
+                .sorted(Comparator.comparing(DigitalAsset::getAssetName,
+                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(DigitalAsset::getId))
                 .map(a -> {
                     AssetAllocation al = mine.get(a.getId());   // null = chưa phân bổ riêng
                     return new InheritanceDossierData.AssetLine(

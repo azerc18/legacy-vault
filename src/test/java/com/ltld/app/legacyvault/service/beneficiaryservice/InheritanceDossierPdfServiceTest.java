@@ -78,8 +78,9 @@ class InheritanceDossierPdfServiceTest {
         var data = new InheritanceDossierData(d.vaultId(), d.vaultName(), d.unlockedAt(), d.claimDeadlineAt(),
                 d.owner(), d.beneficiary(), d.executor(), null, List.of(unallocated), List.of(), d.generatedAt());
 
-        String text = text(assertDoesNotThrow(() -> service.render(data)));
+        // Ô hẹp tự xuống dòng nên gộp khoảng trắng trước khi so khớp
+        String text = text(assertDoesNotThrow(() -> service.render(data))).replaceAll("\\s+", " ");
 
-        assertThat(text).contains("Tài khoản Gmail");
+        assertThat(text).contains("Tài khoản Gmail", "Chung cho mọi người thụ hưởng");
     }
 }

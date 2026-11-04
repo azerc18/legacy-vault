@@ -2583,14 +2583,15 @@ public class BeneficiaryServiceImplTest {
 
         InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId);
 
+        // Sắp theo tên (không phân biệt hoa thường) để thứ tự PDF ổn định
         assertThat(data.assets()).extracting(InheritanceDossierData.AssetLine::assetName)
-                .containsExactly("Vietcombank", "Gmail");
+                .containsExactly("Gmail", "Vietcombank");
         InheritanceDossierData.AssetLine first = data.assets().get(0);
-        assertThat(first.mode()).isEqualTo(AllocationMode.PROPORTIONAL);
-        assertThat(first.sharePercent()).isEqualByComparingTo("60.00");
+        assertThat(first.mode()).isNull();
+        assertThat(first.sharePercent()).isNull();
+        assertThat(first.viaFallback()).isFalse();
         InheritanceDossierData.AssetLine second = data.assets().get(1);
-        assertThat(second.mode()).isNull();
-        assertThat(second.sharePercent()).isNull();
-        assertThat(second.viaFallback()).isFalse();
+        assertThat(second.mode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(second.sharePercent()).isEqualByComparingTo("60.00");
     }
 }
