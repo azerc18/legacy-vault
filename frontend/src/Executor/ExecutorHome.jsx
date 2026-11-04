@@ -12,6 +12,8 @@ import {formatDate} from '../i18n/format.js';
 const EXECUTOR = 'EXECUTOR';
 // FR-07/FR-14: Owner chưa có tên thì hiện email
 const ownerName = (c) => c.ownerFullName || c.ownerEmail;
+// Chỉ nhấn mạnh (đỏ) khi đã quá hạn xác nhận hoặc còn từ 3 ngày trở xuống
+const URGENT_MS = 3 * 24 * 60 * 60 * 1000;
 
 function Icon({name, className = ''}) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -76,13 +78,16 @@ function CaseCard({c, busy, onAcknowledge}) {
                             {t(`request.${c.latestRequestStatus}`, c.latestRequestStatus)}
                         </p>
                     )}
-                    {c.acknowledgeDeadlineAt && (
-                        <p className="text-sm text-error font-semibold mt-1">
-                            {new Date(c.acknowledgeDeadlineAt) < new Date()
-                                ? t('home.ackOverdue', {date: formatDate(c.acknowledgeDeadlineAt)})
-                                : t('home.ackBefore', {date: formatDate(c.acknowledgeDeadlineAt)})}
-                        </p>
-                    )}
+                    {c.acknowledgeDeadlineAt && (() => {
+                        const msLeft = new Date(c.acknowledgeDeadlineAt) - new Date();
+                        return (
+                            <p className={`text-sm mt-1 ${msLeft <= URGENT_MS ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
+                                {msLeft < 0
+                                    ? t('home.ackOverdue', {date: formatDate(c.acknowledgeDeadlineAt)})
+                                    : t('home.ackBefore', {date: formatDate(c.acknowledgeDeadlineAt)})}
+                            </p>
+                        );
+                    })()}
                 </div>
                 <div className="flex gap-2">
                     {step === 0 && (
