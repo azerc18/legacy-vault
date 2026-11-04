@@ -10,7 +10,7 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  * @param bordered true = có khung viền nét đứt (dùng khi đứng một mình trên trang)
  */
 export default function EmptyState({ icon = 'inbox', title, text, action, compact = false, bordered = false }) {
-    const btn = 'mt-4 h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold inline-flex items-center gap-2 hover:opacity-90';
+    const btn = 'mt-4 h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold inline-flex items-center gap-2 hover:opacity-90 lv-pill';
     return (
         <div className={`flex flex-col items-center text-center ${compact ? 'py-6 px-4' : 'py-12 px-6'} ${
             bordered ? 'rounded-2xl border border-dashed border-outline-variant bg-surface-container-lowest' : ''}`}>

@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritanceDossierData;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
@@ -48,6 +49,8 @@ import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
@@ -138,6 +141,10 @@ public class BeneficiaryServiceImplTest {
     private JointConsensusService jointConsensusService;   // X1
     @Mock
     private ApplicationEventPublisher eventPublisher;   // N2-notify
+    @Mock
+    private DigitalSignatureRepository digitalSignatureRepository;   // getDossierData
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;   // getDossierData
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -2549,5 +2556,42 @@ public class BeneficiaryServiceImplTest {
 
         assertThat(response.getReassignedAssets()).isEqualTo(1);
         verify(eventPublisher, never()).publishEvent(any(AssetsReassignedEvent.class));
+    }
+
+    // ===================== Dossier PDF: Q47 (b) tài sản chưa phân bổ =====================
+
+    @Test
+    void getDossierData_includesUnallocatedAssets_andSkipsAssetsAllocatedToOthers() {
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        owner.setFullName("Chủ kho");
+        unlockedVault.setOwner(owner);
+        stubAccessibleVault();
+        stubViewSession(true);
+        DigitalAsset mine = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset unallocated = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        AssetAllocation alMine = AssetAllocation.builder().id(UUID.randomUUID()).asset(mine)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("60.00")).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(mine, unallocated, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(alMine));
+
+        InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId);
+
+        // Sắp theo tên (không phân biệt hoa thường) để thứ tự PDF ổn định
+        assertThat(data.assets()).extracting(InheritanceDossierData.AssetLine::assetName)
+                .containsExactly("Gmail", "Vietcombank");
+        InheritanceDossierData.AssetLine first = data.assets().get(0);
+        assertThat(first.mode()).isNull();
+        assertThat(first.sharePercent()).isNull();
+        assertThat(first.viaFallback()).isFalse();
+        InheritanceDossierData.AssetLine second = data.assets().get(1);
+        assertThat(second.mode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(second.sharePercent()).isEqualByComparingTo("60.00");
     }
 }

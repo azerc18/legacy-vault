@@ -38,6 +38,8 @@ export default function NotificationBell({ source = 'beneficiary' }) {
     const [serverUnread, setServerUnread] = useState(null);
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
+    const btnRef = useRef(null);
+    const [pos, setPos] = useState(null);
 
     // Tải lại mỗi lần mở để thấy thông báo mới mà không cần F5
     useEffect(() => {
@@ -51,6 +53,24 @@ export default function NotificationBell({ source = 'beneficiary' }) {
         const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
         document.addEventListener('mousedown', onClick);
         return () => document.removeEventListener('mousedown', onClick);
+    }, [open]);
+
+    // Dropdown dùng position: fixed để không bị cắt bởi thanh bên (overflow) và không tràn màn hình
+    useEffect(() => {
+        if (!open || !btnRef.current) return;
+        const place = () => {
+            const r = btnRef.current.getBoundingClientRect();
+            const W = 320, gap = 8, margin = 12;
+            const left = Math.max(margin, Math.min(r.right + gap, window.innerWidth - W - margin));
+            const belowFits = r.bottom + gap + 200 < window.innerHeight / 2 + 200 && r.top < window.innerHeight / 2;
+            setPos(belowFits
+                ? { left, top: r.bottom + gap, maxHeight: window.innerHeight - r.bottom - gap - margin }
+                : { left, bottom: window.innerHeight - r.bottom, maxHeight: r.bottom - margin });
+        };
+        place();
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
     }, [open]);
 
     const unread = serverUnread ?? items.filter((n) => !n.read).length;
@@ -68,7 +88,7 @@ export default function NotificationBell({ source = 'beneficiary' }) {
 
     return (
         <div className="relative" ref={ref}>
-            <button onClick={() => setOpen(!open)} className="relative w-10 h-10 rounded-xl border border-outline-variant flex items-center justify-center hover:bg-surface-container-low" aria-label="Notifications">
+            <button ref={btnRef} onClick={() => setOpen(!open)} className="relative w-10 h-10 rounded-xl border border-outline-variant flex items-center justify-center hover:bg-surface-container-low" aria-label="Notifications">
                 <span className="material-symbols-outlined text-[20px]">notifications</span>
                 {unread > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-error text-on-error text-[11px] font-bold flex items-center justify-center">
@@ -76,8 +96,8 @@ export default function NotificationBell({ source = 'beneficiary' }) {
                     </span>
                 )}
             </button>
-            {open && (
-                <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30">
+            {open && pos && (
+                <div style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30 lv-pop text-on-surface">
                     <p className="px-4 py-3 text-sm font-semibold border-b border-outline-variant/30">Notifications</p>
                     {items.length === 0 && <p className="px-4 py-6 text-sm text-on-surface-variant text-center">No notifications yet.</p>}
                     {items.map((n) => (

@@ -3,3 +3,76 @@ html, body {
   padding: 0;
   height: 100%;
 }
+
+/* Nền trang: xanh lạnh có vệt sáng nhẹ ở góc phải trên (theo bản thiết kế UI mới) */
+body {
+  background-color: #e2e6f1;
+  background-image: radial-gradient(1100px 520px at 88% -8%, rgba(160, 175, 235, 0.55), transparent 62%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Nút chính (nền navy) bo tròn dạng viên thuốc, giống bản thiết kế */
+.lv-pill { border-radius: 999px; }
+
+/* Thẻ nổi nhẹ hơn */
+.lv-rise { animation: lv-rise .5s ease both; }
+@keyframes lv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-rise { animation: none; } }
+
+/* Trang auth: trên màn rộng, logo đã nằm ở panel trái nên ẩn khối logo trùng bên phải */
+@media (min-width: 1024px) {
+  .lv-auth-logo { display: none; }
+}
+
+/* Thanh bên (AppHeader). Desktop: cố định bên trái 248px. Điện thoại: thanh ngang phía trên. */
+.lv-side { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; }
+.lv-side-top { padding: 4px 8px 12px; }
+.lv-side-nav { display: flex; flex-direction: column; gap: 4px; }
+.lv-side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.lv-side-bottom .material-symbols-outlined { color: inherit; }
+/* Dropdown thông báo nằm trong sidebar tối nhưng nền sáng: trả lại màu icon của chính nó */
+.lv-side-bottom .lv-pop .material-symbols-outlined.text-secondary { color: #3d5ae0; }
+@media (min-width: 1024px) {
+  .lv-side { position: fixed; z-index: 30; top: 0; left: 0; bottom: 0; width: 248px; overflow-y: auto; }
+  body.lv-has-side #root { padding-left: 248px; }
+}
+@media (max-width: 1023px) {
+  .lv-side { position: sticky; top: 0; z-index: 30; gap: 6px; padding: 10px 14px; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .lv-side-top { padding: 0; }
+  .lv-side-nav { flex-direction: row; overflow-x: auto; order: 3; width: 100%; }
+  .lv-side-bottom { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; padding-top: 0; }
+  .lv-side-bottom > div:last-child { border-top: 0; padding-top: 0; }
+}
+
+/* ===== Hiệu ứng trang chủ ===== */
+.lv-bg { background-color: #e2e6f1; transition: background-color .7s ease; }
+.lv-bg[data-mode="dark"] { background-color: #0b1020; }
+
+/* Hero: từng chữ hiện dần (mờ -> rõ), ánh sáng chạy qua chữ */
+.lv-word { animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both; }
+.lv-shine {
+  background-image: linear-gradient(100deg,#ffffff 0%,#b9c9ff 28%,#7f9dff 50%,#b9c9ff 72%,#ffffff 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both, lv-shine 6s linear infinite;
+}
+@keyframes lv-word { from { opacity: 0; filter: blur(14px); transform: translateY(18px); } to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes lv-shine { to { background-position: -200% 0; } }
+
+/* Cuộn tới thì hiện dần / dựng thẳng (chỉ chạy trên trình duyệt hỗ trợ scroll-driven animation) */
+@supports (animation-timeline: view()) {
+  .lv-reveal { animation: lv-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+  .lv-tilt { animation: lv-tilt linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; transform-origin: 50% 100%; }
+}
+@keyframes lv-reveal { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+@keyframes lv-tilt { from { transform: perspective(1200px) rotateX(24deg) scale(.9); opacity: .6; } to { transform: perspective(1200px) rotateX(0) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .lv-word, .lv-shine, .lv-reveal, .lv-tilt { animation: none !important; }
+  .lv-shine { background-position: 0 0; }
+}
+
+/* Thẻ nổi nhẹ như bản thiết kế; bảng và danh sách trong thẻ thoáng hơn */
+.bg-surface-container-lowest.rounded-2xl,
+.bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(11,16,32,.05), 0 12px 30px -18px rgba(11,16,32,.25); }
+table th { letter-spacing: .04em; }

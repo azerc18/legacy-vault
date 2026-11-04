@@ -49,7 +49,7 @@ export default function AdminAlerts() {
     const rows = data?.content ?? [];
     const tab = (s, label) => (
         <button onClick={() => switchTab(s)}
-                className={`px-4 h-10 rounded-xl text-sm font-semibold ${status === s ? 'bg-primary text-on-primary' : 'border border-outline-variant text-on-surface-variant'}`}>
+                className={`px-4 h-10 rounded-xl text-sm font-semibold ${status === s ? 'bg-primary text-on-primary' : 'border border-outline-variant text-on-surface-variant'} lv-pill`}>
             {label}
         </button>
     );

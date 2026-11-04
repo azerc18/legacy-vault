@@ -169,9 +169,10 @@ export default function ExecutorHome() {
             <AppHeader icon="badge" workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
-                <div className="mb-8">
+                <div className="mb-8 rounded-3xl bg-primary text-white px-8 py-9 lv-rise"
+                     style={{ backgroundImage: 'radial-gradient(700px 260px at 85% 0%, rgba(80,105,230,.45), transparent 70%)' }}>
                     <h1 className="font-headline-md text-headline-md">{t('home.welcome', {name: user.name})}</h1>
-                    <p className="mt-1 text-on-surface-variant">{t('home.intro')}</p>
+                    <p className="mt-1 text-white/75">{t('home.intro')}</p>
                 </div>
 
                 {error && <div
