@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
+import ClaimProgress from '../Common/ClaimProgress.jsx';
 import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
     ASSET_TYPE, DOCUMENT_TYPE, inputClass, btnPrimary, btnOutline,
@@ -19,11 +20,12 @@ export default function BeneficiaryVaultDetail() {
     const user = getUser();
 
     const [vault, setVault] = useState(null);       // BeneficiaryVaultSummaryResponse
-    const [stage, setStage] = useState('loading');  // loading | verify | content | claimed | expired | locked | error
+    const [stage, setStage] = useState('loading');  // loading | verify | content | claimed | declined | expired | locked | error
     const [message, setMessage] = useState('');
     const [assets, setAssets] = useState([]);
     const [documents, setDocuments] = useState([]);
     const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
+    const [progress, setProgress] = useState(null);   // ClaimProgressResponse (N2-notify)
 
     // Map lỗi BE -> trạng thái màn hình
     const handleAccessError = useCallback((err, fallback = 'Something went wrong.') => {
@@ -35,6 +37,12 @@ export default function BeneficiaryVaultDetail() {
         else { setMessage(msg); setStage((s) => (s === 'loading' ? 'error' : s)); }
     }, []);
 
+    // Tiến độ không bao giờ được chặn trang: lỗi (kể cả 409 sau khi đã đóng hồ sơ) thì chỉ ẩn khối này
+    const loadProgress = useCallback(async () => {
+        try { setProgress(await beneficiaryApi.getProgress(vaultId)); }
+        catch { setProgress(null); }
+    }, [vaultId]);
+
     // Thử tải nội dung. BE trả 403 khi chưa có phiên xem hợp lệ -> chuyển sang bước xác thực
     const loadContent = useCallback(async () => {
         try {
@@ -45,10 +53,11 @@ export default function BeneficiaryVaultDetail() {
             setAssets(a);
             setDocuments(d);
             setStage('content');
+            loadProgress();
         } catch (err) {
             handleAccessError(err);
         }
-    }, [vaultId, handleAccessError]);
+    }, [vaultId, handleAccessError, loadProgress]);
 
     useEffect(() => {
         (async () => {
@@ -57,7 +66,8 @@ export default function BeneficiaryVaultDetail() {
                 const v = list.find((x) => x.vaultId === vaultId);
                 if (!v) { setStage('error'); setMessage('Vault not found or not assigned to you.'); return; }
                 setVault(v);
-                if (v.vaultStatus === 'CLAIMED' || v.claimStatus === 'CLAIMED') setStage('claimed');
+                if (v.myStatus === 'DECLINED' || v.myStatus === 'WAIVED') setStage('declined');
+                else if (v.vaultStatus === 'CLAIMED' || v.claimStatus === 'CLAIMED') setStage('claimed');
                 else if (v.vaultStatus === 'ARCHIVED_LOCKED' || v.claimStatus === 'EXPIRED') setStage('expired');
                 else await loadContent();
             } catch (err) {
@@ -75,7 +85,7 @@ export default function BeneficiaryVaultDetail() {
             title={vault?.vaultName || 'Vault'}
             subtitle={vault ? `From ${vault.ownerName || 'Unknown owner'} · claim before ${formatDate(vault.claimDeadlineAt)}` : ''}
         >
-            {vault && <div className="mb-6"><StatusBadge vaultStatus={vault.vaultStatus} claimStatus={vault.claimStatus} /></div>}
+            {vault && <div className="mb-6"><StatusBadge vaultStatus={vault.vaultStatus} claimStatus={vault.claimStatus} myStatus={vault.myStatus} /></div>}
             <Link to="/beneficiary/guide" className="inline-flex items-center gap-1 text-sm text-primary font-semibold mb-6">
                 <Icon name="menu_book" className="text-[18px]" /> Not sure what to do next? Read the guide
             </Link>
@@ -87,6 +97,14 @@ export default function BeneficiaryVaultDetail() {
             {stage === 'claimed' && (
                 <Alert type="success">
                     You have already received this vault{vault?.claimedAt ? ` on ${formatDate(vault.claimedAt, true)}` : ''}. Its content is no longer available.
+                </Alert>
+            )}
+            {stage === 'declined' && (
+                <Alert type="info">
+                    {vault?.myStatus === 'WAIVED'
+                        ? 'Your share of this vault was waived by an administrator.'
+                        : 'You declined your share of this vault.'}
+                    {' '}Its content is no longer available to you.
                 </Alert>
             )}
 
@@ -104,6 +122,14 @@ export default function BeneficiaryVaultDetail() {
                         <Alert type="info">Verified. Your viewing session is valid until {formatDate(sessionExpiresAt, true)}.</Alert>
                     )}
                     {message && <Alert>{message}</Alert>}
+                    <RespondClaim
+                        vaultId={vaultId}
+                        myStatus={progress?.myStatus ?? vault?.myStatus}
+                        onAccepted={() => { setVault((v) => ({ ...v, myStatus: 'ACCEPTED' })); loadProgress(); }}
+                        onDeclined={() => { setVault((v) => ({ ...v, myStatus: 'DECLINED' })); setProgress(null); setStage('declined'); }}
+                        onError={(e) => handleAccessError(e)}
+                    />
+                    <ProgressPanel progress={progress} />
                     <AssetList vaultId={vaultId} assets={assets} onError={(e) => handleAccessError(e)} />
                     <DocumentList vaultId={vaultId} documents={documents} onError={(e) => handleAccessError(e)} />
                     <DossierCard vaultId={vaultId} onError={(e) => handleAccessError(e)} />
@@ -586,6 +612,106 @@ function CloseVault({ vaultId, onClosed, onError }) {
                         </>
                     )}
                 </div>
+            )}
+        </section>
+    );
+}
+
+/* ---------- N2b: phản hồi phần được chia (Accept / Decline) ---------- */
+function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
+    const [confirming, setConfirming] = useState(false);
+    const [reason, setReason] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Đã Accept thì không Decline được nữa (BE trả 409), nên chỉ hiện trạng thái
+    if (myStatus === 'ACCEPTED') {
+        return <Alert type="success">You have accepted your share of this vault.</Alert>;
+    }
+
+    const run = async (action) => {
+        setError(''); setLoading(true);
+        try { await action(); }
+        catch (err) {
+            if (err.response?.status === 403) return onError(err);   // phiên xem hết hạn -> quay lại bước xác thực
+            setError(getErrorMessage(err, 'Could not send your response.'));
+        } finally { setLoading(false); }
+    };
+    const accept = () => run(async () => { await beneficiaryApi.acceptClaim(vaultId); onAccepted(); });
+    const decline = () => run(async () => { onDeclined(await beneficiaryApi.declineClaim(vaultId, reason.trim())); });
+
+    return (
+        <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
+            <h2 className="font-title-lg text-title-lg">Your response</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">
+                Accept to confirm you will receive your share. Declining cannot be undone: your share is passed to
+                the backup beneficiary, if the owner named one.
+            </p>
+            <div className="mt-4"><Alert>{error}</Alert></div>
+            {!confirming ? (
+                <div className="flex gap-3">
+                    <button onClick={accept} disabled={loading} className={btnPrimary}>{loading ? 'Sending...' : 'Accept'}</button>
+                    <button onClick={() => setConfirming(true)} disabled={loading} className={btnOutline}>Decline</button>
+                </div>
+            ) : (
+                <div>
+                    <label className="block text-sm font-semibold mb-1" htmlFor="decline-reason">Reason (optional)</label>
+                    <textarea
+                        id="decline-reason" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)}
+                        className="w-full min-h-[80px] px-4 py-3 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                    <div className="mt-4 flex gap-3">
+                        <button onClick={() => setConfirming(false)} disabled={loading} className={btnOutline}>Cancel</button>
+                        <button onClick={decline} disabled={loading} className={btnPrimary}>{loading ? 'Declining...' : 'Confirm decline'}</button>
+                    </div>
+                </div>
+            )}
+        </section>
+    );
+}
+
+/* ---------- N2-notify: tiến độ phần của mình ---------- */
+const MODE_LABEL = { EXCLUSIVE: 'Yours alone', PROPORTIONAL: 'Shared', JOINT_CONSENSUS: 'Joint approval' };
+
+function ProgressPanel({ progress }) {
+    if (!progress) return null;
+    return (
+        <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
+            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Handover progress</h2>
+            <ClaimProgress accepted={progress.acceptedBeneficiaries} required={progress.totalBeneficiaries} status={progress.vaultStatus} />
+            <p className="mt-3 text-sm text-on-surface-variant">
+                {progress.closedBeneficiaries} of {progress.totalBeneficiaries} beneficiaries have closed their share
+                {progress.declinedBeneficiaries > 0 && ` · ${progress.declinedBeneficiaries} declined`}
+            </p>
+            <p className="mt-4 text-sm">
+                Viewed <b>{progress.viewedAssets}</b> of <b>{progress.totalAssets}</b> of your assets.
+            </p>
+            {progress.assets.length > 0 && (
+                <ul className="mt-3 divide-y divide-outline-variant/30">
+                    {progress.assets.map((a) => {
+                        const t = ASSET_TYPE[a.assetType] || ASSET_TYPE.OTHER;
+                        return (
+                            <li key={a.assetId} className="flex flex-wrap items-center gap-2 py-3">
+                                <Icon name={t.icon} className="text-primary text-[20px]" />
+                                <span className="font-semibold mr-2">{a.assetName}</span>
+                                {a.allocationMode && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container">
+                                        {MODE_LABEL[a.allocationMode] || a.allocationMode}
+                                        {a.allocationMode === 'PROPORTIONAL' && a.sharePercent != null && ` · ${a.sharePercent}%`}
+                                    </span>
+                                )}
+                                {a.reassignedToMe && (
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-warning-container text-on-warning-container">
+                                        Reassigned to you
+                                    </span>
+                                )}
+                                <span className={`ml-auto text-xs font-semibold ${a.viewed ? 'text-primary' : 'text-outline'}`}>
+                                    {a.viewed ? 'Viewed' : 'Not viewed'}
+                                </span>
+                            </li>
+                        );
+                    })}
+                </ul>
             )}
         </section>
     );
