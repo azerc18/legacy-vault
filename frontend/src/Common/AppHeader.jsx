@@ -160,7 +160,7 @@ export function PageTitle({ back, title, subtitle, right, className = 'mb-8' ,})
             )}
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <h1 className="font-headline-md text-headline-md break-words">{title}</h1>
+                    <h1 className="font-headline-md text-[30px] md:text-[34px] leading-tight font-bold tracking-tight break-words">{title}</h1>
                     {subtitle && <p className="mt-1 text-on-surface-variant">{subtitle}</p>}
                 </div>
                 {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}

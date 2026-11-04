@@ -74,3 +74,9 @@ button.bg-secondary.rounded-xl {
   .lv-word, .lv-shine, .lv-reveal, .lv-tilt { animation: none !important; }
   .lv-shine { background-position: 0 0; }
 }
+
+/* Thẻ nổi nhẹ như bản thiết kế; bảng và danh sách trong thẻ thoáng hơn */
+.bg-surface-container-lowest.rounded-2xl,
+.bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(11,16,32,.05), 0 12px 30px -18px rgba(11,16,32,.25); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+table th { letter-spacing: .04em; }
