@@ -65,7 +65,7 @@ export default function AdminAuditLogs() {
                 <input type="datetime-local" value={filters.from} onChange={set('from')} className={inputClass} title={t('audit.from')} />
                 <input type="datetime-local" value={filters.to} onChange={set('to')} className={inputClass} title={t('audit.to')} />
                 <div className="flex gap-2">
-                    <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center gap-2">
+                    <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center gap-2 lv-pill">
                         <Icon name="search" className="text-[18px]" /> {t('search')}
                     </button>
                     <button type="button" onClick={reset} className="h-11 px-3 rounded-xl border border-outline-variant text-sm font-semibold">{t('reset')}</button>

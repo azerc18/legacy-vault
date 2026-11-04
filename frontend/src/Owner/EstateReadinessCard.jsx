@@ -7,20 +7,20 @@ import { Icon } from './ownerUi.jsx';
 // Nhãn hạng lấy từ readiness.json: grade.<GRADE>
 const GRADE_META = {
     EXCELLENT: {
-        badgeCls: 'bg-success-container text-on-success-container',
-        strokeCls: 'text-primary',
+        badgeCls: 'bg-[#8ee9b0]/20 text-[#8ee9b0]',
+        strokeCls: 'text-[#8ee9b0]',
     },
     GOOD: {
-        badgeCls: 'bg-secondary-fixed text-on-secondary-fixed',
-        strokeCls: 'text-primary',
+        badgeCls: 'bg-[#b9c9ff]/20 text-[#b9c9ff]',
+        strokeCls: 'text-[#8fa8ff]',
     },
     FAIR: {
-        badgeCls: 'bg-warning-container text-on-warning-container',
-        strokeCls: 'text-amber-600',
+        badgeCls: 'bg-[#ffd27a]/20 text-[#ffd27a]',
+        strokeCls: 'text-[#ffd27a]',
     },
     AT_RISK: {
-        badgeCls: 'bg-error-container text-on-error-container',
-        strokeCls: 'text-error',
+        badgeCls: 'bg-[#ffb4ab]/20 text-[#ffb4ab]',
+        strokeCls: 'text-[#ffb4ab]',
     },
 };
 
@@ -58,7 +58,8 @@ export default function EstateReadinessCard() {
     const visibleItems = expanded ? items : pendingItems.slice(0, 3);
 
     return (
-        <div className="mb-6 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
+        <div className="mb-6 rounded-3xl p-7 text-white bg-primary lv-rise"
+             style={{ backgroundImage: 'radial-gradient(700px 300px at 15% 0%, rgba(61,90,224,.45), transparent 70%)' }}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
                     <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
@@ -70,7 +71,7 @@ export default function EstateReadinessCard() {
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth="8"
-                                className="text-surface-container-high"
+                                className="text-white/15"
                             />
                             <circle
                                 cx="44"
@@ -87,7 +88,7 @@ export default function EstateReadinessCard() {
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="font-headline-sm text-headline-sm leading-none">{score}</span>
-                            <span className="text-[11px] text-on-surface-variant">{t('outOf', { max: maxScore })}</span>
+                            <span className="text-[11px] text-white/60">{t('outOf', { max: maxScore })}</span>
                         </div>
                     </div>
 
@@ -98,7 +99,7 @@ export default function EstateReadinessCard() {
                                 {t(`grade.${grade}`)}
                             </span>
                         </div>
-                        <p className="mt-1 text-sm text-on-surface-variant">
+                        <p className="mt-1 text-sm text-white/70">
                             {t('progress', { completed: readiness.completedItems, count: readiness.totalItems })}{' '}
                             {pendingItems.length > 0 ? t('pendingHint') : t('doneHint')}
                         </p>
@@ -108,7 +109,7 @@ export default function EstateReadinessCard() {
                 <button
                     type="button"
                     onClick={() => setExpanded((prev) => !prev)}
-                    className="self-start md:self-center shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-outline-variant text-xs font-label-lg text-on-surface hover:bg-surface-container-low"
+                    className="self-start md:self-center shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/30 text-xs font-label-lg text-white hover:bg-white/10"
                 >
                     <Icon name={expanded ? 'expand_less' : 'checklist'} className="text-[16px]" />
                     {expanded ? t('showFewer') : t('viewAll', { count: items.length })}
@@ -116,32 +117,32 @@ export default function EstateReadinessCard() {
             </div>
 
             {visibleItems.length > 0 && (
-                <div className="mt-5 pt-4 border-t border-outline-variant/20 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="mt-5 pt-4 border-t border-white/15 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {visibleItems.map((item) => (
                         <div
                             key={item.key}
                             className={`p-3.5 rounded-xl border flex flex-col justify-between gap-2 ${
                                 item.done
-                                    ? 'bg-surface-container-low/50 border-outline-variant/20'
-                                    : 'bg-surface border-outline-variant/40'
+                                    ? 'bg-white/5 border-white/10'
+                                    : 'bg-white/10 border-white/20'
                             }`}
                         >
                             <div className="flex items-start gap-2.5">
                                 <Icon
                                     name={item.done ? 'check_circle' : 'radio_button_unchecked'}
                                     className={`text-[18px] mt-0.5 ${
-                                        item.done ? 'text-primary' : 'text-on-surface-variant'
+                                        item.done ? 'text-[#8ee9b0]' : 'text-white/60'
                                     }`}
                                 />
                                 <div className="min-w-0 flex-1">
                                     <p
                                         className={`text-xs font-medium leading-snug ${
-                                            item.done ? 'text-on-surface-variant line-through' : 'text-on-surface'
+                                            item.done ? 'text-white/50 line-through' : 'text-white'
                                         }`}
                                     >
                                         {t(item.titleKey, { defaultValue: item.title })}
                                     </p>
-                                    <span className="inline-block mt-1 text-[11px] font-semibold text-primary">
+                                    <span className="inline-block mt-1 text-[11px] font-semibold text-[#b9c9ff]">
                                         {t('points', { count: item.points })}
                                     </span>
                                 </div>
@@ -151,7 +152,7 @@ export default function EstateReadinessCard() {
                                 <div className="flex justify-end">
                                     <Link
                                         to={item.fixUrl}
-                                        className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                        className="inline-flex items-center gap-1 text-xs font-semibold text-[#b9c9ff] hover:underline"
                                     >
                                         {t('fixNow')}
                                         <Icon name="arrow_forward" className="text-[14px]" />

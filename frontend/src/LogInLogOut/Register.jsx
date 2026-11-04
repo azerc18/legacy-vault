@@ -1,3 +1,4 @@
+import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
@@ -60,7 +61,7 @@ export default function Register() {
     };
 
     return (
-        <div className="bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4 py-8">
+        <AuthShell>
             {/* Brand Header */}
             <div className="mb-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
@@ -132,7 +133,7 @@ export default function Register() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 mt-3 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full h-12 mt-3 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed lv-pill"
                     >
                         <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
                         {loading ? t('register.submitting') : t('register.submit')}
@@ -148,6 +149,6 @@ export default function Register() {
                     </p>
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }

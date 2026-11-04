@@ -1,3 +1,4 @@
+import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { authApi } from '../api/authApi.js';
@@ -64,7 +65,7 @@ export default function Login() {
             }
             await finishLogin(res.accessToken);
         } catch (err) {
-            getErrorMessage(err, t('login.errors.failed'));
+            setError(getErrorMessage(err, t('login.errors.failed')));
             // 403 = chưa xác thực email hoặc tài khoản bị khoá
             if (err.response?.status === 403) setNeedVerify(true);
         } finally {
@@ -91,10 +92,10 @@ export default function Login() {
     };
 
     return (
-        <div className="relative bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4">
+        <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
-            <div className="mb-8 text-center">
+            <div className="mb-8 text-center lv-auth-logo">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
                     <span className="material-symbols-outlined text-[28px]">shield_locked</span>
                 </div>
@@ -160,7 +161,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
+                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">login</span>
                             {loading ? t('login.submitting') : t('login.submit')}
@@ -190,7 +191,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
+                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">verified_user</span>
                             {loading ? t('mfa.verifying') : t('mfa.verify')}
@@ -226,6 +227,6 @@ export default function Login() {
                 <span className="material-symbols-outlined text-[16px]">lock</span>
                 <span>{t('brand.footer')}</span>
             </div>
-        </div>
+        </AuthShell>
     );
 }

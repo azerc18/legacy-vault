@@ -26,13 +26,17 @@ export const DOCUMENT_TYPE = {
 };
 
 // Gộp VaultStatus + ClaimStatus thành 1 nhãn dễ hiểu
-export function StatusBadge({ vaultStatus, claimStatus }) {
+export function StatusBadge({ vaultStatus, claimStatus, myStatus }) {
     let label = 'Ready to claim';
     let cls = 'bg-secondary-fixed text-on-secondary-fixed';
-    if (vaultStatus === 'CLAIMED' || claimStatus === 'CLAIMED') {
+    if (myStatus === 'DECLINED' || myStatus === 'WAIVED') {
+        label = myStatus === 'WAIVED' ? 'Waived' : 'Declined'; cls = 'bg-surface-container text-outline';
+    } else if (vaultStatus === 'CLAIMED' || claimStatus === 'CLAIMED') {
         label = 'Claimed'; cls = 'bg-success-container text-on-success-container';
     } else if (vaultStatus === 'ARCHIVED_LOCKED' || claimStatus === 'EXPIRED') {
         label = 'Expired'; cls = 'bg-surface-container text-outline';
+    } else if (myStatus === 'ACCEPTED') {
+        label = 'Accepted'; cls = 'bg-secondary-fixed text-on-secondary-fixed';
     } else if (claimStatus === 'PENDING') {
         label = 'In progress'; cls = 'bg-warning-container text-on-warning-container';
     }
@@ -53,7 +57,7 @@ export function Alert({ type = 'error', children }) {
 export const inputClass =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 export const btnPrimary =
-    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed';
+    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
 export const btnOutline =
     'h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 

@@ -33,6 +33,10 @@ public class DmsCheckin {
     @Column(length = 20)
     private NotificationChannel channel;
 
+    // F2: jti của one-time check-in JWT token (chỉ dùng 1 lần)
+    @Column(name = "token_jti", length = 100, unique = true)
+    private String tokenJti;
+
     @Column(name = "occurred_at", nullable = false, updatable = false)
     private LocalDateTime occurredAt;
 }

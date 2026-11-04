@@ -126,4 +126,34 @@ class OwnerActivityLogControllerTest {
                 eq(Instant.parse("2026-09-01T00:00:00Z")), eq(Instant.parse("2026-10-01T00:00:00Z")),
                 eq(PageRequest.of(2, 100)));
     }
+    @Test
+    void getEstateAccessLogs_defaults_returns200WithOwnerIdFromJwt() throws Exception {
+        when(ownerActivityLogService.getEstateAccessLogs(any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get(URL + "/access").with(token("ROLE_OWNER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(ownerActivityLogService).getEstateAccessLogs(
+                eq(ownerId), isNull(), isNull(), eq(PageRequest.of(0, 20)));
+    }
+
+    @Test
+    void getEstateAccessLogs_withParams_passesDatesAndPaging() throws Exception {
+        when(ownerActivityLogService.getEstateAccessLogs(any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        mockMvc.perform(get(URL + "/access")
+                        .param("startDate", "2026-09-01T00:00:00Z")
+                        .param("endDate", "2026-10-01T00:00:00Z")
+                        .param("page", "1")
+                        .param("size", "50")
+                        .with(token("ROLE_OWNER")))
+                .andExpect(status().isOk());
+
+        verify(ownerActivityLogService).getEstateAccessLogs(eq(ownerId),
+                eq(Instant.parse("2026-09-01T00:00:00Z")), eq(Instant.parse("2026-10-01T00:00:00Z")),
+                eq(PageRequest.of(1, 50)));
+    }
 }

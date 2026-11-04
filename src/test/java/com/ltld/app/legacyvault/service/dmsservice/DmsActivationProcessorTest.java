@@ -750,12 +750,26 @@ class DmsActivationProcessorTest {
     void activationMessage_withoutOwnerName_doesNotPrintNull() {
         User owner = User.builder().id(ownerId).email("owner@example.test").build();
 
-        String content = DmsActivationProcessor.activationMessage(owner, backup);
+        String content = DmsActivationProcessor.activationMessage(owner, backup, 14);
 
         assertThat(content)
                 .contains("The Dead Man's Switch of owner@example.test has been triggered")
-                .contains("Backup executor")
+                .contains("You are the Backup executor")
                 .contains(backup.getId().toString())
                 .doesNotContain("null");
+    }
+
+    // BR-03 chỉ leo thang Primary: chỉ Primary thấy hạn và câu "chuyển sang Backup"
+    @Test
+    void activationMessage_onlyPrimaryGetsDeadline() {
+        User owner = User.builder().id(ownerId).email("owner@example.test").build();
+
+        assertThat(DmsActivationProcessor.activationMessage(owner, primary, 14))
+                .contains("You are the Primary executor")
+                .contains("within 14 days")
+                .contains("may pass to the Backup executor");
+        assertThat(DmsActivationProcessor.activationMessage(owner, backup, 14))
+                .doesNotContain("within")
+                .doesNotContain("may pass to");
     }
 }

@@ -70,6 +70,26 @@ public class EmailSender {
                 ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
     }
 
+    /**
+     * N2-notify: báo cho người nhận thay khi một phần tài sản được chuyển sang họ
+     * (người chính từ chối hoặc không phản hồi kịp). Không nêu danh tính người kia.
+     */
+    @Async
+    public void sendAssetsReassignedNotice(String email, String fullName, String ownerName, String vaultName,
+                                           int assetCount, boolean noResponse, UUID vaultId) {
+        StringBuilder body = new StringBuilder()
+                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
+                .append(assetCount).append(" asset(s) in the vault \"").append(vaultName).append("\" of ")
+                .append(ownerName).append(" have been reassigned to you because another beneficiary ")
+                .append(noResponse ? "did not respond in time" : "declined their share").append(".\n\n");
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            body.append("Open the vault: ").append(link).append("\n\n");
+        }
+        body.append("Please sign in, verify your identity, then view and confirm receipt of the assets allocated to you.");
+        sendWithoutOtpFooter(email, "Assets reassigned to you - LegacyVault", body.toString());
+    }
+
     // FR-02 (bước 7): xác nhận cho Owner
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
@@ -212,12 +232,27 @@ public class EmailSender {
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount) {
+        sendDmsCheckinReminder(email, checkinDueAt, triggerAt, reminderNumber, reminderCount, null);
+    }
+
+    /**
+     * F2: nhắc Owner check-in kèm link một chạm tới trang FE /dms/checkin; mở link chỉ hiện trang,
+     * Owner bấm nút "I'm OK" thì mới check-in. checkinToken null/rỗng -> mail như cũ, không kèm link.
+     */
+    public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
+                                       int reminderNumber, int reminderCount, String checkinToken) {
+        String base = frontendBase();
+        String linkSection = (base != null && checkinToken != null && !checkinToken.isBlank())
+                ? "\n\nStill here? Open this link and press \"I'm OK\" to check in without signing in: "
+                        + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8)
+                : "";
         sendWithoutOtpFooter(email,
                 "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
                 "You have not checked in to your Dead Man's Switch on LegacyVault."
                         + "\nCheck-in deadline: " + formatDeadline(checkinDueAt) + " (Vietnam time)"
                         + "\nIf you do not respond, the system will start the handover process at "
                         + formatDeadline(triggerAt) + " (Vietnam time) and notify your Digital Executor."
+                        + linkSection
                         + "\n\nTo check in, sign in to LegacyVault and choose \"Check-in\" in the Dead Man's Switch settings."
                         + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
     }

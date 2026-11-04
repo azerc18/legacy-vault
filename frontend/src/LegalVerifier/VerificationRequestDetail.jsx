@@ -408,7 +408,7 @@ export default function VerificationRequestDetail() {
                                 <button
                                     onClick={askApprove}
                                     disabled={busy || !canApprove}
-                                    className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
+                                    className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
                                 >
                                     {t('detail.approveRequest')}
                                 </button>
@@ -428,7 +428,7 @@ export default function VerificationRequestDetail() {
                                     <button
                                         onClick={handleSendCode}
                                         disabled={busy}
-                                        className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
+                                        className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
                                     >
                                         {busy ? t('detail.sendingCode') : t('detail.sendCode')}
                                     </button>
@@ -456,7 +456,7 @@ export default function VerificationRequestDetail() {
                                         <button
                                             type="submit"
                                             disabled={busy}
-                                            className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50"
+                                            className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
                                         >
                                             {t('detail.signUnlock')}
                                         </button>

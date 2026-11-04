@@ -58,6 +58,9 @@ public class DmsActivationProcessor {
     private static final String MSG_EXECUTOR_ACTIVATED =
             "The Dead Man's Switch of %s has been triggered. You are the %s executor.%n"
                     + "Please sign in to LegacyVault and acknowledge this notice (code: %s).";
+    // BR-03 chỉ áp dụng cho Primary: không xác nhận đúng hạn thì quyền chuyển sang Backup
+    private static final String MSG_PRIMARY_DEADLINE =
+            "%nAcknowledge within %d days; otherwise the role may pass to the Backup executor.";
 
     // B6: báo Admin khi DMS kích hoạt mà Owner không có Executor khả dụng. Tham số: Owner, mã DmsConfig.
     private static final String MSG_ADMIN_NO_EXECUTOR =
@@ -355,7 +358,7 @@ public class DmsActivationProcessor {
     }
 
     private void notifyActivated(DmsConfig config, ExecutorAssignment assignment, LocalDateTime now) {
-        sendNotification(assignment.getExecutorUser(), config.getId(), activationMessage(config.getOwner(), assignment), now);
+        sendNotification(assignment.getExecutorUser(), config.getId(), activationMessage(config.getOwner(), assignment, config.getBackupActivationWaitDays()), now);
         audit(AuditAction.EXECUTOR_ACTIVATED, ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId(),
                 ownerDetail(config.getOwner().getId()) + ", executorType=" + assignment.getExecutorType());
     }
@@ -389,9 +392,12 @@ public class DmsActivationProcessor {
     }
 
     // Nội dung lưu vào Notification.content nên lần gửi lại dùng đúng nội dung này.
-    static String activationMessage(User owner, ExecutorAssignment assignment) {
-        String executorType = assignment.getExecutorType() == ExecutorType.PRIMARY ? "Primary" : "Backup";
-        return String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel(owner), executorType, assignment.getId());
+    // FR-07/FR-14: Primary được ghi rõ hạn xác nhận (BR-03, mặc định 14 ngày); Backup không bị leo thang nên không có hạn.
+    static String activationMessage(User owner, ExecutorAssignment assignment, int waitDays) {
+        boolean primary = assignment.getExecutorType() == ExecutorType.PRIMARY;
+        String message = String.format(MSG_EXECUTOR_ACTIVATED, ownerLabel(owner), primary ? "Primary" : "Backup",
+                assignment.getId());
+        return primary ? message + String.format(MSG_PRIMARY_DEADLINE, waitDays) : message;
     }
 
     private static String ownerLabel(User owner) {

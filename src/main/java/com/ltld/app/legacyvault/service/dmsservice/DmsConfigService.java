@@ -29,6 +29,14 @@ public interface DmsConfigService {
     DmsConfigResponse checkIn(UUID ownerId);
 
     /**
+     * F2: Owner check-in từ link trong email nhắc (không đăng nhập); cùng luật chu kỳ với {@link #checkIn(UUID)}.
+     * Khóa DmsConfig rồi mới kiểm tokenJti chưa dùng và token thuộc chu kỳ hiện tại
+     * ({@code tokenCycle} = lastCheckinAt lúc sinh token, epoch giây UTC; null = chưa từng check-in).
+     * Lỗi -> {@link com.ltld.app.legacyvault.exception.DmsCheckinLinkException} kèm reason cho trang FE.
+     */
+    DmsConfigResponse checkInFromEmailLink(UUID ownerId, String tokenJti, Long tokenCycle);
+
+    /**
      * Chặn thao tác của Owner khi DMS đã kích hoạt quy trình bàn giao (TRIGGERED) -> DmsException 409.
      * Dùng ở ĐẦU các thao tác của Owner bị cấm sau khi DMS kích hoạt (FR-02/FR-04/FR-27). Hàm khóa DmsConfig
      * (PESSIMISTIC_FORCE_INCREMENT) để không chạy đua với trigger FR-07. Nơi gọi PHẢI đang trong transaction

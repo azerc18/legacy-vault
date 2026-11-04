@@ -35,7 +35,8 @@ async function downloadBlob(url, fallbackName) {
 
 export const executorApi = {
     // B1: các assignment chưa REVOKED của người đang đăng nhập
-    // -> [{ assignmentId, ownerFullName, executorType, status, assignedAt, activatedAt, acknowledgedAt }]
+    // -> [{ assignmentId, ownerFullName, ownerEmail, executorType, status, assignedAt, activatedAt, acknowledgedAt,
+    //      vaultCount, latestRequestStatus, unreadMessageCount, acknowledgeDeadlineAt (chỉ khi ACTIVE và chưa xác nhận) }]
     listMine: () => http.get(`${BASE}/me`).then((r) => unwrap(r) ?? []),
 
     // FR-07: xác nhận đã nhận thông báo kích hoạt -> { id, executorType, status, activatedAt, acknowledgedAt }
@@ -92,6 +93,11 @@ export const executorApi = {
     // N2-exec: nhắc một người chưa phản hồi (1 lần/24h, 429 REMINDER_TOO_SOON) -> dòng tiến độ mới
     remindBeneficiary: (assignmentId, vaultId, vaultBeneficiaryId) =>
         http.post(`${BASE}/${assignmentId}/vaults/${vaultId}/beneficiaries/${vaultBeneficiaryId}/reminders`).then(unwrap),
+    // F5: checklist xử lý tài khoản số theo di nguyện
+    // -> [{ id, vaultId, vaultName, assetType, platform, accountHandle, wish, status, note, helpUrl, updatedAt, completedAt }]
+    getTasks: (assignmentId) => http.get(`${BASE}/${assignmentId}/tasks`).then((r) => unwrap(r) ?? []),
+    // F5: { status: TODO | DOING | DONE, note } -> task đã cập nhật
+    updateTask: (assignmentId, taskId, body) => http.patch(`${BASE}/${assignmentId}/tasks/${taskId}`, body).then(unwrap),
     // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,
@@ -126,19 +132,20 @@ export function caseStep(assignment, progress = []) {
     return 3;
 }
 
-export const HANDOVER_LABEL = {
-    PENDING: { label: 'Waiting for verifier', cls: 'bg-warning-container text-on-warning-container' },
-    VERIFIED: { label: 'Approved, awaiting signature', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
-    REJECTED: { label: 'Rejected', cls: 'bg-error-container text-on-error-container' },
-    UNLOCKED: { label: 'Unlocked for beneficiary', cls: 'bg-success-container text-on-success-container' },
-    CLAIMED: { label: 'Received by beneficiary', cls: 'bg-success-container text-on-success-container' },
-    ARCHIVED_LOCKED: { label: 'Expired', cls: 'bg-surface-container text-outline' },
+// Màu nhãn trạng thái bàn giao; chữ nằm trong executor.json -> handover
+export const HANDOVER_CLASS = {
+    PENDING: 'bg-warning-container text-on-warning-container',
+    VERIFIED: 'bg-secondary-fixed text-on-secondary-fixed',
+    REJECTED: 'bg-error-container text-on-error-container',
+    UNLOCKED: 'bg-success-container text-on-success-container',
+    CLAIMED: 'bg-success-container text-on-success-container',
+    ARCHIVED_LOCKED: 'bg-surface-container text-outline',
 };
 
-// N2-exec: trạng thái nhận tài sản của từng người thụ hưởng
-export const CLAIM_PROGRESS_LABEL = {
-    PENDING: { label: 'Waiting for response', cls: 'bg-warning-container text-on-warning-container' },
-    ACCEPTED: { label: 'Accepted', cls: 'bg-success-container text-on-success-container' },
-    DECLINED: { label: 'Declined', cls: 'bg-error-container text-on-error-container' },
-    FALLBACK_APPLIED: { label: 'Declined - passed to backup', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
+// N2-exec: màu trạng thái nhận tài sản; chữ nằm trong executor.json -> claim
+export const CLAIM_PROGRESS_CLASS = {
+    PENDING: 'bg-warning-container text-on-warning-container',
+    ACCEPTED: 'bg-success-container text-on-success-container',
+    DECLINED: 'bg-error-container text-on-error-container',
+    FALLBACK_APPLIED: 'bg-secondary-fixed text-on-secondary-fixed',
 };

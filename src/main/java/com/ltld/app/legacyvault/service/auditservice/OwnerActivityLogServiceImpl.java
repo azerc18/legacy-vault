@@ -38,4 +38,22 @@ public class OwnerActivityLogServiceImpl implements OwnerActivityLogService {
 
         return logs.map(log -> descriptionBuilder.toResponse(log, ownerId));
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<VaultActivityLogResponse> getEstateAccessLogs(UUID ownerId, Instant startDate, Instant endDate, Pageable pageable) {
+        Instant to = endDate != null ? endDate : Instant.now();
+        Instant from = startDate != null ? startDate : Instant.EPOCH;
+        if (from.isAfter(to)) throw new DmsException("Start date must be before end date.", HttpStatus.BAD_REQUEST);
+
+        Page<AuditLog> logs = auditLogRepository.findEstateAccessActivity(
+                ownerId,
+                AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS,
+                from,
+                to,
+                pageable
+        );
+
+        return logs.map(log -> descriptionBuilder.toResponse(log, ownerId));
+    }
 }

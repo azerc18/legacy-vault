@@ -125,6 +125,46 @@
       "auditNotice": "Every view is recorded in the vault's activity log.",
       "deleteTitle": "Delete this asset?",
       "deleteMessage": "\"{{name}}\" will be permanently deleted.",
+      "allocation": {
+        "title": "Allocation among beneficiaries",
+        "mode": {
+          "ALL": "All beneficiaries",
+          "EXCLUSIVE": "One beneficiary",
+          "PROPORTIONAL": "Split by percentage",
+          "JOINT_CONSENSUS": "K-of-N joint approval"
+        },
+        "modeHint": {
+          "ALL": "Every beneficiary of this vault can see this asset (default).",
+          "EXCLUSIVE": "Only one person receives this asset. You can name a backup who receives it if that person declines.",
+          "PROPORTIONAL": "Split between several people by percentage; shares must total 100%. Only for assets that need a legal claim.",
+          "JOINT_CONSENSUS": "The asset opens only when enough people in the chosen group approve together. Editing the allocation (even its note) re-splits the key and clears earlier approvals."
+        },
+        "recipientPlaceholder": "Choose the recipient",
+        "contingent": "Backup beneficiary (optional)",
+        "contingentNone": "None",
+        "share": "Share (%)",
+        "total": "Total: {{total}}% / 100%",
+        "thresholdPlaceholder": "Approvals needed",
+        "thresholdOption": "{{k}} of {{n}} people",
+        "notePlaceholder": "Note about this allocation (optional)",
+        "vipNote": "Percentage split, backup beneficiary and joint approval require a VIP plan.",
+        "summary": {
+          "ALL": "All beneficiaries",
+          "EXCLUSIVE": "Only {{name}}",
+          "EXCLUSIVE_BACKUP": "Only {{name}} (backup: {{backup}})",
+          "PROPORTIONAL": "Split: {{list}}",
+          "JOINT_CONSENSUS": "Joint approval {{k}}/{{n}}: {{list}}"
+        },
+        "errors": {
+          "pickOne": "Choose exactly one recipient.",
+          "pickTwo": "Choose at least two recipients.",
+          "backupSame": "The backup must be different from the main recipient.",
+          "shareInvalid": "Each share must be above 0 with at most 2 decimals.",
+          "shareTotal": "Shares must total 100%.",
+          "proportionalNotAllowed": "This asset type cannot be split by percentage. Choose another allocation.",
+          "thresholdInvalid": "Approvals needed must be between 2 and the number of recipients."
+        }
+      },
       "errors": {
         "load": "Could not load assets.",
         "open": "Could not open this asset.",

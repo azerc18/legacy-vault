@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -108,6 +109,30 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
                          @Param("purgeAt") LocalDateTime purgeAt);
 
+    // N2-notify: vault UNLOCKED đã qua cửa sổ phản hồi (unlockedAt < cutoff), chưa hết hạn nhận, và còn ít nhất
+    // một phân bổ EXCLUSIVE có dự phòng, chưa chuyển, mà người giữ chính đang chưa phản hồi
+    @Query("""
+            SELECT v.id FROM Vault v
+            WHERE v.status = com.ltld.app.legacyvault.enums.VaultStatus.UNLOCKED
+              AND v.unlockedAt < :cutoff
+              AND (v.claimDeadlineAt IS NULL OR v.claimDeadlineAt >= :now)
+              AND EXISTS (
+                  SELECT 1 FROM AssetAllocation al
+                  WHERE al.asset.vault.id = v.id
+                    AND al.asset.status = com.ltld.app.legacyvault.enums.AssetStatus.ACTIVE
+                    AND al.mode = com.ltld.app.legacyvault.enums.AllocationMode.EXCLUSIVE
+                    AND al.effectiveBeneficiary IS NULL
+                    AND al.contingentBeneficiary IS NOT NULL
+                    AND al.contingentBeneficiary.user IS NOT NULL
+                    AND al.contingentBeneficiary.status = com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.ACCEPTED
+                    AND al.beneficiary.status IN :silentStatuses)
+            ORDER BY v.unlockedAt ASC
+            """)
+    List<UUID> findVaultIdsPastResponseWindow(@Param("cutoff") LocalDateTime cutoff,
+                                              @Param("now") LocalDateTime now,
+                                              @Param("silentStatuses") Collection<BeneficiaryInviteStatus> silentStatuses,
+                                              Pageable pageable);
+
     // Lấy danh sách Vault của Owner (mới nhất xếp trước)
     List<Vault> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
@@ -138,4 +163,13 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             ORDER BY v.purgeEligibleAt ASC
             """)
     List<UUID> findPurgeableVaultIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    // FR-07/FR-14: số Vault còn hiệu lực (bỏ ARCHIVED_LOCKED) của từng Owner trong một truy vấn: [ownerId, count]
+    @Query("""
+            SELECT v.owner.id, COUNT(v) FROM Vault v
+            WHERE v.owner.id IN :ownerIds
+              AND v.status <> com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED
+            GROUP BY v.owner.id
+            """)
+    List<Object[]> countByOwnerIds(@Param("ownerIds") Collection<UUID> ownerIds);
 }

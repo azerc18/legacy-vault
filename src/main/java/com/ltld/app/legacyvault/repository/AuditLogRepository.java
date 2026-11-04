@@ -79,6 +79,37 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
         Pageable pageable
     );
 
+    // F6: Nhật ký minh bạch "Ai đã xem gì" (Transparency Access Log) trên mọi Vault của Owner
+    @org.springframework.data.jpa.repository.Query(
+        value = "SELECT a FROM AuditLog a " +
+                "LEFT JOIN FETCH a.actor " +
+                // M3: LEGAL_DOCUMENT_VIEWED ghi vaultId null (một hồ sơ gồm nhiều vault), nên khớp theo hồ sơ của Owner
+                "WHERE (a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                "       OR (a.entityType = 'LegalVerificationRequest' " +
+                "           AND a.entityId IN (SELECT r.id FROM LegalVerificationRequest r WHERE r.owner.id = :ownerId))) " +
+                // M1: chỉ lượt truy cập của người khác Owner; actor null (hệ thống) vẫn hiện
+                "AND (a.actor IS NULL OR a.actor.id <> :ownerId) " +
+                "AND a.action IN :accessActions " +
+                "AND a.createdAt >= :startDate " +
+                "AND a.createdAt <= :endDate " +
+                "ORDER BY a.createdAt DESC, a.id DESC",
+        countQuery = "SELECT COUNT(a) FROM AuditLog a " +
+                     "WHERE (a.vaultId IN (SELECT v.id FROM Vault v WHERE v.owner.id = :ownerId) " +
+                     "       OR (a.entityType = 'LegalVerificationRequest' " +
+                     "           AND a.entityId IN (SELECT r.id FROM LegalVerificationRequest r WHERE r.owner.id = :ownerId))) " +
+                     "AND (a.actor IS NULL OR a.actor.id <> :ownerId) " +
+                     "AND a.action IN :accessActions " +
+                     "AND a.createdAt >= :startDate " +
+                     "AND a.createdAt <= :endDate"
+    )
+    Page<AuditLog> findEstateAccessActivity(
+        @org.springframework.data.repository.query.Param("ownerId") UUID ownerId,
+        @org.springframework.data.repository.query.Param("accessActions") java.util.Collection<AuditAction> accessActions,
+        @org.springframework.data.repository.query.Param("startDate") java.time.Instant startDate,
+        @org.springframework.data.repository.query.Param("endDate") java.time.Instant endDate,
+        Pageable pageable
+    );
+
     @Query(value = """
     SELECT a FROM AuditLog a LEFT JOIN FETCH a.actor act
     WHERE (:action IS NULL OR a.action = :action)

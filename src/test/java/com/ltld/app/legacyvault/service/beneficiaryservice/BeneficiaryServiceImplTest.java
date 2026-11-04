@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DeclineClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.InheritanceDossierData;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritedAssetSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.LegalDocumentSummaryResponse;
@@ -40,6 +41,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
@@ -47,6 +49,8 @@ import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
+import com.ltld.app.legacyvault.repository.DigitalSignatureRepository;
+import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
@@ -70,6 +74,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -134,6 +139,12 @@ public class BeneficiaryServiceImplTest {
     private AssetAllocationRepository assetAllocationRepository;
     @Mock
     private JointConsensusService jointConsensusService;   // X1
+    @Mock
+    private ApplicationEventPublisher eventPublisher;   // N2-notify
+    @Mock
+    private DigitalSignatureRepository digitalSignatureRepository;   // getDossierData
+    @Mock
+    private ExecutorAssignmentRepository executorAssignmentRepository;   // getDossierData
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;
@@ -2463,6 +2474,8 @@ public class BeneficiaryServiceImplTest {
         assertThat(second.isReassignedToMe()).isTrue();
         assertThat(second.getSharePercent()).isNull();
         assertThat(second.isViewed()).isFalse();
+        // Góp ý review: chỉ kiểm tra người thụ hưởng một lần (loadAccessibleVault), không gọi lại
+        verify(vaultBeneficiaryRepository, times(1)).findByVaultIdAndUserId(vaultId, currentUserId);
     }
 
     @Test
@@ -2476,7 +2489,7 @@ public class BeneficiaryServiceImplTest {
     }
 
     @Test
-    void declineClaim_withContingent_notifiesReceiverInApp() {
+    void declineClaim_withContingent_publishesReassignedEvent() {
         stubDeclinable();
         VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
         AssetAllocation al = allocation(beneficiaryRow, contingent);
@@ -2486,18 +2499,19 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(captor.capture());
-        Notification saved = captor.getValue();
-        assertThat(saved.getRecipient()).isSameAs(contingent.getUser());
-        assertThat(saved.getType()).isEqualTo(NotificationType.ASSET_REASSIGNED);
-        assertThat(saved.getChannel()).isEqualTo(NotificationChannel.IN_APP);
-        assertThat(saved.getReferenceId()).isEqualTo(vaultId);
-        assertThat(saved.getContent()).contains("1 asset(s)");
+        ArgumentCaptor<AssetsReassignedEvent> captor = ArgumentCaptor.forClass(AssetsReassignedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        AssetsReassignedEvent event = captor.getValue();
+        assertThat(event.vaultId()).isEqualTo(vaultId);
+        assertThat(event.receivers()).hasSize(1);
+        assertThat(event.receivers().get(0).userId()).isEqualTo(contingent.getUser().getId());
+        assertThat(event.receivers().get(0).assetCount()).isEqualTo(1);
+        // Thông báo được lưu ở listener sau commit, không còn trong giao dịch decline
+        verify(notificationRepository, never()).save(any(Notification.class));
     }
 
     @Test
-    void declineClaim_twoAssetsToSameReceiver_sendsOneNotification() {
+    void declineClaim_twoAssetsToSameReceiver_publishesOneEventWithTotalCount() {
         stubDeclinable();
         VaultBeneficiary contingent = otherRow(BeneficiaryInviteStatus.INVITED);
         AssetAllocation al1 = allocation(beneficiaryRow, contingent);
@@ -2508,13 +2522,14 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository, times(1)).save(captor.capture());
-        assertThat(captor.getValue().getContent()).contains("2 asset(s)");
+        ArgumentCaptor<AssetsReassignedEvent> captor = ArgumentCaptor.forClass(AssetsReassignedEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        assertThat(captor.getValue().receivers()).hasSize(1);
+        assertThat(captor.getValue().receivers().get(0).assetCount()).isEqualTo(2);
     }
 
     @Test
-    void declineClaim_withoutContingent_sendsNoNotification() {
+    void declineClaim_withoutContingent_publishesNoEvent() {
         stubDeclinable();
         AssetAllocation al = allocation(beneficiaryRow, null);
         VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
@@ -2524,7 +2539,7 @@ public class BeneficiaryServiceImplTest {
 
         beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
-        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(eventPublisher, never()).publishEvent(any(AssetsReassignedEvent.class));
     }
 
     @Test
@@ -2540,6 +2555,43 @@ public class BeneficiaryServiceImplTest {
         DeclineClaimResponse response = beneficiaryService.declineClaim(vaultId, currentUserId, null);
 
         assertThat(response.getReassignedAssets()).isEqualTo(1);
-        verify(notificationRepository, never()).save(any(Notification.class));
+        verify(eventPublisher, never()).publishEvent(any(AssetsReassignedEvent.class));
+    }
+
+    // ===================== Dossier PDF: Q47 (b) tài sản chưa phân bổ =====================
+
+    @Test
+    void getDossierData_includesUnallocatedAssets_andSkipsAssetsAllocatedToOthers() {
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        owner.setFullName("Chủ kho");
+        unlockedVault.setOwner(owner);
+        stubAccessibleVault();
+        stubViewSession(true);
+        DigitalAsset mine = asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT);
+        DigitalAsset unallocated = asset(UUID.randomUUID(), "Gmail", AssetType.BANK_ACCOUNT);
+        DigitalAsset others = asset(UUID.randomUUID(), "Ví Binance", AssetType.CRYPTO_WALLET);
+        AssetAllocation alMine = AssetAllocation.builder().id(UUID.randomUUID()).asset(mine)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("60.00")).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE))
+                .thenReturn(List.of(mine, unallocated, others));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others.getId()));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(alMine));
+
+        InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId);
+
+        // Sắp theo tên (không phân biệt hoa thường) để thứ tự PDF ổn định
+        assertThat(data.assets()).extracting(InheritanceDossierData.AssetLine::assetName)
+                .containsExactly("Gmail", "Vietcombank");
+        InheritanceDossierData.AssetLine first = data.assets().get(0);
+        assertThat(first.mode()).isNull();
+        assertThat(first.sharePercent()).isNull();
+        assertThat(first.viaFallback()).isFalse();
+        InheritanceDossierData.AssetLine second = data.assets().get(1);
+        assertThat(second.mode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(second.sharePercent()).isEqualByComparingTo("60.00");
     }
 }

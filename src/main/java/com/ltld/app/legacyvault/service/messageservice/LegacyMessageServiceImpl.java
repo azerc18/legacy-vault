@@ -309,12 +309,12 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         List<LegacyMessage> messages = legacyMessageRepository.findForBeneficiary(
                 vaultId, beneficiary.getId(), LegacyMessageRecipientType.ALL_BENEFICIARIES);
 
-        // M2: Chỉ giải mã nội dung khi người thụ hưởng đã hoàn tất xác thực danh tính (session 30 phút hợp lệ)
-        boolean hasViewSession = hasValidViewSession(vaultId, userId);
+        // M2 & m2 (vòng 3): Giải mã nội dung khi có phiên xác thực 30 phút hợp lệ, hoặc khi Vault đã CLAIMED
+        boolean canReadContent = canReadMessageContent(vault, userId);
         LocalDate today = LocalDate.now(VN_ZONE);
         return messages.stream().map(m -> {
             boolean isUnlocked = isMessageUnlocked(m, today);
-            String content = (isUnlocked && hasViewSession) ? decryptContentSafely(m.getContent()) : null;
+            String content = (isUnlocked && canReadContent) ? decryptContentSafely(m.getContent()) : null;
             return toResponse(m, content, isUnlocked);
         }).toList();
     }
@@ -323,10 +323,10 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Transactional(readOnly = true)
     public LegacyMessageResponse getMessageDetailForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
         VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
-        // M2: Yêu cầu phiên xác thực danh tính hợp lệ trước khi xem chi tiết lời nhắn
-        assertViewSession(vaultId, userId);
-
         Vault vault = beneficiary.getVault();
+        // M2 & m2 (vòng 3): Yêu cầu phiên xác thực khi UNLOCKED; cho phép đọc sau khi Vault đã CLAIMED
+        assertCanReadMessage(vault, userId);
+
         if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
@@ -353,10 +353,10 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Transactional(readOnly = true)
     public DecryptedAttachment getAttachmentForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
         VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
-        // M2: Yêu cầu phiên xác thực danh tính hợp lệ trước khi tải tệp đính kèm
-        assertViewSession(vaultId, userId);
-
         Vault vault = beneficiary.getVault();
+        // M2 & m2 (vòng 3): Yêu cầu phiên xác thực khi UNLOCKED; cho phép tải đính kèm sau khi Vault đã CLAIMED
+        assertCanReadMessage(vault, userId);
+
         if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
@@ -436,19 +436,22 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         DeliveryPlan plan;
         try {
             plan = requiresNewTx.execute(status -> {
-                // F4b: Chuyển trạng thái ACTIVE -> DELIVERED nguyên tử để ngăn race condition giữa Listener và Scheduler
-                int updated = legacyMessageRepository.markDelivered(messageId, now);
-                if (updated == 0) {
-                    return null;
-                }
-
-                // M1: Load lại entity trong chính session của transaction mới này để tránh LazyInitializationException
+                // M1 & m1 (vòng 3): Load lại entity trong session của transaction mới và kiểm tra trạng thái Vault trước khi markDelivered
                 LegacyMessage message = legacyMessageRepository.findById(messageId).orElse(null);
                 if (message == null) {
+                    status.setRollbackOnly();
                     return null;
                 }
                 Vault vault = message.getVault();
                 if (vault == null || !HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
+                    status.setRollbackOnly();
+                    return null;
+                }
+
+                // F4b: Chuyển trạng thái ACTIVE -> DELIVERED nguyên tử để ngăn race condition giữa Listener và Scheduler
+                int updated = legacyMessageRepository.markDelivered(messageId, now);
+                if (updated == 0) {
+                    status.setRollbackOnly();
                     return null;
                 }
                 message.setStatus(LegacyMessageStatus.DELIVERED);
@@ -552,8 +555,17 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
                 LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
     }
 
-    private void assertViewSession(UUID vaultId, UUID currentUserId) {
-        if (!hasValidViewSession(vaultId, currentUserId)) {
+    // m2 (vòng 3): Khi Vault đã CLAIMED (người thụ hưởng đã hoàn tất xác minh và đóng hồ sơ nhận di sản),
+    // cho phép tiếp tục đọc lời nhắn đã mở khóa (bao gồm cả Time-Capsule đến hạn trong tương lai) mà không cần mở phiên mới.
+    private boolean canReadMessageContent(Vault vault, UUID currentUserId) {
+        if (vault != null && vault.getStatus() == VaultStatus.CLAIMED) {
+            return true;
+        }
+        return vault != null && hasValidViewSession(vault.getId(), currentUserId);
+    }
+
+    private void assertCanReadMessage(Vault vault, UUID currentUserId) {
+        if (!canReadMessageContent(vault, currentUserId)) {
             throw new BusinessException(ErrorCode.IDENTITY_NOT_VERIFIED,
                     "Identity verification is required before viewing messages.");
         }

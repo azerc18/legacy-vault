@@ -1,25 +1,29 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Navigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
-import { executorApi, caseStep, HANDOVER_LABEL, CLAIM_PROGRESS_LABEL } from '../api/executorApi.js';
+import { executorApi, caseStep, HANDOVER_CLASS, CLAIM_PROGRESS_CLASS } from '../api/executorApi.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
-import { Card, Icon, Alert, formatDate, ASSET_TYPES, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { tEnum } from '../i18n/format.js';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 import EmptyState from "../Common/EmptyState.jsx";
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
-const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
+// F5: trạng thái checklist (nhãn trong executor.json -> taskStatus)
+const TASK_STATUSES = ['TODO', 'DOING', 'DONE'];
 
 /* =====================================================================
    Route: /executor/cases/:assignmentId
    FR-07 acknowledge → FR-08 xem vault → FR-09 nộp giấy chứng tử → FR-10 tiến độ → FR-11 trao đổi
    ===================================================================== */
 export default function ExecutorCase() {
+    const { t } = useTranslation('executor');
     const { assignmentId } = useParams();
     const user = getUser();
 
@@ -35,18 +39,18 @@ export default function ExecutorCase() {
         try {
             const mine = await executorApi.listMine();
             const a = mine.find((x) => x.assignmentId === assignmentId);
-            if (!a) { setError('Case not found.'); return; }
+            if (!a) { setError(t('case.notFound')); return; }
             setAssignment(a);
             if (a.status !== 'ACTIVE') return; // INACTIVE: chưa được xem gì
             const [v, p] = await Promise.all([executorApi.getVaults(assignmentId), executorApi.getProgress(assignmentId)]);
             setData(v);
             setProgress(p);
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not load this case.'));
+            setError(getErrorMessage(e, t('case.loadError')));
         } finally {
             setLoading(false);
         }
-    }, [assignmentId]);
+    }, [assignmentId, t]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -58,7 +62,7 @@ export default function ExecutorCase() {
             const res = await executorApi.acknowledge(assignmentId);
             setAssignment((a) => ({ ...a, acknowledgedAt: res.acknowledgedAt }));
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not acknowledge.'));
+            setError(getErrorMessage(e, t('ackError')));
         } finally {
             setAcking(false);
         }
@@ -68,20 +72,20 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
+            <AppHeader icon="badge" workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle
                     className=""
-                    back={{ to: '/executor/home', label: 'All estates' }}
-                    title={`Estate of ${assignment?.ownerFullName || data?.ownerFullName || '…'}`}
-                    subtitle={assignment && `${assignment.executorType === 'PRIMARY' ? 'Primary executor' : 'Backup executor'} · activated ${formatDate(assignment.activatedAt, true)}`}
+                    back={{ to: '/executor/home', label: t('case.back') }}
+                    title={t('estateOf', { name: assignment?.ownerFullName || assignment?.ownerEmail || data?.ownerFullName || '…' })}
+                    subtitle={assignment && t('case.subtitle', { type: t(`type.${assignment.executorType}`, assignment.executorType), date: formatDate(assignment.activatedAt, true) })}
                 />
                 <Alert>{error}</Alert>
-                {loading && <p className="text-on-surface-variant">Loading...</p>}
+                {loading && <p className="text-on-surface-variant">{t('loading')}</p>}
 
                 {assignment && assignment.status !== 'ACTIVE' && (
-                    <Alert type="info">This estate is on standby. You can act once the owner's Dead Man's Switch is triggered.</Alert>
+                    <Alert type="info">{t('case.standby')}</Alert>
                 )}
 
                 {assignment?.status === 'ACTIVE' && (
@@ -91,11 +95,11 @@ export default function ExecutorCase() {
                             <Card>
                                 <div className="flex flex-wrap items-center justify-between gap-4">
                                     <div>
-                                        <h2 className="font-title-lg text-title-lg">You have been activated</h2>
-                                        <p className="text-sm text-on-surface-variant mt-1">Please confirm you received the activation notice and will handle this estate.</p>
+                                        <h2 className="font-title-lg text-title-lg">{t('case.activatedTitle')}</h2>
+                                        <p className="text-sm text-on-surface-variant mt-1">{t('case.activatedText')}</p>
                                     </div>
                                     <button onClick={acknowledge} disabled={acking} className={btnPrimary}>
-                                        <Icon name="task_alt" className="text-[18px]" /> {acking ? 'Saving...' : 'Acknowledge'}
+                                        <Icon name="task_alt" className="text-[18px]" /> {acking ? t('saving') : t('acknowledge')}
                                     </button>
                                 </div>
                             </Card>
@@ -118,6 +122,8 @@ export default function ExecutorCase() {
 
                         <BeneficiaryClaimsSection assignmentId={assignmentId} progress={progress} />
 
+                        <AccountTasksSection assignmentId={assignmentId} progress={progress} />
+
                         <MessagesSection assignmentId={assignmentId} progress={progress} />
                     </>
                 )}
@@ -128,20 +134,21 @@ export default function ExecutorCase() {
 
 /* ---------- FR-08: vault và tài sản (chỉ metadata) ---------- */
 function VaultList({ vaults, progress }) {
+    const { t } = useTranslation('executor');
     return (
-        <Card title={`Vaults (${vaults.length})`} icon="inventory_2">
-            {vaults.length === 0 && <p className="text-sm text-on-surface-variant">The owner has no vaults.</p>}
+        <Card title={t('case.vaults.title', { count: vaults.length })} icon="inventory_2">
+            {vaults.length === 0 && <p className="text-sm text-on-surface-variant">{t('case.vaults.none')}</p>}
             <div className="space-y-4">
                 {vaults.map((v) => {
                     const p = latestProgress(progress, v.vaultId);
-                    const badge = p && HANDOVER_LABEL[p.handoverStatus];
+                    const badge = p && { cls: HANDOVER_CLASS[p.handoverStatus], label: t(`handover.${p.handoverStatus}`, p.handoverStatus) };
                     return (
                         <div key={v.vaultId} className="p-4 rounded-xl border border-outline-variant/40">
                             <div className="flex flex-wrap justify-between items-start gap-2">
                                 <div>
                                     <p className="font-semibold">{v.name}</p>
                                     <p className="text-sm text-on-surface-variant">
-                                        Beneficiary: {v.beneficiary?.fullName || (v.beneficiaryPending ? 'Invited, not registered yet' : 'Not assigned')}
+                                        {t('case.vaults.beneficiary', { name: v.beneficiary?.fullName || (v.beneficiaryPending ? t('case.vaults.invited') : t('case.vaults.notAssigned')) })}
                                     </p>
                                 </div>
                                 {badge
@@ -150,14 +157,14 @@ function VaultList({ vaults, progress }) {
                             </div>
                             {v.handoverInstructions && (
                                 <p className="mt-3 text-sm p-3 rounded-lg bg-surface-container-low">
-                                    <b>Owner's instructions:</b> {v.handoverInstructions}
+                                    <b>{t('case.vaults.instructions')}</b> {v.handoverInstructions}
                                 </p>
                             )}
                             {v.assets?.length > 0 && (
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {v.assets.map((a) => (
                                         <span key={a.assetId} className="text-xs px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant">
-                                            {a.assetName} · {assetLabel(a.assetType)}
+                                            {a.assetName} · {tEnum('assetType', a.assetType)}
                                         </span>
                                     ))}
                                 </div>
@@ -179,6 +186,7 @@ function latestProgress(progress, vaultId) {
 
 /* ---------- FR-09: nộp giấy chứng tử ---------- */
 function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
+    const { t } = useTranslation('executor');
     // Chỉ nộp được cho vault ACTIVE và chưa nằm trong hồ sơ đang chờ / đã duyệt
     const eligible = vaults.filter((v) => {
         const p = latestProgress(progress, v.vaultId);
@@ -201,27 +209,27 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
     const submit = async (e) => {
         e.preventDefault();
         setError(''); setSuccess('');
-        if (selected.length === 0) return setError('Select at least one vault.');
-        if (!file) return setError('Please attach the death certificate.');
-        if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) return setError('Only PDF, PNG or JPG files are allowed.');
-        if (file.size > MAX_SIZE) return setError('File exceeds the 10MB limit.');
-        if (notes.length > 1000) return setError('Notes must be at most 1000 characters.');
+        if (selected.length === 0) return setError(t('case.submit.errSelect'));
+        if (!file) return setError(t('case.submit.errFile'));
+        if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) return setError(t('case.submit.errType'));
+        if (file.size > MAX_SIZE) return setError(t('case.submit.errSize'));
+        if (notes.length > 1000) return setError(t('case.submit.errNotes'));
         setLoading(true);
         try {
             await executorApi.submitVerification(assignmentId, { file, vaultIds: selected, notes: notes.trim() });
-            setSuccess('Submitted. A Legal Verifier will review your request.');
+            setSuccess(t('case.submit.success'));
             setFile(null); setNotes('');
             onSubmitted();
         } catch (err) {
-            setError(getErrorMessage(err, 'Submission failed.'));
+            setError(getErrorMessage(err, t('case.submit.failed')));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card title="Submit death certificate" icon="upload_file">
-            <p className="text-sm text-on-surface-variant mb-4">A Legal Verifier reviews the certificate before any vault is unlocked. PDF, PNG or JPG, up to 10MB.</p>
+        <Card title={t('case.submit.title')} icon="upload_file">
+            <p className="text-sm text-on-surface-variant mb-4">{t('case.submit.intro')}</p>
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
             <form onSubmit={submit} className="space-y-4">
@@ -230,15 +238,15 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
                         <label key={v.vaultId} className="flex items-center gap-3 text-sm">
                             <input type="checkbox" checked={selected.includes(v.vaultId)} onChange={() => toggle(v.vaultId)} />
                             {v.name}
-                            {latestProgress(progress, v.vaultId)?.handoverStatus === 'REJECTED' && <span className="text-xs text-error">(previously rejected)</span>}
+                            {latestProgress(progress, v.vaultId)?.handoverStatus === 'REJECTED' && <span className="text-xs text-error">{t('case.submit.previouslyRejected')}</span>}
                         </label>
                     ))}
                 </div>
                 <FilePicker file={file} onChange={setFile} accept={FILE_TYPES}
-                            label="Choose death certificate" hint="PDF, PNG or JPG, up to 10MB" />
-                <textarea rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes for the verifier (optional)"
+                            label={t('case.submit.chooseFile')} hint={t('case.submit.fileHint')} />
+                <textarea rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('case.submit.notesPlaceholder')}
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
-                <button type="submit" disabled={loading} className={btnPrimary}>{loading ? 'Submitting...' : 'Submit for verification'}</button>
+                <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('case.submit.submitting') : t('case.submit.button')}</button>
             </form>
         </Card>
     );
@@ -246,26 +254,27 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
 
 /* ---------- FR-10: tiến độ bàn giao ---------- */
 function ProgressSection({ progress }) {
+    const { t } = useTranslation('executor');
     if (progress.length === 0) return null;
     return (
-        <Card title="Hand-over progress" icon="timeline">
+        <Card title={t('case.progress.title')} icon="timeline">
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-on-surface-variant">
-                        <tr><th className="py-2 pr-4">Vault</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Submitted</th><th className="py-2 pr-4">Decided</th><th className="py-2">Details</th></tr>
+                        <tr><th className="py-2 pr-4">{t('case.progress.vault')}</th><th className="py-2 pr-4">{t('case.progress.status')}</th><th className="py-2 pr-4">{t('case.progress.submitted')}</th><th className="py-2 pr-4">{t('case.progress.decided')}</th><th className="py-2">{t('case.progress.details')}</th></tr>
                     </thead>
                     <tbody>
                         {progress.map((p) => {
-                            const b = HANDOVER_LABEL[p.handoverStatus] || {};
+                            const cls = HANDOVER_CLASS[p.handoverStatus];
                             return (
                                 <tr key={`${p.vaultId}-${p.requestId}`} className="border-t border-outline-variant/20">
                                     <td className="py-2 pr-4 font-semibold">{p.vaultName}</td>
-                                    <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${b.cls}`}>{b.label || p.handoverStatus}</span></td>
+                                    <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${cls}`}>{t(`handover.${p.handoverStatus}`, p.handoverStatus)}</span></td>
                                     <td className="py-2 pr-4 whitespace-nowrap">{formatDate(p.requestedAt)}</td>
                                     <td className="py-2 pr-4 whitespace-nowrap">{formatDate(p.decidedAt)}</td>
                                     <td className="py-2 text-on-surface-variant">
-                                        {p.rejectionReason && `Reason: ${p.rejectionReason}`}
-                                        {p.unlockedAt && `Unlocked ${formatDate(p.unlockedAt)} · claim before ${formatDate(p.claimDeadlineAt)}`}
+                                        {p.rejectionReason && t('case.progress.reason', { reason: p.rejectionReason })}
+                                        {p.unlockedAt && t('case.progress.unlocked', { date: formatDate(p.unlockedAt), deadline: formatDate(p.claimDeadlineAt) })}
                                     </td>
                                 </tr>
                             );
@@ -279,13 +288,14 @@ function ProgressSection({ progress }) {
 
 /* ---------- N2-exec: người thụ hưởng đã nhận tài sản chưa + nhắc nhở ---------- */
 function BeneficiaryClaimsSection({ assignmentId, progress }) {
+    const { t } = useTranslation('executor');
     // Chỉ vault đã mở khoá trở đi mới có người thụ hưởng phản hồi
     const vaults = [...new Map(progress
         .filter((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus))
         .map((p) => [p.vaultId, p])).values()];
     if (vaults.length === 0) return null;
     return (
-        <Card title="Beneficiary claims" icon="group">
+        <Card title={t('case.claims.title')} icon="group">
             <div className="space-y-6">
                 {vaults.map((p) => <VaultClaims key={p.vaultId} assignmentId={assignmentId} vault={p} />)}
             </div>
@@ -294,6 +304,7 @@ function BeneficiaryClaimsSection({ assignmentId, progress }) {
 }
 
 function VaultClaims({ assignmentId, vault }) {
+    const { t } = useTranslation('executor');
     const [rows, setRows] = useState(null);
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
@@ -302,17 +313,17 @@ function VaultClaims({ assignmentId, vault }) {
     useEffect(() => {
         executorApi.getBeneficiaryProgress(assignmentId, vault.vaultId)
             .then(setRows)
-            .catch((e) => { setError(getErrorMessage(e, 'Could not load beneficiaries.')); setRows([]); });
-    }, [assignmentId, vault.vaultId]);
+            .catch((e) => { setError(getErrorMessage(e, t('case.claims.loadError'))); setRows([]); });
+    }, [assignmentId, vault.vaultId, t]);
 
     const remind = async (row) => {
         setBusyId(row.vaultBeneficiaryId); setError(''); setNotice('');
         try {
             const updated = await executorApi.remindBeneficiary(assignmentId, vault.vaultId, row.vaultBeneficiaryId);
             setRows((prev) => prev.map((r) => (r.vaultBeneficiaryId === updated.vaultBeneficiaryId ? updated : r)));
-            setNotice(`Reminder sent to ${row.fullName || row.maskedEmail}.`);
+            setNotice(t('case.claims.sent', { name: row.fullName || row.maskedEmail }));
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not send the reminder.'));
+            setError(getErrorMessage(e, t('case.claims.sendError')));
         } finally {
             setBusyId(null);
         }
@@ -323,33 +334,33 @@ function VaultClaims({ assignmentId, vault }) {
             <h3 className="font-semibold mb-2">{vault.vaultName}</h3>
             <Alert>{error}</Alert>
             {notice && <Alert type="info">{notice}</Alert>}
-            {rows === null && <p className="text-sm text-on-surface-variant">Loading...</p>}
-            {rows?.length === 0 && !error && <p className="text-sm text-on-surface-variant">No beneficiaries.</p>}
+            {rows === null && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+            {rows?.length === 0 && !error && <p className="text-sm text-on-surface-variant">{t('case.claims.none')}</p>}
             {rows?.length > 0 && (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="text-on-surface-variant">
-                            <tr><th className="py-2 pr-4">Beneficiary</th><th className="py-2 pr-4">Status</th><th className="py-2 pr-4">Responded</th><th className="py-2">Reminder</th></tr>
+                            <tr><th className="py-2 pr-4">{t('case.claims.beneficiary')}</th><th className="py-2 pr-4">{t('case.claims.status')}</th><th className="py-2 pr-4">{t('case.claims.responded')}</th><th className="py-2">{t('case.claims.reminder')}</th></tr>
                         </thead>
                         <tbody>
                             {rows.map((r) => {
-                                const b = CLAIM_PROGRESS_LABEL[r.status] || {};
+                                const cls = CLAIM_PROGRESS_CLASS[r.status];
                                 return (
                                     <tr key={r.vaultBeneficiaryId} className="border-t border-outline-variant/20">
                                         <td className="py-2 pr-4">
                                             <p className="font-semibold">{r.fullName || '—'}</p>
                                             <p className="text-xs text-on-surface-variant">{r.maskedEmail}{r.relationship && ` · ${r.relationship}`}</p>
                                         </td>
-                                        <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${b.cls}`}>{b.label || r.status}</span></td>
+                                        <td className="py-2 pr-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${cls}`}>{t(`claim.${r.status}`, r.status)}</span></td>
                                         <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.claimedAt || r.respondedAt)}</td>
                                         <td className="py-2">
                                             {r.canRemind && (
                                                 <button type="button" onClick={() => remind(r)} disabled={busyId === r.vaultBeneficiaryId} className={btnOutline}>
-                                                    <Icon name="notifications_active" className="text-[18px]" /> {busyId === r.vaultBeneficiaryId ? 'Sending...' : 'Send reminder'}
+                                                    <Icon name="notifications_active" className="text-[18px]" /> {busyId === r.vaultBeneficiaryId ? t('case.claims.sending') : t('case.claims.send')}
                                                 </button>
                                             )}
                                             {!r.canRemind && r.nextReminderAllowedAt && (
-                                                <span className="text-xs text-on-surface-variant">Reminded · next after {formatDate(r.nextReminderAllowedAt, true)}</span>
+                                                <span className="text-xs text-on-surface-variant">{t('case.claims.nextAfter', { date: formatDate(r.nextReminderAllowedAt, true) })}</span>
                                             )}
                                         </td>
                                     </tr>
@@ -363,8 +374,91 @@ function VaultClaims({ assignmentId, vault }) {
     );
 }
 
+/* ---------- F5: checklist xử lý tài khoản số theo di nguyện ---------- */
+function AccountTasksSection({ assignmentId, progress }) {
+    const { t } = useTranslation('executor');
+    const [tasks, setTasks] = useState(null);
+    const [error, setError] = useState('');
+    // Checklist chỉ có sau khi có vault đã mở khoá
+    const handedOver = progress.some((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus));
+
+    useEffect(() => {
+        if (!handedOver) return;
+        executorApi.getTasks(assignmentId)
+            .then(setTasks)
+            .catch((e) => { setError(getErrorMessage(e, t('case.tasks.loadError'))); setTasks([]); });
+    }, [assignmentId, handedOver, t]);
+
+    if (!handedOver || (tasks?.length === 0 && !error)) return null;
+    const done = (tasks || []).filter((x) => x.status === 'DONE').length;
+    return (
+        <Card title={t('case.tasks.title')} icon="checklist">
+            <p className="text-sm text-on-surface-variant mb-4">
+                {t('case.tasks.intro')}
+                {tasks && ` ${t('case.tasks.done', { done, total: tasks.length })}`}
+            </p>
+            <Alert>{error}</Alert>
+            {tasks === null && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+            <div className="space-y-4">
+                {(tasks || []).map((task) => (
+                    <AccountTaskRow key={task.id} assignmentId={assignmentId} task={task}
+                                    onSaved={(u) => setTasks((prev) => prev.map((x) => (x.id === u.id ? u : x)))} />
+                ))}
+            </div>
+        </Card>
+    );
+}
+
+function AccountTaskRow({ assignmentId, task, onSaved }) {
+    const { t } = useTranslation('executor');
+    const [status, setStatus] = useState(task.status);
+    const [note, setNote] = useState(task.note || '');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const dirty = status !== task.status || note !== (task.note || '');
+
+    const save = async () => {
+        setBusy(true); setError('');
+        try {
+            onSaved(await executorApi.updateTask(assignmentId, task.id, { status, note }));
+        } catch (e) {
+            setError(getErrorMessage(e, t('case.tasks.saveError')));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="rounded-xl border border-outline-variant/30 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="font-semibold">{task.platform || tEnum('assetType', task.assetType)}{task.accountHandle && ` · ${task.accountHandle}`}</p>
+                    <p className="text-sm text-on-surface-variant">{task.vaultName} · {t('case.tasks.wish')} <span className="font-semibold">{t(`wish.${task.wish}`, task.wish)}</span></p>
+                    {task.helpUrl && (
+                        <a href={task.helpUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary font-semibold inline-flex items-center gap-1 mt-1">
+                            <Icon name="open_in_new" className="text-[16px]" /> {t('case.tasks.help')}
+                        </a>
+                    )}
+                </div>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} w-auto`}>
+                    {TASK_STATUSES.map((v) => <option key={v} value={v}>{t(`taskStatus.${v}`)}</option>)}
+                </select>
+            </div>
+            <textarea rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)}
+                      placeholder={t('case.tasks.notePlaceholder')} className={`${inputClass} mt-3`} />
+            <Alert>{error}</Alert>
+            <div className="flex justify-end mt-2">
+                <button type="button" onClick={save} disabled={!dirty || busy} className={btnPrimary}>
+                    <Icon name="save" className="text-[18px]" /> {busy ? t('saving') : t('case.tasks.save')}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 /* ---------- FR-11: trao đổi với Legal Verifier ---------- */
 function MessagesSection({ assignmentId, progress }) {
+    const { t } = useTranslation('executor');
     // Mỗi yêu cầu xác minh = 1 luồng trao đổi
     const requests = [...new Map(progress.filter((p) => p.requestId).map((p) => [p.requestId, p])).values()];
     const [requestId, setRequestId] = useState('');
@@ -385,8 +479,8 @@ function MessagesSection({ assignmentId, progress }) {
         if (!requestId) return;
         executorApi.getMessages(assignmentId, requestId)
             .then(({ messages: list, last }) => { setMessages(list); setPage(0); setHasOlder(!last); })
-            .catch((e) => setError(getErrorMessage(e, 'Could not load messages.')));
-    }, [assignmentId, requestId]);
+            .catch((e) => setError(getErrorMessage(e, t('case.messages.loadError'))));
+    }, [assignmentId, requestId, t]);
 
     // Nối trang cũ hơn lên đầu; bỏ trùng theo id vì tin mới đến sau lần tải trước làm các trang lệch đi
     const loadOlder = () => {
@@ -396,7 +490,7 @@ function MessagesSection({ assignmentId, progress }) {
                 setPage(page + 1);
                 setHasOlder(!last);
             })
-            .catch((e) => setError(getErrorMessage(e, 'Could not load messages.')));
+            .catch((e) => setError(getErrorMessage(e, t('case.messages.loadError'))));
     };
 
     useEffect(() => { loadMessages(); }, [loadMessages]);
@@ -408,10 +502,10 @@ function MessagesSection({ assignmentId, progress }) {
         try {
             const res = await executorApi.getAttachmentBlob(assignmentId, requestId, messageId);
             if (tab) showBlobInTab(tab, res.data);
-            else setError('Your browser blocked the pop-up. Please allow pop-ups for this site.');
+            else setError(t('case.messages.popupBlocked'));
         } catch (err) {
             if (tab) tab.close();
-            setError(await getBlobErrorMessage(err, 'Could not open the attachment.'));
+            setError(await getBlobErrorMessage(err, t('case.messages.openError')));
         }
     };
 
@@ -424,7 +518,7 @@ function MessagesSection({ assignmentId, progress }) {
         try {
             await executorApi.downloadAttachment(assignmentId, requestId, m.id, m.attachmentName);
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not download the attachment.'));
+            setError(getErrorMessage(err, t('case.messages.downloadError')));
         } finally {
             setDownloadingId(null);
         }
@@ -433,27 +527,27 @@ function MessagesSection({ assignmentId, progress }) {
     const send = async (e) => {
         e.preventDefault();
         setError('');
-        if (!content.trim() && !file) return setError('Write a message or attach a file.');
-        if (file && (!/\.(pdf|png|jpe?g)$/i.test(file.name) || file.size > MAX_SIZE)) return setError('Attachment must be PDF/PNG/JPG up to 10MB.');
+        if (!content.trim() && !file) return setError(t('case.messages.errEmpty'));
+        if (file && (!/\.(pdf|png|jpe?g)$/i.test(file.name) || file.size > MAX_SIZE)) return setError(t('case.messages.errFile'));
         setSending(true);
         try {
             await executorApi.sendMessage(assignmentId, requestId, { content: content.trim(), file });
             setContent(''); setFile(null);
             loadMessages();
         } catch (err) {
-            setError(getErrorMessage(err, 'Could not send.'));
+            setError(getErrorMessage(err, t('case.messages.sendError')));
         } finally {
             setSending(false);
         }
     };
 
     return (
-        <Card title="Messages with Legal Verifier" icon="forum">
+        <Card title={t('case.messages.title')} icon="forum">
             {requests.length > 1 && (
                 <select value={requestId} onChange={(e) => setRequestId(e.target.value)} className={`${inputClass} mb-4`}>
                     {requests.map((r) => (
                         <option key={r.requestId} value={r.requestId}>
-                            Request of {formatDate(r.requestedAt)} — {HANDOVER_LABEL[r.handoverStatus]?.label || r.handoverStatus}
+                            {t('case.messages.requestOf', { date: formatDate(r.requestedAt), status: t(`handover.${r.handoverStatus}`, r.handoverStatus) })}
                         </option>
                     ))}
                 </select>
@@ -462,28 +556,28 @@ function MessagesSection({ assignmentId, progress }) {
             <div className="space-y-3 max-h-80 overflow-y-auto mb-4">
                 {hasOlder && (
                     <button type="button" onClick={loadOlder} className="block mx-auto text-xs font-semibold text-primary hover:underline">
-                        Load older messages
+                        {t('case.messages.loadOlder')}
                     </button>
                 )}
                 {messages.length === 0 && (
-                    <EmptyState compact icon="forum" title="No messages yet"
-                                text="Send a message if the Legal Verifier needs more information about your request." />
+                    <EmptyState compact icon="forum" title={t('case.messages.emptyTitle')}
+                                text={t('case.messages.emptyText')} />
                 )}
                 {messages.map((m) => {
                     const mine = m.senderRole === 'EXECUTOR';
                     return (
                         <div key={m.id} className={`max-w-[80%] p-3 rounded-xl text-sm ${mine ? 'ml-auto bg-primary-fixed' : 'bg-surface-container-low'}`}>
-                            <p className="text-xs text-outline mb-1">{mine ? 'You' : m.senderName || 'Legal Verifier'} · {formatDate(m.createdAt, true)}</p>
+                            <p className="text-xs text-outline mb-1">{mine ? t('case.messages.you') : m.senderName || t('case.messages.verifier')} · {formatDate(m.createdAt, true)}</p>
                             {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
                             {m.attachmentName && (
                                 <div className="mt-2 flex items-center gap-1.5 max-w-full">
                                     <button type="button" onClick={() => openAttachment(m.id)}
-                                            title="View attachment" aria-label={`View ${m.attachmentName}`}
+                                            title={t('case.messages.view')} aria-label={t('case.messages.viewNamed', { name: m.attachmentName })}
                                             className="inline-flex items-center justify-center h-8 w-8 shrink-0 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary hover:bg-surface-container">
                                         <Icon name="visibility" className="text-[16px]" />
                                     </button>
                                     <button type="button" onClick={() => downloadAttachment(m)} disabled={downloadingId === m.id}
-                                            title="Download attachment" aria-label={`Download ${m.attachmentName}`}
+                                            title={t('case.messages.download')} aria-label={t('case.messages.downloadNamed', { name: m.attachmentName })}
                                             className="inline-flex items-center gap-1.5 min-w-0 h-8 px-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-xs font-semibold text-primary hover:bg-surface-container disabled:opacity-60">
                                         <Icon name={downloadingId === m.id ? 'hourglass_top' : 'download'} className="text-[16px] shrink-0" />
                                         <span className="truncate">{m.attachmentName}</span>
@@ -497,20 +591,20 @@ function MessagesSection({ assignmentId, progress }) {
             {/* B1: hồ sơ REJECTED đã đóng (backend trả 409 khi nhắn), nên mời nộp hồ sơ mới thay cho ô nhắn tin */}
             {selectedRequest?.handoverStatus === 'REJECTED' ? (
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-surface-container-low">
-                    <p className="text-sm text-on-surface-variant">This request was rejected and is closed for messages.</p>
+                    <p className="text-sm text-on-surface-variant">{t('case.messages.rejectedClosed')}</p>
                     <button type="button" className={btnPrimary}
                         onClick={() => document.getElementById('submit-verification')?.scrollIntoView({ behavior: 'smooth' })}>
-                        <Icon name="upload_file" className="text-[18px]" /> Submit a new request
+                        <Icon name="upload_file" className="text-[18px]" /> {t('case.messages.newRequest')}
                     </button>
                 </div>
             ) : (
             <form onSubmit={send} className="space-y-3">
-                <textarea rows={2} maxLength={2000} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Write a message..."
+                <textarea rows={2} maxLength={2000} value={content} onChange={(e) => setContent(e.target.value)} placeholder={t('case.messages.placeholder')}
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <FilePicker file={file} onChange={setFile} accept={FILE_TYPES} label="Attach file" disabled={sending} />
+                    <FilePicker file={file} onChange={setFile} accept={FILE_TYPES} label={t('case.messages.attach')} disabled={sending} />
                     <button type="submit" disabled={sending} className={btnOutline}>
-                        <Icon name="send" className="text-[18px]" /> {sending ? 'Sending...' : 'Send'}
+                        <Icon name="send" className="text-[18px]" /> {sending ? t('case.messages.sending') : t('case.messages.send')}
                     </button>
                 </div>
             </form>

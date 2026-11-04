@@ -566,6 +566,8 @@ class LegacyMessageServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
         when(legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE))
                 .thenReturn(List.of(onClaimMsg));
+        when(legacyMessageRepository.findById(onClaimMsg.getId()))
+                .thenReturn(Optional.of(onClaimMsg));
         when(legacyMessageRepository.markDelivered(eq(onClaimMsg.getId()), any(LocalDateTime.class)))
                 .thenReturn(0);
 
@@ -718,5 +720,36 @@ class LegacyMessageServiceImplTest {
         assertThatThrownBy(() -> messageService.getMessageDetailForBeneficiary(userId, vaultId, msgId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("This time-capsule message is scheduled for");
+    }
+
+    @Test
+    @DisplayName("m2 (vong 3): Khi Vault da CLAIMED (dong ho so), beneficiary van doc duoc loi nhan da mo khoa du khong co view session 30 phut")
+    void getMessageDetailForBeneficiary_ClaimedVaultWithoutViewSession_Success() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID msgId = UUID.randomUUID();
+        vault.setStatus(VaultStatus.CLAIMED);
+        when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId))
+                .thenReturn(Optional.of(beneficiary));
+
+        LegacyMessage deliveredMsg = LegacyMessage.builder()
+                .id(msgId)
+                .vault(vault)
+                .recipientType(LegacyMessageRecipientType.ALL_BENEFICIARIES)
+                .title("Time-Capsule Delivered After Claim")
+                .content("enc:Future Message")
+                .deliveryTrigger(LegacyMessageDeliveryTrigger.SPECIFIC_DATE)
+                .deliverDate(LocalDate.now())
+                .status(LegacyMessageStatus.DELIVERED)
+                .build();
+
+        when(legacyMessageRepository.findByIdAndVaultId(msgId, vaultId))
+                .thenReturn(Optional.of(deliveredMsg));
+        when(cryptoService.decrypt("enc:Future Message")).thenReturn("Future Message");
+
+        LegacyMessageResponse response = messageService.getMessageDetailForBeneficiary(userId, vaultId, msgId);
+
+        assertThat(response.getTitle()).isEqualTo("Time-Capsule Delivered After Claim");
+        assertThat(response.getContent()).isEqualTo("Future Message");
+        assertThat(response.isUnlocked()).isTrue();
     }
 }

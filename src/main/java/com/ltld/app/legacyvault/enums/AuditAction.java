@@ -24,6 +24,8 @@ public enum AuditAction {
     BENEFICIARY_NOTIFIED, BENEFICIARY_NOTIFY_FAILED, BENEFICIARY_NOTIFY_GAVE_UP, VAULT_ARCHIVED,
     // FR-03: cấu hình và check-in DMS
     DMS_CONFIGURED, DMS_CHECKIN,
+    // F2: check-in một chạm từ link trong email nhắc (không đăng nhập)
+    DMS_CHECKIN_ONE_CLICK,
     // FR-02: chỉ định người thụ hưởng
     BENEFICIARY_ASSIGNED, BENEFICIARY_REPLACED, BENEFICIARY_ASSIGN_DENIED, BENEFICIARY_LINKED, BENEFICIARY_REMOVED,
     // FR-02 (V8): gỡ người thụ hưởng bị từ chối
@@ -42,6 +44,8 @@ public enum AuditAction {
     DOCUMENT_DELETED,
     // FR-20: Admin xem chi tiết Két sắt
     ADMIN_VAULT_VIEWED,
+    // F6 (M2): Executor xem danh sách tài sản của vault; Owner thấy trong tab "Ai đã xem"
+    EXECUTOR_VAULT_VIEWED,
     // BR-05: xóa vĩnh viễn Vault sau 2 năm lưu trữ
     VAULT_PURGED,
     // O5: Admin tạm dừng / mở lại DMS
@@ -63,5 +67,7 @@ public enum AuditAction {
     // T1: Thanh toán VNPay & gói VIP
     PAYMENT_SUCCEEDED, PAYMENT_FAILED,
     // X1: người thụ hưởng đồng ý mở tài sản JOINT_CONSENSUS
-    ASSET_CONSENSUS_APPROVED
+    ASSET_CONSENSUS_APPROVED,
+    // F5: Executor cập nhật checklist xử lý tài khoản số
+    EXECUTOR_TASK_UPDATED
 }

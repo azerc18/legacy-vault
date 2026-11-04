@@ -158,9 +158,9 @@ public class InheritanceDossierPdfService {
         }
 
         // ---------- Phần 2 ----------
-        doc.add(heading("2. Danh mục tài sản được phân bổ cho bạn"));
+        doc.add(heading("2. Danh mục tài sản dành cho bạn"));
         if (d.assets().isEmpty()) {
-            doc.add(note("Không có tài sản nào đang được phân bổ cho bạn trong kho di sản này."));
+            doc.add(note("Không có tài sản nào dành cho bạn trong kho di sản này."));
         } else {
             PdfPTable t = table(new float[]{5, 37, 14, 18, 13, 13});
             for (String h : List.of("#", "Tài sản", "Loại", "Cơ chế chuyển giao", "Hình thức", "Tỷ lệ")) header(t, h);
@@ -178,7 +178,11 @@ public class InheritanceDossierPdfService {
                 t.addCell(cell(name.toString(), regular, 9));
                 t.addCell(cell(ASSET_TYPE.getOrDefault(a.type(), String.valueOf(a.type())), regular, 9));
                 t.addCell(cell(MECHANISM.getOrDefault(a.mechanism(), String.valueOf(a.mechanism())), regular, 9));
-                t.addCell(cell(MODE.getOrDefault(a.mode(), String.valueOf(a.mode())), regular, 9));
+                // Tài sản chưa phân bổ riêng có mode = null (Map.of không nhận key null)
+                String modeText = a.mode() == null
+                        ? "Chung cho mọi người thụ hưởng"
+                        : MODE.getOrDefault(a.mode(), String.valueOf(a.mode()));
+                t.addCell(cell(modeText, regular, 9));
                 t.addCell(cell(percent(a.sharePercent()), regular, 9));
             }
             doc.add(t);

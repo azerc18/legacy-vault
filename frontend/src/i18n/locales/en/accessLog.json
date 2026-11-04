@@ -1,0 +1,7 @@
+{
+  "tabDms": "DMS & Executor Events",
+  "tab": "Who Accessed My Estate",
+  "subtitle": "Transparency log showing every time an Executor, Beneficiary, Legal Verifier, or Admin viewed or downloaded your vaults, assets, or legal documents.",
+  "emptyTitle": "No external access recorded yet",
+  "emptyText": "When an Executor, Beneficiary, Legal Verifier, or Admin views your vault, assets, or documents, it will be recorded here."
+}

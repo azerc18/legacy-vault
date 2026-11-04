@@ -38,6 +38,8 @@ class DmsReminderServiceImplTest {
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private DmsReminderProcessor processor;
     @Mock private EmailSender emailSender;
+    // F2: chưa stub -> token null, mail không kèm link
+    @Mock private DmsOneClickCheckinService oneClickCheckinService;
 
     @InjectMocks
     private DmsReminderServiceImpl service;
@@ -61,8 +63,8 @@ class DmsReminderServiceImplTest {
         assertThatCode(() -> service.sendDueReminders(NOW)).doesNotThrowAnyException();
 
         verify(processor).prepareReminder(ok, NOW);
-        verify(emailSender).sendDmsCheckinReminder("ok@example.test", NOW, NOW.plusDays(7), 1, 3);
-        verify(emailSender, times(1)).sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt());
+        verify(emailSender).sendDmsCheckinReminder("ok@example.test", NOW, NOW.plusDays(7), 1, 3, null);
+        verify(emailSender, times(1)).sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt(), any());
     }
 
     @Test
@@ -74,11 +76,11 @@ class DmsReminderServiceImplTest {
         when(processor.prepareReminder(first, NOW)).thenReturn(Optional.of(mail("first@example.test")));
         when(processor.prepareReminder(second, NOW)).thenReturn(Optional.of(mail("second@example.test")));
         doThrow(new IllegalStateException("SMTP down")).when(emailSender)
-                .sendDmsCheckinReminder(eq("first@example.test"), any(), any(), anyInt(), anyInt());
+                .sendDmsCheckinReminder(eq("first@example.test"), any(), any(), anyInt(), anyInt(), any());
 
         assertThatCode(() -> service.sendDueReminders(NOW)).doesNotThrowAnyException();
 
-        verify(emailSender).sendDmsCheckinReminder(eq("second@example.test"), any(), any(), anyInt(), anyInt());
+        verify(emailSender).sendDmsCheckinReminder(eq("second@example.test"), any(), any(), anyInt(), anyInt(), any());
     }
 
     @Test
@@ -95,7 +97,7 @@ class DmsReminderServiceImplTest {
         InOrder order = inOrder(processor, emailSender);
         order.verify(processor).prepareReminder(skipped, NOW);
         order.verify(processor).prepareReminder(due, NOW);
-        order.verify(emailSender).sendDmsCheckinReminder("due@example.test", NOW, NOW.plusDays(7), 1, 3);
+        order.verify(emailSender).sendDmsCheckinReminder("due@example.test", NOW, NOW.plusDays(7), 1, 3, null);
         order.verify(processor).recordReminderSent(due, NOW);
         order.verifyNoMoreInteractions();
     }
@@ -107,7 +109,7 @@ class DmsReminderServiceImplTest {
         when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW)).thenReturn(List.of(id));
         when(processor.prepareReminder(id, NOW)).thenReturn(Optional.of(mail("owner@example.test")));
         doThrow(new IllegalStateException("SMTP down")).when(emailSender)
-                .sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt());
+                .sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt(), any());
 
         service.sendDueReminders(NOW);
 
@@ -140,7 +142,7 @@ class DmsReminderServiceImplTest {
         when(processor.prepareReminder(failingRecord, NOW)).thenReturn(Optional.of(mail("record@example.test")));
         when(processor.prepareReminder(ok, NOW)).thenReturn(Optional.of(mail("ok@example.test")));
         doThrow(new IllegalStateException("SMTP down")).when(emailSender)
-                .sendDmsCheckinReminder(eq("fail@example.test"), any(), any(), anyInt(), anyInt());
+                .sendDmsCheckinReminder(eq("fail@example.test"), any(), any(), anyInt(), anyInt(), any());
         doThrow(new IllegalStateException("DB down")).when(processor).releaseReminder(failingMail, 1, 0, NOW);
         doThrow(new IllegalStateException("DB down")).when(processor).recordReminderSent(failingRecord, NOW);
 
@@ -158,5 +160,34 @@ class DmsReminderServiceImplTest {
         service.sendDueReminders(NOW);
 
         verifyNoInteractions(processor, emailSender);
+    }
+
+    @Test
+    @DisplayName("F2: mail nhắc kèm token check-in một chạm sinh cho đúng DmsConfig")
+    void reminderMail_carriesOneClickToken() {
+        UUID id = UUID.randomUUID();
+        when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW)).thenReturn(List.of(id));
+        when(processor.prepareReminder(id, NOW)).thenReturn(Optional.of(mail("owner@example.test")));
+        when(oneClickCheckinService.generateCheckinTokenForConfig(id)).thenReturn("checkin-token");
+
+        service.sendDueReminders(NOW);
+
+        verify(emailSender).sendDmsCheckinReminder("owner@example.test", NOW, NOW.plusDays(7), 1, 3, "checkin-token");
+        verify(processor).recordReminderSent(id, NOW);
+    }
+
+    @Test
+    @DisplayName("F2: sinh token lỗi -> tính như gửi lỗi: trả lại lần nhắc, không gửi, không ghi REMINDER_SENT")
+    void tokenFailure_releasesReminder() {
+        UUID id = UUID.randomUUID();
+        when(dmsConfigRepository.findIdsDueForReminder(DmsStatus.ACTIVE, NOW)).thenReturn(List.of(id));
+        when(processor.prepareReminder(id, NOW)).thenReturn(Optional.of(mail("owner@example.test")));
+        when(oneClickCheckinService.generateCheckinTokenForConfig(id)).thenThrow(new IllegalStateException("boom"));
+
+        service.sendDueReminders(NOW);
+
+        verify(emailSender, never()).sendDmsCheckinReminder(any(), any(), any(), anyInt(), anyInt(), any());
+        verify(processor).releaseReminder(id, 1, 0, NOW);
+        verify(processor, never()).recordReminderSent(any(), any());
     }
 }
