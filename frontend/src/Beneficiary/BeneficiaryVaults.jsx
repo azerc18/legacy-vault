@@ -44,7 +44,7 @@ export default function BeneficiaryVaults() {
                                     <h3 className="font-title-lg text-title-lg">{v.vaultName}</h3>
                                     <p className="text-sm text-on-surface-variant mt-1">From {v.ownerName || 'Unknown owner'}</p>
                                 </div>
-                                <StatusBadge vaultStatus={v.vaultStatus} claimStatus={v.claimStatus} />
+                                <StatusBadge vaultStatus={v.vaultStatus} claimStatus={v.claimStatus} myStatus={v.myStatus} />
                             </div>
                             <dl className="mt-5 grid grid-cols-2 gap-3 text-sm">
                                 <div>
