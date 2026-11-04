@@ -31,6 +31,8 @@ body {
 .lv-side-nav { display: flex; flex-direction: column; gap: 4px; }
 .lv-side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 .lv-side-bottom .material-symbols-outlined { color: inherit; }
+/* Dropdown thông báo nằm trong sidebar tối nhưng nền sáng: trả lại màu icon của chính nó */
+.lv-side-bottom .lv-pop .material-symbols-outlined.text-secondary { color: #3d5ae0; }
 @media (min-width: 1024px) {
   .lv-side { position: fixed; z-index: 30; top: 0; left: 0; bottom: 0; width: 248px; overflow-y: auto; }
   body.lv-has-side #root { padding-left: 248px; }

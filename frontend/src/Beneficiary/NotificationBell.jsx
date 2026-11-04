@@ -97,7 +97,7 @@ export default function NotificationBell({ source = 'beneficiary' }) {
                 )}
             </button>
             {open && pos && (
-                <div style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30">
+                <div style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30 lv-pop text-on-surface">
                     <p className="px-4 py-3 text-sm font-semibold border-b border-outline-variant/30">Notifications</p>
                     {items.length === 0 && <p className="px-4 py-6 text-sm text-on-surface-variant text-center">No notifications yet.</p>}
                     {items.map((n) => (
