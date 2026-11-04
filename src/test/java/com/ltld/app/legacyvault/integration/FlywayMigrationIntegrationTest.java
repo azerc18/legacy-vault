@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.flywaydb.core.Flyway;
@@ -31,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "app.dms.scheduler.enabled=false",
         "app.beneficiary.notify-retry.enabled=false",
         "app.beneficiary.vault-purge.enabled=false",
-        "app.beneficiary.claim-expiry.enabled=false"
+        "app.beneficiary.claim-expiry.enabled=false",
+        "app.legacy-message.scheduler.enabled=false"
 })
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -119,6 +121,18 @@ class FlywayMigrationIntegrationTest {
                 """, String.class);
         for (DmsConfirmerStatus s : DmsConfirmerStatus.values()) {
             assertThat(col).contains("'" + s.name() + "'");
+        }
+    }
+
+    // F4b: mọi NotificationType (kể cả LEGACY_MESSAGE_DELIVERED) phải có trong enum notifications.type
+    @Test
+    void notificationType_columnAcceptsEveryJavaEnumValue() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'notifications' AND COLUMN_NAME = 'type'
+                """, String.class);
+        for (NotificationType t : NotificationType.values()) {
+            assertThat(col).contains("'" + t.name() + "'");
         }
     }
 }

@@ -4,17 +4,26 @@ import com.ltld.app.legacyvault.dto.messagedto.CreateLegacyMessageRequest;
 import com.ltld.app.legacyvault.dto.messagedto.LegacyMessageResponse;
 import com.ltld.app.legacyvault.dto.messagedto.UpdateLegacyMessageRequest;
 import com.ltld.app.legacyvault.entity.LegacyMessage;
+import com.ltld.app.legacyvault.entity.Notification;
+import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.LegacyMessageDeliveryTrigger;
 import com.ltld.app.legacyvault.enums.LegacyMessageRecipientType;
 import com.ltld.app.legacyvault.enums.LegacyMessageStatus;
+import com.ltld.app.legacyvault.enums.NotificationChannel;
+import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.LegacyMessageRepository;
+import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -22,68 +31,135 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.service.vaultservice.VaultModificationGuard;
-import lombok.RequiredArgsConstructor;
+import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class LegacyMessageServiceImpl implements LegacyMessageService {
 
     private static final long MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024L; // 10MB
+    private static final Set<VaultStatus> HANDOVER_VAULT_STATUSES = Set.of(VaultStatus.UNLOCKED, VaultStatus.CLAIMED);
+    private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    private static final int VIEW_SESSION_MINUTES = 30;
 
     private final LegacyMessageRepository legacyMessageRepository;
     private final VaultRepository vaultRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
+    private final IdentityVerificationRepository identityVerificationRepository;
     private final CryptoService cryptoService;
     private final FileStorageService fileStorageService;
     private final EntitlementService entitlementService;
     private final VaultModificationGuard vaultModificationGuard;
     private final AuditLogService auditLogService;
+    private final NotificationRepository notificationRepository;
+    private final EmailSender emailSender;
+    private final TransactionTemplate requiresNewTx;
+
+    @Autowired
+    public LegacyMessageServiceImpl(
+            LegacyMessageRepository legacyMessageRepository,
+            VaultRepository vaultRepository,
+            VaultBeneficiaryRepository vaultBeneficiaryRepository,
+            IdentityVerificationRepository identityVerificationRepository,
+            CryptoService cryptoService,
+            FileStorageService fileStorageService,
+            EntitlementService entitlementService,
+            VaultModificationGuard vaultModificationGuard,
+            AuditLogService auditLogService,
+            NotificationRepository notificationRepository,
+            EmailSender emailSender,
+            PlatformTransactionManager transactionManager) {
+        this.legacyMessageRepository = legacyMessageRepository;
+        this.vaultRepository = vaultRepository;
+        this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
+        this.identityVerificationRepository = identityVerificationRepository;
+        this.cryptoService = cryptoService;
+        this.fileStorageService = fileStorageService;
+        this.entitlementService = entitlementService;
+        this.vaultModificationGuard = vaultModificationGuard;
+        this.auditLogService = auditLogService;
+        this.notificationRepository = notificationRepository;
+        this.emailSender = emailSender;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     @Override
     @Transactional
     public LegacyMessageResponse createMessage(UUID ownerId, UUID vaultId, CreateLegacyMessageRequest request, MultipartFile attachment) throws Exception {
         Vault vault = getVaultForOwner(vaultId, ownerId);
         vaultModificationGuard.ensureModifiable(vault);
+
         entitlementService.assertCanUseLegacyMessages(ownerId);
 
-        VaultBeneficiary recipient = validateAndResolveRecipient(vault, request.getRecipientType(), request.getRecipientBeneficiaryId());
         validateDeliveryTrigger(request.getDeliveryTrigger(), request.getDeliverDate());
+
+        VaultBeneficiary recipientBeneficiary = null;
+        if (request.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY) {
+            if (request.getRecipientBeneficiaryId() == null) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "recipientBeneficiaryId is required when recipientType is SPECIFIC_BENEFICIARY");
+            }
+            recipientBeneficiary = vaultBeneficiaryRepository.findById(request.getRecipientBeneficiaryId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Beneficiary not found"));
+            if (!recipientBeneficiary.getVault().getId().equals(vaultId)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "Beneficiary does not belong to this vault");
+            }
+        }
+
+        String attachmentPath = null;
+        String attachmentName = null;
+        String attachmentType = null;
+        Long attachmentSize = null;
+
+        if (attachment != null && !attachment.isEmpty()) {
+            if (attachment.getSize() > MAX_ATTACHMENT_SIZE) {
+                throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "Attachment size exceeds 10MB limit");
+            }
+
+            entitlementService.assertStorageQuota(ownerId, attachment.getSize());
+
+            attachmentName = attachment.getOriginalFilename();
+            attachmentType = attachment.getContentType();
+            attachmentSize = attachment.getSize();
+
+            byte[] cipherBytes = cryptoService.encryptBytes(attachment.getBytes());
+            attachmentPath = fileStorageService.storeFile(attachment, cipherBytes);
+        }
 
         String encryptedContent = cryptoService.encrypt(request.getContent());
 
         LegacyMessage message = LegacyMessage.builder()
                 .vault(vault)
                 .recipientType(request.getRecipientType())
-                .recipientBeneficiary(recipient)
-                .title(request.getTitle().trim())
+                .recipientBeneficiary(recipientBeneficiary)
+                .title(request.getTitle())
                 .content(encryptedContent)
                 .deliveryTrigger(request.getDeliveryTrigger())
                 .deliverDate(request.getDeliveryTrigger() == LegacyMessageDeliveryTrigger.SPECIFIC_DATE ? request.getDeliverDate() : null)
                 .status(LegacyMessageStatus.ACTIVE)
+                .attachmentPath(attachmentPath)
+                .attachmentName(attachmentName)
+                .attachmentType(attachmentType)
+                .attachmentSize(attachmentSize)
                 .build();
-
-        if (attachment != null && !attachment.isEmpty()) {
-            validateAttachment(attachment);
-            // T1 (m7): đính kèm tính vào quota dung lượng của gói
-            entitlementService.assertStorageQuota(ownerId, attachment.getSize());
-            byte[] encryptedBytes = cryptoService.encryptBytes(attachment.getBytes());
-            String savedPath = fileStorageService.storeFile(attachment, encryptedBytes);
-            message.setAttachmentName(attachment.getOriginalFilename());
-            message.setAttachmentPath(savedPath);
-            message.setAttachmentType(attachment.getContentType());
-            message.setAttachmentSize(attachment.getSize());
-        }
 
         LegacyMessage saved = legacyMessageRepository.save(message);
 
@@ -96,13 +172,15 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public List<LegacyMessageResponse> getMessagesByVault(UUID ownerId, UUID vaultId) {
-        Vault vault = getVaultForOwner(vaultId, ownerId);
-        return legacyMessageRepository.findByVaultIdOrderByCreatedAtDesc(vault.getId()).stream()
-                .map(m -> {
-                    String decrypted = decryptContentSafely(m.getContent());
-                    return toResponse(m, decrypted, true);
-                })
-                .toList();
+        getVaultForOwner(vaultId, ownerId);
+        List<LegacyMessage> messages = legacyMessageRepository.findByVaultIdOrderByCreatedAtDesc(vaultId);
+
+        List<LegacyMessageResponse> responses = new ArrayList<>();
+        for (LegacyMessage m : messages) {
+            String decryptedContent = decryptContentSafely(m.getContent());
+            responses.add(toResponse(m, decryptedContent, true));
+        }
+        return responses;
     }
 
     @Override
@@ -111,8 +189,9 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         getVaultForOwner(vaultId, ownerId);
         LegacyMessage message = legacyMessageRepository.findByIdAndVaultId(messageId, vaultId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Legacy message not found"));
-        String decrypted = cryptoService.decrypt(message.getContent());
-        return toResponse(message, decrypted, true);
+
+        String decryptedContent = cryptoService.decrypt(message.getContent());
+        return toResponse(message, decryptedContent, true);
     }
 
     @Override
@@ -124,39 +203,50 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         LegacyMessage message = legacyMessageRepository.findByIdAndVaultId(messageId, vaultId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Legacy message not found"));
 
-        VaultBeneficiary recipient = validateAndResolveRecipient(vault, request.getRecipientType(), request.getRecipientBeneficiaryId());
         validateDeliveryTrigger(request.getDeliveryTrigger(), request.getDeliverDate());
 
-        message.setTitle(request.getTitle().trim());
-        message.setContent(cryptoService.encrypt(request.getContent()));
-        message.setRecipientType(request.getRecipientType());
-        message.setRecipientBeneficiary(recipient);
-        message.setDeliveryTrigger(request.getDeliveryTrigger());
-        message.setDeliverDate(request.getDeliveryTrigger() == LegacyMessageDeliveryTrigger.SPECIFIC_DATE ? request.getDeliverDate() : null);
+        VaultBeneficiary recipientBeneficiary = null;
+        if (request.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY) {
+            if (request.getRecipientBeneficiaryId() == null) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "recipientBeneficiaryId is required when recipientType is SPECIFIC_BENEFICIARY");
+            }
+            recipientBeneficiary = vaultBeneficiaryRepository.findById(request.getRecipientBeneficiaryId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Beneficiary not found"));
+            if (!recipientBeneficiary.getVault().getId().equals(vaultId)) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "Beneficiary does not belong to this vault");
+            }
+        }
 
         String oldPathToDelete = null;
 
         if (attachment != null && !attachment.isEmpty()) {
-            validateAttachment(attachment);
-            if (message.getAttachmentPath() != null) {
-                oldPathToDelete = message.getAttachmentPath();
+            if (attachment.getSize() > MAX_ATTACHMENT_SIZE) {
+                throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "Attachment size exceeds 10MB limit");
             }
-            // T1 (m7): đính kèm tính vào quota gói; thay file thì chỉ tính phần tăng thêm
-            long replacedBytes = message.getAttachmentSize() != null ? message.getAttachmentSize() : 0L;
-            entitlementService.assertStorageQuota(ownerId, Math.max(0L, attachment.getSize() - replacedBytes));
-            byte[] encryptedBytes = cryptoService.encryptBytes(attachment.getBytes());
-            String savedPath = fileStorageService.storeFile(attachment, encryptedBytes);
+
+            long oldSize = message.getAttachmentSize() != null ? message.getAttachmentSize() : 0L;
+            long delta = attachment.getSize() - oldSize;
+            if (delta > 0) {
+                entitlementService.assertStorageQuota(ownerId, delta);
+            }
+
+            oldPathToDelete = message.getAttachmentPath();
+
+            byte[] cipherBytes = cryptoService.encryptBytes(attachment.getBytes());
+            String newPath = fileStorageService.storeFile(attachment, cipherBytes);
+
+            message.setAttachmentPath(newPath);
             message.setAttachmentName(attachment.getOriginalFilename());
-            message.setAttachmentPath(savedPath);
             message.setAttachmentType(attachment.getContentType());
             message.setAttachmentSize(attachment.getSize());
-        } else if (!request.isKeepExistingAttachment() && message.getAttachmentPath() != null) {
-            oldPathToDelete = message.getAttachmentPath();
-            message.setAttachmentName(null);
-            message.setAttachmentPath(null);
-            message.setAttachmentType(null);
-            message.setAttachmentSize(null);
         }
+
+        message.setRecipientType(request.getRecipientType());
+        message.setRecipientBeneficiary(recipientBeneficiary);
+        message.setTitle(request.getTitle());
+        message.setContent(cryptoService.encrypt(request.getContent()));
+        message.setDeliveryTrigger(request.getDeliveryTrigger());
+        message.setDeliverDate(request.getDeliveryTrigger() == LegacyMessageDeliveryTrigger.SPECIFIC_DATE ? request.getDeliverDate() : null);
 
         LegacyMessage saved = legacyMessageRepository.save(message);
 
@@ -209,21 +299,22 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public List<LegacyMessageResponse> getMessagesForBeneficiary(UUID userId, UUID vaultId) {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
 
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
         List<LegacyMessage> messages = legacyMessageRepository.findForBeneficiary(
                 vaultId, beneficiary.getId(), LegacyMessageRecipientType.ALL_BENEFICIARIES);
 
-        LocalDate today = LocalDate.now();
+        // M2 & m2 (vòng 3): Giải mã nội dung khi có phiên xác thực 30 phút hợp lệ, hoặc khi Vault đã CLAIMED
+        boolean canReadContent = canReadMessageContent(vault, userId);
+        LocalDate today = LocalDate.now(VN_ZONE);
         return messages.stream().map(m -> {
             boolean isUnlocked = isMessageUnlocked(m, today);
-            String content = isUnlocked ? decryptContentSafely(m.getContent()) : null;
+            String content = (isUnlocked && canReadContent) ? decryptContentSafely(m.getContent()) : null;
             return toResponse(m, content, isUnlocked);
         }).toList();
     }
@@ -231,11 +322,12 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public LegacyMessageResponse getMessageDetailForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
-
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        // M2 & m2 (vòng 3): Yêu cầu phiên xác thực khi UNLOCKED; cho phép đọc sau khi Vault đã CLAIMED
+        assertCanReadMessage(vault, userId);
+
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
@@ -244,10 +336,11 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
         if (message.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY
                 && (message.getRecipientBeneficiary() == null || !message.getRecipientBeneficiary().getId().equals(beneficiary.getId()))) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "This message is not addressed to you");
+            // m2: không gửi cho mình -> NOT_FOUND để tránh IDOR probing
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Legacy message not found");
         }
 
-        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now());
+        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now(VN_ZONE));
         if (!isUnlocked) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This time-capsule message is scheduled for " + message.getDeliverDate());
         }
@@ -259,11 +352,12 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
     @Override
     @Transactional(readOnly = true)
     public DecryptedAttachment getAttachmentForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception {
-        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "You are not a beneficiary of this vault"));
-
+        VaultBeneficiary beneficiary = requireActiveBeneficiary(vaultId, userId);
         Vault vault = beneficiary.getVault();
-        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+        // M2 & m2 (vòng 3): Yêu cầu phiên xác thực khi UNLOCKED; cho phép tải đính kèm sau khi Vault đã CLAIMED
+        assertCanReadMessage(vault, userId);
+
+        if (!HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
             throw new BusinessException(ErrorCode.CLAIM_NOT_READY, "Vault is not unlocked for beneficiaries yet");
         }
 
@@ -272,10 +366,11 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
 
         if (message.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY
                 && (message.getRecipientBeneficiary() == null || !message.getRecipientBeneficiary().getId().equals(beneficiary.getId()))) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "This message is not addressed to you");
+            // m2: NOT_FOUND
+            throw new BusinessException(ErrorCode.NOT_FOUND, "Legacy message not found");
         }
 
-        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now());
+        boolean isUnlocked = isMessageUnlocked(message, LocalDate.now(VN_ZONE));
         if (!isUnlocked) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "This time-capsule message is scheduled for " + message.getDeliverDate());
         }
@@ -289,6 +384,193 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         return new DecryptedAttachment(message.getAttachmentName(), message.getAttachmentType(), plainBytes);
     }
 
+    // F4b: Khi Vault được mở khóa (hoặc nhận bàn giao), phát tất cả lời nhắn ON_CLAIM và các lời nhắn SPECIFIC_DATE đã tới hạn
+    @Override
+    public int deliverOnClaimMessages(UUID vaultId) {
+        Vault vault = vaultRepository.findById(vaultId).orElse(null);
+        if (vault == null || !HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
+            return 0;
+        }
+
+        LocalDate today = LocalDate.now(VN_ZONE);
+        LocalDateTime now = LocalDateTime.now();
+        List<LegacyMessage> activeMessages = legacyMessageRepository.findByVaultIdAndStatus(vaultId, LegacyMessageStatus.ACTIVE);
+
+        int deliveredCount = 0;
+        for (LegacyMessage message : activeMessages) {
+            if (isMessageUnlocked(message, today)) {
+                if (deliverSingleMessageById(message.getId(), now)) {
+                    deliveredCount++;
+                }
+            }
+        }
+        return deliveredCount;
+    }
+
+    // F4b: Scheduler hằng ngày quét và gửi các lời nhắn đến hạn (deliver_date <= hôm nay) hoặc ON_CLAIM chưa gửi trong các Vault đã mở
+    @Override
+    public int deliverDueScheduledMessages(LocalDate today) {
+        LocalDate effectiveDate = today != null ? today : LocalDate.now(VN_ZONE);
+        LocalDateTime now = LocalDateTime.now();
+
+        List<LegacyMessage> dueMessages = legacyMessageRepository.findDueMessagesForUnlockedVaults(
+                LegacyMessageStatus.ACTIVE,
+                HANDOVER_VAULT_STATUSES,
+                LegacyMessageDeliveryTrigger.ON_CLAIM,
+                LegacyMessageDeliveryTrigger.SPECIFIC_DATE,
+                effectiveDate);
+
+        int deliveredCount = 0;
+        for (LegacyMessage message : dueMessages) {
+            if (deliverSingleMessageById(message.getId(), now)) {
+                deliveredCount++;
+            }
+        }
+        return deliveredCount;
+    }
+
+    private record RecipientInfo(UUID beneficiaryId, String email, String fullName, boolean hasAccount) {}
+    private record DeliveryPlan(UUID messageId, UUID vaultId, String vaultName, String ownerName, List<RecipientInfo> recipients) {}
+
+    private boolean deliverSingleMessageById(UUID messageId, LocalDateTime now) {
+        DeliveryPlan plan;
+        try {
+            plan = requiresNewTx.execute(status -> {
+                // M1 & m1 (vòng 3): Load lại entity trong session của transaction mới và kiểm tra trạng thái Vault trước khi markDelivered
+                LegacyMessage message = legacyMessageRepository.findById(messageId).orElse(null);
+                if (message == null) {
+                    status.setRollbackOnly();
+                    return null;
+                }
+                Vault vault = message.getVault();
+                if (vault == null || !HANDOVER_VAULT_STATUSES.contains(vault.getStatus())) {
+                    status.setRollbackOnly();
+                    return null;
+                }
+
+                // F4b: Chuyển trạng thái ACTIVE -> DELIVERED nguyên tử để ngăn race condition giữa Listener và Scheduler
+                int updated = legacyMessageRepository.markDelivered(messageId, now);
+                if (updated == 0) {
+                    status.setRollbackOnly();
+                    return null;
+                }
+                message.setStatus(LegacyMessageStatus.DELIVERED);
+                message.setDeliveredAt(now);
+
+                List<VaultBeneficiary> beneficiaries = resolveRecipientsForDelivery(message, vault.getId());
+                User owner = vault.getOwner();
+                String ownerName = (owner != null && owner.getFullName() != null && !owner.getFullName().isBlank())
+                        ? owner.getFullName()
+                        : (owner != null && owner.getEmail() != null ? owner.getEmail() : "the vault owner");
+
+                List<RecipientInfo> recipients = new ArrayList<>();
+                for (VaultBeneficiary vb : beneficiaries) {
+                    boolean hasAccount = vb.getUser() != null;
+                    recipients.add(new RecipientInfo(vb.getId(), vb.getEmail(), vb.getFullName(), hasAccount));
+
+                    if (hasAccount) {
+                        try {
+                            // n1: Nội dung thông báo không làm lộ tiêu đề riêng tư của lời nhắn
+                            String content = String.format(
+                                    "You have a new legacy message from %s in vault \"%s\".",
+                                    ownerName, vault.getName());
+                            notificationRepository.save(Notification.builder()
+                                    .recipient(vb.getUser())
+                                    .type(NotificationType.LEGACY_MESSAGE_DELIVERED)
+                                    .channel(NotificationChannel.IN_APP)
+                                    .referenceType("Vault")
+                                    .referenceId(vault.getId())
+                                    .content(content)
+                                    .status(NotificationStatus.SENT)
+                                    .sentAt(now)
+                                    .build());
+                        } catch (RuntimeException e) {
+                            log.warn("F4b: failed to save in-app notification for message {} to beneficiary {}: {}",
+                                    message.getId(), vb.getId(), e.getMessage());
+                        }
+                    }
+                }
+
+                // Ghi audit không chứa tiêu đề riêng tư của lời nhắn
+                auditLogService.log(AuditAction.BENEFICIARY_NOTIFIED, AuditResult.SUCCESS, null, null,
+                        vault.getId(), "LegacyMessage", message.getId().toString(),
+                        "Delivered legacy message (id=" + message.getId() + ", recipients=" + recipients.size() + ")");
+
+                return new DeliveryPlan(message.getId(), vault.getId(), vault.getName(), ownerName, recipients);
+            });
+        } catch (RuntimeException e) {
+            log.error("F4b: failed to deliver message {} in new transaction: {}", messageId, e.getMessage(), e);
+            return false;
+        }
+
+        if (plan == null) {
+            return false;
+        }
+
+        // Giao dịch DB đã commit thành công: gửi mail sau commit
+        for (RecipientInfo r : plan.recipients()) {
+            if (r.email() != null && !r.email().isBlank()) {
+                try {
+                    emailSender.sendLegacyMessageDeliveredNotification(
+                            r.email(), r.fullName(), plan.ownerName(), plan.vaultName(), plan.vaultId(), r.hasAccount());
+                } catch (RuntimeException e) {
+                    log.warn("F4b: failed to send legacy message email for message {} to {}: {}",
+                            plan.messageId(), r.email(), e.getMessage());
+                }
+            }
+        }
+        return true;
+    }
+
+    private List<VaultBeneficiary> resolveRecipientsForDelivery(LegacyMessage message, UUID vaultId) {
+        if (message.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY) {
+            VaultBeneficiary target = message.getRecipientBeneficiary();
+            if (target != null && isEligibleRecipient(target)) {
+                return List.of(target);
+            }
+            return List.of();
+        }
+        return vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId).stream()
+                .filter(this::isEligibleRecipient)
+                .toList();
+    }
+
+    private boolean isEligibleRecipient(VaultBeneficiary vb) {
+        return vb.getStatus() != BeneficiaryInviteStatus.DECLINED
+                && vb.getStatus() != BeneficiaryInviteStatus.WAIVED;
+    }
+
+    private VaultBeneficiary requireActiveBeneficiary(UUID vaultId, UUID userId) {
+        VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Vault not found"));
+        if (!isEligibleRecipient(beneficiary)) {
+            throw new BusinessException(ErrorCode.CLAIM_ALREADY_RESPONDED, "You have declined this inheritance");
+        }
+        return beneficiary;
+    }
+
+    private boolean hasValidViewSession(UUID vaultId, UUID currentUserId) {
+        return identityVerificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
+                vaultId, currentUserId, VerificationStatus.SUCCESS,
+                LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
+    }
+
+    // m2 (vòng 3): Khi Vault đã CLAIMED (người thụ hưởng đã hoàn tất xác minh và đóng hồ sơ nhận di sản),
+    // cho phép tiếp tục đọc lời nhắn đã mở khóa (bao gồm cả Time-Capsule đến hạn trong tương lai) mà không cần mở phiên mới.
+    private boolean canReadMessageContent(Vault vault, UUID currentUserId) {
+        if (vault != null && vault.getStatus() == VaultStatus.CLAIMED) {
+            return true;
+        }
+        return vault != null && hasValidViewSession(vault.getId(), currentUserId);
+    }
+
+    private void assertCanReadMessage(Vault vault, UUID currentUserId) {
+        if (!canReadMessageContent(vault, currentUserId)) {
+            throw new BusinessException(ErrorCode.IDENTITY_NOT_VERIFIED,
+                    "Identity verification is required before viewing messages.");
+        }
+    }
+
     private boolean isMessageUnlocked(LegacyMessage m, LocalDate today) {
         if (m.getStatus() == LegacyMessageStatus.DELIVERED) {
             return true;
@@ -297,6 +579,15 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
             return true;
         }
         return m.getDeliverDate() != null && !m.getDeliverDate().isAfter(today);
+    }
+
+    private String decryptContentSafely(String cipher) {
+        try {
+            return cryptoService.decrypt(cipher);
+        } catch (Exception e) {
+            log.warn("F4b: failed to decrypt message content: {}", e.getMessage());
+            return "[Encrypted message content unavailable]";
+        }
     }
 
     private Vault getVaultForOwner(UUID vaultId, UUID ownerId) {
@@ -308,106 +599,60 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
         return vault;
     }
 
-    private VaultBeneficiary validateAndResolveRecipient(Vault vault, LegacyMessageRecipientType recipientType, UUID recipientBeneficiaryId) {
-        if (recipientType == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY) {
-            if (recipientBeneficiaryId == null) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "recipientBeneficiaryId is required when recipientType is SPECIFIC_BENEFICIARY");
-            }
-            VaultBeneficiary beneficiary = vaultBeneficiaryRepository.findById(recipientBeneficiaryId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Recipient beneficiary not found"));
-            if (!beneficiary.getVault().getId().equals(vault.getId())) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "Beneficiary does not belong to this vault");
-            }
-            return beneficiary;
-        }
-        return null;
-    }
-
     private void validateDeliveryTrigger(LegacyMessageDeliveryTrigger trigger, LocalDate deliverDate) {
+        if (trigger == null) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "deliveryTrigger is required");
+        }
         if (trigger == LegacyMessageDeliveryTrigger.SPECIFIC_DATE) {
             if (deliverDate == null) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "deliverDate is required when deliveryTrigger is SPECIFIC_DATE");
             }
-            if (deliverDate.isBefore(LocalDate.now())) {
+            if (deliverDate.isBefore(LocalDate.now(VN_ZONE))) {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "deliverDate cannot be in the past");
             }
         }
     }
 
-    private void validateAttachment(MultipartFile file) {
-        if (file.getSize() > MAX_ATTACHMENT_SIZE) {
-            throw new BusinessException(ErrorCode.FILE_TOO_LARGE, "Attachment size exceeds 10MB limit");
-        }
-        String filename = file.getOriginalFilename();
-        if (filename != null) {
-            String lower = filename.toLowerCase();
-            if (lower.endsWith(".exe") || lower.endsWith(".bat") || lower.endsWith(".sh") || lower.endsWith(".cmd")) {
-                throw new BusinessException(ErrorCode.BAD_REQUEST, "Executable files are not allowed");
-            }
-        }
-    }
-
-    private String decryptContentSafely(String encrypted) {
-        try {
-            return cryptoService.decrypt(encrypted);
-        } catch (Exception e) {
-            log.warn("Failed to decrypt legacy message content: {}", e.getMessage());
-            return "[Encrypted content]";
-        }
-    }
-
     private void schedulePhysicalDelete(String path) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    try {
-                        fileStorageService.deleteFile(path);
-                    } catch (Exception ex) {
-                        log.warn("Failed to physically delete file after commit: {}", path, ex);
-                    }
+                    fileStorageService.deleteFile(path);
                 }
             });
         } else {
-            try {
-                fileStorageService.deleteFile(path);
-            } catch (Exception ex) {
-                log.warn("Failed to physically delete file: {}", path, ex);
-            }
+            fileStorageService.deleteFile(path);
         }
     }
 
-    private LegacyMessageResponse toResponse(LegacyMessage m, String content, boolean unlocked) {
+    private LegacyMessageResponse toResponse(LegacyMessage m, String decryptedContent, boolean isUnlocked) {
         String recipientName = null;
-        String recipientEmail = null;
-        UUID recipientId = null;
-
-        if (m.getRecipientBeneficiary() != null) {
-            recipientId = m.getRecipientBeneficiary().getId();
-            recipientName = m.getRecipientBeneficiary().getFullName();
-            recipientEmail = m.getRecipientBeneficiary().getEmail();
+        if (m.getRecipientType() == LegacyMessageRecipientType.SPECIFIC_BENEFICIARY && m.getRecipientBeneficiary() != null) {
+            recipientName = m.getRecipientBeneficiary().getFullName() != null
+                    ? m.getRecipientBeneficiary().getFullName()
+                    : m.getRecipientBeneficiary().getEmail();
         }
 
         return LegacyMessageResponse.builder()
                 .id(m.getId())
                 .vaultId(m.getVault().getId())
                 .recipientType(m.getRecipientType())
-                .recipientBeneficiaryId(recipientId)
+                .recipientBeneficiaryId(m.getRecipientBeneficiary() != null ? m.getRecipientBeneficiary().getId() : null)
                 .recipientName(recipientName)
-                .recipientEmail(recipientEmail)
                 .title(m.getTitle())
-                .content(content)
+                .content(decryptedContent)
                 .deliveryTrigger(m.getDeliveryTrigger())
                 .deliverDate(m.getDeliverDate())
                 .status(m.getStatus())
+                .unlocked(isUnlocked)
+                .deliveredAt(m.getDeliveredAt())
                 .hasAttachment(m.getAttachmentPath() != null)
                 .attachmentName(m.getAttachmentName())
                 .attachmentType(m.getAttachmentType())
                 .attachmentSize(m.getAttachmentSize())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
-                .deliveredAt(m.getDeliveredAt())
-                .unlocked(unlocked)
                 .build();
     }
 }

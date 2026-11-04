@@ -65,6 +65,14 @@ export const beneficiaryApi = {
     downloadDocument: (vaultId, docId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/documents/${docId}/download`, name || 'document'),
 
+    // F4b: lời nhắn di nguyện & hẹn giờ (Time-Capsule) — đọc ngay sau khi đăng nhập khi vault UNLOCKED / CLAIMED
+    listLegacyMessages: (vaultId) =>
+        http.get(`/beneficiaries/vaults/${vaultId}/messages`).then((r) => r.data?.data ?? []),
+    getLegacyMessage: (vaultId, messageId) =>
+        http.get(`/beneficiaries/vaults/${vaultId}/messages/${messageId}`).then(unwrap),
+    downloadLegacyMessageAttachment: (vaultId, messageId, name) =>
+        downloadBlob(`/beneficiaries/vaults/${vaultId}/messages/${messageId}/attachment`, name || 'attachment'),
+
     // FR-16: thông báo trong app -> [{ id, type, content, vaultId, read, createdAt }]
     listNotifications: () => http.get('/beneficiaries/notifications').then((r) => r.data?.data ?? []),
     markNotificationRead: (id) => http.patch(`/beneficiaries/notifications/${id}/read`),

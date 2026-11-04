@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.messagedto.LegacyMessageResponse;
 import com.ltld.app.legacyvault.dto.messagedto.UpdateLegacyMessageRequest;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,6 +29,9 @@ public interface LegacyMessageService {
 
     DecryptedAttachment getAttachmentForBeneficiary(UUID userId, UUID vaultId, UUID messageId) throws Exception;
 
+    int deliverOnClaimMessages(UUID vaultId);
+
+    int deliverDueScheduledMessages(LocalDate today);
+
     record DecryptedAttachment(String filename, String contentType, byte[] data) {}
 }
-

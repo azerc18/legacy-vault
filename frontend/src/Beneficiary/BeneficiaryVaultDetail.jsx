@@ -8,6 +8,7 @@ import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
     ASSET_TYPE, DOCUMENT_TYPE, inputClass, btnPrimary, btnOutline,
 } from './beneficiaryUi.jsx';
+import BeneficiaryLegacyMessages from './BeneficiaryLegacyMessages.jsx';
 
 const OTP_RESEND_SECONDS = 60; // khớp BeneficiaryServiceImpl.OTP_RESEND_SECONDS
 
@@ -144,6 +145,9 @@ export default function BeneficiaryVaultDetail() {
                 </>
             )}
 
+            {(stage === 'content' || stage === 'claimed') && (
+                <BeneficiaryLegacyMessages vaultId={vaultId} />
+            )}
             {vault && !['loading', 'error'].includes(stage) && <ExecutorTasksCard vaultId={vaultId} />}
         </BeneficiaryLayout>
     );

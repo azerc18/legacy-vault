@@ -171,6 +171,36 @@ public class EmailSender {
         sendWithoutOtpFooter(email, "Reminder: assets waiting for you - LegacyVault", body.toString());
     }
 
+    // F4b: thông báo khi lời nhắn di nguyện / Time-Capsule đến hạn mở cho người thụ hưởng
+    // (n1: không để lộ tiêu đề riêng tư trong mail; m4: bổ sung link đăng ký nếu người nhận chưa có tài khoản)
+    @Async
+    public void sendLegacyMessageDeliveredNotification(String email, String fullName, String ownerName,
+                                                       String vaultName, UUID vaultId, boolean hasAccount) {
+        StringBuilder body = new StringBuilder()
+                .append("Hello ").append(fullName == null || fullName.isBlank() ? "" : fullName).append(",\n\n")
+                .append("You have a new legacy message from ").append(ownerName)
+                .append(" in vault \"").append(vaultName).append("\" on LegacyVault.\n\n");
+
+        if (!hasAccount) {
+            body.append("Your account has not been activated yet. ")
+                    .append("Please complete registration and verify your email first, then sign in to read your message.\n");
+            String regLink = registerLink();
+            if (regLink != null) {
+                body.append("Register at: ").append(regLink).append("\n");
+            }
+            body.append("\n");
+        }
+
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            body.append("Open the vault: ").append(link).append("\n\n");
+        }
+        body.append("Sign in to your LegacyVault account and open the vault to read the message and download any attached media.\n\n")
+                .append("Please do not share this email with anyone.");
+
+        sendWithoutOtpFooter(email, "A legacy message for you - LegacyVault", body.toString());
+    }
+
     public void sendVerificationRequestNotification(String email, UUID requestId) {
         sendWithoutOtpFooter(email,
                 "New verification request - LegacyVault",
