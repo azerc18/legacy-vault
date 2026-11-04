@@ -10,7 +10,7 @@ const STEPS = [
     { icon: 'verified_user', title: 'Verify your identity',
         text: 'Confirm it is you with a one-time code sent to your email. The code expires after a few minutes.' },
     { icon: 'how_to_reg', title: 'Accept the handover',
-        text: 'When a vault has several beneficiaries, every person must accept before the assets can be opened.' },
+        text: 'Each beneficiary responds on their own. Accept to receive your share, or decline and it passes to the backup beneficiary, if the owner named one. Declining cannot be undone.' },
     { icon: 'download', title: 'View and save the assets',
         text: 'Download the information you need and store it safely. Delete downloaded files once you have saved them.' },
     { icon: 'task_alt', title: 'Close the handover case',

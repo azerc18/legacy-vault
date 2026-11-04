@@ -26,13 +26,17 @@ export const DOCUMENT_TYPE = {
 };
 
 // Gộp VaultStatus + ClaimStatus thành 1 nhãn dễ hiểu
-export function StatusBadge({ vaultStatus, claimStatus }) {
+export function StatusBadge({ vaultStatus, claimStatus, myStatus }) {
     let label = 'Ready to claim';
     let cls = 'bg-secondary-fixed text-on-secondary-fixed';
-    if (vaultStatus === 'CLAIMED' || claimStatus === 'CLAIMED') {
+    if (myStatus === 'DECLINED' || myStatus === 'WAIVED') {
+        label = 'Declined'; cls = 'bg-surface-container text-outline';
+    } else if (vaultStatus === 'CLAIMED' || claimStatus === 'CLAIMED') {
         label = 'Claimed'; cls = 'bg-success-container text-on-success-container';
     } else if (vaultStatus === 'ARCHIVED_LOCKED' || claimStatus === 'EXPIRED') {
         label = 'Expired'; cls = 'bg-surface-container text-outline';
+    } else if (myStatus === 'ACCEPTED') {
+        label = 'Accepted'; cls = 'bg-secondary-fixed text-on-secondary-fixed';
     } else if (claimStatus === 'PENDING') {
         label = 'In progress'; cls = 'bg-warning-container text-on-warning-container';
     }
