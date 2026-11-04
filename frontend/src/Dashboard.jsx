@@ -81,23 +81,20 @@ export default function Dashboard() {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             {/* NAVBAR */}
-            <header className="sticky top-0 z-20 bg-background/90 backdrop-blur border-b border-outline-variant/30">
+            <header className="sticky top-0 z-20 bg-primary/95 backdrop-blur border-b border-white/10 text-white">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
-                    <Link to="/" className="flex items-center gap-2">
-                        <span className="w-9 h-9 rounded-xl bg-primary text-on-primary flex items-center justify-center">
-                            <Icon name="shield_locked" className="text-[20px]" />
-                        </span>
-                        <span className="font-headline-sm text-primary font-bold text-xl">LegacyVault</span>
+                    <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
+                        <Icon name="lock" className="text-[26px]" />LEGACYVAULT
                     </Link>
-                    <nav className="hidden md:flex gap-8 text-sm font-semibold text-on-surface-variant">
+                    <nav className="hidden md:flex gap-8 text-sm font-semibold text-white/75">
                         {NAV.map((n) => (
-                            <a key={n.href} href={n.href} className="hover:text-primary">{t(`nav.${n.key}`)}</a>
+                            <a key={n.href} href={n.href} className="hover:text-white">{t(`nav.${n.key}`)}</a>
                         ))}
                     </nav>
                     <div className="flex items-center gap-3">
                         <LanguageSwitch />
-                        <Link to="/login" className="hidden sm:block text-sm font-semibold text-primary">{t('signIn')}</Link>
-                        <Link to="/register" className="h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold flex items-center hover:bg-primary-container">
+                        <Link to="/login" className="hidden sm:block text-sm font-semibold text-white/85 hover:text-white">{t('signIn')}</Link>
+                        <Link to="/register" className="h-10 px-5 rounded-full bg-white text-primary text-sm font-bold flex items-center hover:bg-secondary-fixed">
                             {t('getStarted')}
                         </Link>
                     </div>
@@ -105,26 +102,31 @@ export default function Dashboard() {
             </header>
 
             {/* 1. HERO */}
-            <section className="px-5 pt-20 pb-16 text-center">
-                <div className="max-w-3xl mx-auto">
-                    <h1 className="font-headline-lg text-[40px] md:text-[52px] leading-tight text-primary font-bold">
+            <section className="relative overflow-hidden bg-primary text-white px-5 pt-24 pb-20 text-center"
+                     style={{ backgroundImage: 'radial-gradient(900px 420px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
+                <img src="/key-photo.jpg" alt="" aria-hidden="true"
+                     className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
+                     style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
+                <div className="relative max-w-3xl mx-auto">
+                    <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight lv-rise pb-2"
+                        style={{ backgroundImage: 'linear-gradient(100deg,#ffffff 0%,#b9c9ff 40%,#7f9dff 60%,#ffffff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
                         {t('hero.title')}
                     </h1>
-                    <p className="mt-5 text-body-lg text-on-surface-variant">{t('hero.text')}</p>
+                    <p className="mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
                     <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-                        <Link to="/register" className="h-12 px-6 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 hover:bg-primary-container">
+                        <Link to="/register" className="h-12 px-7 rounded-full bg-white text-primary font-bold flex items-center justify-center gap-2 hover:bg-secondary-fixed">
                             <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                         </Link>
-                        <a href="#how" className="h-12 px-6 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center hover:bg-surface-container-low">
+                        <a href="#how" className="h-12 px-7 rounded-full border border-white/40 text-white font-bold flex items-center justify-center hover:bg-white/10">
                             {t('hero.how')}
                         </a>
                     </div>
                 </div>
                 {/* Trust badges */}
-                <div className="mt-12 flex flex-wrap justify-center gap-3">
+                <div className="relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
                     {BADGES.map((b) => (
-                        <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-surface-container text-sm text-on-surface-variant">
-                            <Icon name={b.icon} className="text-[18px] text-secondary" /> {t(`badges.${b.key}`)}
+                        <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-white/10 border border-white/15 text-sm text-white/85 backdrop-blur">
+                            <Icon name={b.icon} className="text-[18px] text-[#b9c9ff]" /> {t(`badges.${b.key}`)}
                         </span>
                     ))}
                 </div>
@@ -223,21 +225,28 @@ export default function Dashboard() {
                 <div className="max-w-6xl mx-auto rounded-3xl bg-primary text-on-primary px-8 py-14 text-center">
                     <h2 className="font-headline-md text-headline-md">{t('closing.title')}</h2>
                     <p className="mt-3 opacity-80">{t('closing.text')}</p>
-                    <Link to="/register" className="inline-flex mt-8 h-12 px-6 rounded-xl bg-on-primary text-primary font-bold items-center gap-2">
+                    <Link to="/register" className="inline-flex mt-8 h-12 px-7 rounded-full bg-on-primary text-primary font-bold items-center gap-2">
                         {t('closing.cta')} <Icon name="arrow_forward" className="text-[18px]" />
                     </Link>
                 </div>
             </section>
 
             {/* FOOTER */}
-            <footer className="border-t border-outline-variant/30 px-5 py-8">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-center text-sm text-outline">
-                    <span>{t('footer.rights')}</span>
-                    <div className="flex gap-6">
-                        <a href="#" className="hover:text-primary">{t('footer.privacy')}</a>
-                        <a href="#" className="hover:text-primary">{t('footer.terms')}</a>
-                        <a href="#faq" className="hover:text-primary">{t('footer.support')}</a>
+            <footer className="bg-primary text-white px-5 pt-14 pb-8 overflow-hidden">
+                <div className="max-w-6xl mx-auto">
+                    <div className="flex flex-col md:flex-row gap-6 justify-between text-sm text-white/65">
+                        <span className="flex items-center gap-2 font-bold tracking-[0.18em] text-white"><Icon name="lock" className="text-[22px]" />LEGACYVAULT</span>
+                        <div className="flex gap-6">
+                            <a href="#" className="hover:text-white">{t('footer.privacy')}</a>
+                            <a href="#" className="hover:text-white">{t('footer.terms')}</a>
+                            <a href="#faq" className="hover:text-white">{t('footer.support')}</a>
+                        </div>
                     </div>
+                    <div aria-hidden="true" className="mt-10 font-headline-lg font-bold select-none whitespace-nowrap text-center"
+                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', backgroundImage: 'linear-gradient(180deg,#ffffff 0%,#7f9dff 70%,rgba(127,157,255,.25) 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                        LEGACYVAULT
+                    </div>
+                    <p className="mt-2 text-center text-xs text-white/50">{t('footer.rights')}</p>
                 </div>
             </footer>
         </div>

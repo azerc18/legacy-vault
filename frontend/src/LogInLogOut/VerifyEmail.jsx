@@ -1,3 +1,4 @@
+import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +45,7 @@ export default function VerifyEmail() {
     };
 
     return (
-        <div className="relative bg-background min-h-screen flex flex-col justify-center items-center px-4">
+        <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30 max-w-[420px] w-full">
                 <h2 className="font-headline-md text-on-surface font-bold mb-2">{t('verify.title')}</h2>
@@ -68,6 +69,6 @@ export default function VerifyEmail() {
                     <Link to="/login" className="text-secondary font-semibold">{t('backToSignIn')}</Link>
                 </div>
             </div>
-        </div>
+        </AuthShell>
     );
 }

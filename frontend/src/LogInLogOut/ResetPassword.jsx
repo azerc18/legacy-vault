@@ -1,3 +1,4 @@
+import AuthShell from '../Common/AuthShell.jsx';
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -81,7 +82,7 @@ export default function ResetPassword() {
     };
 
     return (
-        <div className="relative bg-background min-h-screen font-body-md text-on-surface antialiased flex flex-col justify-center items-center px-4 py-8">
+        <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
             <div className="mb-6 text-center">
@@ -202,6 +203,6 @@ export default function ResetPassword() {
                     </>
                 )}
             </div>
-        </div>
+        </AuthShell>
     );
 }

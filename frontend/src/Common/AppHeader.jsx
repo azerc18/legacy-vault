@@ -70,14 +70,14 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
     const handleLogout = () => { logout(); navigate('/login'); };
 
     return (
-        <header className="sticky top-0 z-20 bg-surface-container-lowest/95 backdrop-blur-sm border-b border-outline-variant/30">
+        <header className="sticky top-0 z-20 bg-surface-container-lowest/85 backdrop-blur-md border-b border-outline-variant/40">
             <div className={`${PAGE_WIDTH} h-16 flex items-center justify-between gap-3`}>
                 <Link to={home} className="flex items-center gap-2 min-w-0">
                     <span className="w-9 h-9 shrink-0 rounded-xl bg-primary text-on-primary flex items-center justify-center">
                         <Icon name={icon} className="text-[20px]" />
                     </span>
                     <span className="min-w-0">
-                        <span className="font-headline-sm text-primary font-bold text-xl block leading-tight">LegacyVault</span>
+                        <span className="font-headline-sm text-primary font-bold text-base tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (
                             <span className="text-[11px] text-secondary font-semibold tracking-wide uppercase block truncate">{workspace}</span>
                         )}

@@ -3,3 +3,29 @@ html, body {
   padding: 0;
   height: 100%;
 }
+
+/* Nền trang: xanh lạnh có vệt sáng nhẹ ở góc phải trên (theo bản thiết kế UI mới) */
+body {
+  background-color: #e2e6f1;
+  background-image: radial-gradient(1100px 520px at 88% -8%, rgba(160, 175, 235, 0.55), transparent 62%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Nút chính (nền navy) bo tròn dạng viên thuốc, giống bản thiết kế */
+a.bg-primary.rounded-xl,
+button.bg-primary.rounded-xl,
+a.bg-secondary.rounded-xl,
+button.bg-secondary.rounded-xl {
+  border-radius: 999px;
+}
+
+/* Thẻ nổi nhẹ hơn */
+.lv-rise { animation: lv-rise .5s ease both; }
+@keyframes lv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lv-rise { animation: none; } }
+
+/* Trang auth: trên màn rộng, logo đã nằm ở panel trái nên ẩn khối logo trùng bên phải */
+@media (min-width: 1024px) {
+  .lv-auth-form > div.mb-8.text-center:first-of-type { display: none; }
+}
