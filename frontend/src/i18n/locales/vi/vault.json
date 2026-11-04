@@ -137,7 +137,7 @@
           "ALL": "Mọi người thụ hưởng trong két sắt đều thấy tài sản này (mặc định).",
           "EXCLUSIVE": "Chỉ một người nhận tài sản này. Có thể chọn người dự phòng nhận thay nếu người đó từ chối.",
           "PROPORTIONAL": "Chia cho nhiều người theo tỷ lệ %, tổng phải bằng 100%. Chỉ dùng cho tài sản cần hồ sơ pháp lý.",
-          "JOINT_CONSENSUS": "Tài sản chỉ mở khi đủ số người trong nhóm được chọn cùng đồng ý."
+          "JOINT_CONSENSUS": "Tài sản chỉ mở khi đủ số người trong nhóm được chọn cùng đồng ý. Sửa phân bổ (kể cả ghi chú) sẽ chia lại khoá và xoá các lượt đồng ý trước đó."
         },
         "recipientPlaceholder": "Chọn người nhận",
         "contingent": "Người dự phòng (không bắt buộc)",

@@ -137,7 +137,7 @@
           "ALL": "Every beneficiary of this vault can see this asset (default).",
           "EXCLUSIVE": "Only one person receives this asset. You can name a backup who receives it if that person declines.",
           "PROPORTIONAL": "Split between several people by percentage; shares must total 100%. Only for assets that need a legal claim.",
-          "JOINT_CONSENSUS": "The asset opens only when enough people in the chosen group approve together."
+          "JOINT_CONSENSUS": "The asset opens only when enough people in the chosen group approve together. Editing the allocation (even its note) re-splits the key and clears earlier approvals."
         },
         "recipientPlaceholder": "Choose the recipient",
         "contingent": "Backup beneficiary (optional)",

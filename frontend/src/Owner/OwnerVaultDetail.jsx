@@ -315,7 +315,13 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const schemaMissing = isEdit && initial.fields != null && !schema;
     const showAllocation = beneficiaries.length >= 2;
     const allowProportional = schema?.mechanism === 'LEGAL_CLAIM_DOSSIER';   // BE chỉ cho chia % với tài sản cần hồ sơ pháp lý
-    const changeType = (e) => setF((x) => ({ ...x, assetType: e.target.value, fields: {} }));
+    const changeType = (e) => setF((x) => {
+        const type = e.target.value;
+        const keepProportional = schemaOf(schemas, type)?.mechanism === 'LEGAL_CLAIM_DOSSIER';
+        // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh option bị disable mà vẫn đang chọn
+        const allocation = x.allocation.mode === 'PROPORTIONAL' && !keepProportional ? emptyAllocation() : x.allocation;
+        return { ...x, assetType: type, fields: {}, allocation };
+    });
     const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
 
     const submit = async (e) => {
@@ -327,7 +333,6 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
             const msg = validateFields(schema, f.fields || {}, isEdit);
             if (msg) return setError(msg);
         } else if (!isEdit && !f.secret.trim()) return setError(t('detail.assets.errors.secretRequired'));
-        setLoading(true);
         if (showAllocation) {
             const allocMsg = validateAllocation(f.allocation, allowProportional, t);
             if (allocMsg) return setError(allocMsg);
