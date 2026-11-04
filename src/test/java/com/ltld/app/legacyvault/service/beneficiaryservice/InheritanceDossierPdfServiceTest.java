@@ -69,4 +69,17 @@ class InheritanceDossierPdfServiceTest {
         String text = text(service.render(empty));
         assertThat(text).contains("Chưa có chữ ký", "Không có tài sản");
     }
+
+    @Test
+    void render_assetWithoutAllocation_doesNotThrow() throws Exception {
+        var d = sample(false);
+        var unallocated = new InheritanceDossierData.AssetLine("Tài khoản Gmail", AssetType.BANK_ACCOUNT,
+                TransferMechanism.LEGAL_CLAIM_DOSSIER, null, null, null, false, Map.of());
+        var data = new InheritanceDossierData(d.vaultId(), d.vaultName(), d.unlockedAt(), d.claimDeadlineAt(),
+                d.owner(), d.beneficiary(), d.executor(), null, List.of(unallocated), List.of(), d.generatedAt());
+
+        String text = text(assertDoesNotThrow(() -> service.render(data)));
+
+        assertThat(text).contains("Tài khoản Gmail");
+    }
 }

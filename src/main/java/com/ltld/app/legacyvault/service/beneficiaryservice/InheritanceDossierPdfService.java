@@ -178,7 +178,11 @@ public class InheritanceDossierPdfService {
                 t.addCell(cell(name.toString(), regular, 9));
                 t.addCell(cell(ASSET_TYPE.getOrDefault(a.type(), String.valueOf(a.type())), regular, 9));
                 t.addCell(cell(MECHANISM.getOrDefault(a.mechanism(), String.valueOf(a.mechanism())), regular, 9));
-                t.addCell(cell(MODE.getOrDefault(a.mode(), String.valueOf(a.mode())), regular, 9));
+                // Tài sản chưa phân bổ riêng có mode = null (Map.of không nhận key null)
+                String modeText = a.mode() == null
+                        ? "Chưa chia riêng"
+                        : MODE.getOrDefault(a.mode(), String.valueOf(a.mode()));
+                t.addCell(cell(modeText, regular, 9));
                 t.addCell(cell(percent(a.sharePercent()), regular, 9));
             }
             doc.add(t);
