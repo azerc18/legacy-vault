@@ -6,6 +6,7 @@ import { executorApi } from '../api/executorApi.js';
 
 const TYPE_ICON = {
     VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge', VERIFIER_REPLY: 'forum', VERIFICATION_DECIDED: 'gavel',
+    ASSET_REASSIGNED: 'swap_horiz',
 };
 const fmt = (v) => (v ? new Date(v).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
