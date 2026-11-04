@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
@@ -125,6 +126,14 @@ class AdminExecutorRescueServiceImplTest {
             assertThat(m.type()).isEqualTo(ExecutorAssignmentChangedEvent.MailType.REPLACED_BY_ADMIN);
             assertThat(m.recipientEmail()).isEqualTo("backup@example.test");
         });
+
+        // Người được chỉ định vào dòng PRIMARY nhận mail kích hoạt có hạn BR-03 lấy từ cấu hình DMS
+        ArgumentCaptor<Notification> notification = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(notification.capture());
+        assertThat(notification.getValue().getRecipient()).isSameAs(candidate);
+        assertThat(notification.getValue().getContent())
+                .contains("You are the Primary executor")
+                .contains("within 14 days");
     }
 
     // N2-Q26: email là một trong các beneficiary trong vault_beneficiaries -> 409 BENEFICIARY_CONFLICT

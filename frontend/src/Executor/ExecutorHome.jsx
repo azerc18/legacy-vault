@@ -11,6 +11,14 @@ const EXECUTOR = 'EXECUTOR';
 const STEPS = ['Acknowledge', 'Submit documents', 'Legal verification', 'Hand-over'];
 const TYPE_LABEL = {PRIMARY: 'Primary executor', BACKUP: 'Backup executor'};
 const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', {dateStyle: 'medium'}) : '—');
+// FR-07/FR-14: Owner chưa có tên thì hiện email
+const ownerName = (c) => c.ownerFullName || c.ownerEmail;
+const REQUEST_LABEL = {
+    PENDING: 'Documents under review',
+    APPROVED: 'Documents approved',
+    REJECTED: 'Documents rejected - submit again',
+    SIGNED: 'Unlock signed',
+};
 
 function Icon({name, className = ''}) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -57,17 +65,29 @@ function Stepper({step}) {
 function CaseCard({c, busy, onAcknowledge}) {
     const step = caseStep(c, c.progress);
     const btn = 'h-10 px-4 rounded-xl text-sm font-semibold inline-flex items-center gap-2';
-    const vaultCount = new Set(c.progress.map((p) => p.vaultId)).size;
 
     return (
         <article className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
                 <div className="min-w-0">
                     <p className="text-xs font-semibold text-secondary uppercase tracking-wide">{TYPE_LABEL[c.executorType] || c.executorType}</p>
-                    <h3 className="font-title-lg text-title-lg mt-1 truncate">Estate of {c.ownerFullName}</h3>
+                    <h3 className="font-title-lg text-title-lg mt-1 truncate">Estate of {ownerName(c)}</h3>
                     <p className="text-sm text-on-surface-variant">
-                        Activated {fmt(c.activatedAt)}{vaultCount > 0 && ` · ${vaultCount} vault(s) in progress`}
+                        Activated {fmt(c.activatedAt)} · {c.vaultCount} vault(s)
+                        {c.unreadMessageCount > 0 && ` · ${c.unreadMessageCount} unread message(s)`}
                     </p>
+                    {c.latestRequestStatus && (
+                        <p className={`text-sm mt-1 ${c.latestRequestStatus === 'REJECTED' ? 'text-error' : 'text-on-surface-variant'}`}>
+                            {REQUEST_LABEL[c.latestRequestStatus] || c.latestRequestStatus}
+                        </p>
+                    )}
+                    {c.acknowledgeDeadlineAt && (
+                        <p className="text-sm text-error font-semibold mt-1">
+                            {new Date(c.acknowledgeDeadlineAt) < new Date()
+                                ? `Acknowledgement overdue since ${fmt(c.acknowledgeDeadlineAt)}`
+                                : `Acknowledge before ${fmt(c.acknowledgeDeadlineAt)}`}
+                        </p>
+                    )}
                 </div>
                 <div className="flex gap-2">
                     {step === 0 && (
@@ -133,6 +153,7 @@ export default function ExecutorHome() {
             setCases((prev) => prev.map((c) => (c.assignmentId === id ? {
                 ...c,
                 acknowledgedAt: res.acknowledgedAt,
+                acknowledgeDeadlineAt: null,
                 status: res.status
             } : c)));
         } catch (e) {
@@ -186,7 +207,7 @@ export default function ExecutorHome() {
                                 <div key={c.assignmentId}
                                      className="p-4 flex flex-wrap items-center justify-between gap-2">
                                     <div>
-                                        <p className="font-semibold">{c.ownerFullName}</p>
+                                        <p className="font-semibold">{ownerName(c)}</p>
                                         <p className="text-sm text-on-surface-variant">{TYPE_LABEL[c.executorType]} ·
                                             since {fmt(c.assignedAt)}</p>
                                     </div>

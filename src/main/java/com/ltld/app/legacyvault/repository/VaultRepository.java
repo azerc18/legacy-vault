@@ -138,4 +138,13 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
             ORDER BY v.purgeEligibleAt ASC
             """)
     List<UUID> findPurgeableVaultIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    // FR-07/FR-14: số Vault còn hiệu lực (bỏ ARCHIVED_LOCKED) của từng Owner trong một truy vấn: [ownerId, count]
+    @Query("""
+            SELECT v.owner.id, COUNT(v) FROM Vault v
+            WHERE v.owner.id IN :ownerIds
+              AND v.status <> com.ltld.app.legacyvault.enums.VaultStatus.ARCHIVED_LOCKED
+            GROUP BY v.owner.id
+            """)
+    List<Object[]> countByOwnerIds(@Param("ownerIds") Collection<UUID> ownerIds);
 }

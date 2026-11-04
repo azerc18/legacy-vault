@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.integration.MySqlTestContainer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -166,6 +167,23 @@ class VaultRepositoryBeneficiaryEmailCheckIntegrationTest extends MySqlTestConta
         assertThat(vaultRepository.existsBeneficiaryWithEmail(owner.getId(), beneficiaryOfOther.getEmail())).isFalse();
         assertThat(vaultRepository.existsBeneficiaryWithEmail(owner.getId(), pendingOfOther)).isFalse();
         assertThat(vaultRepository.existsBeneficiaryWithEmail(owner.getId(), unrelated.getEmail())).isFalse();
+    }
+
+    // FR-07/FR-14: dashboard Executor chỉ đếm Vault còn hiệu lực, bỏ Vault ARCHIVED_LOCKED
+    @Test
+    void countByOwnerIds_skipsArchivedLockedVaults() {
+        User owner = user("owner");
+        vault(owner, null, email("a"));
+        Vault archived = vault(owner, null, email("b"));
+        archived.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        vaultRepository.save(archived);
+
+        List<Object[]> rows = vaultRepository.countByOwnerIds(List.of(owner.getId()));
+
+        assertThat(rows).singleElement().satisfies(row -> {
+            assertThat(row[0]).isEqualTo(owner.getId());
+            assertThat(row[1]).isEqualTo(1L);
+        });
     }
 
     // ---------- helpers ----------
