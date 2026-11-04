@@ -30,6 +30,8 @@ public class AssetsReassignedNotificationListener {
     // Tham số: số tài sản, tên Vault, tên Owner
     static final String MSG_ASSETS_REASSIGNED =
             "%d asset(s) in the vault \"%s\" of %s have been reassigned to you because another beneficiary declined their share.";
+    static final String MSG_ASSETS_REASSIGNED_NO_RESPONSE =
+            "%d asset(s) in the vault \"%s\" of %s have been reassigned to you because another beneficiary did not respond in time.";
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
@@ -64,10 +66,17 @@ public class AssetsReassignedNotificationListener {
                         .channel(NotificationChannel.IN_APP)
                         .referenceType(ENTITY_VAULT)
                         .referenceId(event.vaultId())
-                        .content(String.format(MSG_ASSETS_REASSIGNED,
+                        .content(String.format(messageFor(event),
                                 receiver.assetCount(), event.vaultName(), event.ownerName()))
                         .status(NotificationStatus.SENT)
                         .sentAt(LocalDateTime.now())
                         .build()));
+    }
+
+
+    private static String messageFor(AssetsReassignedEvent event) {
+        return event.reason() == AssetsReassignedEvent.Reason.NO_RESPONSE
+                ? MSG_ASSETS_REASSIGNED_NO_RESPONSE
+                : MSG_ASSETS_REASSIGNED;
     }
 }
