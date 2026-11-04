@@ -47,3 +47,30 @@ button.bg-secondary.rounded-xl {
   .lv-side-bottom { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; padding-top: 0; }
   .lv-side-bottom > div:last-child { border-top: 0; padding-top: 0; }
 }
+
+/* ===== Hiệu ứng trang chủ ===== */
+.lv-bg { background-color: #e2e6f1; transition: background-color .7s ease; }
+.lv-bg[data-mode="dark"] { background-color: #0b1020; }
+
+/* Hero: từng chữ hiện dần (mờ -> rõ), ánh sáng chạy qua chữ */
+.lv-word { animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both; }
+.lv-shine {
+  background-image: linear-gradient(100deg,#ffffff 0%,#b9c9ff 28%,#7f9dff 50%,#b9c9ff 72%,#ffffff 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both, lv-shine 6s linear infinite;
+}
+@keyframes lv-word { from { opacity: 0; filter: blur(14px); transform: translateY(18px); } to { opacity: 1; filter: blur(0); transform: none; } }
+@keyframes lv-shine { to { background-position: -200% 0; } }
+
+/* Cuộn tới thì hiện dần / dựng thẳng (chỉ chạy trên trình duyệt hỗ trợ scroll-driven animation) */
+@supports (animation-timeline: view()) {
+  .lv-reveal { animation: lv-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
+  .lv-tilt { animation: lv-tilt linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; transform-origin: 50% 100%; }
+}
+@keyframes lv-reveal { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
+@keyframes lv-tilt { from { transform: perspective(1200px) rotateX(24deg) scale(.9); opacity: .6; } to { transform: perspective(1200px) rotateX(0) scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .lv-word, .lv-shine, .lv-reveal, .lv-tilt { animation: none !important; }
+  .lv-shine { background-position: 0 0; }
+}

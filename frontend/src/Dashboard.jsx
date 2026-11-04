@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
@@ -51,16 +51,17 @@ const ROLES = [
 const FAQS = ['staff', 'forget', 'unlock', 'change'];
 
 // ---------- Khối dùng lại ----------
-function Section({ id, eyebrow, title, subtitle, children, alt }) {
+function Section({ id, eyebrow, title, subtitle, children, mode = 'light' }) {
+    const dark = mode === 'dark';
     return (
-        <section id={id} className={`py-20 px-5 ${alt ? 'bg-surface-container-low' : ''}`}>
-            <div className="max-w-6xl mx-auto">
-                <div className="text-center max-w-2xl mx-auto mb-12">
-                    {eyebrow && <p className="font-label-sm text-secondary uppercase tracking-wider mb-2">{eyebrow}</p>}
-                    <h2 className="font-headline-md text-headline-md text-on-surface">{title}</h2>
-                    {subtitle && <p className="mt-3 text-on-surface-variant">{subtitle}</p>}
+        <section id={id} data-mode={mode} className="relative z-10 py-24 px-5 min-h-[70vh] flex items-center">
+            <div className="max-w-6xl mx-auto w-full">
+                <div className="lv-reveal text-center max-w-2xl mx-auto mb-12">
+                    {eyebrow && <p className={`font-label-sm uppercase tracking-wider mb-2 ${dark ? 'text-[#b9c9ff]' : 'text-secondary'}`}>{eyebrow}</p>}
+                    <h2 className={`font-headline-md text-headline-md ${dark ? 'text-white' : 'text-on-surface'}`}>{title}</h2>
+                    {subtitle && <p className={`mt-3 ${dark ? 'text-white/70' : 'text-on-surface-variant'}`}>{subtitle}</p>}
                 </div>
-                {children}
+                <div className="lv-reveal">{children}</div>
             </div>
         </section>
     );
@@ -74,12 +75,26 @@ function Icon({ name, className = '' }) {
 export default function Dashboard() {
     const { t } = useTranslation('landing');
     const [openFaq, setOpenFaq] = useState(0);
+    const [mode, setMode] = useState('dark');
+    const rootRef = useRef(null);
+
+    // Nền đổi sáng/tối theo phần đang nằm giữa màn hình
+    useEffect(() => {
+        const els = rootRef.current ? rootRef.current.querySelectorAll('[data-mode]') : [];
+        if (!('IntersectionObserver' in window) || els.length === 0) return undefined;
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => { if (e.isIntersecting) setMode(e.target.dataset.mode); });
+        }, { rootMargin: '-45% 0px -45% 0px' });
+        els.forEach((el) => io.observe(el));
+        return () => io.disconnect();
+    }, []);
 
     // Đã đăng nhập -> vào thẳng trang chủ người dùng
     if (getUser()) return <Navigate to="/home" replace />;
 
     return (
-        <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
+        <div ref={rootRef} className="font-body-md text-on-surface antialiased min-h-screen relative">
+            <div aria-hidden="true" className="lv-bg fixed inset-0 z-0" data-mode={mode} />
             {/* NAVBAR */}
             <header className="sticky top-0 z-20 bg-primary/95 backdrop-blur border-b border-white/10 text-white">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
@@ -102,15 +117,16 @@ export default function Dashboard() {
             </header>
 
             {/* 1. HERO */}
-            <section className="relative overflow-hidden bg-primary text-white px-5 pt-24 pb-20 text-center"
+            <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center"
                      style={{ backgroundImage: 'radial-gradient(900px 420px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
                 <img src="/key-photo.jpg" alt="" aria-hidden="true"
                      className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
                      style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
                 <div className="relative max-w-3xl mx-auto">
-                    <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight lv-rise pb-2"
-                        style={{ backgroundImage: 'linear-gradient(100deg,#ffffff 0%,#b9c9ff 40%,#7f9dff 60%,#ffffff 100%)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
-                        {t('hero.title')}
+                    <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight pb-2">
+                        {t('hero.title').split(' ').map((w, i) => (
+                            <span key={i} className="lv-word lv-shine inline-block pb-[0.14em] mr-[0.25em]" style={{ animationDelay: `${0.12 * i}s, ${1.6 + 0.12 * i}s` }}>{w}</span>
+                        ))}
                     </h1>
                     <p className="mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
                     <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
@@ -132,8 +148,26 @@ export default function Dashboard() {
                 </div>
             </section>
 
+            {/* PREVIEW — khung trình duyệt nghiêng, cuộn tới thì dựng thẳng */}
+            <section data-mode="dark" className="relative z-10 px-5 py-24 text-center text-white overflow-hidden">
+                <div className="lv-reveal max-w-2xl mx-auto mb-12">
+                    <p className="font-label-sm uppercase tracking-wider mb-2 text-[#b9c9ff]">{t('preview.eyebrow', { defaultValue: 'Xem trước' })}</p>
+                    <h2 className="font-headline-md text-headline-md">{t('preview.title', { defaultValue: 'Mọi thứ về di sản số, trong một màn hình' })}</h2>
+                    <p className="mt-3 text-white/70">{t('preview.text', { defaultValue: 'Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập.' })}</p>
+                </div>
+                <div className="lv-tilt max-w-5xl mx-auto rounded-2xl border border-white/15 bg-white/5 p-2 shadow-2xl" style={{ perspective: '1200px' }}>
+                    <div className="flex items-center gap-1.5 px-3 py-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-white/25" /><span className="w-2.5 h-2.5 rounded-full bg-white/25" /><span className="w-2.5 h-2.5 rounded-full bg-white/25" />
+                    </div>
+                    <div className="relative rounded-xl overflow-hidden">
+                        <img src="/dash-preview.jpg" alt="" className="w-full block" />
+                        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/3" style={{ background: 'linear-gradient(180deg,transparent,#0b1020)' }} />
+                    </div>
+                </div>
+            </section>
+
             {/* 2. PROBLEM */}
-            <Section alt eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
+            <Section eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {PROBLEMS.map((p) => (
                         <div key={p.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
@@ -162,13 +196,13 @@ export default function Dashboard() {
             </Section>
 
             {/* 4. SECURITY */}
-            <Section id="security" alt eyebrow={t('security.eyebrow')} title={t('security.title')}>
+            <Section id="security" mode="dark" eyebrow={t('security.eyebrow')} title={t('security.title')}>
                 <div className="grid md:grid-cols-3 gap-5">
                     {SECURITY.map((s) => (
-                        <div key={s.key} className="bg-surface-container-lowest rounded-2xl p-7 border border-outline-variant/30">
-                            <Icon name={s.icon} className="text-secondary text-[32px]" />
-                            <h3 className="font-title-lg text-title-lg mt-4">{t(`security.items.${s.key}.title`)}</h3>
-                            <p className="mt-2 text-on-surface-variant">{t(`security.items.${s.key}.text`)}</p>
+                        <div key={s.key} className="rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
+                            <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
+                            <h3 className="font-title-lg text-title-lg mt-4 text-white">{t(`security.items.${s.key}.title`)}</h3>
+                            <p className="mt-2 text-white/70">{t(`security.items.${s.key}.text`)}</p>
                         </div>
                     ))}
                 </div>
@@ -187,7 +221,7 @@ export default function Dashboard() {
             </Section>
 
             {/* 6. ROLES — tên vai trò dùng chung common:roles */}
-            <Section id="roles" alt eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
+            <Section id="roles" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {ROLES.map((r) => (
                         <div key={r.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
@@ -221,8 +255,9 @@ export default function Dashboard() {
             </Section>
 
             {/* 8. CLOSING CTA */}
-            <section className="px-5 pb-20">
-                <div className="max-w-6xl mx-auto rounded-3xl bg-primary text-on-primary px-8 py-14 text-center">
+            <section data-mode="dark" className="relative z-10 px-5 py-24">
+                <div className="lv-reveal max-w-6xl mx-auto rounded-3xl border border-white/15 text-white px-8 py-16 text-center"
+                     style={{ backgroundImage: 'radial-gradient(700px 260px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
                     <h2 className="font-headline-md text-headline-md">{t('closing.title')}</h2>
                     <p className="mt-3 opacity-80">{t('closing.text')}</p>
                     <Link to="/register" className="inline-flex mt-8 h-12 px-7 rounded-full bg-on-primary text-primary font-bold items-center gap-2">
@@ -232,7 +267,7 @@ export default function Dashboard() {
             </section>
 
             {/* FOOTER */}
-            <footer className="bg-primary text-white px-5 pt-14 pb-8 overflow-hidden">
+            <footer data-mode="dark" className="relative z-10 text-white px-5 pt-14 pb-8 overflow-hidden">
                 <div className="max-w-6xl mx-auto">
                     <div className="flex flex-col md:flex-row gap-6 justify-between text-sm text-white/65">
                         <span className="flex items-center gap-2 font-bold tracking-[0.18em] text-white"><Icon name="lock" className="text-[22px]" />LEGACYVAULT</span>
