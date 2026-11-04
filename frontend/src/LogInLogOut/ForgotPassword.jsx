@@ -36,7 +36,7 @@ export default function ForgotPassword() {
         <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
-            <div className="mb-8 text-center">
+            <div className="mb-8 text-center lv-auth-logo">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
                     <span className="material-symbols-outlined text-[28px]">lock_reset</span>
                 </div>
@@ -69,7 +69,7 @@ export default function ForgotPassword() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 lv-pill"
                     >
                         <span className="material-symbols-outlined text-[18px]">send</span>
                         {loading ? t('forgot.submitting') : t('forgot.submit')}

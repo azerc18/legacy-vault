@@ -13,12 +13,7 @@ body {
 }
 
 /* Nút chính (nền navy) bo tròn dạng viên thuốc, giống bản thiết kế */
-a.bg-primary.rounded-xl,
-button.bg-primary.rounded-xl,
-a.bg-secondary.rounded-xl,
-button.bg-secondary.rounded-xl {
-  border-radius: 999px;
-}
+.lv-pill { border-radius: 999px; }
 
 /* Thẻ nổi nhẹ hơn */
 .lv-rise { animation: lv-rise .5s ease both; }
@@ -27,7 +22,7 @@ button.bg-secondary.rounded-xl {
 
 /* Trang auth: trên màn rộng, logo đã nằm ở panel trái nên ẩn khối logo trùng bên phải */
 @media (min-width: 1024px) {
-  .lv-auth-form > div.mb-8.text-center { display: none; }
+  .lv-auth-logo { display: none; }
 }
 
 /* Thanh bên (AppHeader). Desktop: cố định bên trái 248px. Điện thoại: thanh ngang phía trên. */
@@ -78,5 +73,4 @@ button.bg-secondary.rounded-xl {
 /* Thẻ nổi nhẹ như bản thiết kế; bảng và danh sách trong thẻ thoáng hơn */
 .bg-surface-container-lowest.rounded-2xl,
 .bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(11,16,32,.05), 0 12px 30px -18px rgba(11,16,32,.25); }
-input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 table th { letter-spacing: .04em; }

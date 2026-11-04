@@ -103,7 +103,7 @@ export default function ResetPassword() {
                         <p className="text-sm text-on-surface-variant mb-6">{t('reset.doneText')}</p>
                         <Link
                             to="/login"
-                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center"
+                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center lv-pill"
                         >
                             {t('reset.goToSignIn')}
                         </Link>
@@ -188,7 +188,7 @@ export default function ResetPassword() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                                className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 lv-pill"
                             >
                                 <span className="material-symbols-outlined text-[18px]">lock_reset</span>
                                 {loading ? t('reset.submitting') : t('reset.submit')}

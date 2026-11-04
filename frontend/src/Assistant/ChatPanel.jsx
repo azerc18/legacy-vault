@@ -149,7 +149,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply }) {
                                focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 <button type="submit" disabled={sending || !input.trim()} aria-label="Send"
-                        className="h-10 w-10 rounded-xl bg-primary text-on-primary flex items-center justify-center disabled:opacity-50">
+                        className="h-10 w-10 rounded-xl bg-primary text-on-primary flex items-center justify-center disabled:opacity-50 lv-pill">
                     <Icon name="send" />
                 </button>
             </form>

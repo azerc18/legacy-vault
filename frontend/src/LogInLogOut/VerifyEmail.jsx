@@ -59,7 +59,7 @@ export default function VerifyEmail() {
                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                            className={`${input} tracking-[0.5em] text-center`} />
                     <button type="submit" disabled={loading}
-                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-bold disabled:opacity-60">
+                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-bold disabled:opacity-60 lv-pill">
                         {loading ? t('verify.submitting') : t('verify.submit')}
                     </button>
                 </form>

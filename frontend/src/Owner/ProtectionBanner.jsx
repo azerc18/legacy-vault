@@ -103,7 +103,7 @@ export default function ProtectionBanner() {
                 </div>
                 {next && pathname !== next.to && (
                     <Link to={next.to}
-                          className="shrink-0 h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold inline-flex items-center gap-2 hover:opacity-90">
+                          className="shrink-0 h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold inline-flex items-center gap-2 hover:opacity-90 lv-pill">
                         {next.cta} <Icon name="arrow_forward" className="text-[18px]" />
                     </Link>
                 )}

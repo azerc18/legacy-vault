@@ -11,27 +11,39 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
-// Menu mặc định theo khu vực khi trang không tự truyền nav
-function defaultNav(pathname) {
-    const profile = { to: '/me', label: 'Profile', icon: 'person' };
-    if (pathname.startsWith('/executor')) return [{ to: '/executor/home', label: 'Estates', icon: 'badge' }, profile];
-    if (pathname.startsWith('/verifier') || pathname === '/home') {
-        if (pathname === '/home') return [{ to: '/home', label: 'Home', icon: 'home' }, profile];
-        return [
-            { to: '/verifier/home', label: 'Home', icon: 'home' },
-            { to: '/verifier', label: 'Requests', icon: 'gavel' },
-            { to: '/verifier/history', label: 'History', icon: 'history' },
-            profile,
+// Menu mặc định khi trang không tự truyền nav: theo khu vực của URL, còn /me và /home thì theo vai trò chính của user
+const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
+function roleItems(role) {
+    switch (role) {
+        case 'ADMIN': return [{ to: '/admin/users', key: 'admin', icon: 'admin_panel_settings' }];
+        case 'OWNER': return [
+            { to: '/owner/vaults', key: 'myVaults', icon: 'inventory_2' },
+            { to: '/owner/dms', key: 'dms', icon: 'favorite' },
+            { to: '/owner/executors', key: 'executors', icon: 'badge' },
+            { to: '/owner/activity', key: 'activity', icon: 'history' },
+            { to: '/billing', key: 'billing', icon: 'workspace_premium' },
         ];
+        case 'EXECUTOR': return [{ to: '/executor/home', key: 'estates', icon: 'badge' }];
+        case 'LEGAL_VERIFIER': return [
+            { to: '/verifier', key: 'requests', icon: 'gavel', end: true },
+            { to: '/verifier/history', key: 'history', icon: 'history' },
+        ];
+        case 'BENEFICIARY': return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }];
+        default: return [];
+    }
+}
+function defaultNav(pathname, roles) {
+    const home = { to: '/home', key: 'home', icon: 'home', end: true };
+    const profile = { to: '/me', key: 'profile', icon: 'person' };
+    if (pathname.startsWith('/executor')) return [{ to: '/executor/home', key: 'estates', icon: 'badge' }, profile];
+    if (pathname.startsWith('/verifier')) {
+        return [{ to: '/verifier/home', key: 'home', icon: 'home', end: true }, ...roleItems('LEGAL_VERIFIER'), profile];
     }
     if (pathname.startsWith('/beneficiary')) {
-        return [
-            { to: '/beneficiary', label: 'My vaults', icon: 'inventory_2' },
-            { to: '/beneficiary/guide', label: 'Guide', icon: 'menu_book' },
-            profile,
-        ];
+        return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }, { to: '/beneficiary/guide', key: 'guide', icon: 'menu_book' }, profile];
     }
-    return [{ to: '/home', label: 'Home', icon: 'home' }, profile];
+    const main = ROLE_ORDER.find((r) => roles.includes(r));
+    return [home, ...roleItems(main), profile];
 }
 
 export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
@@ -48,11 +60,13 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  */
 export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav: navProp, extra, userHome = false }) {
     const { pathname } = useLocation();
-    const nav = navProp && navProp.length > 0 ? navProp : defaultNav(pathname);
     const { t } = useTranslation();
+    const user = getUser();
+    const nav = navProp && navProp.length > 0
+        ? navProp
+        : defaultNav(pathname, Array.isArray(user?.roles) ? user.roles : []).map(({ key, ...n }) => ({ ...n, label: t(`nav.${key}`) }));
     const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
-    const user = getUser();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
     const [vipStatus, setVipStatus] = useState(null);
 
@@ -118,7 +132,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
             {nav?.length > 0 && (
                 <nav className="lv-side-nav">
                     {nav.map((n) => (
-                        <NavLink key={n.to} to={n.to}
+                        <NavLink key={n.to} to={n.to} end={n.end}
                                  className={({ isActive }) =>
                                      `${linkBase} ${isActive ? 'bg-primary-container text-white' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
                             <Icon name={n.icon} className="text-[20px]" /> {n.label}
@@ -152,7 +166,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                     </Link>
                 )}
                 <div className="flex items-center gap-2">
-                    <LanguageSwitch />
+                    <LanguageSwitch variant="dark" />
                     {extra}
                 </div>
                 <div className="flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
@@ -160,7 +174,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
                         <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
                         <span className="text-sm font-semibold text-white truncate">{user?.name}</span>
                     </Link>
-                    <button type="button" onClick={handleLogout} title={t('header.logout')}
+                    <button type="button" onClick={handleLogout} title={t('header.logout')} aria-label={t('header.logout')}
                             className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10">
                         <Icon name="logout" className="text-[18px]" />
                     </button>

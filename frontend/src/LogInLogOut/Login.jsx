@@ -95,7 +95,7 @@ export default function Login() {
         <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
-            <div className="mb-8 text-center">
+            <div className="mb-8 text-center lv-auth-logo">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
                     <span className="material-symbols-outlined text-[28px]">shield_locked</span>
                 </div>
@@ -161,7 +161,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
+                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">login</span>
                             {loading ? t('login.submitting') : t('login.submit')}
@@ -191,7 +191,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2"
+                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">verified_user</span>
                             {loading ? t('mfa.verifying') : t('mfa.verify')}

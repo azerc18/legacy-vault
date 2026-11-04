@@ -20,7 +20,7 @@ export default function RequireRole({ roles, children }) {
                     This page is for {roles.map((r) => r.replace('_', ' ').toLowerCase()).join(' / ')} accounts.
                     If you were just given this role, sign out and sign in again.
                 </p>
-                <Link to="/home" className="mt-6 h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center">
+                <Link to="/home" className="mt-6 h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center lv-pill">
                     Back to home
                 </Link>
             </div>

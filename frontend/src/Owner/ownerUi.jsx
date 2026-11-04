@@ -44,7 +44,7 @@ export function Alert({type = 'error', children}) {
 export const inputClass =
     'w-full h-11 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 export const btnPrimary =
-    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed';
+    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
 export const btnOutline =
     'h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 export const btnDanger =

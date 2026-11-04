@@ -151,9 +151,9 @@ export default function Dashboard() {
             {/* PREVIEW — khung trình duyệt nghiêng, cuộn tới thì dựng thẳng */}
             <section data-mode="dark" className="relative z-10 px-5 py-24 text-center text-white overflow-hidden">
                 <div className="lv-reveal max-w-2xl mx-auto mb-12">
-                    <p className="font-label-sm uppercase tracking-wider mb-2 text-[#b9c9ff]">{t('preview.eyebrow', { defaultValue: 'Xem trước' })}</p>
-                    <h2 className="font-headline-md text-headline-md">{t('preview.title', { defaultValue: 'Mọi thứ về di sản số, trong một màn hình' })}</h2>
-                    <p className="mt-3 text-white/70">{t('preview.text', { defaultValue: 'Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập.' })}</p>
+                    <p className="font-label-sm uppercase tracking-wider mb-2 text-[#b9c9ff]">{t('preview.eyebrow')}</p>
+                    <h2 className="font-headline-md text-headline-md">{t('preview.title')}</h2>
+                    <p className="mt-3 text-white/70">{t('preview.text')}</p>
                 </div>
                 <div className="lv-tilt max-w-5xl mx-auto rounded-2xl border border-white/15 bg-white/5 p-2 shadow-2xl" style={{ perspective: '1200px' }}>
                     <div className="flex items-center gap-1.5 px-3 py-2">
