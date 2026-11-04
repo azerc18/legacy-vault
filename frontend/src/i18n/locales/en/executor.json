@@ -1,1 +1,163 @@
-{}
+{
+  "workspace": "Executor workspace",
+  "type": {
+    "PRIMARY": "Primary executor",
+    "BACKUP": "Backup executor"
+  },
+  "steps": ["Acknowledge", "Submit documents", "Legal verification", "Hand-over"],
+  "handover": {
+    "PENDING": "Waiting for verifier",
+    "VERIFIED": "Approved, awaiting signature",
+    "REJECTED": "Rejected",
+    "UNLOCKED": "Unlocked for beneficiary",
+    "CLAIMED": "Received by beneficiary",
+    "ARCHIVED_LOCKED": "Expired"
+  },
+  "request": {
+    "PENDING": "Documents under review",
+    "APPROVED": "Documents approved",
+    "REJECTED": "Documents rejected - submit again",
+    "SIGNED": "Unlock signed"
+  },
+  "claim": {
+    "PENDING": "Waiting for response",
+    "ACCEPTED": "Accepted",
+    "DECLINED": "Declined",
+    "FALLBACK_APPLIED": "Declined - passed to backup"
+  },
+  "wish": {
+    "MEMORIALIZE": "Memorialize the account",
+    "DELETE": "Delete the account",
+    "TRANSFER_DATA": "Download data for the family"
+  },
+  "taskStatus": {
+    "TODO": "Not started",
+    "DOING": "In progress",
+    "DONE": "Done"
+  },
+  "estateOf": "Estate of {{name}}",
+  "acknowledge": "Acknowledge",
+  "saving": "Saving...",
+  "loading": "Loading...",
+  "ackError": "Could not acknowledge.",
+  "home": {
+    "welcome": "Welcome back, {{name}}",
+    "intro": "Here are the estates you are handling as an executor.",
+    "loadError": "Could not load your cases.",
+    "stats": {
+      "needAction": "Need your action",
+      "waiting": "Waiting for verification",
+      "unlocked": "Vaults unlocked",
+      "standby": "On standby"
+    },
+    "activeTitle": "Active estates",
+    "emptyTitle": "No active estates right now",
+    "emptyText": "You'll get an email when an owner's Dead Man's Switch is triggered and you need to act.",
+    "activated": "Activated {{date}}",
+    "vaults_one": "{{count}} vault",
+    "vaults_other": "{{count}} vaults",
+    "unread_one": "{{count}} unread message",
+    "unread_other": "{{count}} unread messages",
+    "ackBefore": "Acknowledge before {{date}}",
+    "ackOverdue": "Acknowledgement overdue since {{date}}",
+    "openCase": "Open case",
+    "standbyTitle": "On standby",
+    "standbySince": "{{type}} · since {{date}}",
+    "standbyHint": "Nothing to do until the Dead Man's Switch is triggered."
+  },
+  "case": {
+    "notFound": "Case not found.",
+    "loadError": "Could not load this case.",
+    "back": "All estates",
+    "subtitle": "{{type}} · activated {{date}}",
+    "standby": "This estate is on standby. You can act once the owner's Dead Man's Switch is triggered.",
+    "activatedTitle": "You have been activated",
+    "activatedText": "Please confirm you received the activation notice and will handle this estate.",
+    "vaults": {
+      "title": "Vaults ({{count}})",
+      "none": "The owner has no vaults.",
+      "beneficiary": "Beneficiary: {{name}}",
+      "invited": "Invited, not registered yet",
+      "notAssigned": "Not assigned",
+      "instructions": "Owner's instructions:"
+    },
+    "submit": {
+      "title": "Submit death certificate",
+      "intro": "A Legal Verifier reviews the certificate before any vault is unlocked. PDF, PNG or JPG, up to 10MB.",
+      "previouslyRejected": "(previously rejected)",
+      "chooseFile": "Choose death certificate",
+      "fileHint": "PDF, PNG or JPG, up to 10MB",
+      "notesPlaceholder": "Notes for the verifier (optional)",
+      "button": "Submit for verification",
+      "submitting": "Submitting...",
+      "success": "Submitted. A Legal Verifier will review your request.",
+      "failed": "Submission failed.",
+      "errSelect": "Select at least one vault.",
+      "errFile": "Please attach the death certificate.",
+      "errType": "Only PDF, PNG or JPG files are allowed.",
+      "errSize": "File exceeds the 10MB limit.",
+      "errNotes": "Notes must be at most 1000 characters."
+    },
+    "progress": {
+      "title": "Hand-over progress",
+      "vault": "Vault",
+      "status": "Status",
+      "submitted": "Submitted",
+      "decided": "Decided",
+      "details": "Details",
+      "reason": "Reason: {{reason}}",
+      "unlocked": "Unlocked {{date}} · claim before {{deadline}}"
+    },
+    "claims": {
+      "title": "Beneficiary claims",
+      "loadError": "Could not load beneficiaries.",
+      "none": "No beneficiaries.",
+      "beneficiary": "Beneficiary",
+      "status": "Status",
+      "responded": "Responded",
+      "reminder": "Reminder",
+      "send": "Send reminder",
+      "sending": "Sending...",
+      "sent": "Reminder sent to {{name}}.",
+      "sendError": "Could not send the reminder.",
+      "nextAfter": "Reminded · next after {{date}}"
+    },
+    "tasks": {
+      "title": "Online accounts checklist",
+      "intro": "Handle each account following the owner's wish, then update its status. Beneficiaries can follow this progress.",
+      "done": "{{done}}/{{total}} done.",
+      "loadError": "Could not load the account checklist.",
+      "wish": "Wish:",
+      "help": "Official help page",
+      "notePlaceholder": "Note for the family (e.g. request number sent to the provider)",
+      "save": "Save",
+      "saveError": "Could not save."
+    },
+    "messages": {
+      "title": "Messages with Legal Verifier",
+      "requestOf": "Request of {{date}} — {{status}}",
+      "loadError": "Could not load messages.",
+      "loadOlder": "Load older messages",
+      "emptyTitle": "No messages yet",
+      "emptyText": "Send a message if the Legal Verifier needs more information about your request.",
+      "you": "You",
+      "verifier": "Legal Verifier",
+      "view": "View attachment",
+      "viewNamed": "View {{name}}",
+      "download": "Download attachment",
+      "downloadNamed": "Download {{name}}",
+      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site.",
+      "openError": "Could not open the attachment.",
+      "downloadError": "Could not download the attachment.",
+      "rejectedClosed": "This request was rejected and is closed for messages.",
+      "newRequest": "Submit a new request",
+      "placeholder": "Write a message...",
+      "attach": "Attach file",
+      "send": "Send",
+      "sending": "Sending...",
+      "sendError": "Could not send.",
+      "errEmpty": "Write a message or attach a file.",
+      "errFile": "Attachment must be PDF/PNG/JPG up to 10MB."
+    }
+  }
+}
