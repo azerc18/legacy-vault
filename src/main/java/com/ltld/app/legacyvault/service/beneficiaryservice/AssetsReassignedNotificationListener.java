@@ -73,7 +73,6 @@ public class AssetsReassignedNotificationListener {
                         .build()));
     }
 
-
     private static String messageFor(AssetsReassignedEvent event) {
         return event.reason() == AssetsReassignedEvent.Reason.NO_RESPONSE
                 ? MSG_ASSETS_REASSIGNED_NO_RESPONSE

@@ -8,9 +8,11 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
+import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,9 +34,10 @@ import java.util.UUID;
  * chưa phản hồi được chuyển sang người dự phòng đang hoạt động (cùng cơ chế effective_beneficiary như Decline).
  * <p>
  * Luật:
- * - Người giữ chính "chưa phản hồi" = trạng thái PENDING_REGISTRATION / INVITED và chưa có claim nào
- *   (có claim nghĩa là đã bắt đầu xác minh / xem tài sản, không lấy phần của họ).
- * - Người nhận thay phải có tài khoản và claim PENDING (đang hoạt động).
+ * - Người giữ chính "chưa phản hồi" = trạng thái PENDING_REGISTRATION / INVITED và chưa từng xác minh danh
+ *   tính thành công cho vault này. Không dựa vào "có claim" vì BeneficiaryNotificationListener tạo sẵn claim
+ *   PENDING cho mọi người đã có tài khoản ngay lúc mở khóa.
+ * - Người nhận thay phải đã ACCEPTED, có tài khoản và claim còn PENDING (chưa đóng phần của mình).
  * - PROPORTIONAL và JOINT_CONSENSUS giữ nguyên (không có người dự phòng, Owner quyết định chia lại).
  * - Không đổi trạng thái của người quá hạn; chạy lại không chuyển lần hai vì chỉ chọn effective IS NULL.
  * Trùng khoảng 10 dòng với declineClaim (canReceive + vòng lặp chuyển); gộp lại ở PR refactor sau.
@@ -50,6 +53,7 @@ public class AllocationTimeoutFallbackService {
     private final VaultRepository vaultRepository;
     private final AssetAllocationRepository assetAllocationRepository;
     private final BeneficiaryClaimRepository claimRepository;
+    private final IdentityVerificationRepository verificationRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
     private final int responseWindowDays;
@@ -57,12 +61,14 @@ public class AllocationTimeoutFallbackService {
     public AllocationTimeoutFallbackService(VaultRepository vaultRepository,
                                             AssetAllocationRepository assetAllocationRepository,
                                             BeneficiaryClaimRepository claimRepository,
+                                            IdentityVerificationRepository verificationRepository,
                                             AuditLogService auditLogService,
                                             ApplicationEventPublisher eventPublisher,
                                             @Value("${app.beneficiary.response-window-days:30}") int responseWindowDays) {
         this.vaultRepository = vaultRepository;
         this.assetAllocationRepository = assetAllocationRepository;
         this.claimRepository = claimRepository;
+        this.verificationRepository = verificationRepository;
         this.auditLogService = auditLogService;
         this.eventPublisher = eventPublisher;
         this.responseWindowDays = responseWindowDays;
@@ -124,20 +130,20 @@ public class AllocationTimeoutFallbackService {
         return reassigned;
     }
 
-    // Chưa phản hồi: đúng trạng thái "im lặng" và chưa bắt đầu claim
+    // Chưa phản hồi: đúng trạng thái "im lặng" và chưa từng xác minh danh tính thành công cho vault này.
+    // Không dựa vào việc có claim: claim PENDING được hệ thống tạo sẵn lúc mở khóa cho mọi người đã có tài khoản.
     private boolean isSilent(UUID vaultId, VaultBeneficiary vb) {
         if (!SILENT_STATUSES.contains(vb.getStatus())) {
             return false;
         }
         return vb.getUser() == null
-                || claimRepository.findByVaultIdAndBeneficiaryId(vaultId, vb.getUser().getId()).isEmpty();
+                || !verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
+                vaultId, vb.getUser().getId(), VerificationStatus.SUCCESS);
     }
 
-    // Người nhận thay phải còn nhận được và đang hoạt động: có tài khoản, claim PENDING
+    // Người nhận thay phải đã chủ động ACCEPTED, có tài khoản và claim còn PENDING (chưa đóng phần của mình)
     private boolean isActive(UUID vaultId, VaultBeneficiary vb) {
-        if (vb.getUser() == null
-                || vb.getStatus() == BeneficiaryInviteStatus.DECLINED
-                || vb.getStatus() == BeneficiaryInviteStatus.WAIVED) {
+        if (vb.getUser() == null || vb.getStatus() != BeneficiaryInviteStatus.ACCEPTED) {
             return false;
         }
         return claimRepository.findByVaultIdAndBeneficiaryId(vaultId, vb.getUser().getId())

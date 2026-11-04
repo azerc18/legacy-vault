@@ -109,7 +109,6 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     int archiveIfExpired(@Param("id") UUID id, @Param("now") LocalDateTime now,
                          @Param("purgeAt") LocalDateTime purgeAt);
 
-
     // N2-notify: vault UNLOCKED đã qua cửa sổ phản hồi (unlockedAt < cutoff), chưa hết hạn nhận, và còn ít nhất
     // một phân bổ EXCLUSIVE có dự phòng, chưa chuyển, mà người giữ chính đang chưa phản hồi
     @Query("""
@@ -124,6 +123,8 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
                     AND al.mode = com.ltld.app.legacyvault.enums.AllocationMode.EXCLUSIVE
                     AND al.effectiveBeneficiary IS NULL
                     AND al.contingentBeneficiary IS NOT NULL
+                    AND al.contingentBeneficiary.user IS NOT NULL
+                    AND al.contingentBeneficiary.status = com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.ACCEPTED
                     AND al.beneficiary.status IN :silentStatuses)
             ORDER BY v.unlockedAt ASC
             """)

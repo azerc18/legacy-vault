@@ -95,7 +95,6 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
             """)
     List<UUID> findAssetIdsNotHeldBy(@Param("vaultId") UUID vaultId, @Param("holderId") UUID holderId);
 
-
     // N2-notify: phân bổ EXCLUSIVE có người dự phòng, chưa fallback, mà người giữ chính đang ở trạng thái
     // trong silentStatuses (chưa phản hồi). Bước kiểm tra "chưa có claim" làm ở service.
     @Query("""
@@ -105,6 +104,8 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
               AND al.mode = com.ltld.app.legacyvault.enums.AllocationMode.EXCLUSIVE
               AND al.effectiveBeneficiary IS NULL
               AND al.contingentBeneficiary IS NOT NULL
+              AND al.contingentBeneficiary.user IS NOT NULL
+              AND al.contingentBeneficiary.status = com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.ACCEPTED
               AND al.beneficiary.status IN :silentStatuses
             """)
     List<AssetAllocation> findTimeoutFallbackCandidates(

@@ -14,9 +14,11 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.VerificationStatus;
 import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
+import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +51,7 @@ class AllocationTimeoutFallbackServiceTest {
     @Mock private VaultRepository vaultRepository;
     @Mock private AssetAllocationRepository assetAllocationRepository;
     @Mock private BeneficiaryClaimRepository claimRepository;
+    @Mock private IdentityVerificationRepository verificationRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
@@ -62,7 +65,7 @@ class AllocationTimeoutFallbackServiceTest {
     @BeforeEach
     void setUp() {
         service = new AllocationTimeoutFallbackService(vaultRepository, assetAllocationRepository,
-                claimRepository, auditLogService, eventPublisher, 30);
+                claimRepository, verificationRepository, auditLogService, eventPublisher, 30);
         vaultId = UUID.randomUUID();
         User owner = new User();
         owner.setId(UUID.randomUUID());
@@ -150,15 +153,42 @@ class AllocationTimeoutFallbackServiceTest {
     }
 
     @Test
-    void holderAlreadyStartedClaim_isSkipped() {
+    void holderWithSystemCreatedPendingClaim_isStillReassigned() {
+        // BeneficiaryNotificationListener tạo claim PENDING cho mọi người đã có tài khoản lúc mở khóa
         AssetAllocation al = allocation("Vietcombank");
         stubVaultAndCandidates(al);
         stubClaim(holder, claim(holder, ClaimStatus.PENDING));
+        stubClaim(receiver, claim(receiver, ClaimStatus.PENDING));
+
+        assertThat(service.applyFallback(vaultId, now)).isEqualTo(1);
+
+        assertThat(al.getEffectiveBeneficiary()).isSameAs(receiver);
+    }
+
+    @Test
+    void holderWhoVerifiedIdentity_isSkipped() {
+        AssetAllocation al = allocation("Vietcombank");
+        stubVaultAndCandidates(al);
+        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatus(
+                vaultId, holder.getUser().getId(), VerificationStatus.SUCCESS)).thenReturn(true);
 
         assertThat(service.applyFallback(vaultId, now)).isZero();
 
         assertThat(al.getEffectiveBeneficiary()).isNull();
         verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void receiverNotAccepted_isSkipped() {
+        receiver.setStatus(BeneficiaryInviteStatus.INVITED);
+        AssetAllocation al = allocation("Vietcombank");
+        stubVaultAndCandidates(al);
+        stubClaim(receiver, claim(receiver, ClaimStatus.PENDING));
+
+        assertThat(service.applyFallback(vaultId, now)).isZero();
+
+        assertThat(al.getEffectiveBeneficiary()).isNull();
         verifyNoInteractions(eventPublisher);
     }
 

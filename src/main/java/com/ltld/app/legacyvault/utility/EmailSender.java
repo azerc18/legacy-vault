@@ -70,7 +70,6 @@ public class EmailSender {
                 ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
     }
 
-
     /**
      * N2-notify: báo cho người nhận thay khi một phần tài sản được chuyển sang họ
      * (người chính từ chối hoặc không phản hồi kịp). Không nêu danh tính người kia.
