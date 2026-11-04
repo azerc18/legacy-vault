@@ -140,6 +140,39 @@ class AuditDescriptionBuilderTest {
         assertThat(response.getCreatedAt()).isEqualTo(acknowledged.getCreatedAt());
     }
 
+    // F6 (m1): Beneficiary hiện tên, Verifier ẩn danh như Admin
+    @Test
+    void toResponse_beneficiaryAndVerifierActors_areNamedByRole() {
+        assertThat(builder.toResponse(log(AuditAction.ASSET_VIEWED, actor("BENEFICIARY", "Tran Thi B"),
+                Map.of("result", "SUCCESS")), ownerId).getActorName()).isEqualTo("Beneficiary: Tran Thi B");
+        assertThat(builder.toResponse(log(AuditAction.ASSET_VIEWED, actor("BENEFICIARY", null),
+                Map.of("result", "SUCCESS")), ownerId).getActorName()).isEqualTo("Beneficiary");
+        VaultActivityLogResponse verifier = builder.toResponse(log(AuditAction.LEGAL_DOCUMENT_VIEWED,
+                actor("LEGAL_VERIFIER", "Le Van C"), Map.of("result", "SUCCESS")), ownerId);
+        assertThat(verifier.getActorName()).isEqualTo("Legal verifier");
+        assertThat(verifier.getIpAddress()).isEqualTo("***.***.***.***");
+    }
+
+    // F6 (n2): lần đọc lỗi không được mô tả như lượt xem thành công
+    @Test
+    void describe_legalDocumentViewed_distinguishesFailure() {
+        User verifier = actor("LEGAL_VERIFIER", "Le Van C");
+        assertThat(builder.describe(log(AuditAction.LEGAL_DOCUMENT_VIEWED, verifier, Map.of("result", "SUCCESS"))))
+                .isEqualTo("A legal verifier viewed the uploaded legal document.");
+        assertThat(builder.describe(log(AuditAction.LEGAL_DOCUMENT_VIEWED, verifier, Map.of("result", "FAILURE"))))
+                .isEqualTo("A legal verifier could not open the uploaded legal document.");
+    }
+
+    private static User actor(String roleCode, String fullName) {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setFullName(fullName);
+        Role role = new Role();
+        role.setCode(roleCode);
+        user.setRoles(Set.of(role));
+        return user;
+    }
+
     @Test
     void toResponse_ownerActor_seesSelfAndFullIp() {
         VaultActivityLogResponse response = builder.toResponse(

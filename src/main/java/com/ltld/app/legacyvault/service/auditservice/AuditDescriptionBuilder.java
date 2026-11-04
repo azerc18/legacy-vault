@@ -23,6 +23,18 @@ public class AuditDescriptionBuilder {
     public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
             EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN));
 
+    // F6: Danh sách các hành động truy cập được hiển thị minh bạch trong tab "Who accessed" của Owner
+    public static final Set<AuditAction> ESTATE_ACCESS_ACTIONS = Collections.unmodifiableSet(EnumSet.of(
+            AuditAction.ADMIN_VAULT_VIEWED,
+            AuditAction.ASSET_VIEWED,
+            AuditAction.ASSET_DOWNLOADED,
+            AuditAction.LEGAL_DOCUMENT_VIEWED,
+            AuditAction.DOSSIER_DOWNLOADED,
+            // M2: lượt Owner tự tải đã bị query loại (M1), nên chỉ còn Beneficiary
+            AuditAction.DOCUMENT_DOWNLOADED,
+            AuditAction.EXECUTOR_VAULT_VIEWED
+    ));
+
     // ownerId: chủ nhật ký đang xem (chủ Vault hoặc Owner gọi API), được thấy "Bạn" và IP đầy đủ.
     public VaultActivityLogResponse toResponse(AuditLog log, UUID ownerId) {
         return VaultActivityLogResponse.builder()
@@ -41,14 +53,21 @@ public class AuditDescriptionBuilder {
 
         boolean isAdmin = false;
         boolean isExecutor = false;
+        // F6 (m1): Owner cần biết ai đã xem; Verifier giữ ẩn danh như Admin
+        boolean isVerifier = false;
+        boolean isBeneficiary = false;
         if (actor.getRoles() != null) {
             for (Role role : actor.getRoles()) {
                 if ("ADMIN".equals(role.getCode())) isAdmin = true;
                 if ("EXECUTOR".equals(role.getCode())) isExecutor = true;
+                if ("LEGAL_VERIFIER".equals(role.getCode())) isVerifier = true;
+                if ("BENEFICIARY".equals(role.getCode())) isBeneficiary = true;
             }
         }
         if (isAdmin) return "System administrator";
+        if (isVerifier) return "Legal verifier";
         if (isExecutor) return "Executor: " + actor.getFullName();
+        if (isBeneficiary) return actor.getFullName() != null ? "Beneficiary: " + actor.getFullName() : "Beneficiary";
         return "Another user";
     }
 
@@ -76,6 +95,7 @@ public class AuditDescriptionBuilder {
             case DOCUMENT_UPLOADED -> "Uploaded a new document.";
             case DOCUMENT_DELETED -> "Deleted a document.";
             case ADMIN_VAULT_VIEWED -> "An administrator viewed the vault details.";
+            case EXECUTOR_VAULT_VIEWED -> "Your executor viewed the vault's asset list.";
             // FR-02: không nối detail vì detail là dạng kỹ thuật (id, trạng thái nội bộ)
             case BENEFICIARY_ASSIGNED -> "Assigned a beneficiary to the vault.";
             case BENEFICIARY_REPLACED -> "Changed the vault's beneficiary.";
@@ -93,6 +113,12 @@ public class AuditDescriptionBuilder {
             case ASSET_UPDATED -> "Updated a digital asset.";
             case ASSET_DELETED -> "Deleted a digital asset.";
             case DOCUMENT_DOWNLOADED -> isFailure(log) ? "Document download failed." : "Downloaded a document.";
+            // F6 (n2): dòng FAILURE là lần đọc / giải mã lỗi, không phải lượt xem thành công
+            case LEGAL_DOCUMENT_VIEWED -> isFailure(log)
+                    ? "A legal verifier could not open the uploaded legal document."
+                    : "A legal verifier viewed the uploaded legal document.";
+            case VERIFICATION_ATTACHMENT_VIEWED -> "Viewed a verification message attachment.";
+            case DOSSIER_DOWNLOADED -> "The beneficiary downloaded the inheritance dossier.";
             case LEGAL_VERIFICATION_REQUESTED -> "Submitted a legal verification request.";
             case LEGAL_REQUEST_REOPENED -> "The verification request missed its signing deadline and was returned to the review queue.";
             // FR-16: detail chứa email người nhận, không được hiển thị

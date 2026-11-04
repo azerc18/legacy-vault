@@ -164,4 +164,77 @@ class OwnerActivityLogServiceImplTest {
                         "The Dead Man's Switch was triggered because the check-in deadline passed.");
         assertThat(result.getContent().get(0).getIpAddress()).isEqualTo("192.168.1.100");
     }
+
+    @Test
+    void getEstateAccessLogs_returnsMappedAccessEvents() {
+        Pageable page0 = PageRequest.of(0, 20);
+        AuditLog log = AuditLog.builder()
+                .id(UUID.randomUUID())
+                .action(AuditAction.ASSET_DOWNLOADED)
+                .entityType("DigitalAsset")
+                .entityId(UUID.randomUUID())
+                .createdAt(Instant.now())
+                .build();
+
+        when(auditLogRepository.findEstateAccessActivity(
+                eq(ownerId),
+                eq(AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS),
+                any(Instant.class),
+                any(Instant.class),
+                eq(page0)
+        )).thenReturn(new PageImpl<>(List.of(log), page0, 1));
+
+        Page<VaultActivityLogResponse> result = ownerActivityLogService.getEstateAccessLogs(ownerId, null, null, page0);
+
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent().get(0).getAction()).isEqualTo(AuditAction.ASSET_DOWNLOADED);
+        assertThat(result.getContent().get(0).getDescription()).isEqualTo("Downloaded a digital asset.");
+
+        assertThat(AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS).containsExactlyInAnyOrder(
+                AuditAction.ADMIN_VAULT_VIEWED,
+                AuditAction.ASSET_VIEWED,
+                AuditAction.ASSET_DOWNLOADED,
+                AuditAction.LEGAL_DOCUMENT_VIEWED,
+                AuditAction.DOSSIER_DOWNLOADED,
+                AuditAction.DOCUMENT_DOWNLOADED,
+                AuditAction.EXECUTOR_VAULT_VIEWED
+        );
+        assertThatThrownBy(() -> AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS.add(AuditAction.VAULT_CREATED))
+                .isInstanceOf(UnsupportedOperationException.class);
+
+        verify(auditLogRepository).findEstateAccessActivity(
+                eq(ownerId),
+                eq(AuditDescriptionBuilder.ESTATE_ACCESS_ACTIONS),
+                any(Instant.class),
+                any(Instant.class),
+                eq(page0)
+        );
+    }
+
+    @Test
+    void getEstateAccessLogs_whenStartAfterEnd_throwsBadRequest() {
+        Instant now = Instant.now();
+
+        assertThatThrownBy(() -> ownerActivityLogService.getEstateAccessLogs(
+                ownerId, now, now.minus(5, ChronoUnit.DAYS), pageable))
+                .isInstanceOf(DmsException.class)
+                .satisfies(ex -> assertThat(((DmsException) ex).getStatus()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verifyNoInteractions(auditLogRepository);
+    }
+
+    @Test
+    void getEstateAccessLogs_noDates_defaultsFromEpoch() {
+        when(auditLogRepository.findEstateAccessActivity(any(), any(), any(), any(), any()))
+                .thenReturn(Page.empty(pageable));
+        Instant before = Instant.now();
+
+        ownerActivityLogService.getEstateAccessLogs(ownerId, null, null, pageable);
+
+        ArgumentCaptor<Instant> fromCaptor = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> toCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(auditLogRepository).findEstateAccessActivity(eq(ownerId), any(),
+                fromCaptor.capture(), toCaptor.capture(), eq(pageable));
+        assertThat(fromCaptor.getValue()).isEqualTo(Instant.EPOCH);
+        assertThat(toCaptor.getValue()).isAfterOrEqualTo(before);
+    }
 }
