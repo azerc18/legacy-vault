@@ -1,0 +1,27 @@
+package com.ltld.app.legacyvault.repository;
+
+import com.ltld.app.legacyvault.entity.ExecutorTask;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+@Repository
+public interface ExecutorTaskRepository extends JpaRepository<ExecutorTask, UUID> {
+
+    // Kèm vault để trả tên vault mà không N+1
+    @Query("""
+            SELECT t FROM ExecutorTask t JOIN FETCH t.vault
+            WHERE t.vault.id IN :vaultIds
+            ORDER BY t.vault.name ASC, t.createdAt ASC, t.id ASC
+            """)
+    List<ExecutorTask> findByVaultIds(@Param("vaultIds") Collection<UUID> vaultIds);
+
+    @Query("SELECT t.asset.id FROM ExecutorTask t WHERE t.asset.id IN :assetIds")
+    Set<UUID> findAssetIdsWithTask(@Param("assetIds") Collection<UUID> assetIds);
+}

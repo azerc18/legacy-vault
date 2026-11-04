@@ -92,6 +92,11 @@ export const executorApi = {
     // N2-exec: nhắc một người chưa phản hồi (1 lần/24h, 429 REMINDER_TOO_SOON) -> dòng tiến độ mới
     remindBeneficiary: (assignmentId, vaultId, vaultBeneficiaryId) =>
         http.post(`${BASE}/${assignmentId}/vaults/${vaultId}/beneficiaries/${vaultBeneficiaryId}/reminders`).then(unwrap),
+    // F5: checklist xử lý tài khoản số theo di nguyện
+    // -> [{ id, vaultId, vaultName, assetType, platform, accountHandle, wish, status, note, helpUrl, updatedAt, completedAt }]
+    getTasks: (assignmentId) => http.get(`${BASE}/${assignmentId}/tasks`).then((r) => unwrap(r) ?? []),
+    // F5: { status: TODO | DOING | DONE, note } -> task đã cập nhật
+    updateTask: (assignmentId, taskId, body) => http.patch(`${BASE}/${assignmentId}/tasks/${taskId}`, body).then(unwrap),
     // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,

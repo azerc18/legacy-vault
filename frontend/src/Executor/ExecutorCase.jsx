@@ -14,6 +14,13 @@ import EmptyState from "../Common/EmptyState.jsx";
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
 const assetLabel = (t) => ASSET_TYPES.find((a) => a.value === t)?.label || t;
+// F5: di nguyện của Owner và trạng thái checklist
+const WISH_LABEL = {
+    MEMORIALIZE: 'Memorialize the account',
+    DELETE: 'Delete the account',
+    TRANSFER_DATA: 'Download data for the family',
+};
+const TASK_STATUS_LABEL = { TODO: 'Not started', DOING: 'In progress', DONE: 'Done' };
 
 /* =====================================================================
    Route: /executor/cases/:assignmentId
@@ -117,6 +124,8 @@ export default function ExecutorCase() {
                         <ProgressSection progress={progress} />
 
                         <BeneficiaryClaimsSection assignmentId={assignmentId} progress={progress} />
+
+                        <AccountTasksSection assignmentId={assignmentId} progress={progress} />
 
                         <MessagesSection assignmentId={assignmentId} progress={progress} />
                     </>
@@ -359,6 +368,86 @@ function VaultClaims({ assignmentId, vault }) {
                     </table>
                 </div>
             )}
+        </div>
+    );
+}
+
+/* ---------- F5: checklist xử lý tài khoản số theo di nguyện ---------- */
+function AccountTasksSection({ assignmentId, progress }) {
+    const [tasks, setTasks] = useState(null);
+    const [error, setError] = useState('');
+    // Checklist chỉ có sau khi có vault đã mở khoá
+    const handedOver = progress.some((p) => ['UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'].includes(p.handoverStatus));
+
+    useEffect(() => {
+        if (!handedOver) return;
+        executorApi.getTasks(assignmentId)
+            .then(setTasks)
+            .catch((e) => { setError(getErrorMessage(e, 'Could not load the account checklist.')); setTasks([]); });
+    }, [assignmentId, handedOver]);
+
+    if (!handedOver || (tasks?.length === 0 && !error)) return null;
+    const done = (tasks || []).filter((t) => t.status === 'DONE').length;
+    return (
+        <Card title="Online accounts checklist" icon="checklist">
+            <p className="text-sm text-on-surface-variant mb-4">
+                Handle each account following the owner's wish, then update its status. Beneficiaries can follow this progress.
+                {tasks && ` ${done}/${tasks.length} done.`}
+            </p>
+            <Alert>{error}</Alert>
+            {tasks === null && <p className="text-sm text-on-surface-variant">Loading...</p>}
+            <div className="space-y-4">
+                {(tasks || []).map((t) => (
+                    <AccountTaskRow key={t.id} assignmentId={assignmentId} task={t}
+                                    onSaved={(u) => setTasks((prev) => prev.map((x) => (x.id === u.id ? u : x)))} />
+                ))}
+            </div>
+        </Card>
+    );
+}
+
+function AccountTaskRow({ assignmentId, task, onSaved }) {
+    const [status, setStatus] = useState(task.status);
+    const [note, setNote] = useState(task.note || '');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const dirty = status !== task.status || note !== (task.note || '');
+
+    const save = async () => {
+        setBusy(true); setError('');
+        try {
+            onSaved(await executorApi.updateTask(assignmentId, task.id, { status, note }));
+        } catch (e) {
+            setError(getErrorMessage(e, 'Could not save.'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="rounded-xl border border-outline-variant/30 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className="font-semibold">{task.platform || assetLabel(task.assetType)}{task.accountHandle && ` · ${task.accountHandle}`}</p>
+                    <p className="text-sm text-on-surface-variant">{task.vaultName} · Wish: <span className="font-semibold">{WISH_LABEL[task.wish] || task.wish}</span></p>
+                    {task.helpUrl && (
+                        <a href={task.helpUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary font-semibold inline-flex items-center gap-1 mt-1">
+                            <Icon name="open_in_new" className="text-[16px]" /> Official help page
+                        </a>
+                    )}
+                </div>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} w-auto`}>
+                    {Object.entries(TASK_STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+            </div>
+            <textarea rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)}
+                      placeholder="Note for the family (e.g. request number sent to the provider)" className={`${inputClass} mt-3`} />
+            <Alert>{error}</Alert>
+            <div className="flex justify-end mt-2">
+                <button type="button" onClick={save} disabled={!dirty || busy} className={btnPrimary}>
+                    <Icon name="save" className="text-[18px]" /> {busy ? 'Saving...' : 'Save'}
+                </button>
+            </div>
         </div>
     );
 }

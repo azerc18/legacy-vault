@@ -73,4 +73,9 @@ export const beneficiaryApi = {
     closePreview: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/close-preview`).then(unwrap),
     closeVault: (vaultId, acknowledgeUnviewed) =>
         http.post(`/beneficiaries/vaults/${vaultId}/close`, { confirmed: true, acknowledgeUnviewed }).then(unwrap),
+
+    // F5: Executor xử lý tài khoản số theo di nguyện (chỉ xem)
+    // -> [{ id, platform, accountHandle, wish, status, note, updatedAt, completedAt }]
+    listExecutorTasks: (vaultId) =>
+        http.get(`/beneficiaries/vaults/${vaultId}/executor-tasks`).then((r) => r.data?.data ?? []),
 };
