@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {Link, Navigate} from 'react-router-dom';
 import {getUser} from '../auth/auth.js';
 import {getErrorMessage} from '../api/http.js';
@@ -6,19 +7,13 @@ import {executorApi, caseStep} from '../api/executorApi.js';
 import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
 import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import {formatDate} from '../i18n/format.js';
 
 const EXECUTOR = 'EXECUTOR';
-const STEPS = ['Acknowledge', 'Submit documents', 'Legal verification', 'Hand-over'];
-const TYPE_LABEL = {PRIMARY: 'Primary executor', BACKUP: 'Backup executor'};
-const fmt = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', {dateStyle: 'medium'}) : '—');
 // FR-07/FR-14: Owner chưa có tên thì hiện email
 const ownerName = (c) => c.ownerFullName || c.ownerEmail;
-const REQUEST_LABEL = {
-    PENDING: 'Documents under review',
-    APPROVED: 'Documents approved',
-    REJECTED: 'Documents rejected - submit again',
-    SIGNED: 'Unlock signed',
-};
+// Chỉ nhấn mạnh (đỏ) khi đã quá hạn xác nhận hoặc còn từ 3 ngày trở xuống
+const URGENT_MS = 3 * 24 * 60 * 60 * 1000;
 
 function Icon({name, className = ''}) {
     return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -41,9 +36,10 @@ function StatCard({icon, label, value}) {
 }
 
 function Stepper({step}) {
+    const {t} = useTranslation('executor');
     return (
         <ol className="grid grid-cols-4 gap-2">
-            {STEPS.map((label, i) => {
+            {t('steps', {returnObjects: true}).map((label, i) => {
                 const done = i < step;
                 const active = i === step;
                 return (
@@ -63,6 +59,7 @@ function Stepper({step}) {
 }
 
 function CaseCard({c, busy, onAcknowledge}) {
+    const {t} = useTranslation('executor');
     const step = caseStep(c, c.progress);
     const btn = 'h-10 px-4 rounded-xl text-sm font-semibold inline-flex items-center gap-2';
 
@@ -70,35 +67,38 @@ function CaseCard({c, busy, onAcknowledge}) {
         <article className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4 mb-5">
                 <div className="min-w-0">
-                    <p className="text-xs font-semibold text-secondary uppercase tracking-wide">{TYPE_LABEL[c.executorType] || c.executorType}</p>
-                    <h3 className="font-title-lg text-title-lg mt-1 truncate">Estate of {ownerName(c)}</h3>
+                    <p className="text-xs font-semibold text-secondary uppercase tracking-wide">{t(`type.${c.executorType}`, c.executorType)}</p>
+                    <h3 className="font-title-lg text-title-lg mt-1 truncate">{t('estateOf', {name: ownerName(c)})}</h3>
                     <p className="text-sm text-on-surface-variant">
-                        Activated {fmt(c.activatedAt)} · {c.vaultCount} vault(s)
-                        {c.unreadMessageCount > 0 && ` · ${c.unreadMessageCount} unread message(s)`}
+                        {t('home.activated', {date: formatDate(c.activatedAt)})} · {t('home.vaults', {count: c.vaultCount ?? 0})}
+                        {c.unreadMessageCount > 0 && ` · ${t('home.unread', {count: c.unreadMessageCount})}`}
                     </p>
                     {c.latestRequestStatus && (
                         <p className={`text-sm mt-1 ${c.latestRequestStatus === 'REJECTED' ? 'text-error' : 'text-on-surface-variant'}`}>
-                            {REQUEST_LABEL[c.latestRequestStatus] || c.latestRequestStatus}
+                            {t(`request.${c.latestRequestStatus}`, c.latestRequestStatus)}
                         </p>
                     )}
-                    {c.acknowledgeDeadlineAt && (
-                        <p className="text-sm text-error font-semibold mt-1">
-                            {new Date(c.acknowledgeDeadlineAt) < new Date()
-                                ? `Acknowledgement overdue since ${fmt(c.acknowledgeDeadlineAt)}`
-                                : `Acknowledge before ${fmt(c.acknowledgeDeadlineAt)}`}
-                        </p>
-                    )}
+                    {c.acknowledgeDeadlineAt && (() => {
+                        const msLeft = new Date(c.acknowledgeDeadlineAt) - new Date();
+                        return (
+                            <p className={`text-sm mt-1 ${msLeft <= URGENT_MS ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
+                                {msLeft < 0
+                                    ? t('home.ackOverdue', {date: formatDate(c.acknowledgeDeadlineAt)})
+                                    : t('home.ackBefore', {date: formatDate(c.acknowledgeDeadlineAt)})}
+                            </p>
+                        );
+                    })()}
                 </div>
                 <div className="flex gap-2">
                     {step === 0 && (
                         <button onClick={onAcknowledge} disabled={busy}
                                 className={`${btn} bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60`}>
-                            <Icon name="task_alt" className="text-[18px]"/> {busy ? 'Saving...' : 'Acknowledge'}
+                            <Icon name="task_alt" className="text-[18px]"/> {busy ? t('saving') : t('acknowledge')}
                         </button>
                     )}
                     <Link to={`/executor/cases/${c.assignmentId}`}
                           className={`${btn} ${step === 0 ? 'border border-outline-variant text-primary' : 'bg-primary text-on-primary hover:bg-primary-container'}`}>
-                        <Icon name="folder_open" className="text-[18px]"/> Open case
+                        <Icon name="folder_open" className="text-[18px]"/> {t('home.openCase')}
                     </Link>
                 </div>
             </div>
@@ -108,6 +108,7 @@ function CaseCard({c, busy, onAcknowledge}) {
 }
 
 export default function ExecutorHome() {
+    const {t} = useTranslation('executor');
     const user = getUser();
     const [cases, setCases] = useState(null);
     const [error, setError] = useState('');
@@ -126,10 +127,10 @@ export default function ExecutorHome() {
             })));
             setCases(withProgress);
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not load your cases.'));
+            setError(getErrorMessage(e, t('home.loadError')));
             setCases([]);
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         if (isExecutor) load();
@@ -157,7 +158,7 @@ export default function ExecutorHome() {
                 status: res.status
             } : c)));
         } catch (e) {
-            setError(getErrorMessage(e, 'Could not acknowledge.'));
+            setError(getErrorMessage(e, t('ackError')));
         } finally {
             setBusyId(null);
         }
@@ -165,31 +166,30 @@ export default function ExecutorHome() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace="Executor workspace" home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
+            <AppHeader icon="badge" workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 <div className="mb-8">
-                    <h1 className="font-headline-md text-headline-md">Welcome back, {user.name}</h1>
-                    <p className="mt-1 text-on-surface-variant">Here are the estates you are handling as an
-                        executor.</p>
+                    <h1 className="font-headline-md text-headline-md">{t('home.welcome', {name: user.name})}</h1>
+                    <p className="mt-1 text-on-surface-variant">{t('home.intro')}</p>
                 </div>
 
                 {error && <div
                     className="mb-6 p-4 rounded-xl bg-error-container text-on-error-container text-sm">{error}</div>}
 
                 <section className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard icon="assignment_late" label="Need your action" value={cases && needAction}/>
-                    <StatCard icon="hourglass_top" label="Waiting for verification" value={cases && waiting}/>
-                    <StatCard icon="lock_open" label="Vaults unlocked" value={cases && unlocked}/>
-                    <StatCard icon="pause_circle" label="On standby" value={cases && standby.length}/>
+                    <StatCard icon="assignment_late" label={t('home.stats.needAction')} value={cases && needAction}/>
+                    <StatCard icon="hourglass_top" label={t('home.stats.waiting')} value={cases && waiting}/>
+                    <StatCard icon="lock_open" label={t('home.stats.unlocked')} value={cases && unlocked}/>
+                    <StatCard icon="pause_circle" label={t('home.stats.standby')} value={cases && standby.length}/>
                 </section>
 
                 <section className="mb-10">
-                    <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Active estates</h2>
-                    {cases === null && <p className="text-on-surface-variant">Loading...</p>}
+                    <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('home.activeTitle')}</h2>
+                    {cases === null && <p className="text-on-surface-variant">{t('loading')}</p>}
                     {cases !== null && active.length === 0 &&
-                        <EmptyState bordered icon="badge" title="No active estates right now"
-                                    text="You'll get an email when an owner's Dead Man's Switch is triggered and you need to act." />}
+                        <EmptyState bordered icon="badge" title={t('home.emptyTitle')}
+                                    text={t('home.emptyText')} />}
                     <div className="flex flex-col gap-5">
                         {active.map((c) => (
                             <CaseCard key={c.assignmentId} c={c} busy={busyId === c.assignmentId}
@@ -200,7 +200,7 @@ export default function ExecutorHome() {
 
                 {standby.length > 0 && (
                     <section>
-                        <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">On standby</h2>
+                        <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('home.standbyTitle')}</h2>
                         <div
                             className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 divide-y divide-outline-variant/20">
                             {standby.map((c) => (
@@ -208,10 +208,9 @@ export default function ExecutorHome() {
                                      className="p-4 flex flex-wrap items-center justify-between gap-2">
                                     <div>
                                         <p className="font-semibold">{ownerName(c)}</p>
-                                        <p className="text-sm text-on-surface-variant">{TYPE_LABEL[c.executorType]} ·
-                                            since {fmt(c.assignedAt)}</p>
+                                        <p className="text-sm text-on-surface-variant">{t('home.standbySince', {type: t(`type.${c.executorType}`, c.executorType), date: formatDate(c.assignedAt)})}</p>
                                     </div>
-                                    <span className="text-sm text-outline">Nothing to do until the Dead Man's Switch is triggered.</span>
+                                    <span className="text-sm text-outline">{t('home.standbyHint')}</span>
                                 </div>
                             ))}
                         </div>

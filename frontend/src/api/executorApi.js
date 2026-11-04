@@ -132,19 +132,20 @@ export function caseStep(assignment, progress = []) {
     return 3;
 }
 
-export const HANDOVER_LABEL = {
-    PENDING: { label: 'Waiting for verifier', cls: 'bg-warning-container text-on-warning-container' },
-    VERIFIED: { label: 'Approved, awaiting signature', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
-    REJECTED: { label: 'Rejected', cls: 'bg-error-container text-on-error-container' },
-    UNLOCKED: { label: 'Unlocked for beneficiary', cls: 'bg-success-container text-on-success-container' },
-    CLAIMED: { label: 'Received by beneficiary', cls: 'bg-success-container text-on-success-container' },
-    ARCHIVED_LOCKED: { label: 'Expired', cls: 'bg-surface-container text-outline' },
+// Màu nhãn trạng thái bàn giao; chữ nằm trong executor.json -> handover
+export const HANDOVER_CLASS = {
+    PENDING: 'bg-warning-container text-on-warning-container',
+    VERIFIED: 'bg-secondary-fixed text-on-secondary-fixed',
+    REJECTED: 'bg-error-container text-on-error-container',
+    UNLOCKED: 'bg-success-container text-on-success-container',
+    CLAIMED: 'bg-success-container text-on-success-container',
+    ARCHIVED_LOCKED: 'bg-surface-container text-outline',
 };
 
-// N2-exec: trạng thái nhận tài sản của từng người thụ hưởng
-export const CLAIM_PROGRESS_LABEL = {
-    PENDING: { label: 'Waiting for response', cls: 'bg-warning-container text-on-warning-container' },
-    ACCEPTED: { label: 'Accepted', cls: 'bg-success-container text-on-success-container' },
-    DECLINED: { label: 'Declined', cls: 'bg-error-container text-on-error-container' },
-    FALLBACK_APPLIED: { label: 'Declined - passed to backup', cls: 'bg-secondary-fixed text-on-secondary-fixed' },
+// N2-exec: màu trạng thái nhận tài sản; chữ nằm trong executor.json -> claim
+export const CLAIM_PROGRESS_CLASS = {
+    PENDING: 'bg-warning-container text-on-warning-container',
+    ACCEPTED: 'bg-success-container text-on-success-container',
+    DECLINED: 'bg-error-container text-on-error-container',
+    FALLBACK_APPLIED: 'bg-secondary-fixed text-on-secondary-fixed',
 };

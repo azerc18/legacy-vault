@@ -1,1 +1,161 @@
-{}
+{
+  "workspace": "Không gian người thi hành",
+  "type": {
+    "PRIMARY": "Người thi hành chính",
+    "BACKUP": "Người thi hành dự phòng"
+  },
+  "steps": ["Xác nhận", "Nộp giấy tờ", "Xác minh pháp lý", "Bàn giao"],
+  "handover": {
+    "PENDING": "Chờ người xác minh",
+    "VERIFIED": "Đã duyệt, chờ ký",
+    "REJECTED": "Bị từ chối",
+    "UNLOCKED": "Đã mở khoá cho người thụ hưởng",
+    "CLAIMED": "Người thụ hưởng đã nhận",
+    "ARCHIVED_LOCKED": "Đã hết hạn"
+  },
+  "request": {
+    "PENDING": "Giấy tờ đang được xem xét",
+    "APPROVED": "Giấy tờ đã được duyệt",
+    "REJECTED": "Giấy tờ bị từ chối - hãy nộp lại",
+    "SIGNED": "Đã ký mở khoá"
+  },
+  "claim": {
+    "PENDING": "Chờ phản hồi",
+    "ACCEPTED": "Đã nhận",
+    "DECLINED": "Đã từ chối",
+    "FALLBACK_APPLIED": "Đã từ chối - chuyển cho người dự phòng"
+  },
+  "wish": {
+    "MEMORIALIZE": "Chuyển sang chế độ tưởng niệm",
+    "DELETE": "Xoá tài khoản",
+    "TRANSFER_DATA": "Tải dữ liệu giao cho gia đình"
+  },
+  "taskStatus": {
+    "TODO": "Chưa làm",
+    "DOING": "Đang làm",
+    "DONE": "Đã xong"
+  },
+  "estateOf": "Di sản của {{name}}",
+  "acknowledge": "Xác nhận",
+  "saving": "Đang lưu...",
+  "loading": "Đang tải...",
+  "ackError": "Không thể xác nhận.",
+  "home": {
+    "welcome": "Chào mừng trở lại, {{name}}",
+    "intro": "Đây là các di sản bạn đang phụ trách với vai trò người thi hành.",
+    "loadError": "Không tải được danh sách hồ sơ.",
+    "stats": {
+      "needAction": "Cần bạn xử lý",
+      "waiting": "Đang chờ xác minh",
+      "unlocked": "Két sắt đã mở khoá",
+      "standby": "Đang chờ"
+    },
+    "activeTitle": "Di sản đang xử lý",
+    "emptyTitle": "Hiện chưa có di sản nào cần xử lý",
+    "emptyText": "Bạn sẽ nhận email khi Dead Man's Switch của chủ két sắt được kích hoạt và cần bạn xử lý.",
+    "activated": "Kích hoạt {{date}}",
+    "vaults_other": "{{count}} két sắt",
+    "unread_other": "{{count}} tin nhắn chưa đọc",
+    "ackBefore": "Xác nhận trước {{date}}",
+    "ackOverdue": "Đã quá hạn xác nhận từ {{date}}",
+    "openCase": "Mở hồ sơ",
+    "standbyTitle": "Đang chờ",
+    "standbySince": "{{type}} · từ {{date}}",
+    "standbyHint": "Chưa cần làm gì cho tới khi Dead Man's Switch được kích hoạt."
+  },
+  "case": {
+    "notFound": "Không tìm thấy hồ sơ.",
+    "loadError": "Không tải được hồ sơ này.",
+    "back": "Tất cả di sản",
+    "subtitle": "{{type}} · kích hoạt {{date}}",
+    "standby": "Di sản này đang ở trạng thái chờ. Bạn có thể xử lý khi Dead Man's Switch của chủ két sắt được kích hoạt.",
+    "activatedTitle": "Bạn đã được kích hoạt",
+    "activatedText": "Vui lòng xác nhận bạn đã nhận thông báo kích hoạt và sẽ xử lý di sản này.",
+    "vaults": {
+      "title": "Két sắt ({{count}})",
+      "none": "Chủ két sắt chưa có két sắt nào.",
+      "beneficiary": "Người thụ hưởng: {{name}}",
+      "invited": "Đã mời, chưa đăng ký",
+      "notAssigned": "Chưa chỉ định",
+      "instructions": "Chỉ dẫn của chủ két sắt:"
+    },
+    "submit": {
+      "title": "Nộp giấy chứng tử",
+      "intro": "Người xác minh pháp lý sẽ xem giấy chứng tử trước khi mở khoá két sắt. Tệp PDF, PNG hoặc JPG, tối đa 10MB.",
+      "previouslyRejected": "(đã bị từ chối trước đó)",
+      "chooseFile": "Chọn giấy chứng tử",
+      "fileHint": "PDF, PNG hoặc JPG, tối đa 10MB",
+      "notesPlaceholder": "Ghi chú cho người xác minh (không bắt buộc)",
+      "button": "Gửi xác minh",
+      "submitting": "Đang gửi...",
+      "success": "Đã gửi. Người xác minh pháp lý sẽ xem xét yêu cầu của bạn.",
+      "failed": "Gửi không thành công.",
+      "errSelect": "Hãy chọn ít nhất một két sắt.",
+      "errFile": "Vui lòng đính kèm giấy chứng tử.",
+      "errType": "Chỉ chấp nhận tệp PDF, PNG hoặc JPG.",
+      "errSize": "Tệp vượt quá giới hạn 10MB.",
+      "errNotes": "Ghi chú tối đa 1000 ký tự."
+    },
+    "progress": {
+      "title": "Tiến độ bàn giao",
+      "vault": "Két sắt",
+      "status": "Trạng thái",
+      "submitted": "Ngày nộp",
+      "decided": "Ngày quyết định",
+      "details": "Chi tiết",
+      "reason": "Lý do: {{reason}}",
+      "unlocked": "Mở khoá {{date}} · nhận trước {{deadline}}"
+    },
+    "claims": {
+      "title": "Tình trạng nhận tài sản",
+      "loadError": "Không tải được danh sách người thụ hưởng.",
+      "none": "Chưa có người thụ hưởng.",
+      "beneficiary": "Người thụ hưởng",
+      "status": "Trạng thái",
+      "responded": "Ngày phản hồi",
+      "reminder": "Nhắc nhở",
+      "send": "Gửi nhắc nhở",
+      "sending": "Đang gửi...",
+      "sent": "Đã gửi nhắc nhở tới {{name}}.",
+      "sendError": "Không gửi được nhắc nhở.",
+      "nextAfter": "Đã nhắc · lần sau từ {{date}}"
+    },
+    "tasks": {
+      "title": "Danh sách xử lý tài khoản số",
+      "intro": "Xử lý từng tài khoản theo di nguyện của chủ két sắt rồi cập nhật trạng thái. Người thụ hưởng theo dõi được tiến độ này.",
+      "done": "Đã xong {{done}}/{{total}}.",
+      "loadError": "Không tải được danh sách tài khoản số.",
+      "wish": "Di nguyện:",
+      "help": "Trang hỗ trợ chính thức",
+      "notePlaceholder": "Ghi chú cho gia đình (ví dụ mã yêu cầu đã gửi nhà cung cấp)",
+      "save": "Lưu",
+      "saveError": "Không lưu được."
+    },
+    "messages": {
+      "title": "Trao đổi với người xác minh pháp lý",
+      "requestOf": "Yêu cầu ngày {{date}} — {{status}}",
+      "loadError": "Không tải được tin nhắn.",
+      "loadOlder": "Xem tin nhắn cũ hơn",
+      "emptyTitle": "Chưa có tin nhắn",
+      "emptyText": "Gửi tin nhắn nếu người xác minh pháp lý cần thêm thông tin về yêu cầu của bạn.",
+      "you": "Bạn",
+      "verifier": "Người xác minh pháp lý",
+      "view": "Xem tệp đính kèm",
+      "viewNamed": "Xem {{name}}",
+      "download": "Tải tệp đính kèm",
+      "downloadNamed": "Tải {{name}}",
+      "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này.",
+      "openError": "Không mở được tệp đính kèm.",
+      "downloadError": "Không tải được tệp đính kèm.",
+      "rejectedClosed": "Yêu cầu này đã bị từ chối và đã đóng trao đổi.",
+      "newRequest": "Nộp yêu cầu mới",
+      "placeholder": "Nhập tin nhắn...",
+      "attach": "Đính kèm tệp",
+      "send": "Gửi",
+      "sending": "Đang gửi...",
+      "sendError": "Không gửi được.",
+      "errEmpty": "Hãy nhập tin nhắn hoặc đính kèm tệp.",
+      "errFile": "Tệp đính kèm phải là PDF/PNG/JPG, tối đa 10MB."
+    }
+  }
+}
