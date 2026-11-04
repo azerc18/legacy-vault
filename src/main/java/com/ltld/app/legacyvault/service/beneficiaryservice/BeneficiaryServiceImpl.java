@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
+import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.exception.BeneficiaryException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
@@ -29,6 +30,7 @@ import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
 import com.ltld.app.legacyvault.utility.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -73,9 +75,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final DateTimeFormatter EXPORT_TIME_FORMAT =
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss '(GMT+7)'");
     private static final String CONFIRM_REQUIRED_MSG = "Final confirmation is required to close the handover case.";
-    // N2-notify. Tham số: số tài sản, tên Vault, tên Owner
-    private static final String MSG_ASSETS_REASSIGNED =
-            "%d asset(s) in the vault \"%s\" of %s have been reassigned to you because another beneficiary declined their share.";
     // Dùng chung cho tên tệp và Content-Type; khớp các loại FR-04 cho phép (PDF, DOC/DOCX, JPG/PNG)
     private static final Map<String, String> DOCUMENT_TYPES = Map.of(
             "pdf", "application/pdf",
@@ -104,6 +103,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final JointConsensusService jointConsensusService;   // X1
     private final DigitalSignatureRepository digitalSignatureRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
+    private final ApplicationEventPublisher eventPublisher;   // N2-notify
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -572,7 +572,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
-        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+        VaultBeneficiary me = ctx.beneficiary();   // đã kiểm tra trong loadAccessibleVault
         // Cùng quy tắc N2-access: bỏ tài sản đã phân bổ cho người khác
         Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
         Map<UUID, AssetAllocation> mine = new HashMap<>();
@@ -704,7 +704,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private record DecryptedAsset(Vault vault, DigitalAsset asset, String secret, String notes) {
     }
 
-    private record AccessContext(Vault vault, BeneficiaryClaim claim) {
+    private record AccessContext(Vault vault, BeneficiaryClaim claim, VaultBeneficiary beneficiary) {
     }
 
     // Kiểm tra quyền, trạng thái, khóa, phiên xem rồi giải mã trong bộ nhớ
@@ -976,9 +976,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 stalled++;
             }
         }
-        // N2-notify: báo cho từng người nhận thay (cùng giao dịch với việc chuyển phân bổ)
-        reassignedCounts.forEach((receiverId, count) ->
-                notifyAssetsReassigned(vault, receivers.get(receiverId), count));
+        // N2-notify: phát event, thông báo được lưu sau khi giao dịch này commit
+        publishAssetsReassigned(vault, receivers, reassignedCounts);
 
         // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
         stalled += (int) held.stream()
@@ -1059,24 +1058,23 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         }
     }
 
-    // N2-notify: thông báo trong app cho người nhận thay. Người chưa có tài khoản thì bỏ qua: phần này đã
-    // thuộc về họ (effective_beneficiary), họ sẽ nhận thông báo bàn giao thường khi đăng ký xong.
-    private void notifyAssetsReassigned(Vault vault, VaultBeneficiary receiver, int count) {
-        if (receiver == null || receiver.getUser() == null) {
+    // N2-notify: người chưa có tài khoản thì bỏ qua: phần này đã thuộc về họ (effective_beneficiary),
+    // họ sẽ nhận thông báo bàn giao thường khi đăng ký xong. Thông báo lưu sau commit (listener).
+    private void publishAssetsReassigned(Vault vault, Map<UUID, VaultBeneficiary> receivers,
+                                         Map<UUID, Integer> counts) {
+        List<AssetsReassignedEvent.Receiver> toNotify = new ArrayList<>();
+        counts.forEach((receiverId, count) -> {
+            VaultBeneficiary receiver = receivers.get(receiverId);
+            if (receiver != null && receiver.getUser() != null) {
+                toNotify.add(new AssetsReassignedEvent.Receiver(receiver.getUser().getId(), count));
+            }
+        });
+        if (toNotify.isEmpty()) {
             return;
         }
         String ownerName = vault.getOwner() != null && vault.getOwner().getFullName() != null
                 ? vault.getOwner().getFullName() : "the owner";
-        notificationRepository.save(Notification.builder()
-                .recipient(receiver.getUser())
-                .type(NotificationType.ASSET_REASSIGNED)
-                .channel(NotificationChannel.IN_APP)
-                .referenceType(REF_VAULT)
-                .referenceId(vault.getId())
-                .content(String.format(MSG_ASSETS_REASSIGNED, count, vault.getName(), ownerName))
-                .status(NotificationStatus.SENT)
-                .sentAt(LocalDateTime.now())
-                .build());
+        eventPublisher.publishEvent(new AssetsReassignedEvent(vault.getId(), vault.getName(), ownerName, toNotify));
     }
 
     // N2b: người dự phòng chỉ nhận được phần chuyển sang nếu chưa đóng / chưa hết hạn / chưa từ chối
@@ -1097,7 +1095,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Vault vault = vaultRepository.findById(vaultId)
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
 
-        requireBeneficiary(vault.getId(), currentUserId);
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
 
         if (vault.getStatus() == VaultStatus.CLAIMED) {
             throw new BeneficiaryException(ALREADY_CLAIMED_MSG, HttpStatus.CONFLICT);
@@ -1118,7 +1116,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         if (claim.getStatus() == ClaimStatus.EXPIRED || LocalDateTime.now().isAfter(claim.getClaimDeadlineAt())) {
             throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
         }
-        return new AccessContext(vault, claim);
+        return new AccessContext(vault, claim, me);
     }
 
     @Override
