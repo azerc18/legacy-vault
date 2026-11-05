@@ -351,7 +351,7 @@ function AssetList({ vaultId, assets, onError }) {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold truncate">{a.assetName}</p>
-                                    <p className="text-xs text-outline">{label.assetType(a.assetType in ASSET_ICON ? a.assetType : 'OTHER')}</p>
+                                    <p className="text-xs text-outline">{label.assetType(a.assetType)}</p>
                                     {c && (
                                         <p className="mt-1 text-xs text-on-surface-variant">
                                             {c.reached
@@ -407,7 +407,7 @@ function AssetDetailModal({ detail, onClose }) {
             <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>
-                        <p className="text-xs text-outline">{label.assetType(detail.assetType in ASSET_ICON ? detail.assetType : 'OTHER')}</p>
+                        <p className="text-xs text-outline">{label.assetType(detail.assetType)}</p>
                         <h3 className="font-title-lg text-title-lg">{detail.assetName}</h3>
                     </div>
                     <button onClick={onClose} aria-label={t('assets.close')}><Icon name="close" className="text-outline" /></button>

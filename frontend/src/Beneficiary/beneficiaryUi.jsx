@@ -18,6 +18,9 @@ export const ASSET_ICON = {
     CRYPTO_WALLET: 'currency_bitcoin',
     SOCIAL_MEDIA: 'groups',
     DOCUMENT: 'description',
+    EMAIL: 'mail',
+    E_WALLET: 'account_balance_wallet',
+    EXCHANGE_ACCOUNT: 'currency_exchange',
     OTHER: 'category',
 };
 

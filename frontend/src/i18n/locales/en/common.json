@@ -2,6 +2,7 @@
   "header": { "userHome": "User home", "logout": "Log out" },
   "nav": {"home": "Home", "profile": "Profile", "estates": "Estates", "requests": "Requests", "history": "History", "myVaults": "My vaults", "guide": "Guide", "dms": "Dead Man's Switch", "executors": "Executors", "activity": "Activity", "billing": "Billing & VIP", "admin": "Administration"},
   "actions": { "back": "Back", "save": "Save", "cancel": "Cancel", "confirm": "Confirm", "retry": "Retry" },
+  "notifications": { "title": "Notifications", "empty": "No notifications yet." },
   "language": { "label": "Language", "en": "EN", "vi": "VI" },
   "claim": {
     "progress": "Claim progress",
