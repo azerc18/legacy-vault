@@ -159,5 +159,27 @@
     "reassigned": "Được chuyển cho bạn",
     "viewed": "Đã xem",
     "notViewed": "Chưa xem"
+  },
+  "legacyMessages": {
+    "title": "Lời nhắn di nguyện & Hẹn giờ ({{count}})",
+    "intro": "Những lá thư riêng, kỷ niệm âm thanh/video và lời nhắn hẹn giờ (Time-Capsule) được để lại cho bạn.",
+    "loadError": "Không thể tải lời nhắn di nguyện.",
+    "openError": "Không thể mở lời nhắn này.",
+    "downloadError": "Không thể tải tệp đính kèm.",
+    "family": "Gia đình",
+    "personal": "Cá nhân",
+    "unlocked": "Đã mở khoá",
+    "opensOn": "Mở vào {{date}}",
+    "attachment": "Đính kèm",
+    "sealed": "Lời nhắn Time-Capsule — Lời nhắn này được niêm phong đến {{date}}.",
+    "read": "Đọc",
+    "downloadAttachment": "Tải tệp đính kèm",
+    "download": "Tải về",
+    "close": "Đóng",
+    "viewer": {
+      "family": "Lời nhắn gửi cả gia đình",
+      "personal": "Lời nhắn riêng gửi bạn",
+      "scheduled": "Hẹn ngày {{date}}"
+    }
   }
 }

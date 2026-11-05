@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 const TYPE_ICON = {
     VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge', VERIFIER_REPLY: 'forum', VERIFICATION_DECIDED: 'gavel',
     ASSET_REASSIGNED: 'swap_horiz',
+    LEGACY_MESSAGE_DELIVERED: 'mark_email_unread',
 };
 const fmt = (v, lng) => (v
     ? new Date(v).toLocaleString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })
