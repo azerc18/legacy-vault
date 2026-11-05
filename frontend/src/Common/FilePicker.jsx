@@ -1,6 +1,7 @@
 // Nút chọn file dùng chung thay cho <input type="file"> mặc định của trình duyệt.
 // Component "có kiểm soát": cha giữ state `file`, đặt file = null là ô tự xoá (không cần form.reset()).
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 
@@ -15,9 +16,11 @@ const formatSize = (b) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024)
  * @param compact   true = chỉ nút icon (dùng trong ô soạn tin nhắn)
  */
 export default function FilePicker({
-    file, onChange, accept, label = 'Choose file', hint, disabled = false, required = false, compact = false, id,
+                                       file, onChange, accept, label, hint, disabled = false, required = false, compact = false, id,
 }) {
     const inputRef = useRef(null);
+    const { t } = useTranslation('common');
+    const pickLabel = label ?? t('filePicker.choose');
 
     // Cha xoá file -> xoá luôn giá trị của input để chọn lại cùng file vẫn kích hoạt onChange
     useEffect(() => {
@@ -34,10 +37,10 @@ export default function FilePicker({
 
             <div className="flex flex-wrap items-center gap-2 min-w-0">
                 <button type="button" onClick={pick} disabled={disabled}
-                        title={compact ? label : undefined} aria-label={label}
+                        title={compact ? pickLabel : undefined} aria-label={pickLabel}
                         className={`${compact ? 'h-11 w-11 justify-center' : 'h-11 px-4'} shrink-0 rounded-xl border border-dashed border-outline-variant text-primary text-sm font-semibold inline-flex items-center gap-2 hover:bg-surface-container-low hover:border-primary disabled:opacity-60 disabled:cursor-not-allowed`}>
                     <Icon name={compact ? 'attach_file' : 'upload_file'} className="text-[20px]" />
-                    {!compact && (file ? 'Change file' : label)}
+                    {!compact && (file ? t('filePicker.change') : pickLabel)}
                 </button>
 
                 {file && (
@@ -45,13 +48,13 @@ export default function FilePicker({
                         <Icon name="description" className="text-[18px] shrink-0" />
                         <span className="truncate max-w-[220px]" title={file.name}>{file.name}</span>
                         <span className="text-xs opacity-70 shrink-0">{formatSize(file.size)}</span>
-                        <button type="button" onClick={() => onChange(null)} disabled={disabled} aria-label="Remove file"
+                        <button type="button" onClick={() => onChange(null)} disabled={disabled} aria-label={t('filePicker.remove')}
                                 className="w-7 h-7 shrink-0 rounded-full hover:bg-black/10 inline-flex items-center justify-center">
                             <Icon name="close" className="text-[16px]" />
                         </button>
                     </span>
                 )}
-                {!file && !compact && <span className="text-sm text-on-surface-variant">No file selected</span>}
+                {!file && !compact && <span className="text-sm text-on-surface-variant">{t('filePicker.none')}</span>}
             </div>
 
             {hint && !compact && <p className="text-xs text-on-surface-variant">{hint}</p>}

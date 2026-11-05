@@ -159,5 +159,27 @@
     "reassigned": "Reassigned to you",
     "viewed": "Viewed",
     "notViewed": "Not viewed"
+  },
+  "legacyMessages": {
+    "title": "Legacy messages & Time-capsule ({{count}})",
+    "intro": "Personal letters, audio/video memories and scheduled anniversary time-capsules left for you.",
+    "loadError": "Could not load legacy messages.",
+    "openError": "Could not open this message.",
+    "downloadError": "Could not download attachment.",
+    "family": "Family",
+    "personal": "Personal",
+    "unlocked": "Unlocked",
+    "opensOn": "Opens on {{date}}",
+    "attachment": "Attachment",
+    "sealed": "Time-Capsule message — This message is sealed until {{date}}.",
+    "read": "Read",
+    "downloadAttachment": "Download attachment",
+    "download": "Download",
+    "close": "Close",
+    "viewer": {
+      "family": "Message for the family",
+      "personal": "Personal message for you",
+      "scheduled": "Scheduled for {{date}}"
+    }
   }
 }

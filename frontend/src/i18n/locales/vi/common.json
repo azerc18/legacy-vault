@@ -16,5 +16,22 @@
   "roles": {
     "OWNER": "Chủ di sản", "BENEFICIARY": "Người thụ hưởng", "EXECUTOR": "Người thi hành",
     "LEGAL_VERIFIER": "Người xác minh pháp lý", "ADMIN": "Quản trị viên"
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "message": "Trang bạn tìm không tồn tại hoặc đã được chuyển đi.",
+    "backHome": "Về trang chủ",
+    "goHome": "Đến trang chủ"
+  },
+  "forbidden": {
+    "title": "Bạn không có quyền truy cập trang này",
+    "message": "Trang này dành cho tài khoản {{roles}}. Nếu bạn vừa được cấp vai trò này, hãy đăng xuất rồi đăng nhập lại.",
+    "backHome": "Về trang chủ"
+  },
+  "filePicker": {
+    "choose": "Chọn tệp",
+    "change": "Đổi tệp",
+    "none": "Chưa chọn tệp",
+    "remove": "Gỡ tệp"
   }
 }

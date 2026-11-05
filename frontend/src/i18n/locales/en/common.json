@@ -16,5 +16,22 @@
   "roles": {
     "OWNER": "Vault Owner", "BENEFICIARY": "Beneficiary", "EXECUTOR": "Executor",
     "LEGAL_VERIFIER": "Legal Verifier", "ADMIN": "Administrator"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "message": "The page you are looking for does not exist or has been moved.",
+    "backHome": "Back to home",
+    "goHome": "Go to homepage"
+  },
+  "forbidden": {
+    "title": "You don't have access to this page",
+    "message": "This page is for {{roles}} accounts. If you were just given this role, sign out and sign in again.",
+    "backHome": "Back to home"
+  },
+  "filePicker": {
+    "choose": "Choose file",
+    "change": "Change file",
+    "none": "No file selected",
+    "remove": "Remove file"
   }
 }
