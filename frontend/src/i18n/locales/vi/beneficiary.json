@@ -1,1 +1,163 @@
-{}
+{
+  "unknownOwner": "Chủ sở hữu không rõ",
+  "status": {
+    "readyToClaim": "Sẵn sàng nhận",
+    "inProgress": "Đang xử lý",
+    "accepted": "Đã chấp nhận",
+    "claimed": "Đã nhận",
+    "expired": "Đã hết hạn",
+    "declined": "Đã từ chối",
+    "waived": "Đã miễn phần"
+  },
+  "list": {
+    "title": "Két thừa kế",
+    "subtitle": "Các két đã được bàn giao cho bạn.",
+    "loadError": "Không thể tải danh sách két của bạn.",
+    "loading": "Đang tải...",
+    "empty": "Chưa có két nào được bàn giao cho bạn.",
+    "from": "Từ {{owner}}",
+    "unlocked": "Mở khóa lúc",
+    "claimed": "Đã nhận lúc",
+    "claimBefore": "Nhận trước"
+  },
+  "guide": {
+    "title": "Hướng dẫn cho người thụ hưởng",
+    "subtitle": "Những gì diễn ra sau khi một két được bàn giao cho bạn.",
+    "goodToKnow": "Cần lưu ý",
+    "steps": [
+      { "title": "Kiểm tra email và đăng nhập", "text": "Bạn sẽ nhận được email khi một két được bàn giao cho bạn. Hãy đăng nhập LegacyVault bằng đúng địa chỉ email đó." },
+      { "title": "Xác minh danh tính", "text": "Xác nhận bạn là người nhận bằng mã dùng một lần gửi qua email. Mã hết hạn sau vài phút." },
+      { "title": "Chấp nhận bàn giao", "text": "Mỗi người thụ hưởng tự phản hồi riêng. Hãy chấp nhận để nhận phần của bạn, hoặc từ chối để phần đó chuyển cho người thụ hưởng dự phòng (nếu chủ sở hữu có chỉ định). Từ chối không thể hoàn tác." },
+      { "title": "Xem và lưu tài sản", "text": "Tải về những thông tin bạn cần và cất giữ cẩn thận. Hãy xóa các tệp đã tải sau khi bạn đã lưu xong." },
+      { "title": "Đóng hồ sơ bàn giao", "text": "Xác nhận rằng bạn đã nhận đủ mọi thứ. Đóng hồ sơ không thể hoàn tác." }
+    ],
+    "tips": [
+      "Hãy thực hiện trước hạn nhận hiển thị trên từng két. Sau hạn này, nội dung sẽ được lưu trữ.",
+      "Chuẩn bị sẵn giấy chứng tử và giấy tờ tùy thân của chủ sở hữu cho các thủ tục pháp lý.",
+      "Với thủ tục thừa kế, bạn nên cân nhắc liên hệ luật sư hoặc công chứng viên có giấy phép tại địa phương."
+    ]
+  },
+  "detail": {
+    "vaultFallback": "Két",
+    "subtitle": "Từ {{owner}} · nhận trước {{date}}",
+    "loading": "Đang tải...",
+    "genericError": "Đã xảy ra lỗi.",
+    "notFound": "Không tìm thấy két hoặc két không được giao cho bạn.",
+    "loadError": "Không thể tải két này.",
+    "guideLink": "Chưa biết làm gì tiếp theo? Xem hướng dẫn",
+    "expired": "Thời hạn nhận két này đã kết thúc.",
+    "claimed": "Bạn đã nhận két này. Nội dung không còn khả dụng.",
+    "claimedAt": "Bạn đã nhận két này vào {{date}}. Nội dung không còn khả dụng.",
+    "waived": "Phần của bạn trong két này đã được quản trị viên miễn. Nội dung không còn khả dụng với bạn.",
+    "declined": "Bạn đã từ chối phần của mình trong két này. Nội dung không còn khả dụng với bạn.",
+    "verified": "Đã xác minh. Phiên xem của bạn có hiệu lực đến {{date}}."
+  },
+  "verify": {
+    "title": "Xác minh danh tính",
+    "intro": "Vì lý do bảo mật, bạn cần xác minh danh tính trước khi xem tài sản. Việc xác minh có hiệu lực trong 30 phút.",
+    "methodOtp": "Mã qua email",
+    "methodKyc": "Số giấy tờ (eKYC)",
+    "start": "Bắt đầu xác minh",
+    "starting": "Đang bắt đầu...",
+    "otpSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
+    "otpResent": "Đã gửi mã mới.",
+    "otpPlaceholder": "Mã 6 chữ số",
+    "idPlaceholder": "Số căn cước / CMND",
+    "resend": "Gửi lại mã",
+    "resendIn": "Gửi lại mã sau {{seconds}} giây",
+    "changeMethod": "Đổi phương thức",
+    "submit": "Xác minh",
+    "submitting": "Đang xác minh...",
+    "otpInvalid": "Mã phải gồm đúng 6 chữ số.",
+    "idRequired": "Vui lòng nhập số giấy tờ của bạn.",
+    "startError": "Không thể bắt đầu xác minh.",
+    "resendError": "Không thể gửi lại mã.",
+    "verifyError": "Xác minh thất bại."
+  },
+  "assets": {
+    "title": "Tài sản ({{count}})",
+    "empty": "Két này không có tài sản nào.",
+    "consensusDone": "Đã đủ đồng thuận ({{approved}}/{{total}} người đã đồng ý)",
+    "consensusNeeded": "Cần {{threshold}}/{{total}} người nhận đồng ý (hiện có {{approved}})",
+    "youApproved": "Bạn đã đồng ý",
+    "approve": "Đồng ý",
+    "refresh": "Làm mới",
+    "view": "Xem",
+    "download": "Tải về",
+    "secret": "Thông tin bí mật",
+    "notes": "Ghi chú",
+    "reveal": "Hiện thông tin bí mật",
+    "hide": "Ẩn thông tin bí mật",
+    "copy": "Sao chép thông tin bí mật",
+    "close": "Đóng",
+    "sessionNote": "Nội dung này chỉ được giải mã trong phiên này và không được lưu trong trình duyệt của bạn."
+  },
+  "documents": {
+    "title": "Tài liệu pháp lý ({{count}})",
+    "empty": "Két này không có tài liệu pháp lý nào.",
+    "download": "Tải về"
+  },
+  "executor": {
+    "title": "Tiến độ của người thực thi với các tài khoản trực tuyến",
+    "intro": "Người thực thi xử lý các tài khoản này theo di nguyện của chủ sở hữu: đã xong {{done}}/{{total}}.",
+    "account": "Tài khoản",
+    "note": "Ghi chú của người thực thi: {{note}}",
+    "wish": {
+      "MEMORIALIZE": "Chuyển tài khoản sang chế độ tưởng niệm",
+      "DELETE": "Xóa tài khoản",
+      "TRANSFER_DATA": "Tải dữ liệu về cho gia đình"
+    },
+    "taskStatus": {
+      "TODO": "Chưa bắt đầu",
+      "DOING": "Đang xử lý",
+      "DONE": "Hoàn thành"
+    }
+  },
+  "dossier": {
+    "title": "Hồ sơ khai nhận di sản",
+    "description": "Tệp PDF liệt kê các tài sản được phân bổ cho bạn, chữ ký của người xác minh pháp lý và các bước để nhận từng tài sản (ví dụ tại văn phòng công chứng hoặc ngân hàng). Tệp không chứa mật khẩu hay khóa.",
+    "download": "Tải PDF",
+    "preparing": "Đang chuẩn bị..."
+  },
+  "close": {
+    "title": "Hoàn tất và đóng hồ sơ",
+    "intro": "Xác nhận rằng bạn đã nhận đủ mọi thứ. Sau khi đóng, bạn sẽ không thể xem hoặc tải két này nữa.",
+    "review": "Xem lại trước khi đóng",
+    "checking": "Đang kiểm tra...",
+    "viewedOf": "Đã xem <b>{{viewed}}</b>/<b>{{total}}</b> tài sản.",
+    "notViewed": "{{name}} (chưa xem)",
+    "mustView": "Bạn cần xem hoặc tải ít nhất một tài sản trước khi đóng hồ sơ.",
+    "ack": "Tôi hiểu rằng mình sẽ mất quyền truy cập các tài sản chưa xem.",
+    "cancel": "Hủy",
+    "confirm": "Xác nhận và đóng",
+    "closing": "Đang đóng...",
+    "error": "Không thể đóng két này."
+  },
+  "respond": {
+    "title": "Phản hồi của bạn",
+    "intro": "Hãy chấp nhận để xác nhận bạn sẽ nhận phần của mình. Từ chối không thể hoàn tác: phần của bạn sẽ được chuyển cho người thụ hưởng dự phòng (nếu chủ sở hữu có chỉ định).",
+    "accepted": "Bạn đã chấp nhận phần của mình trong két này.",
+    "accept": "Chấp nhận",
+    "sending": "Đang gửi...",
+    "decline": "Từ chối",
+    "reason": "Lý do (không bắt buộc)",
+    "cancel": "Hủy",
+    "confirmDecline": "Xác nhận từ chối",
+    "declining": "Đang từ chối...",
+    "error": "Không thể gửi phản hồi của bạn."
+  },
+  "progress": {
+    "title": "Tiến độ bàn giao",
+    "closedOf": "{{closed}}/{{total}} người thụ hưởng đã đóng phần của mình",
+    "declined": "{{count}} người từ chối",
+    "viewedOf": "Đã xem <b>{{viewed}}</b>/<b>{{total}}</b> tài sản của bạn.",
+    "mode": {
+      "EXCLUSIVE": "Chỉ mình bạn",
+      "PROPORTIONAL": "Chia sẻ",
+      "JOINT_CONSENSUS": "Đồng thuận chung"
+    },
+    "reassigned": "Được chuyển cho bạn",
+    "viewed": "Đã xem",
+    "notViewed": "Chưa xem"
+  }
+}

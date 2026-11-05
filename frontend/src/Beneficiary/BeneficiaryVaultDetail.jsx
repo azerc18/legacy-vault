@@ -1,12 +1,13 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
 import ClaimProgress from '../Common/ClaimProgress.jsx';
 import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
-    ASSET_TYPE, DOCUMENT_TYPE, inputClass, btnPrimary, btnOutline,
+    ASSET_ICON, useEnumLabels, inputClass, btnPrimary, btnOutline,
 } from './beneficiaryUi.jsx';
 import BeneficiaryLegacyMessages from './BeneficiaryLegacyMessages.jsx';
 
@@ -18,6 +19,9 @@ const OTP_RESEND_SECONDS = 60; // khớp BeneficiaryServiceImpl.OTP_RESEND_SECON
    ===================================================================== */
 export default function BeneficiaryVaultDetail() {
     const { vaultId } = useParams();
+    const { t } = useTranslation('beneficiary');
+    const tRef = useRef(t);          // callback/effect đọc t qua ref để đổi ngôn ngữ không kích hoạt tải lại
+    tRef.current = t;
     const user = getUser();
 
     const [vault, setVault] = useState(null);       // BeneficiaryVaultSummaryResponse
@@ -29,9 +33,9 @@ export default function BeneficiaryVaultDetail() {
     const [progress, setProgress] = useState(null);   // ClaimProgressResponse (N2-notify)
 
     // Map lỗi BE -> trạng thái màn hình
-    const handleAccessError = useCallback((err, fallback = 'Something went wrong.') => {
+    const handleAccessError = useCallback((err, fallback) => {
         const status = err.response?.status;
-        const msg = getErrorMessage(err, fallback);
+        const msg = getErrorMessage(err, fallback ?? tRef.current('detail.genericError'));
         if (status === 403) { setStage('verify'); setMessage(''); }          // chưa xác thực / phiên 30 phút hết hạn
         else if (status === 423) { setStage('locked'); setMessage(msg); }    // sai quá 5 lần -> khoá 24h
         else if (status === 410) { setStage('expired'); setMessage(msg); }   // hết hạn nhận
@@ -65,7 +69,7 @@ export default function BeneficiaryVaultDetail() {
             try {
                 const list = await beneficiaryApi.listVaults();
                 const v = list.find((x) => x.vaultId === vaultId);
-                if (!v) { setStage('error'); setMessage('Vault not found or not assigned to you.'); return; }
+                if (!v) { setStage('error'); setMessage(tRef.current('detail.notFound')); return; }
                 setVault(v);
                 if (v.myStatus === 'DECLINED' || v.myStatus === 'WAIVED') setStage('declined');
                 else if (v.vaultStatus === 'CLAIMED' || v.claimStatus === 'CLAIMED') setStage('claimed');
@@ -73,7 +77,7 @@ export default function BeneficiaryVaultDetail() {
                 else await loadContent();
             } catch (err) {
                 setStage('error');
-                setMessage(getErrorMessage(err, 'Could not load this vault.'));
+                setMessage(getErrorMessage(err, tRef.current('detail.loadError')));
             }
         })();
     }, [vaultId, loadContent]);
@@ -83,29 +87,28 @@ export default function BeneficiaryVaultDetail() {
     return (
         <BeneficiaryLayout
             back="/beneficiary"
-            title={vault?.vaultName || 'Vault'}
-            subtitle={vault ? `From ${vault.ownerName || 'Unknown owner'} · claim before ${formatDate(vault.claimDeadlineAt)}` : ''}
+            title={vault?.vaultName || t('detail.vaultFallback')}
+            subtitle={vault ? t('detail.subtitle', { owner: vault.ownerName || t('unknownOwner'), date: formatDate(vault.claimDeadlineAt) }) : ''}
         >
             {vault && <div className="mb-6"><StatusBadge vaultStatus={vault.vaultStatus} claimStatus={vault.claimStatus} myStatus={vault.myStatus} /></div>}
             <Link to="/beneficiary/guide" className="inline-flex items-center gap-1 text-sm text-primary font-semibold mb-6">
-                <Icon name="menu_book" className="text-[18px]" /> Not sure what to do next? Read the guide
+                <Icon name="menu_book" className="text-[18px]" /> {t('detail.guideLink')}
             </Link>
 
-            {stage === 'loading' && <p className="text-on-surface-variant">Loading...</p>}
+            {stage === 'loading' && <p className="text-on-surface-variant">{t('detail.loading')}</p>}
             {stage === 'error' && <Alert>{message}</Alert>}
             {stage === 'locked' && <Alert type="warning">{message}</Alert>}
-            {stage === 'expired' && <Alert type="warning">{message || 'The claim period for this vault has ended.'}</Alert>}
+            {stage === 'expired' && <Alert type="warning">{message || t('detail.expired')}</Alert>}
             {stage === 'claimed' && (
                 <Alert type="success">
-                    You have already received this vault{vault?.claimedAt ? ` on ${formatDate(vault.claimedAt, true)}` : ''}. Its content is no longer available.
+                    {vault?.claimedAt
+                        ? t('detail.claimedAt', { date: formatDate(vault.claimedAt, true) })
+                        : t('detail.claimed')}
                 </Alert>
             )}
             {stage === 'declined' && (
                 <Alert type="info">
-                    {vault?.myStatus === 'WAIVED'
-                        ? 'Your share of this vault was waived by an administrator.'
-                        : 'You declined your share of this vault.'}
-                    {' '}Its content is no longer available to you.
+                    {vault?.myStatus === 'WAIVED' ? t('detail.waived') : t('detail.declined')}
                 </Alert>
             )}
 
@@ -120,7 +123,7 @@ export default function BeneficiaryVaultDetail() {
             {stage === 'content' && (
                 <>
                     {sessionExpiresAt && (
-                        <Alert type="info">Verified. Your viewing session is valid until {formatDate(sessionExpiresAt, true)}.</Alert>
+                        <Alert type="info">{t('detail.verified', { date: formatDate(sessionExpiresAt, true) })}</Alert>
                     )}
                     {message && <Alert>{message}</Alert>}
                     <RespondClaim
@@ -155,6 +158,7 @@ export default function BeneficiaryVaultDetail() {
 
 /* ---------- Bước 1: xác thực danh tính (FR-16 + FR-17) ---------- */
 function VerifyIdentity({ vaultId, onVerified, onLocked }) {
+    const { t } = useTranslation('beneficiary');
     const [method, setMethod] = useState('OTP');
     const [started, setStarted] = useState(false);   // đã gọi /claim (+ gửi OTP)
     const [otp, setOtp] = useState('');
@@ -166,8 +170,8 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 
     useEffect(() => {
         if (cooldown <= 0) return;
-        const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => setCooldown((c) => c - 1), 1000);
+        return () => clearTimeout(timer);
     }, [cooldown]);
 
     const fail = (err, fallback) => {
@@ -182,12 +186,12 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
             await beneficiaryApi.initClaim(vaultId, method);
             if (method === 'OTP') {
                 await beneficiaryApi.sendOtp(vaultId);
-                setInfo('A 6-digit code has been sent to your email. It expires in 5 minutes.');
+                setInfo(t('verify.otpSent'));
                 setCooldown(OTP_RESEND_SECONDS);
             }
             setStarted(true);
         } catch (err) {
-            fail(err, 'Could not start verification.');
+            fail(err, t('verify.startError'));
         } finally {
             setLoading(false);
         }
@@ -197,27 +201,27 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
         setError(''); setInfo('');
         try {
             await beneficiaryApi.sendOtp(vaultId);
-            setInfo('A new code has been sent.');
+            setInfo(t('verify.otpResent'));
             setCooldown(OTP_RESEND_SECONDS);
         } catch (err) {
             // Phiên 15 phút sắp hết -> phải khởi tạo lại
             if (err.response?.status === 400) setStarted(false);
-            fail(err, 'Could not resend code.');
+            fail(err, t('verify.resendError'));
         }
     };
 
     const submit = async (e) => {
         e.preventDefault();
         setError('');
-        if (method === 'OTP' && !/^\d{6}$/.test(otp)) return setError('The code must be exactly 6 digits.');
-        if (method === 'EKYC_MOCK' && !kycIdNumber.trim()) return setError('Please enter your ID number.');
+        if (method === 'OTP' && !/^\d{6}$/.test(otp)) return setError(t('verify.otpInvalid'));
+        if (method === 'EKYC_MOCK' && !kycIdNumber.trim()) return setError(t('verify.idRequired'));
         setLoading(true);
         try {
             const res = await beneficiaryApi.verify(vaultId, method,
                 method === 'OTP' ? { otp } : { kycIdNumber: kycIdNumber.trim() });
             onVerified(res);
         } catch (err) {
-            fail(err, 'Verification failed.');
+            fail(err, t('verify.verifyError'));
         } finally {
             setLoading(false);
         }
@@ -227,11 +231,9 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
         <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 max-w-lg">
             <div className="flex items-center gap-3">
                 <Icon name="verified_user" className="text-secondary text-[28px]" />
-                <h2 className="font-title-lg text-title-lg">Verify your identity</h2>
+                <h2 className="font-title-lg text-title-lg">{t('verify.title')}</h2>
             </div>
-            <p className="mt-2 text-sm text-on-surface-variant">
-                For security, you need to verify your identity before viewing the assets. Verification lasts 30 minutes.
-            </p>
+            <p className="mt-2 text-sm text-on-surface-variant">{t('verify.intro')}</p>
 
             <div className="mt-5">
                 <Alert>{error}</Alert>
@@ -242,8 +244,8 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
                 <>
                     <div className="grid grid-cols-2 gap-3">
                         {[
-                            { value: 'OTP', label: 'Email code', icon: 'mail' },
-                            { value: 'EKYC_MOCK', label: 'ID number (eKYC)', icon: 'badge' },
+                            { value: 'OTP', label: t('verify.methodOtp'), icon: 'mail' },
+                            { value: 'EKYC_MOCK', label: t('verify.methodKyc'), icon: 'badge' },
                         ].map((m) => (
                             <button
                                 key={m.value}
@@ -257,7 +259,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
                         ))}
                     </div>
                     <button onClick={start} disabled={loading} className={`${btnPrimary} w-full mt-5`}>
-                        {loading ? 'Starting...' : 'Start verification'}
+                        {loading ? t('verify.starting') : t('verify.start')}
                     </button>
                 </>
             ) : (
@@ -265,27 +267,27 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
                     {method === 'OTP' ? (
                         <>
                             <input
-                                inputMode="numeric" maxLength={6} placeholder="6-digit code" value={otp}
+                                inputMode="numeric" maxLength={6} placeholder={t('verify.otpPlaceholder')} value={otp}
                                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                                 className={`${inputClass} tracking-[0.5em] text-center`}
                             />
                             <button type="button" onClick={resend} disabled={cooldown > 0} className="text-sm font-semibold text-secondary disabled:text-outline self-start">
-                                {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+                                {cooldown > 0 ? t('verify.resendIn', { seconds: cooldown }) : t('verify.resend')}
                             </button>
                         </>
                     ) : (
                         <input
-                            placeholder="ID card number" value={kycIdNumber}
+                            placeholder={t('verify.idPlaceholder')} value={kycIdNumber}
                             onChange={(e) => setKycIdNumber(e.target.value)}
                             className={inputClass}
                         />
                     )}
                     <div className="flex gap-3">
                         <button type="button" onClick={() => { setStarted(false); setError(''); setInfo(''); }} className={btnOutline}>
-                            Change method
+                            {t('verify.changeMethod')}
                         </button>
                         <button type="submit" disabled={loading} className={`${btnPrimary} flex-1`}>
-                            {loading ? 'Verifying...' : 'Verify'}
+                            {loading ? t('verify.submitting') : t('verify.submit')}
                         </button>
                     </div>
                 </form>
@@ -296,6 +298,8 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 
 /* ---------- Bước 2a: tài sản (FR-17 xem, FR-18 tải) ---------- */
 function AssetList({ vaultId, assets, onError }) {
+    const { t } = useTranslation('beneficiary');
+    const label = useEnumLabels();
     const [detail, setDetail] = useState(null);
     const [busyId, setBusyId] = useState(null);
     // X1: trạng thái đồng thuận mới nhất theo assetId (ghi đè giá trị trong danh sách sau khi đồng ý / làm mới)
@@ -335,49 +339,49 @@ function AssetList({ vaultId, assets, onError }) {
 
     return (
         <section className="mb-10">
-            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Assets ({assets.length})</h2>
+            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('assets.title', { count: assets.length })}</h2>
             {assets.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">This vault has no assets.</p>
+                <p className="text-sm text-on-surface-variant">{t('assets.empty')}</p>
             ) : (
                 <ul className="divide-y divide-outline-variant/30 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     {assets.map((a) => {
-                        const t = ASSET_TYPE[a.assetType] || ASSET_TYPE.OTHER;
+                        const icon = ASSET_ICON[a.assetType] || ASSET_ICON.OTHER;
                         const c = consensusOf(a);
                         const locked = !!c && !c.reached;   // X1: chưa đủ K người đồng ý thì chưa xem / tải được
                         return (
                             <li key={a.id} className="flex flex-wrap items-center gap-4 p-4">
                                 <div className="w-10 h-10 rounded-xl bg-primary-fixed text-primary flex items-center justify-center shrink-0">
-                                    <Icon name={t.icon} />
+                                    <Icon name={icon} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold truncate">{a.assetName}</p>
-                                    <p className="text-xs text-outline">{t.label}</p>
+                                    <p className="text-xs text-outline">{label.assetType(a.assetType)}</p>
                                     {c && (
                                         <p className="mt-1 text-xs text-on-surface-variant">
                                             {c.reached
-                                                ? `Joint approval complete (${c.approved} of ${c.total} approved)`
-                                                : `Needs approval from ${c.threshold} of ${c.total} recipients (${c.approved} so far)`}
+                                                ? t('assets.consensusDone', { approved: c.approved, total: c.total })
+                                                : t('assets.consensusNeeded', { threshold: c.threshold, total: c.total, approved: c.approved })}
                                         </p>
                                     )}
                                 </div>
                                 {locked && (
                                     <>
                                         {c.myApproved ? (
-                                            <span className="text-xs font-semibold text-primary">You approved</span>
+                                            <span className="text-xs font-semibold text-primary">{t('assets.youApproved')}</span>
                                         ) : (
                                             <button onClick={() => approve(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold bg-primary text-on-primary disabled:opacity-50">
-                                                Approve
+                                                {t('assets.approve')}
                                             </button>
                                         )}
                                         <button onClick={() => refresh(a)} disabled={busyId === a.id} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
-                                            Refresh
+                                            {t('assets.refresh')}
                                         </button>
                                     </>
                                 )}
                                 <button onClick={() => view(a)} disabled={busyId === a.id || locked} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
-                                    View
+                                    {t('assets.view')}
                                 </button>
-                                <button onClick={() => download(a)} disabled={busyId === a.id || locked} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
+                                <button onClick={() => download(a)} disabled={busyId === a.id || locked} aria-label={t('assets.download')} title={t('assets.download')} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
                                     <Icon name="download" className="text-[18px]" />
                                 </button>
                             </li>
@@ -391,9 +395,10 @@ function AssetList({ vaultId, assets, onError }) {
 }
 
 function AssetDetailModal({ detail, onClose }) {
+    const { t } = useTranslation('beneficiary');
+    const label = useEnumLabels();
     const [reveal, setReveal] = useState(false);
     const [copied, setCopied] = useState(false);
-    const t = ASSET_TYPE[detail.assetType] || ASSET_TYPE.OTHER;
 
     const copy = async () => {
         await navigator.clipboard.writeText(detail.secret || '');
@@ -406,26 +411,26 @@ function AssetDetailModal({ detail, onClose }) {
             <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>
-                        <p className="text-xs text-outline">{t.label}</p>
+                        <p className="text-xs text-outline">{label.assetType(detail.assetType)}</p>
                         <h3 className="font-title-lg text-title-lg">{detail.assetName}</h3>
                     </div>
-                    <button onClick={onClose}><Icon name="close" className="text-outline" /></button>
+                    <button onClick={onClose} aria-label={t('assets.close')}><Icon name="close" className="text-outline" /></button>
                 </div>
 
-                <p className="mt-5 font-label-sm text-on-surface-variant">Secret</p>
+                <p className="mt-5 font-label-sm text-on-surface-variant">{t('assets.secret')}</p>
                 <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
                     <span className="flex-1">{reveal ? detail.secret : '••••••••••••'}</span>
-                    <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
-                    <button onClick={copy}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
+                    <button onClick={() => setReveal(!reveal)} aria-label={reveal ? t('assets.hide') : t('assets.reveal')}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+                    <button onClick={copy} aria-label={t('assets.copy')}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
                 </div>
 
                 {detail.notes && (
                     <>
-                        <p className="mt-4 font-label-sm text-on-surface-variant">Notes</p>
+                        <p className="mt-4 font-label-sm text-on-surface-variant">{t('assets.notes')}</p>
                         <p className="mt-1 text-sm whitespace-pre-wrap">{detail.notes}</p>
                     </>
                 )}
-                <p className="mt-5 text-xs text-outline">This content is decrypted only for this session and is not stored in your browser.</p>
+                <p className="mt-5 text-xs text-outline">{t('assets.sessionNote')}</p>
             </div>
         </div>
     );
@@ -433,6 +438,8 @@ function AssetDetailModal({ detail, onClose }) {
 
 /* ---------- Bước 2b: tài liệu pháp lý (FR-18 phần 2) ---------- */
 function DocumentList({ vaultId, documents, onError }) {
+    const { t } = useTranslation('beneficiary');
+    const label = useEnumLabels();
     const [busyId, setBusyId] = useState(null);
 
     const download = async (doc) => {
@@ -444,9 +451,9 @@ function DocumentList({ vaultId, documents, onError }) {
 
     return (
         <section className="mb-10">
-            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Legal documents ({documents.length})</h2>
+            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('documents.title', { count: documents.length })}</h2>
             {documents.length === 0 ? (
-                <p className="text-sm text-on-surface-variant">No legal documents in this vault.</p>
+                <p className="text-sm text-on-surface-variant">{t('documents.empty')}</p>
             ) : (
                 <ul className="divide-y divide-outline-variant/30 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     {documents.map((d) => (
@@ -454,10 +461,10 @@ function DocumentList({ vaultId, documents, onError }) {
                             <Icon name="description" className="text-secondary" />
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold truncate">{d.fileName}</p>
-                                <p className="text-xs text-outline">{DOCUMENT_TYPE[d.documentType] || d.documentType} · {formatDate(d.uploadedAt)}</p>
+                                <p className="text-xs text-outline">{label.documentType(d.documentType)} · {formatDate(d.uploadedAt)}</p>
                             </div>
                             <button onClick={() => download(d)} disabled={busyId === d.id} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
-                                <Icon name="download" className="text-[18px]" /> Download
+                                <Icon name="download" className="text-[18px]" /> {t('documents.download')}
                             </button>
                         </li>
                     ))}
@@ -468,18 +475,14 @@ function DocumentList({ vaultId, documents, onError }) {
 }
 
 // F5: theo dõi Executor xử lý tài khoản số (MXH / email / ví điện tử) theo di nguyện, chỉ xem
-const WISH_LABEL = {
-    MEMORIALIZE: 'Memorialize the account',
-    DELETE: 'Delete the account',
-    TRANSFER_DATA: 'Download data for the family',
-};
-const TASK_STATUS = {
-    TODO: { label: 'Not started', cls: 'bg-surface-container text-on-surface-variant' },
-    DOING: { label: 'In progress', cls: 'bg-warning-container text-on-warning-container' },
-    DONE: { label: 'Done', cls: 'bg-success-container text-on-success-container' },
+const TASK_STATUS_CLS = {
+    TODO: 'bg-surface-container text-on-surface-variant',
+    DOING: 'bg-warning-container text-on-warning-container',
+    DONE: 'bg-success-container text-on-success-container',
 };
 
 function ExecutorTasksCard({ vaultId }) {
+    const { t } = useTranslation('beneficiary');
     const [tasks, setTasks] = useState([]);
 
     // Không có task hoặc lỗi thì ẩn khối này, không chặn phần còn lại của trang
@@ -488,29 +491,28 @@ function ExecutorTasksCard({ vaultId }) {
     }, [vaultId]);
 
     if (tasks.length === 0) return null;
-    const done = tasks.filter((t) => t.status === 'DONE').length;
+    const done = tasks.filter((x) => x.status === 'DONE').length;
     return (
         <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 mt-6">
             <h2 className="font-title-lg text-title-lg flex items-center gap-2">
-                <Icon name="checklist" className="text-secondary" /> Executor progress on online accounts
+                <Icon name="checklist" className="text-secondary" /> {t('executor.title')}
             </h2>
             <p className="mt-1 text-sm text-on-surface-variant">
-                The executor handles these accounts following the owner's wishes: {done}/{tasks.length} done.
+                {t('executor.intro', { done, total: tasks.length })}
             </p>
             <ul className="mt-4 divide-y divide-outline-variant/20">
-                {tasks.map((t) => {
-                    const s = TASK_STATUS[t.status] || {};
-                    return (
-                        <li key={t.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="font-semibold">{t.platform || 'Account'}{t.accountHandle && ` · ${t.accountHandle}`}</p>
-                                <p className="text-sm text-on-surface-variant">{WISH_LABEL[t.wish] || t.wish}</p>
-                                {t.note && <p className="text-sm text-on-surface-variant mt-1">Executor note: {t.note}</p>}
-                            </div>
-                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${s.cls}`}>{s.label || t.status}</span>
-                        </li>
-                    );
-                })}
+                {tasks.map((task) => (
+                    <li key={task.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="font-semibold">{task.platform || t('executor.account')}{task.accountHandle && ` · ${task.accountHandle}`}</p>
+                            <p className="text-sm text-on-surface-variant">{t(`executor.wish.${task.wish}`, { defaultValue: task.wish })}</p>
+                            {task.note && <p className="text-sm text-on-surface-variant mt-1">{t('executor.note', { note: task.note })}</p>}
+                        </div>
+                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${TASK_STATUS_CLS[task.status] || ''}`}>
+                            {t(`executor.taskStatus.${task.status}`, { defaultValue: task.status })}
+                        </span>
+                    </li>
+                ))}
             </ul>
         </section>
     );
@@ -518,6 +520,7 @@ function ExecutorTasksCard({ vaultId }) {
 
 // X4: tải hồ sơ khai nhận di sản (PDF) — chỉ phần tài sản của mình, không chứa thông tin bí mật
 function DossierCard({ vaultId, onError }) {
+    const { t } = useTranslation('beneficiary');
     const [busy, setBusy] = useState(false);
 
     const download = async () => {
@@ -532,15 +535,12 @@ function DossierCard({ vaultId, onError }) {
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                     <h2 className="font-title-lg text-title-lg flex items-center gap-2">
-                        <Icon name="picture_as_pdf" className="text-secondary" /> Inheritance dossier
+                        <Icon name="picture_as_pdf" className="text-secondary" /> {t('dossier.title')}
                     </h2>
-                    <p className="mt-1 text-sm text-on-surface-variant max-w-xl">
-                        A PDF listing the assets allocated to you, the legal verifier's signature and the steps to claim each asset
-                        (e.g. at a notary or bank). It contains no passwords or keys.
-                    </p>
+                    <p className="mt-1 text-sm text-on-surface-variant max-w-xl">{t('dossier.description')}</p>
                 </div>
                 <button type="button" onClick={download} disabled={busy} className={btnPrimary}>
-                    <Icon name="download" className="text-[18px]" /> {busy ? 'Preparing...' : 'Download PDF'}
+                    <Icon name="download" className="text-[18px]" /> {busy ? t('dossier.preparing') : t('dossier.download')}
                 </button>
             </div>
         </section>
@@ -549,6 +549,7 @@ function DossierCard({ vaultId, onError }) {
 
 /* ---------- Bước 3: đóng hồ sơ (FR-19) ---------- */
 function CloseVault({ vaultId, onClosed, onError }) {
+    const { t } = useTranslation('beneficiary');
     const [preview, setPreview] = useState(null);
     const [ack, setAck] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -567,7 +568,7 @@ function CloseVault({ vaultId, onClosed, onError }) {
             onClosed(await beneficiaryApi.closeVault(vaultId, preview.unviewedCount > 0 ? ack : undefined));
         } catch (err) {
             if (err.response?.status === 403) return onError(err);
-            setError(getErrorMessage(err, 'Could not close this vault.'));
+            setError(getErrorMessage(err, t('close.error')));
         } finally {
             setLoading(false);
         }
@@ -578,39 +579,41 @@ function CloseVault({ vaultId, onClosed, onError }) {
 
     return (
         <section className="bg-surface-container-low rounded-2xl p-6">
-            <h2 className="font-title-lg text-title-lg">Finish and close</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">
-                Confirm you have received everything. After closing, you can no longer view or download this vault.
-            </p>
+            <h2 className="font-title-lg text-title-lg">{t('close.title')}</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">{t('close.intro')}</p>
             {!preview ? (
                 <button onClick={openPreview} disabled={loading} className={`${btnOutline} mt-5`}>
-                    {loading ? 'Checking...' : 'Review before closing'}
+                    {loading ? t('close.checking') : t('close.review')}
                 </button>
             ) : (
                 <div className="mt-5">
                     <Alert>{error}</Alert>
                     <p className="text-sm">
-                        Viewed <b>{preview.viewedCount}</b> of <b>{preview.totalAssets}</b> assets.
+                        <Trans
+                            i18nKey="close.viewedOf" ns="beneficiary"
+                            values={{ viewed: preview.viewedCount, total: preview.totalAssets }}
+                            components={{ b: <b /> }}
+                        />
                     </p>
                     {needAck && (
                         <ul className="mt-3 text-sm list-disc pl-5 text-on-surface-variant">
-                            {preview.unviewedAssets.map((a) => <li key={a.id}>{a.assetName} (not viewed)</li>)}
+                            {preview.unviewedAssets.map((a) => <li key={a.id}>{t('close.notViewed', { name: a.assetName })}</li>)}
                         </ul>
                     )}
                     {noneViewed ? (
-                        <Alert type="warning">You need to view or download at least one asset before closing.</Alert>
+                        <Alert type="warning">{t('close.mustView')}</Alert>
                     ) : (
                         <>
                             {needAck && (
                                 <label className="mt-4 flex items-start gap-2 text-sm">
                                     <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-1" />
-                                    I understand that I will lose access to the assets I have not viewed.
+                                    {t('close.ack')}
                                 </label>
                             )}
                             <div className="mt-5 flex gap-3">
-                                <button onClick={() => setPreview(null)} className={btnOutline}>Cancel</button>
+                                <button onClick={() => setPreview(null)} className={btnOutline}>{t('close.cancel')}</button>
                                 <button onClick={confirm} disabled={loading || (needAck && !ack)} className={btnPrimary}>
-                                    {loading ? 'Closing...' : 'Confirm and close'}
+                                    {loading ? t('close.closing') : t('close.confirm')}
                                 </button>
                             </div>
                         </>
@@ -623,6 +626,7 @@ function CloseVault({ vaultId, onClosed, onError }) {
 
 /* ---------- N2b: phản hồi phần được chia (Accept / Decline) ---------- */
 function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
+    const { t } = useTranslation('beneficiary');
     const [confirming, setConfirming] = useState(false);
     const [reason, setReason] = useState('');
     const [loading, setLoading] = useState(false);
@@ -630,7 +634,7 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
 
     // Đã Accept thì không Decline được nữa (BE trả 409), nên chỉ hiện trạng thái
     if (myStatus === 'ACCEPTED') {
-        return <Alert type="success">You have accepted your share of this vault.</Alert>;
+        return <Alert type="success">{t('respond.accepted')}</Alert>;
     }
 
     const run = async (action) => {
@@ -638,7 +642,7 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
         try { await action(); }
         catch (err) {
             if (err.response?.status === 403) return onError(err);   // phiên xem hết hạn -> quay lại bước xác thực
-            setError(getErrorMessage(err, 'Could not send your response.'));
+            setError(getErrorMessage(err, t('respond.error')));
         } finally { setLoading(false); }
     };
     const accept = () => run(async () => { await beneficiaryApi.acceptClaim(vaultId); onAccepted(); });
@@ -646,27 +650,24 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
 
     return (
         <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-            <h2 className="font-title-lg text-title-lg">Your response</h2>
-            <p className="mt-1 text-sm text-on-surface-variant">
-                Accept to confirm you will receive your share. Declining cannot be undone: your share is passed to
-                the backup beneficiary, if the owner named one.
-            </p>
+            <h2 className="font-title-lg text-title-lg">{t('respond.title')}</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">{t('respond.intro')}</p>
             <div className="mt-4"><Alert>{error}</Alert></div>
             {!confirming ? (
                 <div className="flex gap-3">
-                    <button onClick={accept} disabled={loading} className={btnPrimary}>{loading ? 'Sending...' : 'Accept'}</button>
-                    <button onClick={() => setConfirming(true)} disabled={loading} className={btnOutline}>Decline</button>
+                    <button onClick={accept} disabled={loading} className={btnPrimary}>{loading ? t('respond.sending') : t('respond.accept')}</button>
+                    <button onClick={() => setConfirming(true)} disabled={loading} className={btnOutline}>{t('respond.decline')}</button>
                 </div>
             ) : (
                 <div>
-                    <label className="block text-sm font-semibold mb-1" htmlFor="decline-reason">Reason (optional)</label>
+                    <label className="block text-sm font-semibold mb-1" htmlFor="decline-reason">{t('respond.reason')}</label>
                     <textarea
                         id="decline-reason" value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)}
                         className="w-full min-h-[80px] px-4 py-3 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                     />
                     <div className="mt-4 flex gap-3">
-                        <button onClick={() => setConfirming(false)} disabled={loading} className={btnOutline}>Cancel</button>
-                        <button onClick={decline} disabled={loading} className={btnPrimary}>{loading ? 'Declining...' : 'Confirm decline'}</button>
+                        <button onClick={() => setConfirming(false)} disabled={loading} className={btnOutline}>{t('respond.cancel')}</button>
+                        <button onClick={decline} disabled={loading} className={btnPrimary}>{loading ? t('respond.declining') : t('respond.confirmDecline')}</button>
                     </div>
                 </div>
             )}
@@ -675,42 +676,46 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
 }
 
 /* ---------- N2-notify: tiến độ phần của mình ---------- */
-const MODE_LABEL = { EXCLUSIVE: 'Yours alone', PROPORTIONAL: 'Shared', JOINT_CONSENSUS: 'Joint approval' };
-
 function ProgressPanel({ progress }) {
+    const { t } = useTranslation('beneficiary');
+    const label = useEnumLabels();
     if (!progress) return null;
     return (
         <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">Handover progress</h2>
+            <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('progress.title')}</h2>
             <ClaimProgress accepted={progress.acceptedBeneficiaries} required={progress.totalBeneficiaries} status={progress.vaultStatus} />
             <p className="mt-3 text-sm text-on-surface-variant">
-                {progress.closedBeneficiaries} of {progress.totalBeneficiaries} beneficiaries have closed their share
-                {progress.declinedBeneficiaries > 0 && ` · ${progress.declinedBeneficiaries} declined`}
+                {t('progress.closedOf', { closed: progress.closedBeneficiaries, total: progress.totalBeneficiaries })}
+                {progress.declinedBeneficiaries > 0 && ` · ${t('progress.declined', { count: progress.declinedBeneficiaries })}`}
             </p>
             <p className="mt-4 text-sm">
-                Viewed <b>{progress.viewedAssets}</b> of <b>{progress.totalAssets}</b> of your assets.
+                <Trans
+                    i18nKey="progress.viewedOf" ns="beneficiary"
+                    values={{ viewed: progress.viewedAssets, total: progress.totalAssets }}
+                    components={{ b: <b /> }}
+                />
             </p>
             {progress.assets.length > 0 && (
                 <ul className="mt-3 divide-y divide-outline-variant/30">
                     {progress.assets.map((a) => {
-                        const t = ASSET_TYPE[a.assetType] || ASSET_TYPE.OTHER;
+                        const icon = ASSET_ICON[a.assetType] || ASSET_ICON.OTHER;
                         return (
                             <li key={a.assetId} className="flex flex-wrap items-center gap-2 py-3">
-                                <Icon name={t.icon} className="text-primary text-[20px]" />
+                                <Icon name={icon} className="text-primary text-[20px]" />
                                 <span className="font-semibold mr-2">{a.assetName}</span>
                                 {a.allocationMode && (
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container">
-                                        {MODE_LABEL[a.allocationMode] || a.allocationMode}
+                                        {t(`progress.mode.${a.allocationMode}`, { defaultValue: a.allocationMode })}
                                         {a.allocationMode === 'PROPORTIONAL' && a.sharePercent != null && ` · ${a.sharePercent}%`}
                                     </span>
                                 )}
                                 {a.reassignedToMe && (
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-warning-container text-on-warning-container">
-                                        Reassigned to you
+                                        {t('progress.reassigned')}
                                     </span>
                                 )}
                                 <span className={`ml-auto text-xs font-semibold ${a.viewed ? 'text-primary' : 'text-outline'}`}>
-                                    {a.viewed ? 'Viewed' : 'Not viewed'}
+                                    {a.viewed ? t('progress.viewed') : t('progress.notViewed')}
                                 </span>
                             </li>
                         );

@@ -1,1 +1,163 @@
-{}
+{
+  "unknownOwner": "Unknown owner",
+  "status": {
+    "readyToClaim": "Ready to claim",
+    "inProgress": "In progress",
+    "accepted": "Accepted",
+    "claimed": "Claimed",
+    "expired": "Expired",
+    "declined": "Declined",
+    "waived": "Waived"
+  },
+  "list": {
+    "title": "Inherited vaults",
+    "subtitle": "Vaults that have been handed over to you.",
+    "loadError": "Could not load your vaults.",
+    "loading": "Loading...",
+    "empty": "No vault has been handed over to you yet.",
+    "from": "From {{owner}}",
+    "unlocked": "Unlocked",
+    "claimed": "Claimed",
+    "claimBefore": "Claim before"
+  },
+  "guide": {
+    "title": "Guide for beneficiaries",
+    "subtitle": "What happens after a vault is handed over to you.",
+    "goodToKnow": "Good to know",
+    "steps": [
+      { "title": "Check your email and sign in", "text": "You receive an email when a vault is handed over to you. Sign in to LegacyVault with the same email address." },
+      { "title": "Verify your identity", "text": "Confirm it is you with a one-time code sent to your email. The code expires after a few minutes." },
+      { "title": "Accept the handover", "text": "Each beneficiary responds on their own. Accept to receive your share, or decline and it passes to the backup beneficiary, if the owner named one. Declining cannot be undone." },
+      { "title": "View and save the assets", "text": "Download the information you need and store it safely. Delete downloaded files once you have saved them." },
+      { "title": "Close the handover case", "text": "Confirm that you have received everything. Closing the case cannot be undone." }
+    ],
+    "tips": [
+      "Act before the claim deadline shown on each vault. After it, the content is archived.",
+      "Keep the death certificate and identity documents of the owner ready for legal procedures.",
+      "For inheritance procedures, consider contacting a licensed lawyer or notary in your area."
+    ]
+  },
+  "detail": {
+    "vaultFallback": "Vault",
+    "subtitle": "From {{owner}} · claim before {{date}}",
+    "loading": "Loading...",
+    "genericError": "Something went wrong.",
+    "notFound": "Vault not found or not assigned to you.",
+    "loadError": "Could not load this vault.",
+    "guideLink": "Not sure what to do next? Read the guide",
+    "expired": "The claim period for this vault has ended.",
+    "claimed": "You have already received this vault. Its content is no longer available.",
+    "claimedAt": "You have already received this vault on {{date}}. Its content is no longer available.",
+    "waived": "Your share of this vault was waived by an administrator. Its content is no longer available to you.",
+    "declined": "You declined your share of this vault. Its content is no longer available to you.",
+    "verified": "Verified. Your viewing session is valid until {{date}}."
+  },
+  "verify": {
+    "title": "Verify your identity",
+    "intro": "For security, you need to verify your identity before viewing the assets. Verification lasts 30 minutes.",
+    "methodOtp": "Email code",
+    "methodKyc": "ID number (eKYC)",
+    "start": "Start verification",
+    "starting": "Starting...",
+    "otpSent": "A 6-digit code has been sent to your email. It expires in 5 minutes.",
+    "otpResent": "A new code has been sent.",
+    "otpPlaceholder": "6-digit code",
+    "idPlaceholder": "ID card number",
+    "resend": "Resend code",
+    "resendIn": "Resend code in {{seconds}}s",
+    "changeMethod": "Change method",
+    "submit": "Verify",
+    "submitting": "Verifying...",
+    "otpInvalid": "The code must be exactly 6 digits.",
+    "idRequired": "Please enter your ID number.",
+    "startError": "Could not start verification.",
+    "resendError": "Could not resend code.",
+    "verifyError": "Verification failed."
+  },
+  "assets": {
+    "title": "Assets ({{count}})",
+    "empty": "This vault has no assets.",
+    "consensusDone": "Joint approval complete ({{approved}} of {{total}} approved)",
+    "consensusNeeded": "Needs approval from {{threshold}} of {{total}} recipients ({{approved}} so far)",
+    "youApproved": "You approved",
+    "approve": "Approve",
+    "refresh": "Refresh",
+    "view": "View",
+    "download": "Download",
+    "secret": "Secret",
+    "notes": "Notes",
+    "reveal": "Show secret",
+    "hide": "Hide secret",
+    "copy": "Copy secret",
+    "close": "Close",
+    "sessionNote": "This content is decrypted only for this session and is not stored in your browser."
+  },
+  "documents": {
+    "title": "Legal documents ({{count}})",
+    "empty": "No legal documents in this vault.",
+    "download": "Download"
+  },
+  "executor": {
+    "title": "Executor progress on online accounts",
+    "intro": "The executor handles these accounts following the owner's wishes: {{done}}/{{total}} done.",
+    "account": "Account",
+    "note": "Executor note: {{note}}",
+    "wish": {
+      "MEMORIALIZE": "Memorialize the account",
+      "DELETE": "Delete the account",
+      "TRANSFER_DATA": "Download data for the family"
+    },
+    "taskStatus": {
+      "TODO": "Not started",
+      "DOING": "In progress",
+      "DONE": "Done"
+    }
+  },
+  "dossier": {
+    "title": "Inheritance dossier",
+    "description": "A PDF listing the assets allocated to you, the legal verifier's signature and the steps to claim each asset (e.g. at a notary or bank). It contains no passwords or keys.",
+    "download": "Download PDF",
+    "preparing": "Preparing..."
+  },
+  "close": {
+    "title": "Finish and close",
+    "intro": "Confirm you have received everything. After closing, you can no longer view or download this vault.",
+    "review": "Review before closing",
+    "checking": "Checking...",
+    "viewedOf": "Viewed <b>{{viewed}}</b> of <b>{{total}}</b> assets.",
+    "notViewed": "{{name}} (not viewed)",
+    "mustView": "You need to view or download at least one asset before closing.",
+    "ack": "I understand that I will lose access to the assets I have not viewed.",
+    "cancel": "Cancel",
+    "confirm": "Confirm and close",
+    "closing": "Closing...",
+    "error": "Could not close this vault."
+  },
+  "respond": {
+    "title": "Your response",
+    "intro": "Accept to confirm you will receive your share. Declining cannot be undone: your share is passed to the backup beneficiary, if the owner named one.",
+    "accepted": "You have accepted your share of this vault.",
+    "accept": "Accept",
+    "sending": "Sending...",
+    "decline": "Decline",
+    "reason": "Reason (optional)",
+    "cancel": "Cancel",
+    "confirmDecline": "Confirm decline",
+    "declining": "Declining...",
+    "error": "Could not send your response."
+  },
+  "progress": {
+    "title": "Handover progress",
+    "closedOf": "{{closed}} of {{total}} beneficiaries have closed their share",
+    "declined": "{{count}} declined",
+    "viewedOf": "Viewed <b>{{viewed}}</b> of <b>{{total}}</b> of your assets.",
+    "mode": {
+      "EXCLUSIVE": "Yours alone",
+      "PROPORTIONAL": "Shared",
+      "JOINT_CONSENSUS": "Joint approval"
+    },
+    "reassigned": "Reassigned to you",
+    "viewed": "Viewed",
+    "notViewed": "Not viewed"
+  }
+}

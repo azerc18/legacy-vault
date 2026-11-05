@@ -3,12 +3,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { executorApi } from '../api/executorApi.js';
+import { useTranslation } from 'react-i18next';
 
 const TYPE_ICON = {
     VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge', VERIFIER_REPLY: 'forum', VERIFICATION_DECIDED: 'gavel',
     ASSET_REASSIGNED: 'swap_horiz',
 };
-const fmt = (v) => (v ? new Date(v).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
+const fmt = (v, lng) => (v
+    ? new Date(v).toLocaleString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+    : '');
 
 // Mỗi nguồn: lấy danh sách, đánh dấu đã đọc, và trang cần mở khi bấm (null = ở lại)
 const SOURCES = {
@@ -33,6 +36,7 @@ const SOURCES = {
 
 export default function NotificationBell({ source = 'beneficiary' }) {
     const api = SOURCES[source];
+    const { t, i18n } = useTranslation('common');
     const navigate = useNavigate();
     const [items, setItems] = useState([]);
     const [serverUnread, setServerUnread] = useState(null);
@@ -88,7 +92,7 @@ export default function NotificationBell({ source = 'beneficiary' }) {
 
     return (
         <div className="relative" ref={ref}>
-            <button ref={btnRef} onClick={() => setOpen(!open)} className="relative w-10 h-10 rounded-xl border border-outline-variant flex items-center justify-center hover:bg-surface-container-low" aria-label="Notifications">
+            <button ref={btnRef} onClick={() => setOpen(!open)} className="relative w-10 h-10 rounded-xl border border-outline-variant flex items-center justify-center hover:bg-surface-container-low" aria-label={t('notifications.title')}>
                 <span className="material-symbols-outlined text-[20px]">notifications</span>
                 {unread > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-error text-on-error text-[11px] font-bold flex items-center justify-center">
@@ -98,14 +102,14 @@ export default function NotificationBell({ source = 'beneficiary' }) {
             </button>
             {open && pos && (
                 <div style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30 lv-pop text-on-surface">
-                    <p className="px-4 py-3 text-sm font-semibold border-b border-outline-variant/30">Notifications</p>
-                    {items.length === 0 && <p className="px-4 py-6 text-sm text-on-surface-variant text-center">No notifications yet.</p>}
+                    <p className="px-4 py-3 text-sm font-semibold border-b border-outline-variant/30">{t('notifications.title')}</p>
+                    {items.length === 0 && <p className="px-4 py-6 text-sm text-on-surface-variant text-center">{t('notifications.empty')}</p>}
                     {items.map((n) => (
                         <button key={n.id} onClick={() => openItem(n)} className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-surface-container-low ${n.read ? '' : 'bg-secondary-fixed/40'}`}>
                             <span className="material-symbols-outlined text-[20px] text-secondary">{TYPE_ICON[n.type] || 'notifications'}</span>
                             <span className="flex-1 min-w-0">
                                 <span className={`block text-sm ${n.read ? 'text-on-surface-variant' : 'font-semibold'}`}>{n.content}</span>
-                                <span className="block text-xs text-outline mt-0.5">{fmt(n.createdAt)}</span>
+                                <span className="block text-xs text-outline mt-0.5">{fmt(n.createdAt, i18n.language)}</span>
                             </span>
                         </button>
                     ))}
