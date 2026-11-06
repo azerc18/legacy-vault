@@ -4,10 +4,11 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
+import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
 
 const inputCls =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
@@ -16,12 +17,13 @@ export default function Login() {
     const { t } = useTranslation('auth');
     const navigate = useNavigate();
     const location = useLocation();
-    const [email, setEmail] = useState('');
+    // Trang Đăng ký chuyển sang khi tài khoản Google đã bật 2FA: { email, mfaToken }
+    const [email, setEmail] = useState(location.state?.email || '');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [needVerify, setNeedVerify] = useState(false);
-    const [mfaToken, setMfaToken] = useState(null);   // != null -> đang ở bước 2
+    const [mfaToken, setMfaToken] = useState(location.state?.mfaToken || null);   // != null -> đang ở bước 2
     const [code, setCode] = useState('');
     const [useBackup, setUseBackup] = useState(false);
 
@@ -37,8 +39,9 @@ export default function Login() {
     }
 
     // Lưu token TRƯỚC rồi mới gọi /users/me (để request có Bearer token)
-    const finishLogin = async (accessToken) => {
-        const user = saveSession(accessToken, email.trim());
+    // mail: truyền thẳng khi vừa setEmail (state chưa kịp cập nhật), vd. đăng nhập Google
+    const finishLogin = async (accessToken, mail = email) => {
+        const user = saveSession(accessToken, mail.trim());
         try {
             updateStoredUser(toStoredUser(await userApi.getMe()));
         } catch { /* header vẫn hiển thị được tên mặc định */ }
@@ -68,6 +71,25 @@ export default function Login() {
             setError(getErrorMessage(err, t('login.errors.failed')));
             // Chỉ tài khoản chưa xác minh email mới cần link xác minh (bị khoá cũng là 403 nhưng khác mã)
             setNeedVerify(getErrorCode(err) === 'ACCOUNT_NOT_ACTIVE');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Google trả ID token -> BE kiểm tra và cấp phiên như đăng nhập thường (vẫn hỏi mã nếu đã bật 2FA)
+    const handleGoogle = async (credential) => {
+        const googleEmail = emailFromCredential(credential);
+        setError(''); setNeedVerify(false); setEmail(googleEmail); setLoading(true);
+        try {
+            const res = await authApi.loginGoogle(credential);
+            if (res.mfaRequired) {
+                setMfaToken(res.mfaToken);
+                setCode(''); setUseBackup(false);
+                return;
+            }
+            await finishLogin(res.accessToken, googleEmail);
+        } catch (err) {
+            setError(getErrorMessage(err, t('google.failed')));
         } finally {
             setLoading(false);
         }
@@ -135,7 +157,8 @@ export default function Login() {
                 )}
 
                 {!mfaToken ? (
-                    /* ---------- Bước 1: email + mật khẩu ---------- */
+                    /* ---------- Bước 1: email + mật khẩu, hoặc Google ---------- */
+                    <div className="flex flex-col gap-4">
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
                             <label htmlFor="login-email" className="font-label-sm text-on-surface-variant font-semibold">{t('login.email')}</label>
@@ -174,6 +197,8 @@ export default function Login() {
                             {loading ? t('login.submitting') : t('login.submit')}
                         </button>
                     </form>
+                    <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
+                    </div>
                 ) : (
                     /* ---------- Bước 2: mã 2FA (H4) ---------- */
                     <form onSubmit={handleMfa} className="flex flex-col gap-4">

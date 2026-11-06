@@ -13,4 +13,9 @@ export const authApi = {
     // H4: bước 2 khi login trả { mfaRequired: true, mfaToken }
     loginMfa: (mfaToken, code) =>
         http.post('/auth/login/2fa', { mfaToken, code }).then((r) => r.data.data),
+    // Đăng nhập Google: credential = ID token từ Google Identity Services. Trả giống login (có thể mfaRequired)
+    loginGoogle: (credential) =>
+        http.post('/auth/google', { credential }).then((r) => r.data.data),
+    // { enabled, clientId } — BE chưa đặt GOOGLE_CLIENT_ID thì enabled = false
+    googleConfig: () => http.get('/auth/google/config').then((r) => r.data.data),
 };

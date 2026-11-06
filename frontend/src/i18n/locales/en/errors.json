@@ -58,5 +58,8 @@
   "PAYMENT_SIGNATURE_INVALID": "The payment could not be verified.",
   "PAYMENT_AMOUNT_MISMATCH": "The payment amount does not match.",
   "STORAGE_UNAVAILABLE": "File storage is temporarily unavailable. Please try again later.",
-  "MFA_CHALLENGE_EXPIRED": "Your sign-in session expired. Please sign in again."
+  "MFA_CHALLENGE_EXPIRED": "Your sign-in session expired. Please sign in again.",
+  "GOOGLE_LOGIN_DISABLED": "Google sign-in is not enabled.",
+  "GOOGLE_TOKEN_INVALID": "Google could not confirm your sign-in. Please try again.",
+  "GOOGLE_EMAIL_NOT_VERIFIED": "Your Google account email is not verified."
 }

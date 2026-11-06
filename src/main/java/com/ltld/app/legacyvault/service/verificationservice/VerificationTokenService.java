@@ -11,6 +11,8 @@ public interface VerificationTokenService {
     void sendOtp(SendOtpRequest request);
     void issueOtp(User user, TokenType type);
     void verifyEmail(VerifyOtpRequest request);
+    // Gắn tài khoản vừa kích hoạt vào các Vault đã mời email này (xác minh OTP hoặc đăng nhập Google)
+    void linkPendingBeneficiaryVaults(User user);
     void sendPasswordResetOtp(ForgotPasswordRequest request);
     void consumeOtp(User user, TokenType type, String otp, AuditAction failAction);
 }

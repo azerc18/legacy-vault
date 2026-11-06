@@ -5,10 +5,13 @@ import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
+import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
@@ -46,6 +49,7 @@ public class AuthServiceImpl implements AuthService{
     private final VerificationTokenService verificationTokenService;
     private final AuditLogService auditLogService;
     private final MfaService mfaService;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
@@ -140,15 +144,109 @@ public class AuthServiceImpl implements AuthService{
 
         // H4: đã bật 2FA -> chưa cấp token, trả phiếu tạm để nhập mã
         if (user.isMfaEnabled()) {
-            String rawToken = newChallengeToken();
-            user.setMfaChallengeHash(sha256Hex(rawToken));
-            user.setMfaChallengeExpiresAt(Instant.now().plus(MFA_CHALLENGE_TTL));
-            userRepository.save(user);
-            LoginResponse challenge = LoginResponse.builder().mfaRequired(true).mfaToken(rawToken).build();
-            return new LoginResult(challenge, null);
+            return mfaChallenge(user);
         }
 
         return completeLogin(user, ipAddress, userAgent);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = LockedAccountException.class)
+    public LoginResult loginWithGoogle(GoogleLoginRequest request, String ipAddress, String userAgent) {
+        // Chữ ký, issuer, audience, hạn và email_verified đã được kiểm ở đây
+        GoogleTokenVerifier.GoogleProfile google = googleTokenVerifier.verify(request.credential());
+        String email = google.email();
+
+        User user = userRepository.findByEmailForUpdate(email).orElse(null);
+        if (user == null) {
+            user = registerFromGoogle(google);
+        } else {
+            if (user.getStatus() == UserStatus.LOCKED) {
+                auditLogService.failure(AuditAction.LOGIN_FAILED, user.getId(), email, "account locked (google)");
+                throw new LockedAccountException();
+            }
+            // Vẫn tôn trọng khoá tạm do sai mật khẩu / sai mã 2FA: nếu không, Google sẽ thành đường vòng
+            // để thử tiếp mã 2FA khi đã bị khoá.
+            if (user.getLockedUntil() != null) {
+                if (user.getLockedUntil().isAfter(Instant.now())) {
+                    auditLogService.failure(AuditAction.LOGIN_FAILED, user.getId(), email,
+                            "account temporarily locked until " + user.getLockedUntil() + " (google)");
+                    throw new LockedAccountException();
+                }
+                user.setLockedUntil(null);
+            }
+            if (user.getStatus() == UserStatus.PENDING) {
+                activateFromGoogle(user);
+            }
+        }
+
+        user.setFailedLoginAttempts(0);
+        if (user.isMfaEnabled()) {
+            return mfaChallenge(user);
+        }
+        return completeLogin(user, ipAddress, userAgent);
+    }
+
+    @Override
+    public GoogleConfigResponse googleConfig() {
+        return googleTokenVerifier.isEnabled()
+                ? new GoogleConfigResponse(true, googleTokenVerifier.getClientId())
+                : new GoogleConfigResponse(false, null);
+    }
+
+    // Lần đầu đăng nhập Google: tạo tài khoản ACTIVE (Google đã xác minh email), cùng role mặc định như đăng ký thường.
+    // Mật khẩu là chuỗi ngẫu nhiên không ai biết; muốn đăng nhập bằng mật khẩu thì dùng "Quên mật khẩu".
+    private User registerFromGoogle(GoogleTokenVerifier.GoogleProfile google) {
+        Role defaultRole = roleRepository.findByCode("OWNER")
+                .orElseThrow(() -> new RuntimeException("Default role not found in database."));
+        Role beneficiaryRole = roleRepository.findByCode("BENEFICIARY")
+                .orElseThrow(() -> new RuntimeException("Beneficiary role not found in database."));
+
+        User saved = userRepository.save(User.builder()
+                .email(google.email())
+                .fullName(displayName(google))
+                .passwordHash(passwordEncoder.encode(randomSecret()))
+                .status(UserStatus.ACTIVE)
+                .roles(new HashSet<>(Set.of(defaultRole, beneficiaryRole)))
+                .build());
+
+        auditLogService.log(AuditAction.REGISTER, AuditResult.SUCCESS, saved.getId(), saved.getEmail(),
+                null, null, null, "google");
+        verificationTokenService.linkPendingBeneficiaryVaults(saved);
+        return saved;
+    }
+
+    // Tài khoản đã đăng ký nhưng chưa xác minh email: Google vừa chứng minh người này sở hữu email.
+    // Người tạo tài khoản PENDING có thể không phải chủ email (đăng ký trước bằng email người khác),
+    // nên thay mật khẩu cũ bằng chuỗi ngẫu nhiên để họ không đăng nhập được bằng mật khẩu đã đặt.
+    private void activateFromGoogle(User user) {
+        user.setPasswordHash(passwordEncoder.encode(randomSecret()));
+        user.setStatus(UserStatus.ACTIVE);
+        userRepository.save(user);
+        auditLogService.log(AuditAction.EMAIL_VERIFIED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
+                null, null, null, "google");
+        verificationTokenService.linkPendingBeneficiaryVaults(user);
+    }
+
+    private LoginResult mfaChallenge(User user) {
+        String rawToken = newChallengeToken();
+        user.setMfaChallengeHash(sha256Hex(rawToken));
+        user.setMfaChallengeExpiresAt(Instant.now().plus(MFA_CHALLENGE_TTL));
+        userRepository.save(user);
+        LoginResponse challenge = LoginResponse.builder().mfaRequired(true).mfaToken(rawToken).build();
+        return new LoginResult(challenge, null);
+    }
+
+    private static String displayName(GoogleTokenVerifier.GoogleProfile google) {
+        String name = google.name() == null ? "" : google.name().trim();
+        if (name.length() < 2) name = google.email().substring(0, google.email().indexOf('@'));
+        return name.length() > 100 ? name.substring(0, 100) : name;
+    }
+
+    private static String randomSecret() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     @Override

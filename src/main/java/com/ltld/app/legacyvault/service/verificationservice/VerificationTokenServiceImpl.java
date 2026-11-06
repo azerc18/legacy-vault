@@ -190,7 +190,8 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
 
     // FR-02: liên kết các Vault đã mời email này làm người thụ hưởng khi chưa có tài khoản.
     // Dùng email đã chuẩn hóa (lowercase) của user, khớp với beneficiary_email đã lưu, không dùng email từ request.
-    private void linkPendingBeneficiaryVaults(User user) {
+    @Override
+    public void linkPendingBeneficiaryVaults(User user) {
         String email = user.getEmail();
         List<Vault> pendingVaults = vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull(email);
         for (Vault vault : pendingVaults) {

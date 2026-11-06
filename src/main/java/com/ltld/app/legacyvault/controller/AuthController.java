@@ -6,6 +6,8 @@ import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
+import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
@@ -72,6 +74,24 @@ public class AuthController {
         LoginResult result = authService.loginWithMfa(request,
                 httpRequest.getRemoteAddr(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
         return withRefreshCookie(result, "Login successfully");
+    }
+
+    // Đăng nhập bằng Google: FE gửi ID token lấy từ Google Identity Services
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<LoginResponse>> loginWithGoogle(
+            @Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
+        LoginResult result = authService.loginWithGoogle(request,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader(HttpHeaders.USER_AGENT));
+        if (result.refreshToken() == null) {   // tài khoản bật 2FA: vẫn phải nhập mã ở /login/2fa
+            return ResponseEntity.ok(ApiResponse.success("Two-factor code required", result.response()));
+        }
+        return withRefreshCookie(result, "Login successfully");
+    }
+
+    // Công khai: FE hỏi có bật Google không và Client ID là gì
+    @GetMapping("/google/config")
+    public ResponseEntity<ApiResponse<GoogleConfigResponse>> googleConfig() {
+        return ResponseEntity.ok(ApiResponse.success(authService.googleConfig()));
     }
 
     private ResponseEntity<ApiResponse<LoginResponse>> withRefreshCookie(LoginResult result, String message) {

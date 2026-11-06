@@ -1,13 +1,15 @@
 import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { getUser, homeFor } from '../auth/auth.js';
+import { getUser, homeFor, saveSession, updateStoredUser, emailFromCredential } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
+import { userApi, toStoredUser } from '../api/userApi.js';
 import { useTranslation } from 'react-i18next';
 
 const inputCls =
@@ -38,6 +40,27 @@ export default function Register() {
     };
     // PasswordInput trả thẳng giá trị chứ không trả event
     const setField = (name) => (value) => setFormData((f) => ({ ...f, [name]: value }));
+
+    // Đăng ký bằng Google: BE tạo tài khoản (đã xác minh email) rồi đăng nhập luôn, không cần OTP
+    const handleGoogle = async (credential) => {
+        const googleEmail = emailFromCredential(credential);
+        setError(''); setLoading(true);
+        try {
+            const res = await authApi.loginGoogle(credential);
+            if (res.mfaRequired) {
+                // Email này đã có tài khoản bật 2FA -> sang trang Đăng nhập nhập mã
+                navigate('/login', { state: { email: googleEmail, mfaToken: res.mfaToken } });
+                return;
+            }
+            const user = saveSession(res.accessToken, googleEmail);
+            try { updateStoredUser(toStoredUser(await userApi.getMe())); } catch { /* giữ tên mặc định */ }
+            navigate(homeFor(user), { replace: true });
+        } catch (err) {
+            setError(getErrorMessage(err, t('google.failed')));
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -154,6 +177,10 @@ export default function Register() {
                         {loading ? t('register.submitting') : t('register.submit')}
                     </button>
                 </form>
+
+                <div className="mt-4">
+                    <GoogleSignInButton text="signup_with" onCredential={handleGoogle} disabled={loading} />
+                </div>
 
                 <div className="mt-6 pt-6 border-t border-outline-variant/20 text-center">
                     <p className="text-sm text-on-surface-variant">
