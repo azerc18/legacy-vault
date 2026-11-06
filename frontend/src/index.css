@@ -178,3 +178,17 @@ html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
   transition: opacity .9s cubic-bezier(.2,.7,.2,1) var(--d,0s), transform .9s cubic-bezier(.2,.7,.2,1) var(--d,0s);
   will-change: opacity, transform; }
 .lv-rv.lv-in { opacity: 1; transform: none; }
+
+/* Chữ LEGACYVAULT cuối trang: nền mờ + dải sáng chạy chậm qua các chữ (chỉ để bớt tĩnh) */
+.lv-wordmark {
+  background-image:
+    linear-gradient(100deg, transparent 0%, transparent 42%, rgba(150,175,255,.55) 50%, transparent 58%, transparent 100%),
+    linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,0));
+  background-size: 300% 100%, 100% 100%;
+  background-position: 100% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lv-sweep 11s ease-in-out infinite;
+}
+@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 70%, 100% { background-position: 0% 0, 0 0; } }
+@media (prefers-reduced-motion: reduce) { .lv-wordmark { animation: none; } }

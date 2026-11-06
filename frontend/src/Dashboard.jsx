@@ -355,8 +355,8 @@ export default function Dashboard() {
                         </div>
                         </div>
                     </div>
-                    <div aria-hidden="true" className="mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
-                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em', backgroundImage: 'linear-gradient(180deg,rgba(255,255,255,0.20),rgba(255,255,255,0))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                    <div aria-hidden="true" className="lv-wordmark mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
+                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em' }}>
                         LEGACYVAULT
                     </div>
                     <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/50">
