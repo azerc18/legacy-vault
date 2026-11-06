@@ -72,7 +72,7 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
+            <AppHeader workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle

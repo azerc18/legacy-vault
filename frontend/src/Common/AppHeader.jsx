@@ -9,6 +9,7 @@ import UserAvatar from './UserAvatar.jsx';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
+import BrandMark from './BrandMark.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -52,14 +53,13 @@ export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 
 /**
- * @param icon       icon trong ô logo (mặc định khiên)
  * @param workspace  dòng nhỏ dưới chữ LegacyVault, vd. "Administration"
  * @param home       logo dẫn về đâu
  * @param nav        [{ to, label, icon, badge }] — badge là số, > 0 thì hiện chấm đỏ
  * @param extra      phần tử thêm bên phải, trước avatar (vd. NotificationBell)
  * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
  */
-export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav: navProp, extra, userHome = false }) {
+export default function AppHeader({ workspace, home = '/home', nav: navProp, extra, userHome = false }) {
     const { pathname } = useLocation();
     const { t } = useTranslation();
     const user = getUser();
@@ -120,7 +120,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
         <header className="lv-side bg-brand text-white">
             <div className="lv-side-top">
                 <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
-                    <Icon name={icon === 'shield_locked' ? 'lock' : icon} className="text-[26px]" />
+                    <BrandMark className="h-[30px] w-[30px]" />
                     <span className="min-w-0">
                         <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (

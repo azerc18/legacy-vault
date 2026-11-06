@@ -38,7 +38,7 @@ export function AdminLayout({title, subtitle, children}) {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="admin_panel_settings" workspace={t('workspace')} home="/admin/users" nav={nav}/>
+            <AppHeader workspace={t('workspace')} home="/admin/users" nav={nav}/>
             <main className={`${PAGE_WIDTH} py-10`}>
                 <PageTitle title={title} subtitle={subtitle}/>
                 {children}

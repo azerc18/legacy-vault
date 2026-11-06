@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
 import ThemeToggle from './Common/ThemeToggle.jsx';
+import BrandMark from './Common/BrandMark.jsx';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
 const NAV = [
@@ -100,7 +101,7 @@ export default function Dashboard() {
             <header className="sticky top-0 z-20 bg-brand/95 backdrop-blur border-b border-white/10 text-white">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
-                        <Icon name="lock" className="text-[26px]" />LEGACYVAULT
+                        <BrandMark className="h-[30px] w-[30px]" />LEGACYVAULT
                     </Link>
                     <nav className="hidden md:flex gap-8 text-sm font-semibold text-white/75">
                         {NAV.map((n) => (
@@ -273,7 +274,7 @@ export default function Dashboard() {
                 <div className="max-w-6xl mx-auto">
                     <div className="flex flex-wrap gap-12 justify-between">
                         <div className="flex-[1_1_280px] max-w-[360px] flex flex-col gap-4">
-                            <span className="flex items-center gap-2.5 font-bold tracking-[0.14em] text-lg"><Icon name="lock" className="text-[28px]" />LEGACYVAULT</span>
+                            <span className="flex items-center gap-2.5 font-bold tracking-[0.14em] text-lg"><BrandMark className="h-[34px] w-[34px]" />LEGACYVAULT</span>
                             <p className="text-white/70 leading-relaxed">{t('footerNav.tagline')}</p>
                         </div>
                         <div className="flex-[2_1_520px] flex flex-wrap gap-9">

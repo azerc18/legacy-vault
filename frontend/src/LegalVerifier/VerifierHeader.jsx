@@ -13,7 +13,7 @@ export default function VerifierHeader({ title, subtitle, backTo = '/verifier/ho
     const hasOtherRoles = roles.some((r) => r !== ROLES.LEGAL_VERIFIER);
     return (
         <>
-            <AppHeader icon="verified_user" workspace={t('portal')} home="/verifier/home" userHome={hasOtherRoles} />
+            <AppHeader workspace={t('portal')} home="/verifier/home" userHome={hasOtherRoles} />
             <div className={`${PAGE_WIDTH} pt-10`}>
                 <PageTitle className="" back={{ to: backTo, label: backLabel || (BACK_KEY[backTo] ? t(BACK_KEY[backTo]) : t('common:actions.back')) }}
                            title={title} subtitle={subtitle} right={right} />
