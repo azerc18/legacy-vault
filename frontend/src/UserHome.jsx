@@ -73,7 +73,7 @@ export default function UserHome() {
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
-                <div className="mb-10 rounded-3xl bg-primary text-white px-8 py-9 lv-rise"
+                <div className="mb-10 rounded-3xl bg-brand text-white px-8 py-9 lv-rise"
                      style={{ backgroundImage: 'radial-gradient(700px 260px at 85% 0%, rgba(80,105,230,.45), transparent 70%)' }}>
                     <h1 className="font-headline-md text-headline-md">{t('welcome', { name: user.name })}</h1>
                     <div className="mt-3 flex flex-wrap gap-2">

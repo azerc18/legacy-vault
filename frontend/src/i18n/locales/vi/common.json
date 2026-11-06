@@ -4,6 +4,7 @@
   "actions": { "back": "Quay lại", "save": "Lưu", "cancel": "Huỷ", "confirm": "Xác nhận", "retry": "Thử lại" },
   "notifications": { "title": "Thông báo", "empty": "Chưa có thông báo nào." },
   "language": { "label": "Ngôn ngữ", "en": "EN", "vi": "VI" },
+  "theme": { "toLight": "Chuyển sang nền sáng", "toDark": "Chuyển sang nền tối" },
   "claim": {
     "progress": "Tiến độ nhận tài sản",
     "accepted": "{{accepted}}/{{required}} người đã đồng ý",

@@ -3,12 +3,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import ThemeToggle from './ThemeToggle.jsx';
 
 export default function AuthShell({ children, className = '' }) {
     const { t } = useTranslation('auth');
     return (
         <div className="min-h-screen font-body-md text-on-surface antialiased lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-            <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary text-white p-12">
+            <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-brand text-white p-12">
                 <img src="/key-photo.jpg" alt="" aria-hidden="true"
                      className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: '60% 50%' }} />
                 <div aria-hidden="true" className="absolute inset-0"
@@ -27,6 +28,8 @@ export default function AuthShell({ children, className = '' }) {
                 <p className="relative text-sm text-white/60">SWP391, FPT University</p>
             </aside>
             <div className={`lv-auth-form relative flex flex-col justify-center items-center px-4 py-8 min-h-screen ${className}`}>
+                {/* Đặt ngay bên trái nút đổi ngôn ngữ (LanguageSwitch nằm ở top-4 right-4 trong từng trang) */}
+                <ThemeToggle className="absolute top-4 right-[6.25rem]" />
                 {children}
             </div>
         </div>

@@ -12,7 +12,7 @@ export default function LanguageSwitch({ className = '', variant = 'light' }) {
                 <button key={lng} type="button" onClick={() => i18n.changeLanguage(lng)}
                         aria-pressed={current === lng}
                         className={`h-full px-2.5 ${current === lng
-                            ? (dark ? 'bg-white text-primary' : 'bg-primary text-on-primary')
+                            ? (dark ? 'bg-white text-brand' : 'bg-primary text-on-primary')
                             : (dark ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-on-surface-variant hover:bg-surface-container-low')}`}>
                     {t(`language.${lng}`)}
                 </button>
