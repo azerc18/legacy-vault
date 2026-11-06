@@ -50,6 +50,7 @@
     "claimedAt": "You have already received this vault on {{date}}. Its content is no longer available.",
     "waived": "Your share of this vault was waived by an administrator. Its content is no longer available to you.",
     "declined": "You declined your share of this vault. Its content is no longer available to you.",
+    "declinedStalled": "Some of your assets could not be passed on because no other recipient is available ({{n}} in total).",
     "verified": "Verified. Your viewing session is valid until {{date}}."
   },
   "verify": {
@@ -79,6 +80,7 @@
     "empty": "This vault has no assets.",
     "consensusDone": "Joint approval complete ({{approved}} of {{total}} approved)",
     "consensusNeeded": "Needs approval from {{threshold}} of {{total}} recipients ({{approved}} so far)",
+    "refreshHint": "Waiting for the others. Press Refresh to check their approvals.",
     "youApproved": "You approved",
     "approve": "Approve",
     "refresh": "Refresh",
@@ -128,6 +130,7 @@
     "notViewed": "{{name}} (not viewed)",
     "mustView": "You need to view or download at least one asset before closing.",
     "ack": "I understand that I will lose access to the assets I have not viewed.",
+    "jointNote": "Some assets need joint approval. Closing your case counts as your approval for those assets, so the other recipients can still open them.",
     "cancel": "Cancel",
     "confirm": "Confirm and close",
     "closing": "Closing...",
