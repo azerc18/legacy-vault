@@ -9,47 +9,68 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet" />
 
+  <!-- Đặt theme TRƯỚC khi vẽ trang để không bị nháy trắng: lv_theme = light | dark, chưa chọn thì theo hệ điều hành -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('lv_theme');
+        var dark = t === 'dark' || (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      } catch (e) { /* localStorage bị chặn: dùng nền sáng */ }
+    })();
+  </script>
+
   <!-- Dùng thẳng Tailwind qua CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           borderRadius: { lg: '0.875rem', xl: '1.125rem', '2xl': '1.5rem' },
           boxShadow: { sm: '0 1px 2px rgba(11,16,32,0.06), 0 8px 24px -12px rgba(11,16,32,0.18)' },
+          // Màu lấy từ biến CSS (src/index.css): :root = nền sáng, html.dark = nền tối
           colors: {
-            "primary": "#0b1020",
-            "on-primary": "#ffffff",
-            "primary-container": "#1a2140",
-            "secondary": "#3d5ae0",
-            "on-secondary": "#ffffff",
-            "background": "#e2e6f1",
-            "on-surface": "#0b1020",
-            "on-surface-variant": "#4a5272",
-            "surface-container-lowest": "#f3f5fa",
-            "surface-container-low": "#eaedf7",
-            "surface-container": "#e0e5f4",
-            "surface-container-high": "#d6dcee",
-            "outline": "#6b7390",
-            "outline-variant": "#c3cae0",
-            "secondary-fixed": "#dbe2ff",
-            "on-secondary-fixed": "#0f1f6b",
-            "tertiary-fixed": "#89f5e7",
-            "tertiary-container": "#004942",
-            "primary-fixed": "#d6dcf5",
-            "on-primary-fixed": "#0b1020",
-            "error": "#ba1a1a",
-            "on-error": "#ffffff",
-            "error-container": "#ffdad6",
-            "on-error-container": "#93000a",
-            "success": "#1b7a3d",
-            "on-success": "#ffffff",
-            "success-container": "#c8f0d3",
-            "on-success-container": "#00210d",
-            "warning": "#8a5a00",
-            "on-warning": "#ffffff",
-            "warning-container": "#ffe9b8",
-            "on-warning-container": "#2b1b00"
+            "primary": "rgb(var(--c-primary) / <alpha-value>)",
+            "on-primary": "rgb(var(--c-on-primary) / <alpha-value>)",
+            "primary-container": "rgb(var(--c-primary-container) / <alpha-value>)",
+            "secondary": "rgb(var(--c-secondary) / <alpha-value>)",
+            "on-secondary": "rgb(var(--c-on-secondary) / <alpha-value>)",
+            "background": "rgb(var(--c-background) / <alpha-value>)",
+            "on-surface": "rgb(var(--c-on-surface) / <alpha-value>)",
+            "on-surface-variant": "rgb(var(--c-on-surface-variant) / <alpha-value>)",
+            "surface-container-lowest": "rgb(var(--c-surface-container-lowest) / <alpha-value>)",
+            "surface-container-low": "rgb(var(--c-surface-container-low) / <alpha-value>)",
+            "surface-container": "rgb(var(--c-surface-container) / <alpha-value>)",
+            "surface-container-high": "rgb(var(--c-surface-container-high) / <alpha-value>)",
+            "outline": "rgb(var(--c-outline) / <alpha-value>)",
+            "outline-variant": "rgb(var(--c-outline-variant) / <alpha-value>)",
+            "secondary-fixed": "rgb(var(--c-secondary-fixed) / <alpha-value>)",
+            "on-secondary-fixed": "rgb(var(--c-on-secondary-fixed) / <alpha-value>)",
+            "tertiary-fixed": "rgb(var(--c-tertiary-fixed) / <alpha-value>)",
+            "tertiary-container": "rgb(var(--c-tertiary-container) / <alpha-value>)",
+            "primary-fixed": "rgb(var(--c-primary-fixed) / <alpha-value>)",
+            "on-primary-fixed": "rgb(var(--c-on-primary-fixed) / <alpha-value>)",
+            "error": "rgb(var(--c-error) / <alpha-value>)",
+            "on-error": "rgb(var(--c-on-error) / <alpha-value>)",
+            "error-container": "rgb(var(--c-error-container) / <alpha-value>)",
+            "on-error-container": "rgb(var(--c-on-error-container) / <alpha-value>)",
+            "success": "rgb(var(--c-success) / <alpha-value>)",
+            "on-success": "rgb(var(--c-on-success) / <alpha-value>)",
+            "success-container": "rgb(var(--c-success-container) / <alpha-value>)",
+            "on-success-container": "rgb(var(--c-on-success-container) / <alpha-value>)",
+            "warning": "rgb(var(--c-warning) / <alpha-value>)",
+            "on-warning": "rgb(var(--c-on-warning) / <alpha-value>)",
+            "warning-container": "rgb(var(--c-warning-container) / <alpha-value>)",
+            "on-warning-container": "rgb(var(--c-on-warning-container) / <alpha-value>)",
+            "brand": "rgb(var(--c-brand) / <alpha-value>)",
+            "brand-container": "rgb(var(--c-brand-container) / <alpha-value>)",
+            "surface": "rgb(var(--c-surface) / <alpha-value>)",
+            "secondary-container": "rgb(var(--c-secondary-container) / <alpha-value>)",
+            "on-secondary-container": "rgb(var(--c-on-secondary-container) / <alpha-value>)",
+            "on-primary-container": "rgb(var(--c-on-primary-container) / <alpha-value>)",
+            "on-tertiary-container": "rgb(var(--c-on-tertiary-container) / <alpha-value>)"
           },
           spacing: {
             "margin": "1.25rem",

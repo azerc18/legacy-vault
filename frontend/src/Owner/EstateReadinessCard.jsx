@@ -58,7 +58,7 @@ export default function EstateReadinessCard() {
     const visibleItems = expanded ? items : pendingItems.slice(0, 3);
 
     return (
-        <div className="mb-6 rounded-3xl p-7 text-white bg-primary lv-rise"
+        <div className="mb-6 rounded-3xl p-7 text-white bg-brand lv-rise"
              style={{ backgroundImage: 'radial-gradient(700px 300px at 15% 0%, rgba(61,90,224,.45), transparent 70%)' }}>
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">

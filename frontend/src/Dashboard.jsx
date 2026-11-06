@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
+import ThemeToggle from './Common/ThemeToggle.jsx';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
 const NAV = [
@@ -96,7 +97,7 @@ export default function Dashboard() {
         <div ref={rootRef} className="font-body-md text-on-surface antialiased min-h-screen relative">
             <div aria-hidden="true" className="lv-bg fixed inset-0 z-0" data-mode={mode} />
             {/* NAVBAR */}
-            <header className="sticky top-0 z-20 bg-primary/95 backdrop-blur border-b border-white/10 text-white">
+            <header className="sticky top-0 z-20 bg-brand/95 backdrop-blur border-b border-white/10 text-white">
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
                         <Icon name="lock" className="text-[26px]" />LEGACYVAULT
@@ -107,9 +108,10 @@ export default function Dashboard() {
                         ))}
                     </nav>
                     <div className="flex items-center gap-3">
-                        <LanguageSwitch />
+                        <ThemeToggle variant="dark" />
+                        <LanguageSwitch variant="dark" />
                         <Link to="/login" className="hidden sm:block text-sm font-semibold text-white/85 hover:text-white">{t('signIn')}</Link>
-                        <Link to="/register" className="h-10 px-5 rounded-full bg-white text-primary text-sm font-bold flex items-center hover:bg-secondary-fixed">
+                        <Link to="/register" className="h-10 px-5 rounded-full bg-white text-brand text-sm font-bold flex items-center hover:bg-white/85">
                             {t('getStarted')}
                         </Link>
                     </div>
@@ -130,7 +132,7 @@ export default function Dashboard() {
                     </h1>
                     <p className="mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
                     <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-                        <Link to="/register" className="h-12 px-7 rounded-full bg-white text-primary font-bold flex items-center justify-center gap-2 hover:bg-secondary-fixed">
+                        <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
                             <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                         </Link>
                         <a href="#how" className="h-12 px-7 rounded-full border border-white/40 text-white font-bold flex items-center justify-center hover:bg-white/10">
@@ -260,7 +262,7 @@ export default function Dashboard() {
                      style={{ backgroundImage: 'radial-gradient(700px 260px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
                     <h2 className="font-headline-md text-headline-md">{t('closing.title')}</h2>
                     <p className="mt-3 opacity-80">{t('closing.text')}</p>
-                    <Link to="/register" className="inline-flex mt-8 h-12 px-7 rounded-full bg-on-primary text-primary font-bold items-center gap-2">
+                    <Link to="/register" className="inline-flex mt-8 h-12 px-7 rounded-full bg-white text-brand font-bold items-center gap-2">
                         {t('closing.cta')} <Icon name="arrow_forward" className="text-[18px]" />
                     </Link>
                 </div>

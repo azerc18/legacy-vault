@@ -14,7 +14,7 @@ export default function PasswordStrengthMeter({ password }) {
             <div className="flex gap-1">
                 {Array.from({ length: BLOCKS }, (_, i) => (
                     <div key={i} className="h-1.5 flex-1 rounded-full transition-colors duration-300"
-                         style={{ backgroundColor: i < filled ? colorAt(i) : '#E5E7EB' }} />
+                         style={{ backgroundColor: i < filled ? colorAt(i) : 'rgb(var(--c-surface-container-high))' }} />
                 ))}
             </div>
             <p className="text-xs font-semibold" style={{ color: colorAt(filled - 1) }}>
