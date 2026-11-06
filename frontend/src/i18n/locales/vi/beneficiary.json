@@ -50,6 +50,7 @@
     "claimedAt": "Bạn đã nhận két này vào {{date}}. Nội dung không còn khả dụng.",
     "waived": "Phần của bạn trong két này đã được quản trị viên miễn. Nội dung không còn khả dụng với bạn.",
     "declined": "Bạn đã từ chối phần của mình trong két này. Nội dung không còn khả dụng với bạn.",
+    "declinedStalled": "Một số tài sản ({{n}}) tạm thời chưa có ai nhận được. Việc này đã được ghi nhận, bạn không cần làm gì thêm.",
     "verified": "Đã xác minh. Phiên xem của bạn có hiệu lực đến {{date}}."
   },
   "verify": {
@@ -79,6 +80,7 @@
     "empty": "Két này không có tài sản nào.",
     "consensusDone": "Đã đủ đồng thuận ({{approved}}/{{total}} người đã đồng ý)",
     "consensusNeeded": "Cần {{threshold}}/{{total}} người nhận đồng ý (hiện có {{approved}})",
+    "refreshHint": "Đang chờ những người khác. Bấm Làm mới để xem họ đã đồng ý chưa.",
     "youApproved": "Bạn đã đồng ý",
     "approve": "Đồng ý",
     "refresh": "Làm mới",
@@ -128,6 +130,7 @@
     "notViewed": "{{name}} (chưa xem)",
     "mustView": "Bạn cần xem hoặc tải ít nhất một tài sản trước khi đóng hồ sơ.",
     "ack": "Tôi hiểu rằng mình sẽ mất quyền truy cập các tài sản chưa xem.",
+    "jointNote": "Một số tài sản cần đồng thuận chung. Đóng hồ sơ được tính là bạn đồng ý với các tài sản đó, nên những người nhận khác vẫn mở được.",
     "cancel": "Hủy",
     "confirm": "Xác nhận và đóng",
     "closing": "Đang đóng...",

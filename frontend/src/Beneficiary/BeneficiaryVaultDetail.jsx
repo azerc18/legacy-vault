@@ -31,6 +31,7 @@ export default function BeneficiaryVaultDetail() {
     const [documents, setDocuments] = useState([]);
     const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
     const [progress, setProgress] = useState(null);   // ClaimProgressResponse (N2-notify)
+    const [declineResult, setDeclineResult] = useState(null);   // DeclineClaimResponse (X1: stalledAssets)
 
     // Map lỗi BE -> trạng thái màn hình
     const handleAccessError = useCallback((err, fallback) => {
@@ -107,9 +108,14 @@ export default function BeneficiaryVaultDetail() {
                 </Alert>
             )}
             {stage === 'declined' && (
-                <Alert type="info">
-                    {vault?.myStatus === 'WAIVED' ? t('detail.waived') : t('detail.declined')}
-                </Alert>
+                <>
+                    <Alert type="info">
+                        {vault?.myStatus === 'WAIVED' ? t('detail.waived') : t('detail.declined')}
+                    </Alert>
+                    {declineResult?.stalledAssets > 0 && (
+                        <Alert type="warning">{t('detail.declinedStalled', { n: declineResult.stalledAssets })}</Alert>
+                    )}
+                </>
             )}
 
             {stage === 'verify' && (
@@ -130,7 +136,7 @@ export default function BeneficiaryVaultDetail() {
                         vaultId={vaultId}
                         myStatus={progress?.myStatus ?? vault?.myStatus}
                         onAccepted={() => { setVault((v) => ({ ...v, myStatus: 'ACCEPTED' })); loadProgress(); }}
-                        onDeclined={() => { setVault((v) => ({ ...v, myStatus: 'DECLINED' })); setProgress(null); setStage('declined'); }}
+                        onDeclined={(res) => { setDeclineResult(res); setVault((v) => ({ ...v, myStatus: 'DECLINED' })); setProgress(null); setStage('declined'); }}
                         onError={(e) => handleAccessError(e)}
                     />
                     <ProgressPanel progress={progress} />
@@ -139,6 +145,7 @@ export default function BeneficiaryVaultDetail() {
                     <DossierCard vaultId={vaultId} onError={(e) => handleAccessError(e)} />
                     <CloseVault
                         vaultId={vaultId}
+                        hasJoint={assets.some((a) => a.consensus)}
                         onClosed={(res) => {
                             setVault((v) => ({ ...v, vaultStatus: res.vaultStatus, claimStatus: res.claimStatus, claimedAt: res.claimedAt }));
                             setStage('claimed');
@@ -363,6 +370,9 @@ function AssetList({ vaultId, assets, onError }) {
                                                 : t('assets.consensusNeeded', { threshold: c.threshold, total: c.total, approved: c.approved })}
                                         </p>
                                     )}
+                                    {c && !c.reached && c.myApproved && (
+                                        <p className="mt-1 text-xs text-outline">{t('assets.refreshHint')}</p>
+                                    )}
                                 </div>
                                 {locked && (
                                     <>
@@ -548,7 +558,7 @@ function DossierCard({ vaultId, onError }) {
 }
 
 /* ---------- Bước 3: đóng hồ sơ (FR-19) ---------- */
-function CloseVault({ vaultId, onClosed, onError }) {
+function CloseVault({ vaultId, hasJoint, onClosed, onError }) {
     const { t } = useTranslation('beneficiary');
     const [preview, setPreview] = useState(null);
     const [ack, setAck] = useState(false);
@@ -595,6 +605,7 @@ function CloseVault({ vaultId, onClosed, onError }) {
                             components={{ b: <b /> }}
                         />
                     </p>
+                    {hasJoint && <Alert type="info">{t('close.jointNote')}</Alert>}
                     {needAck && (
                         <ul className="mt-3 text-sm list-disc pl-5 text-on-surface-variant">
                             {preview.unviewedAssets.map((a) => <li key={a.id}>{t('close.notViewed', { name: a.assetName })}</li>)}
