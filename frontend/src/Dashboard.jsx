@@ -101,6 +101,7 @@ export default function Dashboard() {
         let dir = 1;
         let touching = false;
         let snapping = false;
+        let raf = 0;
 
         const snap = () => {
             if (touching) return;
@@ -125,9 +126,27 @@ export default function Dashboard() {
                 }
             }
             if (target === null) return;
+            glide(Math.max(0, target - off));
+        };
+
+        // Tự trượt bằng rAF (êm hơn smooth mặc định); người dùng chạm/cuộn là dừng ngay
+        const cancel = () => { if (raf) cancelAnimationFrame(raf); raf = 0; snapping = false; };
+        const glide = (to) => {
+            cancel();
+            const from = window.scrollY;
+            const dist = to - from;
+            if (Math.abs(dist) < 2) return;
+            const dur = Math.min(520, 280 + Math.abs(dist) * 0.25);
+            const t0 = performance.now();
             snapping = true;
-            window.scrollTo({ top: Math.max(0, target - off), behavior: 'smooth' });
-            setTimeout(() => { snapping = false; }, 700);
+            const step = (now) => {
+                const k = Math.min(1, (now - t0) / dur);
+                const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
+                window.scrollTo(0, from + dist * e);
+                if (k < 1) raf = requestAnimationFrame(step);
+                else { raf = 0; snapping = false; lastY = window.scrollY; }
+            };
+            raf = requestAnimationFrame(step);
         };
 
         const onScroll = () => {
@@ -136,16 +155,23 @@ export default function Dashboard() {
             if (Math.abs(y - lastY) > 1) dir = y > lastY ? 1 : -1;
             lastY = y;
             clearTimeout(timer);
-            timer = setTimeout(snap, 140);
+            timer = setTimeout(snap, 220);
         };
-        const down = () => { touching = true; };
+        const down = () => { touching = true; cancel(); };
         const up = () => { touching = false; clearTimeout(timer); timer = setTimeout(snap, 180); };
 
+        window.addEventListener('wheel', cancel, { passive: true });
+        window.addEventListener('keydown', cancel);
+        window.addEventListener('mousedown', cancel);
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('touchstart', down, { passive: true });
         window.addEventListener('touchend', up, { passive: true });
         return () => {
             clearTimeout(timer);
+            cancel();
+            window.removeEventListener('wheel', cancel);
+            window.removeEventListener('keydown', cancel);
+            window.removeEventListener('mousedown', cancel);
             window.removeEventListener('scroll', onScroll);
             window.removeEventListener('touchstart', down);
             window.removeEventListener('touchend', up);
