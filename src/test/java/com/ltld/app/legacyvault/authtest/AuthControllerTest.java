@@ -7,6 +7,8 @@ import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
+import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
+import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
@@ -41,6 +43,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -480,5 +483,63 @@ public class AuthControllerTest {
 
         postJson(RESET_PASSWORD_URL, resetBody("123456", "NewPass@123", "NewPass@123"))
                 .andExpect(status().isConflict());
+    }
+
+    @Nested
+    @DisplayName("Đăng nhập bằng Google")
+    class GoogleLogin {
+        private static final String GOOGLE_URL = "/api/auth/google";
+
+        @Test
+        void google_success_setsRefreshCookie_andReturnsAccessToken() throws Exception {
+            when(authService.loginWithGoogle(any(GoogleLoginRequest.class), any(), any())).thenReturn(loginResult());
+
+            postJson(GOOGLE_URL, Map.of("credential", "google-id-token"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.accessToken").value("access-token"))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refresh_token=raw-refresh-token")))
+                    .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")));
+            verify(authService).loginWithGoogle(eq(new GoogleLoginRequest("google-id-token")), eq(IP), any());
+        }
+
+        @Test
+        void google_mfaRequired_returnsChallenge_withoutCookie() throws Exception {
+            LoginResponse challenge = LoginResponse.builder().mfaRequired(true).mfaToken("mfa-token").build();
+            when(authService.loginWithGoogle(any(GoogleLoginRequest.class), any(), any()))
+                    .thenReturn(new LoginResult(challenge, null));
+
+            postJson(GOOGLE_URL, Map.of("credential", "google-id-token"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.mfaRequired").value(true))
+                    .andExpect(jsonPath("$.data.mfaToken").value("mfa-token"))
+                    .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+        }
+
+        @Test
+        void google_blankCredential_returnsBadRequest() throws Exception {
+            postJson(GOOGLE_URL, Map.of("credential", ""))
+                    .andExpect(status().isBadRequest());
+            verify(authService, never()).loginWithGoogle(any(), any(), any());
+        }
+
+        @Test
+        void google_invalidToken_returnsUnauthorized() throws Exception {
+            when(authService.loginWithGoogle(any(GoogleLoginRequest.class), any(), any()))
+                    .thenThrow(new BusinessException(ErrorCode.GOOGLE_TOKEN_INVALID, "Invalid Google credential"));
+
+            postJson(GOOGLE_URL, Map.of("credential", "bad"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value("GOOGLE_TOKEN_INVALID"));
+        }
+
+        @Test
+        void googleConfig_isPublic_andReturnsClientId() throws Exception {
+            when(authService.googleConfig()).thenReturn(new GoogleConfigResponse(true, "client-123.apps.googleusercontent.com"));
+
+            mockMvc.perform(get(GOOGLE_URL + "/config"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.enabled").value(true))
+                    .andExpect(jsonPath("$.data.clientId").value("client-123.apps.googleusercontent.com"));
+        }
     }
 }

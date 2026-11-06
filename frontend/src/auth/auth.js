@@ -36,6 +36,15 @@ export const homeFor = (u) =>
 export const safeRedirect = (path) =>
     typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path !== '/login' ? path : null;
 
+// Email trong ID token của Google, chỉ để hiển thị / lưu tên mặc định (BE mới là nơi kiểm tra chữ ký)
+export function emailFromCredential(credential) {
+    try {
+        return decodeJwt(credential).email || '';
+    } catch {
+        return '';
+    }
+}
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 

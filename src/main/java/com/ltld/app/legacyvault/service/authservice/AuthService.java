@@ -4,6 +4,8 @@ import com.ltld.app.legacyvault.dto.forgotpassworddto.ResetPasswordRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
+import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 
 public interface AuthService {
@@ -13,4 +15,6 @@ public interface AuthService {
      LoginResult refresh(String rawRefreshToken, String ipAddress, String userAgent);
      void resetPassword(ResetPasswordRequest request);
      LoginResult loginWithMfa(MfaLoginRequest request, String ipAddress, String userAgent);
+     LoginResult loginWithGoogle(GoogleLoginRequest request, String ipAddress, String userAgent);
+     GoogleConfigResponse googleConfig();
 }

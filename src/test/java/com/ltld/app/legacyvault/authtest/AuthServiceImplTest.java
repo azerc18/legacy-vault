@@ -38,6 +38,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
+import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.service.authservice.GoogleTokenVerifier;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -71,6 +75,9 @@ public class AuthServiceImplTest {
 
     @Mock
     MfaService mfaService;
+
+    @Mock
+    GoogleTokenVerifier googleTokenVerifier;
 
 
     private Role ownerRole;
@@ -551,5 +558,129 @@ public class AuthServiceImplTest {
         verify(mfaService, never()).verifyCode(any(), anyString());
     }
 
+    // ---------- Đăng nhập bằng Google ----------
 
+    private static final GoogleLoginRequest GOOGLE_REQUEST = new GoogleLoginRequest("google-id-token");
+    private static final GoogleTokenVerifier.GoogleProfile GOOGLE_PROFILE =
+            new GoogleTokenVerifier.GoogleProfile("google-sub-1", "test@example.com", "Nguyen Van A");
+
+    private void stubGoogleTokens() {
+        when(tokenService.generateAccessToken(any(User.class))).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(any(User.class), eq(IP), eq(USER_AGENT))).thenReturn("refresh-token");
+        when(tokenService.getAccessTokenExpiry()).thenReturn(EXPIRES_AT);
+    }
+
+    @Test
+    void loginWithGoogle_newEmail_createsActiveAccount_linksInvites_andIssuesTokens() {
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.empty());
+        when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
+        when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            if (u.getId() == null) u.setId(UUID.randomUUID());
+            return u;
+        });
+        stubGoogleTokens();
+
+        LoginResult result = authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
+
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, atLeastOnce()).save(saved.capture());
+        User created = saved.getAllValues().get(0);
+        assertThat(created.getEmail()).isEqualTo("test@example.com");
+        assertThat(created.getFullName()).isEqualTo("Nguyen Van A");
+        assertThat(created.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(created.getRoles()).containsExactlyInAnyOrder(ownerRole, beneficiaryRole);
+        verify(verificationTokenService).linkPendingBeneficiaryVaults(created);
+        verify(verificationTokenService, never()).issueOtp(any(), any());
+        assertThat(result.response().getAccessToken()).isEqualTo("access-token");
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+    }
+
+    @Test
+    void loginWithGoogle_pendingAccount_activates_andReplacesPassword() {
+        user.setStatus(UserStatus.PENDING);
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+        stubGoogleTokens();
+
+        authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
+
+        // Người tạo tài khoản PENDING có thể không phải chủ email -> mật khẩu họ đặt không còn dùng được
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(user.getPasswordHash()).isEqualTo("random-hash");
+        verify(verificationTokenService).linkPendingBeneficiaryVaults(user);
+        verify(auditLogService).log(AuditAction.EMAIL_VERIFIED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
+                null, null, null, "google");
+    }
+
+    @Test
+    void loginWithGoogle_existingActiveAccount_keepsPassword_andLogsIn() {
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        stubGoogleTokens();
+
+        LoginResult result = authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
+
+        assertThat(user.getPasswordHash()).isEqualTo("hashed-password");
+        assertThat(user.getLastLoginAt()).isNotNull();
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+        verify(verificationTokenService, never()).linkPendingBeneficiaryVaults(any());
+    }
+
+    @Test
+    void loginWithGoogle_lockedAccount_isRejected() {
+        user.setStatus(UserStatus.LOCKED);
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT))
+                .isInstanceOf(LockedAccountException.class);
+        verify(tokenService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void loginWithGoogle_temporarilyLocked_isRejected() {
+        user.setLockedUntil(Instant.now().plus(10, ChronoUnit.MINUTES));
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT))
+                .isInstanceOf(LockedAccountException.class);
+        verify(tokenService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void loginWithGoogle_mfaEnabled_returnsChallenge_withoutTokens() {
+        user.setMfaEnabled(true);
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+
+        LoginResult result = authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
+
+        assertThat(result.refreshToken()).isNull();
+        assertThat(result.response().isMfaRequired()).isTrue();
+        assertThat(result.response().getMfaToken()).isNotBlank();
+        assertThat(user.getMfaChallengeHash()).isNotBlank();
+        verify(tokenService, never()).generateAccessToken(any());
+    }
+
+    @Test
+    void loginWithGoogle_invalidToken_propagatesError_andTouchesNoUser() {
+        when(googleTokenVerifier.verify("google-id-token"))
+                .thenThrow(new BusinessException(ErrorCode.GOOGLE_TOKEN_INVALID, "Invalid Google credential"));
+
+        assertThatThrownBy(() -> authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(userRepository);
+    }
+
+    @Test
+    void googleConfig_hidesClientId_whenDisabled() {
+        when(googleTokenVerifier.isEnabled()).thenReturn(false);
+        assertThat(authService.googleConfig()).isEqualTo(new GoogleConfigResponse(false, null));
+    }
 }

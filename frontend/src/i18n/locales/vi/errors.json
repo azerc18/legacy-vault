@@ -58,5 +58,8 @@
   "PAYMENT_SIGNATURE_INVALID": "Không xác thực được giao dịch thanh toán.",
   "PAYMENT_AMOUNT_MISMATCH": "Số tiền thanh toán không khớp.",
   "STORAGE_UNAVAILABLE": "Kho lưu trữ file tạm thời không khả dụng. Vui lòng thử lại sau.",
-  "MFA_CHALLENGE_EXPIRED": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+  "MFA_CHALLENGE_EXPIRED": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+  "GOOGLE_LOGIN_DISABLED": "Đăng nhập bằng Google chưa được bật.",
+  "GOOGLE_TOKEN_INVALID": "Google không xác nhận được lần đăng nhập này. Vui lòng thử lại.",
+  "GOOGLE_EMAIL_NOT_VERIFIED": "Email tài khoản Google của bạn chưa được xác minh."
 }

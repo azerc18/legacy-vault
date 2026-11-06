@@ -79,6 +79,9 @@ app:
     return-url: ${VNPAY_RETURN_URL:http://localhost:8084/api/payments/vnpay-return}
     # false: chỉ IPN (server-to-server, có chữ ký) mới kích hoạt gói; return-url chỉ để hiển thị kết quả
     activate-on-return: false
+  google:
+    # OAuth Client ID (Google Cloud Console > Credentials > Web application). Để trống = ẩn nút Google.
+    client-id: ${GOOGLE_CLIENT_ID:}
   ai:
     provider: ${AI_PROVIDER:mock}
     gemini:
