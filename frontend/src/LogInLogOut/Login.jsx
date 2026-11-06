@@ -9,6 +9,7 @@ import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
+import BrandMark from '../Common/BrandMark.jsx';
 
 const inputCls =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
@@ -121,8 +122,8 @@ export default function Login() {
             <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
             <div className="mb-8 text-center lv-auth-logo">
-                <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
-                    <span className="material-symbols-outlined text-[28px]">shield_locked</span>
+                <div className="w-12 h-12 rounded-2xl bg-brand flex items-center justify-center shadow-sm mx-auto mb-3">
+                    <BrandMark className="h-8 w-8" />
                 </div>
                 <h1 className="font-headline-lg text-primary font-bold tracking-tight text-2xl">LegacyVault</h1>
                 <p className="font-body-sm text-on-surface-variant mt-1">{t('brand.tagline')}</p>

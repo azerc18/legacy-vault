@@ -9,6 +9,7 @@ import UserAvatar from './UserAvatar.jsx';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
+import BrandMark from './BrandMark.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -120,7 +121,7 @@ export default function AppHeader({ icon = 'shield_locked', workspace, home = '/
         <header className="lv-side bg-brand text-white">
             <div className="lv-side-top">
                 <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
-                    <Icon name={icon === 'shield_locked' ? 'lock' : icon} className="text-[26px]" />
+                    <BrandMark className="h-[30px] w-[30px]" />
                     <span className="min-w-0">
                         <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (

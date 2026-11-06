@@ -4,6 +4,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle.jsx';
+import BrandMark from './BrandMark.jsx';
 
 export default function AuthShell({ children, className = '' }) {
     const { t } = useTranslation('auth');
@@ -17,7 +18,7 @@ export default function AuthShell({ children, className = '' }) {
                 <div aria-hidden="true" className="absolute inset-0"
                      style={{ background: 'linear-gradient(90deg,rgba(11,16,32,.7) 0%,rgba(11,16,32,0) 75%)' }} />
                 <Link to="/" className="relative flex items-center gap-2 text-white font-bold tracking-[0.18em] text-sm">
-                    <span className="material-symbols-outlined text-[26px]">lock</span>LEGACYVAULT
+                    <BrandMark className="h-[30px] w-[30px]" />LEGACYVAULT
                 </Link>
                 <div className="relative max-w-[520px] flex flex-col gap-5">
                     <h1 className="font-headline-lg text-[44px] leading-[1.1] font-semibold tracking-tight lv-rise">
