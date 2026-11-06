@@ -91,6 +91,67 @@ export default function Dashboard() {
         return () => io.disconnect();
     }, []);
 
+    // Tự khớp trang: vuốt qua ~30% phần kế bên rồi dừng thì tự trượt cho vừa khít phần đó
+    useEffect(() => {
+        const root = rootRef.current;
+        if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        const THRESHOLD = 0.3;
+        let timer = null;
+        let lastY = window.scrollY;
+        let dir = 1;
+        let touching = false;
+        let snapping = false;
+
+        const snap = () => {
+            if (touching) return;
+            const vh = window.innerHeight;
+            const head = root.querySelector('header');
+            const off = head ? head.offsetHeight : 0;
+            const y = window.scrollY + off; // mép trên vùng nhìn thấy (dưới navbar)
+            const view = vh - off;
+            const tops = Array.from(root.querySelectorAll('[data-mode]'))
+                .filter((el) => el.tagName !== 'DIV')
+                .map((el) => ({ top: el.getBoundingClientRect().top + window.scrollY, h: el.offsetHeight }));
+            let target = null;
+            if (dir > 0) {
+                const next = tops.find((s) => s.top > y + 8);
+                if (next && next.top - y < view * (1 - THRESHOLD)) target = next.top;
+            } else {
+                const cur = [...tops].reverse().find((s) => s.top < y - 8);
+                if (cur) {
+                    const curBottom = cur.top + cur.h;
+                    // phần trên đang hiện >=30% khung nhìn thì lùi về vừa khít phần đó
+                    if (y - curBottom < 0 && curBottom - y >= view * THRESHOLD) target = Math.max(cur.top, curBottom - view);
+                }
+            }
+            if (target === null) return;
+            snapping = true;
+            window.scrollTo({ top: Math.max(0, target - off), behavior: 'smooth' });
+            setTimeout(() => { snapping = false; }, 700);
+        };
+
+        const onScroll = () => {
+            const y = window.scrollY;
+            if (snapping) { lastY = y; return; }
+            if (Math.abs(y - lastY) > 1) dir = y > lastY ? 1 : -1;
+            lastY = y;
+            clearTimeout(timer);
+            timer = setTimeout(snap, 140);
+        };
+        const down = () => { touching = true; };
+        const up = () => { touching = false; clearTimeout(timer); timer = setTimeout(snap, 180); };
+
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('touchstart', down, { passive: true });
+        window.addEventListener('touchend', up, { passive: true });
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('touchstart', down);
+            window.removeEventListener('touchend', up);
+        };
+    }, []);
+
     // Đã đăng nhập -> vào thẳng trang chủ người dùng
     if (getUser()) return <Navigate to="/home" replace />;
 
