@@ -75,6 +75,10 @@
     "addBeneficiary": "Thêm người thụ hưởng",
     "assetsTitle": "Tài sản số ({{count}})",
     "assetItem": "Tài sản {{index}}",
+    "assetTypeLabel": "Loại tài sản",
+    "secretHint": "Được mã hoá trước khi lưu. Người thụ hưởng chỉ xem được sau khi két được mở.",
+    "assetsPartial": "Đã tạo két, nhưng {{count}} tài sản chưa lưu được. Mở két để thêm lại.",
+    "openVault": "Mở két",
     "assetNamePlaceholder": "Tên tài sản (VD: Ngân hàng Vietcombank)",
     "secretPlaceholder": "Thông tin bí mật (mật khẩu, cụm từ khôi phục, số tài khoản...)",
     "notesPlaceholder": "Ghi chú cho người thụ hưởng (không bắt buộc)",
@@ -328,6 +332,38 @@
       "title": "Tiêu đề",
       "description": "Mô tả",
       "secret": "Thông tin bí mật"
+    },
+    "sections": {
+      "sealed": "Phần niêm phong",
+      "sealedHint": "Được mã hoá trước khi lưu. Chỉ mở cho người thụ hưởng khi két được bàn giao."
+    },
+    "examples": {
+      "institutionName": "VD: Vietcombank",
+      "accountNumber": "VD: 0071000123456",
+      "branchName": "VD: Chi nhánh Quận 7, TP.HCM",
+      "estimatedValue": "VD: 150000000",
+      "legalInstruction": "VD: Mang giấy chứng tử và hồ sơ khai nhận di sản tới chi nhánh để tất toán.",
+      "accountId": "VD: 12345678",
+      "documentTitle": "VD: Sổ đỏ căn hộ Quận 7",
+      "issuer": "VD: UBND Quận 7",
+      "location": "VD: Két sắt ở nhà, ngăn trên cùng",
+      "walletProvider": "VD: Ledger Nano X",
+      "walletAddress": "VD: 0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+      "seedPhrase": "12 hoặc 24 từ, cách nhau bằng dấu cách",
+      "usernameOrHandle": "VD: nguyenvanan",
+      "deviceOrSimLocation": "VD: Ngăn kéo bàn làm việc",
+      "title": "VD: Tài khoản hosting website",
+      "description": "VD: Gia hạn mỗi năm vào tháng 3."
+    },
+    "hints": {
+      "accountNumber": "Từ 6 đến 19 chữ số, không có dấu cách.",
+      "estimatedValue": "Chỉ để người thụ hưởng hình dung, không cần chính xác.",
+      "walletAddress": "Chỉ gồm chữ và số, 20 đến 100 ký tự.",
+      "seedPhrase": "Viết đúng thứ tự các từ.",
+      "wish": "Người thi hành sẽ làm theo lựa chọn này.",
+      "location": "Bản gốc cần thiết khi làm thủ tục pháp lý.",
+      "twoFactorRecoveryCodes": "Dán toàn bộ mã khôi phục, mỗi mã cách nhau một dấu cách.",
+      "pinOrPasswordNote": "Có thể ghi gợi ý thay vì mật khẩu thật."
     },
     "keepCurrentPlaceholder": "Để trống nếu giữ nguyên giá trị hiện tại",
     "errors": {
