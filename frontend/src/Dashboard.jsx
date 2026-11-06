@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
@@ -91,6 +91,45 @@ export default function Dashboard() {
         return () => io.disconnect();
     }, []);
 
+    // Phần tử hiện dần khi cuộn tới (mờ -> rõ, trượt nhẹ lên), so le từng thẻ trong một lưới
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        if (!root || !('IntersectionObserver' in window)) return undefined;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        const items = [];
+        const add = (el, delay) => {
+            if (!el || items.some((i) => i.el === el)) return;
+            el.style.setProperty('--d', `${delay}s`);
+            el.classList.add('lv-rv');
+            items.push({ el, delay });
+        };
+        // Hero: hiện sau khi tiêu đề chạy chữ xong
+        add(root.querySelector('.lv-hero-rv'), 0.8);
+        add(root.querySelectorAll('.lv-hero-rv')[1], 0.95);
+        root.querySelectorAll('.lv-hero-badges > *').forEach((el, i) => add(el, 1.1 + i * 0.08));
+        // Các phần còn lại: tiêu đề, rồi từng thẻ so le
+        root.querySelectorAll('.lv-reveal').forEach((el) => { if (!el.querySelector('.grid, .divide-y')) add(el, 0); }); // khối có lưới thì để từng thẻ tự hiện
+        root.querySelectorAll('section .grid, footer .grid, .divide-y').forEach((grid) => {
+            Array.from(grid.children).forEach((el, i) => add(el, 0.1 + Math.min(i, 5) * 0.09));
+        });
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => {
+                if (!e.isIntersecting) return;
+                const el = e.target;
+                io.unobserve(el);
+                el.classList.add('lv-in');
+                const d = parseFloat(el.style.getPropertyValue('--d')) || 0;
+                // Xong thì gỡ lớp để không chặn hiệu ứng hover/transition riêng của phần tử
+                setTimeout(() => { el.classList.remove('lv-rv', 'lv-in'); el.style.removeProperty('--d'); }, (d + 1) * 1000);
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+        items.forEach(({ el }) => io.observe(el));
+        return () => {
+            io.disconnect();
+            items.forEach(({ el }) => { el.classList.remove('lv-rv', 'lv-in'); el.style.removeProperty('--d'); });
+        };
+    }, []);
+
     // Tự khớp trang: dùng scroll-snap gốc của trình duyệt (êm, không giành quyền cuộn)
     useEffect(() => {
         const el = document.documentElement;
@@ -141,8 +180,8 @@ export default function Dashboard() {
                             <span key={i} className="lv-word lv-shine inline-block pb-[0.14em] mr-[0.25em]" style={{ animationDelay: `${0.12 * i}s, ${1.6 + 0.12 * i}s` }}>{w}</span>
                         ))}
                     </h1>
-                    <p className="mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
-                    <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                    <p className="lv-hero-rv mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
+                    <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center">
                         <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
                             <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                         </Link>
@@ -152,7 +191,7 @@ export default function Dashboard() {
                     </div>
                 </div>
                 {/* Trust badges */}
-                <div className="relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
+                <div className="lv-hero-badges relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
                     {BADGES.map((b) => (
                         <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-white/10 border border-white/15 text-sm text-white/85 backdrop-blur">
                             <Icon name={b.icon} className="text-[18px] text-[#b9c9ff]" /> {t(`badges.${b.key}`)}
