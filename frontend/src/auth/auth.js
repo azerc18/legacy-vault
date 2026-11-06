@@ -26,6 +26,16 @@ export function saveSession(accessToken, email) {
     return user;
 }
 
+// Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
+export const homeFor = (u) =>
+    u?.roles?.includes('ADMIN') ? '/admin/users'
+        : u?.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home'
+            : '/home';
+
+// Chỉ nhận đường dẫn nội bộ ("/owner/vaults/1"), chặn "//evil.com" hay "https://..." (open redirect)
+export const safeRedirect = (path) =>
+    typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path !== '/login' ? path : null;
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 

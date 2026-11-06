@@ -48,7 +48,7 @@ export default function ForgotPassword() {
                 <p className="text-sm text-on-surface-variant mb-6">{t('forgot.subtitle')}</p>
 
                 {error && (
-                    <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
+                    <div role="alert" className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px]">error</span>
                         {error}
                     </div>
@@ -56,9 +56,11 @@ export default function ForgotPassword() {
 
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <label className="font-label-sm text-on-surface-variant font-semibold">{t('forgot.email')}</label>
+                        <label htmlFor="forgot-email" className="font-label-sm text-on-surface-variant font-semibold">{t('forgot.email')}</label>
                         <input
+                            id="forgot-email"
                             type="email"
+                            autoComplete="username"
                             placeholder="name@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}

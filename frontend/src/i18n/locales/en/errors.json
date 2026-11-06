@@ -12,7 +12,7 @@
   "DATA_CONFLICT": "This data conflicts with existing records.",
   "INVALID_CREDENTIALS": "Incorrect email or password.",
   "INVALID_REFRESH_TOKEN": "Your session has expired. Please sign in again.",
-  "ACCOUNT_LOCKED": "Your account is locked. Please contact support.",
+  "ACCOUNT_LOCKED": "Your account is temporarily locked. Try again in a few minutes or contact an administrator.",
   "ACCOUNT_NOT_ACTIVE": "Your account is not active. Please verify your email.",
   "EMAIL_ALREADY_EXISTS": "This email is already registered.",
   "OTP_INVALID": "The verification code is incorrect.",

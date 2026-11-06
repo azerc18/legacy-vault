@@ -146,6 +146,16 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
     const isOwner = allRoles.includes('OWNER');
     const link = 'text-xs font-semibold text-secondary hover:text-primary whitespace-nowrap';
+    // "grant:LEGAL_VERIFIER" / "revoke:ADMIN"; mã role chỉ có A–Z, 0–9, _ nên tách bằng ":" an toàn
+    const roleOptions = manageable
+        .filter((r) => !(r === 'ADMIN' && isMe && roles.includes(r)))   // không tự gỡ ADMIN
+        .map((r) => {
+            const has = roles.includes(r);
+            return {
+                value: `${has ? 'revoke' : 'grant'}:${r}`,
+                label: t(has ? 'users.actions.revoke' : 'users.actions.grant', { role: labelOf(r) }),
+            };
+        });
 
     return (
         <tr className="border-t border-outline-variant/20 align-top">
@@ -173,16 +183,21 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
             <td className="p-4 whitespace-nowrap">{formatDate(u.lastLoginAt, true)}</td>
             <td className="p-4">
                 <div className="flex flex-col items-end gap-1.5">
-                    {/* Cấp / gỡ role (chỉ với tài khoản ACTIVE) */}
-                    {u.status === 'ACTIVE' && manageable.map((r) => {
-                        const has = roles.includes(r);
-                        if (has && r === 'ADMIN' && isMe) return null; // không tự gỡ ADMIN
-                        return (
-                            <button key={r} onClick={() => onAction({ kind: has ? 'revoke' : 'grant', user: u, roleCode: r })} className={link}>
-                                {t(has ? 'users.actions.revoke' : 'users.actions.grant', { role: labelOf(r) })}
-                            </button>
-                        );
-                    })}
+                    {/* Cấp / gỡ role (chỉ với tài khoản ACTIVE): gom vào 1 menu để cột không dài ra khi có nhiều role tự tạo */}
+                    {u.status === 'ACTIVE' && roleOptions.length > 0 && (
+                        <select
+                            value=""
+                            aria-label={t('users.actions.rolesMenu')}
+                            onChange={(e) => {
+                                const [kind, roleCode] = e.target.value.split(':');
+                                onAction({ kind, user: u, roleCode });
+                            }}
+                            className="h-8 max-w-[180px] px-2 rounded-lg border border-outline-variant bg-background text-xs font-semibold text-secondary cursor-pointer focus:outline-none focus:border-primary"
+                        >
+                            <option value="" disabled>{t('users.actions.rolesMenu')}</option>
+                            {roleOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                    )}
                     {/* Khoá / mở khoá (không áp dụng cho chính mình và tài khoản PENDING) */}
                     {!isMe && u.status === 'ACTIVE' && (
                         <button onClick={() => onAction({ kind: 'lock', user: u })} className={`${link} text-error`}>{t('users.actions.lock')}</button>

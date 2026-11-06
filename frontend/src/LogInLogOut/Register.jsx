@@ -1,12 +1,17 @@
 import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { getUser } from '../auth/auth.js';
+import { getUser, homeFor } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
-import {useTranslation} from "react-i18next";
+import PasswordInput from '../Common/PasswordInput.jsx';
+import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import { useTranslation } from 'react-i18next';
+
+const inputCls =
+    'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
 
 export default function Register() {
     const { t } = useTranslation('auth');
@@ -20,8 +25,9 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    // Đã đăng nhập -> về trang chủ người dùng
-    if (getUser()) return <Navigate to="/home" replace />;
+    // Đã đăng nhập -> về trang chủ theo role (giống Login)
+    const current = getUser();
+    if (current) return <Navigate to={homeFor(current)} replace />;
 
 
     const handleChange = (e) => {
@@ -30,6 +36,8 @@ export default function Register() {
             [e.target.name]: e.target.value
         });
     };
+    // PasswordInput trả thẳng giá trị chứ không trả event
+    const setField = (name) => (value) => setFormData((f) => ({ ...f, [name]: value }));
 
     const handleRegister = async (e) => {
         e.preventDefault();
@@ -62,6 +70,7 @@ export default function Register() {
 
     return (
         <AuthShell>
+            <LanguageSwitch className="absolute top-4 right-4" />
             {/* Brand Header */}
             <div className="mb-6 text-center">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-on-primary flex items-center justify-center shadow-sm mx-auto mb-3">
@@ -74,7 +83,7 @@ export default function Register() {
             {/* Register Card */}
             <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30 max-w-[440px] w-full">
                 {error && (
-                    <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
+                    <div role="alert" className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px]">error</span>
                         {error}
                     </div>
@@ -82,51 +91,57 @@ export default function Register() {
 
                 <form onSubmit={handleRegister} className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <label className="font-label-sm text-on-surface-variant font-semibold">{t('register.fullName')}</label>
+                        <label htmlFor="reg-name" className="font-label-sm text-on-surface-variant font-semibold">{t('register.fullName')}</label>
                         <input
+                            id="reg-name"
                             type="text"
+                            autoComplete="name"
                             name="fullName"
                             placeholder={t('register.fullNamePlaceholder')}
                             value={formData.fullName}
                             onChange={handleChange}
-                            className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            className={inputCls}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="font-label-sm text-on-surface-variant font-semibold">{t('register.email')}</label>
+                        <label htmlFor="reg-email" className="font-label-sm text-on-surface-variant font-semibold">{t('register.email')}</label>
                         <input
+                            id="reg-email"
                             type="email"
+                            autoComplete="email"
                             name="email"
                             placeholder="name@example.com"
                             value={formData.email}
                             onChange={handleChange}
-                            className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            className={inputCls}
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="font-label-sm text-on-surface-variant font-semibold">{t('register.password')}</label>
-                        <input
-                            type="password"
+                        <label htmlFor="reg-password" className="font-label-sm text-on-surface-variant font-semibold">{t('register.password')}</label>
+                        <PasswordInput
+                            id="reg-password"
                             name="password"
+                            autoComplete="new-password"
                             placeholder={t('register.passwordPlaceholder')}
                             value={formData.password}
-                            onChange={handleChange}
-                            className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            onChange={setField('password')}
+                            className={inputCls}
                         />
                         <PasswordStrengthMeter password={formData.password} />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="font-label-sm text-on-surface-variant font-semibold">{t('register.confirm')}</label>
-                        <input
-                            type="password"
+                        <label htmlFor="reg-confirm" className="font-label-sm text-on-surface-variant font-semibold">{t('register.confirm')}</label>
+                        <PasswordInput
+                            id="reg-confirm"
                             name="passwordConfirm"
+                            autoComplete="new-password"
                             placeholder={t('register.confirmPlaceholder')}
                             value={formData.passwordConfirm}
-                            onChange={handleChange}
-                            className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                            onChange={setField('passwordConfirm')}
+                            className={inputCls}
                         />
                     </div>
 

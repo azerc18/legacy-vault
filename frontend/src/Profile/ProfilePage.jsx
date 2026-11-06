@@ -8,6 +8,7 @@ import { getErrorMessage } from '../api/http.js';
 import { updateStoredUser, logout } from '../auth/auth.js';
 import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
+import SharedPasswordInput from '../Common/PasswordInput.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
 import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
@@ -34,30 +35,8 @@ function Field({ label, hint, children }) {
     );
 }
 
-// Ô mật khẩu có nút hiện/ẩn
-function PasswordInput({ value, onChange, autoComplete }) {
-    const { t } = useTranslation('profile');
-    const [show, setShow] = useState(false);
-    return (
-        <div className="relative">
-            <input
-                type={show ? 'text' : 'password'}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                autoComplete={autoComplete}
-                className={`${inputClass} pr-11`}
-            />
-            <button
-                type="button"
-                onClick={() => setShow(!show)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary"
-                aria-label={show ? t('password.hide') : t('password.show')}
-            >
-                <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
-            </button>
-        </div>
-    );
-}
+// Ô mật khẩu dùng chung (Common/PasswordInput) với style input của trang hồ sơ
+const PasswordInput = (props) => <SharedPasswordInput className={inputClass} {...props} />;
 
 // ---------- Cột trái: thẻ tóm tắt ----------
 // Ảnh đại diện + nút đổi / xoá ảnh

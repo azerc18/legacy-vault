@@ -1,39 +1,39 @@
 import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, ROLES, getUser, updateStoredUser } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
-import {useTranslation} from "react-i18next";
-
-// Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
-const homeFor = (u) =>
-    u.roles?.includes('ADMIN') ? '/admin/users'
-        : u.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home'
-            : '/home';
+import PasswordInput from '../Common/PasswordInput.jsx';
 
 const inputCls =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
 
 export default function Login() {
+    const { t } = useTranslation('auth');
+    const navigate = useNavigate();
+    const location = useLocation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const navigate = useNavigate();
-    const location = useLocation();
     const [loading, setLoading] = useState(false);
     const [needVerify, setNeedVerify] = useState(false);
     const [mfaToken, setMfaToken] = useState(null);   // != null -> đang ở bước 2
     const [code, setCode] = useState('');
     const [useBackup, setUseBackup] = useState(false);
 
+    // Trang cần đăng nhập mà người dùng đang mở dở (RequireRole truyền sang)
+    const from = safeRedirect(location.state?.from);
+    // http.js chuyển về /login?expired=1 khi refresh token hết hạn
+    const expired = new URLSearchParams(location.search).has('expired');
+
     // Đã đăng nhập -> không cho vào lại trang login
     const current = getUser();
-    const { t } = useTranslation('auth');
     if (current) {
-        return <Navigate to={homeFor(current)} replace />;
+        return <Navigate to={from || homeFor(current)} replace />;
     }
 
     // Lưu token TRƯỚC rồi mới gọi /users/me (để request có Bearer token)
@@ -42,7 +42,7 @@ export default function Login() {
         try {
             updateStoredUser(toStoredUser(await userApi.getMe()));
         } catch { /* header vẫn hiển thị được tên mặc định */ }
-        navigate(homeFor(user));
+        navigate(from || homeFor(user), { replace: true });
     };
 
     const backToPassword = () => {
@@ -66,8 +66,8 @@ export default function Login() {
             await finishLogin(res.accessToken);
         } catch (err) {
             setError(getErrorMessage(err, t('login.errors.failed')));
-            // 403 = chưa xác thực email hoặc tài khoản bị khoá
-            if (err.response?.status === 403) setNeedVerify(true);
+            // Chỉ tài khoản chưa xác minh email mới cần link xác minh (bị khoá cũng là 403 nhưng khác mã)
+            setNeedVerify(getErrorCode(err) === 'ACCOUNT_NOT_ACTIVE');
         } finally {
             setLoading(false);
         }
@@ -91,6 +91,9 @@ export default function Login() {
         }
     };
 
+    // Thông báo xanh: từ trang khác chuyển sang (đã xác minh email, đã đổi mật khẩu...) hoặc hết phiên
+    const notice = location.state?.message || (expired ? t('login.expired') : '');
+
     return (
         <AuthShell>
             <LanguageSwitch className="absolute top-4 right-4" />
@@ -112,19 +115,20 @@ export default function Login() {
                     {mfaToken ? t('mfa.signingInAs', { email: email.trim() }) : t('login.subtitle')}
                 </p>
 
-                {location.state?.message && !error && !mfaToken && (
-                    <div className="mb-4 p-3 rounded-lg bg-success-container text-on-success-container text-sm">
-                        {location.state.message}
+                {notice && !error && !mfaToken && (
+                    <div role="status" className="mb-4 p-3 rounded-lg bg-success-container text-on-success-container text-sm">
+                        {notice}
                     </div>
                 )}
                 {needVerify && !mfaToken && (
-                    <Link to="/verify-email" state={{ email }} className="block mb-4 text-sm text-secondary font-semibold">
+                    <Link to="/verify-email" state={{ email: email.trim(), fromLogin: true }}
+                          className="block mb-4 text-sm text-secondary font-semibold">
                         {t('login.notVerified')}
                     </Link>
                 )}
 
                 {error && (
-                    <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
+                    <div role="alert" className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
                         <span className="material-symbols-outlined text-[18px]">error</span>
                         {error}
                     </div>
@@ -134,9 +138,11 @@ export default function Login() {
                     /* ---------- Bước 1: email + mật khẩu ---------- */
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label className="font-label-sm text-on-surface-variant font-semibold">{t('login.email')}</label>
+                            <label htmlFor="login-email" className="font-label-sm text-on-surface-variant font-semibold">{t('login.email')}</label>
                             <input
+                                id="login-email"
                                 type="email"
+                                autoComplete="username"
                                 placeholder="name@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -146,14 +152,15 @@ export default function Login() {
 
                         <div className="flex flex-col gap-1.5">
                             <div className="flex justify-between items-center">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('login.password')}</label>
+                                <label htmlFor="login-password" className="font-label-sm text-on-surface-variant font-semibold">{t('login.password')}</label>
                                 <Link to="/forgot-password" className="text-xs text-secondary hover:text-primary transition-colors font-semibold">{t('login.forgot')}</Link>
                             </div>
-                            <input
-                                type="password"
+                            <PasswordInput
+                                id="login-password"
+                                autoComplete="current-password"
                                 placeholder="••••••••"
                                 value={password}
-                                onChange={(e) => setPassword(e.target.value)}
+                                onChange={setPassword}
                                 className={inputCls}
                             />
                         </div>
@@ -161,7 +168,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
+                            className="w-full h-12 mt-2 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">login</span>
                             {loading ? t('login.submitting') : t('login.submit')}
@@ -172,12 +179,11 @@ export default function Login() {
                     <form onSubmit={handleMfa} className="flex flex-col gap-4">
                         <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary-fixed text-on-secondary-fixed text-sm">
                             <span className="material-symbols-outlined">phonelink_lock</span>
-                            {useBackup
-                                ? 'Enter one of your backup codes (each code works once).'
-                                : 'Open your authenticator app and enter the 6-digit code.'}
+                            {useBackup ? t('mfa.hintBackup') : t('mfa.hintApp')}
                         </div>
                         <input
                             autoFocus
+                            aria-label={useBackup ? t('mfa.hintBackup') : t('mfa.hintApp')}
                             value={code}
                             onChange={(e) => setCode(useBackup
                                 ? e.target.value.toUpperCase()
@@ -191,7 +197,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 lv-pill"
+                            className="w-full h-12 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-60 lv-pill"
                         >
                             <span className="material-symbols-outlined text-[18px]">verified_user</span>
                             {loading ? t('mfa.verifying') : t('mfa.verify')}

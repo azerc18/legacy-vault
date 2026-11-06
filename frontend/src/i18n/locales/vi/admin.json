@@ -25,7 +25,8 @@
     "actions": {
       "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",
       "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản",
-      "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành"
+      "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành",
+      "rolesMenu": "Vai trò…"
     },
     "success": {
       "lock": "Đã khoá {{email}}.",
@@ -90,6 +91,7 @@
       "assetsDocs": "Tài sản / tài liệu",
       "deadline": "Hạn nhận",
       "extensionsUsed": "Số lần gia hạn",
+      "unlockedAt": "Mở khoá lúc",
       "maxReached": "Thời hạn nhận đã được gia hạn {{max}} lần.",
       "auditNote": "Việc admin xem kho được ghi vào nhật ký."
     },
@@ -129,7 +131,7 @@
     "ackError": "Không xác nhận được cảnh báo.",
     "acknowledgedMsg": "Đã xác nhận cảnh báo.",
     "empty": {
-      "openTitle": "Không có gì bất thường", "openText": "Thông báo gửi lỗi và bàn giao bị kẹt sẽ hiện ở đây.",
+      "openTitle": "Không có gì bất thường", "openText": "Đăng nhập sai liên tục, refresh token bị dùng lại, tải xuống hàng loạt và việc cấp quyền ADMIN sẽ hiện ở đây.",
       "ackTitle": "Chưa có cảnh báo nào được xử lý", "ackText": "Cảnh báo bạn xác nhận sẽ được liệt kê ở đây."
     },
     "severity": { "HIGH": "CAO", "MEDIUM": "TRUNG BÌNH" },
