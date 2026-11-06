@@ -196,9 +196,14 @@
       "addButton": "Add beneficiary",
       "removeTitle": "Remove beneficiary?",
       "removeMessage": "Remove {{email}} from this vault? They will be notified.",
+      "saveEdit": "Save",
+      "cancelEdit": "Cancel",
+      "emailLocked": "Email can't be edited. To change it, add the new person and then remove this one.",
+      "lastOneHint": "You can't remove the last beneficiary. Add another one first.",
       "errors": {
         "add": "Could not add the beneficiary.",
-        "remove": "Could not remove the beneficiary."
+        "remove": "Could not remove the beneficiary.",
+        "update": "Could not update the beneficiary."
       }
     },
     "documents": {

@@ -30,6 +30,8 @@ public enum AuditAction {
     BENEFICIARY_ASSIGNED, BENEFICIARY_REPLACED, BENEFICIARY_ASSIGN_DENIED, BENEFICIARY_LINKED, BENEFICIARY_REMOVED,
     // FR-02 (V8): gỡ người thụ hưởng bị từ chối
     BENEFICIARY_REMOVE_DENIED,
+    // Owner sửa tên / mối quan hệ người thụ hưởng
+    BENEFICIARY_UPDATED, BENEFICIARY_UPDATE_DENIED,
     LEGAL_VERIFICATION_REQUESTED,
     VERIFICATION_MESSAGE_SENT,
     // FR-06: Owner chỉ định / thay thế Executor (thu hồi dùng lại EXECUTOR_REVOKE)

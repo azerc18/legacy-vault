@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
 import com.ltld.app.legacyvault.dto.vaultdto.AddBeneficiaryRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
@@ -431,6 +432,84 @@ class VaultBeneficiaryManagementTest {
 
         assertThatThrownBy(() -> vaultService.removeBeneficiary(ownerId, vaultId, UUID.randomUUID()))
                 .isInstanceOf(DmsException.class);
+        verify(vaultRepository, never()).findByIdForUpdate(any());
+    }
+
+    // ===== updateBeneficiary =====
+
+    private static UpdateBeneficiaryRequest updateRequest(String fullName, String relationship) {
+        UpdateBeneficiaryRequest r = new UpdateBeneficiaryRequest();
+        r.setFullName(fullName);
+        r.setRelationship(relationship);
+        return r;
+    }
+
+    @Test
+    @DisplayName("update: sửa tên + quan hệ (trim, rỗng → null), giữ email/trạng thái, ghi audit")
+    void updateBeneficiary_updatesNameAndRelationship() {
+        VaultBeneficiary only = row("a@test.com", null);
+        only.setFullName("Old");
+        only.setRelationship("Bạn");
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(only));
+
+        VaultBeneficiaryResponse res = vaultService.updateBeneficiary(ownerId, vaultId, only.getId(),
+                updateRequest("  Nguyễn Văn A  ", "   "));
+
+        assertThat(res.fullName()).isEqualTo("Nguyễn Văn A");
+        assertThat(res.relationship()).isNull();
+        assertThat(res.email()).isEqualTo("a@test.com");
+        assertThat(res.status()).isEqualTo(BeneficiaryInviteStatus.PENDING_REGISTRATION);
+        verify(vaultBeneficiaryRepository).save(only);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_UPDATED), eq(AuditResult.SUCCESS),
+                any(), any(), any(), any(), any(), eq("beneficiaryRowId=" + only.getId()));
+        verify(emailSender, never()).sendBeneficiaryRemovedNotice(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("update: id không thuộc vault → 404")
+    void updateBeneficiary_unknownId_throws404() {
+        lockVault();
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId))
+                .thenReturn(List.of(row("a@test.com", null)));
+
+        assertStatus(() -> vaultService.updateBeneficiary(ownerId, vaultId, UUID.randomUUID(),
+                updateRequest("X", null)), HttpStatus.NOT_FOUND);
+        verify(vaultBeneficiaryRepository, never()).save(any(VaultBeneficiary.class));
+    }
+
+    @Test
+    @DisplayName("update: không phải chủ vault → 404 và ghi audit từ chối")
+    void updateBeneficiary_notOwner_throws404() {
+        vault.setOwner(User.builder().id(UUID.randomUUID()).email("other@test.com").build());
+        lockVault();
+
+        assertStatus(() -> vaultService.updateBeneficiary(ownerId, vaultId, UUID.randomUUID(),
+                updateRequest("X", null)), HttpStatus.NOT_FOUND);
+        verify(auditLogService).log(eq(AuditAction.BENEFICIARY_UPDATE_DENIED), eq(AuditResult.FAILURE),
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("update: guard từ chối (vault đang khóa) → lỗi của guard, không lưu")
+    void updateBeneficiary_guardRejects_throws() {
+        lockVault();
+        doThrow(new VaultException("Cannot modify vault that is not in active state", HttpStatus.BAD_REQUEST))
+                .when(vaultModificationGuard).ensureModifiable(vault);
+
+        assertStatus(() -> vaultService.updateBeneficiary(ownerId, vaultId, UUID.randomUUID(),
+                updateRequest("X", null)), HttpStatus.BAD_REQUEST);
+        verify(vaultBeneficiaryRepository, never()).save(any(VaultBeneficiary.class));
+    }
+
+    @Test
+    @DisplayName("update: DMS đã kích hoạt → DmsException, chưa khóa vault")
+    void updateBeneficiary_dmsTriggered_propagates() {
+        doThrow(new DmsException("The Dead Man's Switch has started the handover process and cannot be changed.",
+                HttpStatus.CONFLICT)).when(dmsConfigService).assertHandoverNotStarted(ownerId);
+
+        assertThatThrownBy(() -> vaultService.updateBeneficiary(ownerId, vaultId, UUID.randomUUID(),
+                updateRequest("X", null))).isInstanceOf(DmsException.class);
         verify(vaultRepository, never()).findByIdForUpdate(any());
     }
 }

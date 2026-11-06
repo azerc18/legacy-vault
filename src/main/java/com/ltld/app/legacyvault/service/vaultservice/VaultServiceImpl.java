@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
@@ -455,6 +456,39 @@ public class VaultServiceImpl implements VaultService {
         String ownerName = vault.getOwner().getFullName();
         String vaultName = vault.getName();
         runAfterCommit(() -> emailSender.sendBeneficiaryRemovedNotice(removedEmail, ownerName, vaultName));
+    }
+
+    // Owner sửa tên / mối quan hệ của một người thụ hưởng. Cùng điều kiện khóa như thêm/xóa
+    // (DMS chưa kích hoạt, vault còn sửa được). Không đụng email, phân bổ tài sản hay đồng thuận K-of-N.
+    @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public VaultBeneficiaryResponse updateBeneficiary(UUID ownerId, UUID vaultId, UUID beneficiaryId,
+                                                      UpdateBeneficiaryRequest request) {
+        dmsConfigService.assertHandoverNotStarted(ownerId);
+        Vault vault = lockActiveOwnedVault(ownerId, vaultId, AuditAction.BENEFICIARY_UPDATE_DENIED);
+
+        VaultBeneficiary target = vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId).stream()
+                .filter(b -> b.getId().equals(beneficiaryId))
+                .findFirst()
+                .orElseThrow(() -> new VaultException("Beneficiary not found", HttpStatus.NOT_FOUND));
+
+        target.setFullName(blankToNull(request.getFullName()));
+        target.setRelationship(blankToNull(request.getRelationship()));
+        vaultBeneficiaryRepository.save(target);
+
+        // m5: audit không ghi tên/email bên thứ ba
+        auditLogService.log(AuditAction.BENEFICIARY_UPDATED, AuditResult.SUCCESS, ownerId,
+                vault.getOwner().getEmail(), vaultId, "Vault", vaultId.toString(),
+                "beneficiaryRowId=" + beneficiaryId);
+
+        return new VaultBeneficiaryResponse(target.getId(), target.getEmail(), target.getFullName(),
+                target.getRelationship(), target.getStatus());
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     // N2-owner / N1: chuẩn hóa email rồi chặn tự gán và trùng Executor (thứ tự kiểm giữ nguyên như trước)
