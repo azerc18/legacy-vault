@@ -123,7 +123,19 @@ html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba
 .lv-side-bottom .lv-pop .material-symbols-outlined.text-secondary { color: rgb(var(--c-secondary)); }
 @media (min-width: 1024px) {
   .lv-side { position: fixed; z-index: 30; top: 0; left: 0; bottom: 0; width: 248px; overflow-y: auto; }
-  body.lv-has-side #root { padding-left: 248px; }
+  body.lv-has-side #root { padding-left: 248px; transition: padding-left .2s ease; }
+  .lv-side { transition: width .2s ease; }
+  /* Thu gọn: thanh hẹp chỉ còn icon */
+  body.lv-side-collapsed .lv-side { width: 76px; padding-left: 12px; padding-right: 12px; }
+  body.lv-side-collapsed.lv-has-side #root { padding-left: 76px; }
+  body.lv-side-collapsed .lv-label { display: none; }
+  body.lv-side-collapsed .lv-side-top { padding-left: 0; padding-right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  body.lv-side-collapsed .lv-side-nav a { position: relative; justify-content: center; padding-left: 0; padding-right: 0; }
+  body.lv-side-collapsed .lv-badge { position: absolute; top: 4px; right: 8px; margin: 0; }
+  body.lv-side-collapsed .lv-side-bottom { align-items: center; }
+  body.lv-side-collapsed .lv-side-tools,
+  body.lv-side-collapsed .lv-side-user { flex-direction: column; }
+  body.lv-side-collapsed .lv-side-user { gap: 8px; }
 }
 @media (max-width: 1023px) {
   .lv-side { position: sticky; top: 0; z-index: 30; gap: 6px; padding: 10px 14px; flex-direction: row; flex-wrap: wrap; align-items: center; }
