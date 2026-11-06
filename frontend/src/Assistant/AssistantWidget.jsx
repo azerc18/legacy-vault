@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
-import ChibiAvatar from './ChibiAvatar.jsx';
+// import ChibiAvatar from './ChibiAvatar.jsx';
 import ChatPanel, { WELCOME } from './ChatPanel.jsx';
 import { pickGreeting, pickTip } from './assistantLines.js';
+import ChibiAvatar from './ChibiAvatar3D.jsx';
 import './assistant.css';
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
