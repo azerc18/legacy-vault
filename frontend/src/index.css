@@ -136,6 +136,9 @@ html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba
   body.lv-side-collapsed .lv-side-tools,
   body.lv-side-collapsed .lv-side-user { flex-direction: column; }
   body.lv-side-collapsed .lv-side-user { gap: 8px; }
+  /* EN/VI xếp dọc cho vừa thanh hẹp */
+  body.lv-side-collapsed .lv-lang { flex-direction: column; height: auto; width: 44px; }
+  body.lv-side-collapsed .lv-lang button { height: 34px; width: 100%; padding: 0; }
 }
 @media (max-width: 1023px) {
   .lv-side { position: sticky; top: 0; z-index: 30; gap: 6px; padding: 10px 14px; flex-direction: row; flex-wrap: wrap; align-items: center; }

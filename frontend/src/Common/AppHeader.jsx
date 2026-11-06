@@ -181,7 +181,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     </Link>
                 )}
                 <div className="lv-side-tools flex items-center gap-2">
-                    <LanguageSwitch variant="dark" />
+                    <LanguageSwitch variant="dark" className="lv-lang" />
                     <ThemeToggle variant="dark" />
                     {extra}
                 </div>
