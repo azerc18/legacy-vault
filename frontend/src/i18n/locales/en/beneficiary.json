@@ -50,7 +50,7 @@
     "claimedAt": "You have already received this vault on {{date}}. Its content is no longer available.",
     "waived": "Your share of this vault was waived by an administrator. Its content is no longer available to you.",
     "declined": "You declined your share of this vault. Its content is no longer available to you.",
-    "declinedStalled": "Some of your assets could not be passed on because no other recipient is available ({{n}} in total).",
+    "declinedStalled": "Some assets ({{n}}) can't be received by anyone for now. This has been recorded and you don't need to do anything further.",
     "verified": "Verified. Your viewing session is valid until {{date}}."
   },
   "verify": {

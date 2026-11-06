@@ -50,7 +50,7 @@
     "claimedAt": "Bạn đã nhận két này vào {{date}}. Nội dung không còn khả dụng.",
     "waived": "Phần của bạn trong két này đã được quản trị viên miễn. Nội dung không còn khả dụng với bạn.",
     "declined": "Bạn đã từ chối phần của mình trong két này. Nội dung không còn khả dụng với bạn.",
-    "declinedStalled": "Một số tài sản của bạn chưa chuyển được vì không còn người nhận nào khác ({{n}} tài sản).",
+    "declinedStalled": "Một số tài sản ({{n}}) tạm thời chưa có ai nhận được. Việc này đã được ghi nhận, bạn không cần làm gì thêm.",
     "verified": "Đã xác minh. Phiên xem của bạn có hiệu lực đến {{date}}."
   },
   "verify": {
