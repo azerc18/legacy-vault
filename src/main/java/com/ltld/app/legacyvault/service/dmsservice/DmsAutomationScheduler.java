@@ -18,8 +18,9 @@ public class DmsAutomationScheduler {
 
     private final DmsAutomationService dmsAutomationService;
 
-    // Quét DMS quá hạn check-in (FR-07 bước 1-3).
-    @Scheduled(fixedDelayString = "${app.dms.trigger-scan-delay:PT1M}")
+    // Quét DMS quá hạn check-in (FR-07 bước 1-3). Mặc định 20 giây (trước là 1 phút) để Owner quá hạn
+    // được phát hiện gần như ngay, kể cả khi demo tua next_checkin_due_at bằng SQL. Đổi bằng app.dms.trigger-scan-delay.
+    @Scheduled(fixedDelayString = "${app.dms.trigger-scan-delay:PT20S}")
     public void processOverdueDms() {
         dmsAutomationService.processOverdueDms(LocalDateTime.now());
     }
