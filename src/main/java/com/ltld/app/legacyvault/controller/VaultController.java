@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
@@ -119,6 +120,19 @@ public class VaultController {
         UUID ownerId = UUID.fromString(principal.getName());
         vaultService.removeBeneficiary(ownerId, vaultId, beneficiaryId);
         return ResponseEntity.ok(ApiResponse.success("Beneficiary removed successfully"));
+    }
+
+    // Owner sửa tên / mối quan hệ của một người thụ hưởng
+    @PatchMapping("/{vaultId}/beneficiaries/{beneficiaryId}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<VaultBeneficiaryResponse>> updateBeneficiary(
+            Principal principal,
+            @PathVariable UUID vaultId,
+            @PathVariable UUID beneficiaryId,
+            @Valid @RequestBody UpdateBeneficiaryRequest request) {
+        UUID ownerId = UUID.fromString(principal.getName());
+        VaultBeneficiaryResponse response = vaultService.updateBeneficiary(ownerId, vaultId, beneficiaryId, request);
+        return ResponseEntity.ok(ApiResponse.success("Beneficiary updated successfully", response));
     }
 
     // FR-27: Owner xem danh sách Vault của mình

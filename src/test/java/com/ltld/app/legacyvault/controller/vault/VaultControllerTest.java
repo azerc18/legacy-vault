@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -283,5 +284,38 @@ public class VaultControllerTest {
                 .andExpect(jsonPath("$.message").value("Beneficiary removed successfully"));
 
         verify(vaultService).removeBeneficiary(ownerId, vaultId);
+    }
+
+    @Test
+    @DisplayName("PATCH beneficiaries/{id}: sửa tên + quan hệ → 200, trả dòng đã sửa")
+    void updateBeneficiary_ReturnsOk() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        UUID vaultId = UUID.randomUUID();
+        UUID beneficiaryId = UUID.randomUUID();
+        when(vaultService.updateBeneficiary(eq(ownerId), eq(vaultId), eq(beneficiaryId),
+                any(com.ltld.app.legacyvault.dto.vaultdto.UpdateBeneficiaryRequest.class)))
+                .thenReturn(new com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse(beneficiaryId,
+                        "a@test.com", "Tài", "Vợ",
+                        com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.PENDING_REGISTRATION));
+
+        mockMvc.perform(patch("/api/vaults/" + vaultId + "/beneficiaries/" + beneficiaryId)
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fullName\":\"Tài\",\"relationship\":\"Vợ\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fullName").value("Tài"))
+                .andExpect(jsonPath("$.data.relationship").value("Vợ"));
+    }
+
+    @Test
+    @DisplayName("PATCH beneficiaries/{id}: quan hệ dài hơn 50 ký tự → 400, không gọi service")
+    void updateBeneficiary_RelationshipTooLong_Returns400() throws Exception {
+        UUID ownerId = UUID.randomUUID();
+        mockMvc.perform(patch("/api/vaults/" + UUID.randomUUID() + "/beneficiaries/" + UUID.randomUUID())
+                        .principal(() -> ownerId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"relationship\":\"" + "x".repeat(51) + "\"}"))
+                .andExpect(status().isBadRequest());
+        verify(vaultService, never()).updateBeneficiary(any(), any(), any(), any());
     }
 }

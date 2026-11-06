@@ -412,7 +412,9 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
     const [form, setForm] = useState(emptyBeneficiaryForm);
     const [error, setError] = useState('');
     const [removing, setRemoving] = useState(null);   // beneficiary đang chờ xác nhận xoá
+    const [editing, setEditing] = useState(null);     // { id, fullName, relationship } đang sửa
     const [loading, setLoading] = useState(false);
+    const onlyOne = beneficiaries.length <= 1;          // BE chặn xoá người cuối cùng (LAST_BENEFICIARY)
 
     const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -450,6 +452,28 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
         }
     };
 
+    const startEdit = (b) => {
+        setError('');
+        setEditing({ id: b.id, fullName: b.fullName || '', relationship: b.relationship || '' });
+    };
+
+    const handleUpdate = async (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        try {
+            await ownerApi.updateBeneficiary(vaultId, editing.id, {
+                fullName: editing.fullName.trim() || null,
+                relationship: editing.relationship.trim() || null,
+            });
+            setEditing(null);
+            onSaved();
+        } catch (err) {
+            setError(getErrorMessage(err, t('detail.beneficiaries.errors.update')));
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <Card title={t('detail.beneficiaries.title', { count: beneficiaries.length })} icon="family_restroom">
             <Alert>{error}</Alert>
@@ -457,7 +481,34 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                 <p className="text-sm mb-4">{t('detail.beneficiaries.empty')}</p>
             ) : (
                 <ul className="mb-4 space-y-2">
-                    {beneficiaries.map((b) => (
+                    {beneficiaries.map((b) => (editing?.id === b.id ? (
+                        <li key={b.id} className="p-3 rounded-xl border border-primary/40">
+                            <form onSubmit={handleUpdate} className="space-y-3">
+                                <div className="text-sm">
+                                    <b className="break-all">{b.email}</b>
+                                    <div className="text-xs text-outline">{t('detail.beneficiaries.emailLocked')}</div>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    <input value={editing.fullName} maxLength={255} autoFocus
+                                           aria-label={t('detail.beneficiaries.fullNamePlaceholder')}
+                                           onChange={(e) => setEditing((f) => ({ ...f, fullName: e.target.value }))}
+                                           placeholder={t('detail.beneficiaries.fullNamePlaceholder')} className={inputClass} />
+                                    <input value={editing.relationship} maxLength={50}
+                                           aria-label={t('detail.beneficiaries.relationshipPlaceholder')}
+                                           onChange={(e) => setEditing((f) => ({ ...f, relationship: e.target.value }))}
+                                           placeholder={t('detail.beneficiaries.relationshipPlaceholder')} className={inputClass} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="submit" disabled={loading} className={btnPrimary}>
+                                        {loading ? t('ui.saving') : t('detail.beneficiaries.saveEdit')}
+                                    </button>
+                                    <button type="button" disabled={loading} onClick={() => setEditing(null)} className={btnOutline}>
+                                        {t('detail.beneficiaries.cancelEdit')}
+                                    </button>
+                                </div>
+                            </form>
+                        </li>
+                    ) : (
                         <li key={b.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-outline-variant/50">
                             <div className="text-sm min-w-0">
                                 <b className="break-all">{b.email}</b>
@@ -467,14 +518,32 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                                     {t(`detail.beneficiaries.status.${b.status}`, { defaultValue: humanize(b.status) })}
                                 </div>
                             </div>
-                            {editable && beneficiaries.length > 1 && (
-                                <button type="button" disabled={loading} onClick={() => setRemoving(b)}
-                                        className="text-sm text-error font-semibold shrink-0">
-                                    {t('ui.remove')}
-                                </button>
+                            {editable && (
+                                <div className="flex items-center gap-4 shrink-0">
+                                    <button type="button" disabled={loading || !!editing} onClick={() => startEdit(b)}
+                                            className="text-sm text-primary font-semibold disabled:opacity-50">
+                                        {t('ui.edit')}
+                                    </button>
+                                    {/* Chỉ còn 1 người: nút mờ, rê chuột / focus thì hiện lý do (dùng aria-disabled để tooltip vẫn hiện) */}
+                                    <span className="relative group inline-flex">
+                                        <button type="button"
+                                                aria-disabled={onlyOne || loading || undefined}
+                                                aria-describedby={onlyOne ? `last-bnf-${b.id}` : undefined}
+                                                onClick={() => { if (!onlyOne && !loading) setRemoving(b); }}
+                                                className={`text-sm text-error font-semibold ${onlyOne ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                                            {t('ui.remove')}
+                                        </button>
+                                        {onlyOne && (
+                                            <span id={`last-bnf-${b.id}`} role="tooltip"
+                                                  className="pointer-events-none absolute right-0 bottom-full mb-2 w-60 rounded-lg bg-on-surface text-background text-xs px-3 py-2 shadow-lg opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 z-10">
+                                                {t('detail.beneficiaries.lastOneHint')}
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
                             )}
                         </li>
-                    ))}
+                    )))}
                 </ul>
             )}
             {editable && (

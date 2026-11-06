@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.AssignBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.CreateVaultRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.UpdateVaultRequest;
+import com.ltld.app.legacyvault.dto.vaultdto.UpdateBeneficiaryRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultBeneficiaryResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.VaultResponse;
@@ -34,4 +35,6 @@ public interface VaultService {
 
     VaultBeneficiaryResponse addBeneficiary(UUID ownerId, UUID vaultId, AddBeneficiaryRequest request);
     void removeBeneficiary(UUID ownerId, UUID vaultId, UUID beneficiaryId);
+    VaultBeneficiaryResponse updateBeneficiary(UUID ownerId, UUID vaultId, UUID beneficiaryId,
+                                               UpdateBeneficiaryRequest request);
 }

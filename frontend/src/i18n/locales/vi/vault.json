@@ -196,9 +196,14 @@
       "addButton": "Thêm người thụ hưởng",
       "removeTitle": "Gỡ người thụ hưởng?",
       "removeMessage": "Gỡ {{email}} khỏi két sắt này? Họ sẽ nhận được thông báo.",
+      "saveEdit": "Lưu",
+      "cancelEdit": "Huỷ",
+      "emailLocked": "Không sửa được email. Muốn đổi email, hãy thêm người mới rồi gỡ người này.",
+      "lastOneHint": "Không thể gỡ người thụ hưởng cuối cùng. Hãy thêm người khác trước.",
       "errors": {
         "add": "Không thể thêm người thụ hưởng.",
-        "remove": "Không thể gỡ người thụ hưởng."
+        "remove": "Không thể gỡ người thụ hưởng.",
+        "update": "Không thể cập nhật người thụ hưởng."
       }
     },
     "documents": {

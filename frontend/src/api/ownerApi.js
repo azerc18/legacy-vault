@@ -72,6 +72,10 @@ export const ownerApi = {
     removeBeneficiaryById: (vaultId, beneficiaryId) =>
         http.delete(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`).then(changed),
 
+    // Owner sửa tên / mối quan hệ của 1 người thụ hưởng (email không sửa) -> { id, email, fullName, relationship, status }
+    updateBeneficiary: (vaultId, beneficiaryId, { fullName, relationship }) =>
+        http.patch(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`, { fullName, relationship }).then(unwrap).then(changed),
+
     // FR-04 & X5: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
     // documentGroupId (tùy chọn): gửi kèm để tạo phiên bản mới (v2, v3...) cho nhóm tài liệu đã có
