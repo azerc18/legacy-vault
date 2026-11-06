@@ -91,91 +91,11 @@ export default function Dashboard() {
         return () => io.disconnect();
     }, []);
 
-    // Tự khớp trang: vuốt qua ~30% phần kế bên rồi dừng thì tự trượt cho vừa khít phần đó
+    // Tự khớp trang: dùng scroll-snap gốc của trình duyệt (êm, không giành quyền cuộn)
     useEffect(() => {
-        const root = rootRef.current;
-        if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
-        const THRESHOLD = 0.3;
-        let timer = null;
-        let lastY = window.scrollY;
-        let dir = 1;
-        let touching = false;
-        let snapping = false;
-        let raf = 0;
-
-        const snap = () => {
-            if (touching) return;
-            const vh = window.innerHeight;
-            const head = root.querySelector('header');
-            const off = head ? head.offsetHeight : 0;
-            const y = window.scrollY + off; // mép trên vùng nhìn thấy (dưới navbar)
-            const view = vh - off;
-            const tops = Array.from(root.querySelectorAll('[data-mode]'))
-                .filter((el) => el.tagName !== 'DIV')
-                .map((el) => ({ top: el.getBoundingClientRect().top + window.scrollY, h: el.offsetHeight }));
-            let target = null;
-            if (dir > 0) {
-                const next = tops.find((s) => s.top > y + 8);
-                if (next && next.top - y < view * (1 - THRESHOLD)) target = next.top;
-            } else {
-                const cur = [...tops].reverse().find((s) => s.top < y - 8);
-                if (cur) {
-                    const curBottom = cur.top + cur.h;
-                    // phần trên đang hiện >=30% khung nhìn thì lùi về vừa khít phần đó
-                    if (y - curBottom < 0 && curBottom - y >= view * THRESHOLD) target = Math.max(cur.top, curBottom - view);
-                }
-            }
-            if (target === null) return;
-            glide(Math.max(0, target - off));
-        };
-
-        // Tự trượt bằng rAF (êm hơn smooth mặc định); người dùng chạm/cuộn là dừng ngay
-        const cancel = () => { if (raf) cancelAnimationFrame(raf); raf = 0; snapping = false; };
-        const glide = (to) => {
-            cancel();
-            const from = window.scrollY;
-            const dist = to - from;
-            if (Math.abs(dist) < 2) return;
-            const dur = Math.min(520, 280 + Math.abs(dist) * 0.25);
-            const t0 = performance.now();
-            snapping = true;
-            const step = (now) => {
-                const k = Math.min(1, (now - t0) / dur);
-                const e = 1 - Math.pow(1 - k, 3); // easeOutCubic
-                window.scrollTo(0, from + dist * e);
-                if (k < 1) raf = requestAnimationFrame(step);
-                else { raf = 0; snapping = false; lastY = window.scrollY; }
-            };
-            raf = requestAnimationFrame(step);
-        };
-
-        const onScroll = () => {
-            const y = window.scrollY;
-            if (snapping) { lastY = y; return; }
-            if (Math.abs(y - lastY) > 1) dir = y > lastY ? 1 : -1;
-            lastY = y;
-            clearTimeout(timer);
-            timer = setTimeout(snap, 220);
-        };
-        const down = () => { touching = true; cancel(); };
-        const up = () => { touching = false; clearTimeout(timer); timer = setTimeout(snap, 180); };
-
-        window.addEventListener('wheel', cancel, { passive: true });
-        window.addEventListener('keydown', cancel);
-        window.addEventListener('mousedown', cancel);
-        window.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('touchstart', down, { passive: true });
-        window.addEventListener('touchend', up, { passive: true });
-        return () => {
-            clearTimeout(timer);
-            cancel();
-            window.removeEventListener('wheel', cancel);
-            window.removeEventListener('keydown', cancel);
-            window.removeEventListener('mousedown', cancel);
-            window.removeEventListener('scroll', onScroll);
-            window.removeEventListener('touchstart', down);
-            window.removeEventListener('touchend', up);
-        };
+        const el = document.documentElement;
+        el.classList.add('lv-snap');
+        return () => el.classList.remove('lv-snap');
     }, []);
 
     // Đã đăng nhập -> vào thẳng trang chủ người dùng

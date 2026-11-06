@@ -168,3 +168,9 @@ html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba
 html.dark .bg-surface-container-lowest.rounded-2xl,
 html.dark .bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -18px rgba(0,0,0,.7); }
 table th { letter-spacing: .04em; }
+
+/* Landing: tự khớp từng phần khi cuộn (bật bằng class lv-snap trên <html>) */
+html.lv-snap { scroll-snap-type: y mandatory; scroll-padding-top: 64px; }
+html.lv-snap .lv-landing section[data-mode] { scroll-snap-align: start; }
+html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
+@media (prefers-reduced-motion: reduce) { html.lv-snap { scroll-snap-type: none; } }
