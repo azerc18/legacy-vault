@@ -3,7 +3,6 @@ import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
-import ThemeToggle from './Common/ThemeToggle.jsx';
 import BrandMark from './Common/BrandMark.jsx';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
@@ -79,6 +78,7 @@ export default function Dashboard() {
     const [openFaq, setOpenFaq] = useState(0);
     const [mode, setMode] = useState('dark');
     const rootRef = useRef(null);
+    const light = mode === 'light';
 
     // Nền đổi sáng/tối theo phần đang nằm giữa màn hình
     useEffect(() => {
@@ -95,24 +95,27 @@ export default function Dashboard() {
     if (getUser()) return <Navigate to="/home" replace />;
 
     return (
-        <div ref={rootRef} className="font-body-md text-on-surface antialiased min-h-screen relative">
+        <div ref={rootRef} className="lv-landing font-body-md text-on-surface antialiased min-h-screen relative">
             <div aria-hidden="true" className="lv-bg fixed inset-0 z-0" data-mode={mode} />
             {/* NAVBAR */}
-            <header className="sticky top-0 z-20 bg-brand/95 backdrop-blur border-b border-white/10 text-white">
+            <header className={`sticky top-0 z-20 backdrop-blur border-b transition-colors duration-500 ${light
+                ? 'bg-white/80 border-black/10 text-brand'
+                : 'bg-brand/95 border-white/10 text-white'}`}>
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
-                        <BrandMark className="h-[30px] w-[30px]" />LEGACYVAULT
+                        <span className={`rounded-lg transition-colors duration-500 ${light ? 'bg-brand p-[3px]' : 'p-[3px]'}`}>
+                            <BrandMark className="h-[30px] w-[30px]" />
+                        </span>LEGACYVAULT
                     </Link>
-                    <nav className="hidden md:flex gap-8 text-sm font-semibold text-white/75">
+                    <nav className={`hidden md:flex gap-8 text-sm font-semibold ${light ? 'text-brand/70' : 'text-white/75'}`}>
                         {NAV.map((n) => (
-                            <a key={n.href} href={n.href} className="hover:text-white">{t(`nav.${n.key}`)}</a>
+                            <a key={n.href} href={n.href} className={light ? 'hover:text-brand' : 'hover:text-white'}>{t(`nav.${n.key}`)}</a>
                         ))}
                     </nav>
                     <div className="flex items-center gap-3">
-                        <ThemeToggle variant="dark" />
-                        <LanguageSwitch variant="dark" />
-                        <Link to="/login" className="hidden sm:block text-sm font-semibold text-white/85 hover:text-white">{t('signIn')}</Link>
-                        <Link to="/register" className="h-10 px-5 rounded-full bg-white text-brand text-sm font-bold flex items-center hover:bg-white/85">
+                        <LanguageSwitch variant={light ? 'light' : 'dark'} />
+                        <Link to="/login" className={`hidden sm:block text-sm font-semibold ${light ? 'text-brand/80 hover:text-brand' : 'text-white/85 hover:text-white'}`}>{t('signIn')}</Link>
+                        <Link to="/register" className={`h-10 px-5 rounded-full text-sm font-bold flex items-center ${light ? 'bg-brand text-white hover:bg-brand-container' : 'bg-white text-brand hover:bg-white/85'}`}>
                             {t('getStarted')}
                         </Link>
                     </div>

@@ -1,7 +1,9 @@
 /* ===== Bảng màu (dùng trong tailwind.config ở index.html) =====
    Giá trị là "R G B" để Tailwind ghép được độ trong suốt: bg-primary/40.
    brand = nền thương hiệu luôn tối (sidebar, banner); primary đổi sang màu sáng khi nền tối. */
-:root {
+/* .lv-landing: trang chủ luôn dùng bảng màu sáng (nền đổi sáng/tối theo phần cuộn), kể cả khi cả app đang ở chế độ tối */
+:root,
+.lv-landing {
   --c-primary: 11 16 32;
   --c-on-primary: 255 255 255;
   --c-primary-container: 26 33 64;
