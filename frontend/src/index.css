@@ -190,5 +190,5 @@ html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: lv-sweep 9s ease-in-out infinite;
 }
-@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 66.667%, 100% { background-position: 0% 0, 0 0; } } /* chạy 6s, nghỉ 3s (vòng 9s) */
+@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 33.333%, 100% { background-position: 0% 0, 0 0; } } /* chạy 3s, nghỉ 6s (vòng 9s) */
 @media (prefers-reduced-motion: reduce) { .lv-wordmark { animation: none; } }
