@@ -11,7 +11,9 @@
   },
   "password": {
     "rules": { "length": "Từ 8 ký tự", "lower": "Chữ thường", "upper": "Chữ hoa", "digit": "Chữ số", "special": "Ký tự đặc biệt" },
-    "levels": ["Rất yếu", "Yếu", "Trung bình", "Mạnh", "Rất mạnh"]
+    "levels": ["Rất yếu", "Yếu", "Trung bình", "Mạnh", "Rất mạnh"],
+    "show": "Hiện mật khẩu",
+    "hide": "Ẩn mật khẩu"
   },
   "roles": {
     "OWNER": "Chủ di sản", "BENEFICIARY": "Người thụ hưởng", "EXECUTOR": "Người thi hành",

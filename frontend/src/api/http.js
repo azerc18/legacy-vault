@@ -35,7 +35,8 @@ http.interceptors.response.use(
             } catch {
                 clearAuth();
                 if (original.skipLoginRedirect) return Promise.reject(error);   // T1: trang công khai tự xử lý 401
-                window.location.href = '/login';
+                // Báo cho trang Login biết phiên đã hết hạn (hiện thông báo thay vì chuyển trang im lặng)
+                if (window.location.pathname !== '/login') window.location.href = '/login?expired=1';
             }
         }
         if (error.response?.data?.errorCode === 'PLAN_LIMIT_REACHED') {

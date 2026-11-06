@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
-import { getErrorMessage } from '../api/http.js';
+import { getErrorMessage, getErrorCode } from '../api/http.js';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import PasswordInput from '../Common/PasswordInput.jsx';
 
 const RESEND_SECONDS = 60;
 
@@ -44,6 +45,8 @@ export default function ResetPassword() {
             setInfo(t('reset.resent'));
             setCooldown(RESEND_SECONDS);
         } catch (err) {
+            const wait = err.response?.data?.data?.retryAfterSeconds;
+            if (getErrorCode(err) === 'TOO_MANY_OTP_REQUESTS' && wait) setCooldown(Number(wait));
             setError(getErrorMessage(err, t('reset.errors.resendFailed')));
         }
     };
@@ -115,7 +118,7 @@ export default function ResetPassword() {
                         <p className="text-sm text-on-surface-variant mb-6">{t('reset.subtitle')}</p>
 
                         {error && (
-                            <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
+                            <div role="alert" className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[18px]">error</span>
                                 {error}
                             </div>
@@ -129,9 +132,11 @@ export default function ResetPassword() {
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.email')}</label>
+                                <label htmlFor="reset-email" className="font-label-sm text-on-surface-variant font-semibold">{t('reset.email')}</label>
                                 <input
+                                    id="reset-email"
                                     type="email"
+                                    autoComplete="username"
                                     placeholder="name@example.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
@@ -141,7 +146,7 @@ export default function ResetPassword() {
 
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex justify-between items-center">
-                                    <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.otp')}</label>
+                                    <label htmlFor="reset-otp" className="font-label-sm text-on-surface-variant font-semibold">{t('reset.otp')}</label>
                                     <button
                                         type="button"
                                         onClick={handleResend}
@@ -152,8 +157,10 @@ export default function ResetPassword() {
                                     </button>
                                 </div>
                                 <input
+                                    id="reset-otp"
                                     type="text"
                                     inputMode="numeric"
+                                    autoComplete="one-time-code"
                                     maxLength={6}
                                     placeholder="______"
                                     value={otp}
@@ -163,24 +170,26 @@ export default function ResetPassword() {
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.newPassword')}</label>
-                                <input
-                                    type="password"
+                                <label htmlFor="reset-password" className="font-label-sm text-on-surface-variant font-semibold">{t('reset.newPassword')}</label>
+                                <PasswordInput
+                                    id="reset-password"
+                                    autoComplete="new-password"
                                     placeholder={t('reset.newPasswordPlaceholder')}
                                     value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    onChange={setPassword}
                                     className={inputClass}
                                 />
                                 <PasswordStrengthMeter password={password} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">
-                                <label className="font-label-sm text-on-surface-variant font-semibold">{t('reset.confirm')}</label>
-                                <input
-                                    type="password"
+                                <label htmlFor="reset-confirm" className="font-label-sm text-on-surface-variant font-semibold">{t('reset.confirm')}</label>
+                                <PasswordInput
+                                    id="reset-confirm"
+                                    autoComplete="new-password"
                                     placeholder={t('reset.confirmPlaceholder')}
                                     value={passwordConfirm}
-                                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                                    onChange={setPasswordConfirm}
                                     className={inputClass}
                                 />
                             </div>

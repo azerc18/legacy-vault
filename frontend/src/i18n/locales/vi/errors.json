@@ -12,7 +12,7 @@
   "DATA_CONFLICT": "Dữ liệu bị trùng hoặc xung đột với dữ liệu đã có.",
   "INVALID_CREDENTIALS": "Email hoặc mật khẩu không đúng.",
   "INVALID_REFRESH_TOKEN": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-  "ACCOUNT_LOCKED": "Tài khoản đã bị khoá. Vui lòng liên hệ hỗ trợ.",
+  "ACCOUNT_LOCKED": "Tài khoản đang bị tạm khoá. Thử lại sau ít phút hoặc liên hệ quản trị viên.",
   "ACCOUNT_NOT_ACTIVE": "Tài khoản chưa được kích hoạt. Vui lòng xác minh email.",
   "EMAIL_ALREADY_EXISTS": "Email này đã được đăng ký.",
   "OTP_INVALID": "Mã xác minh không đúng.",

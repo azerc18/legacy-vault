@@ -112,6 +112,7 @@ export default function AdminVaults() {
                             <Info label={t('vaults.detail.assetsDocs')} value={`${detail.totalAssets} / ${detail.totalDocuments}`} />
                             <Info label={t('vaults.cols.created')} value={formatDate(detail.createdAt, true)} />
                             <Info label={t('vaults.cols.updated')} value={formatDate(detail.updatedAt, true)} />
+                            <Info label={t('vaults.detail.unlockedAt')} value={formatDate(detail.unlockedAt, true)} />
                             <Info label={t('vaults.detail.deadline')} value={formatDate(detail.claimDeadlineAt, true)} />
                             <Info label={t('vaults.detail.extensionsUsed')} value={`${detail.claimExtensions ?? 0} / ${MAX_EXTENSIONS}`} />
                         </dl>

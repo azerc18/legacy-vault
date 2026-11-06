@@ -10,6 +10,13 @@ import EmptyState from "../Common/EmptyState.jsx";
 // <input type="datetime-local"> -> ISO string cho BE
 const toIso = (local) => (local ? new Date(local).toISOString() : undefined);
 
+// Nhóm mã hành động theo tiền tố (LOGIN_FAILED -> LOGIN) để dropdown ~100 mục dễ tìm
+const groupActions = (actions) => {
+    const groups = {};
+    [...actions].sort().forEach((a) => { (groups[a.split('_')[0]] ??= []).push(a); });
+    return Object.entries(groups).sort(([x], [y]) => x.localeCompare(y));
+};
+
 const RESULT_CLS = {
     SUCCESS: 'bg-success-container text-on-success-container',
     FAILURE: 'bg-error-container text-on-error-container',
@@ -58,7 +65,11 @@ export default function AdminAuditLogs() {
             <form onSubmit={search} className="grid gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-[200px_1fr_160px_190px_190px_auto]">
                 <select value={filters.action} onChange={set('action')} className={inputClass}>
                     <option value="">{t('audit.allActions')}</option>
-                    {actions.map((a) => <option key={a} value={a}>{a}</option>)}
+                    {groupActions(actions).map(([group, items]) => (
+                        <optgroup key={group} label={group}>
+                            {items.map((a) => <option key={a} value={a}>{a}</option>)}
+                        </optgroup>
+                    ))}
                 </select>
                 <input value={filters.actorEmail} onChange={set('actorEmail')} placeholder={t('audit.actorEmail')} className={inputClass} />
                 <input value={filters.ip} onChange={set('ip')} placeholder={t('audit.ip')} className={inputClass} />

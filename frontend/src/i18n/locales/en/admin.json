@@ -25,7 +25,8 @@
     "actions": {
       "grant": "Make {{role}}", "revoke": "Remove {{role}}",
       "lock": "Lock account", "unlock": "Unlock account",
-      "suspend": "Suspend DMS", "resume": "Resume DMS", "rescue": "Assign executor"
+      "suspend": "Suspend DMS", "resume": "Resume DMS", "rescue": "Assign executor",
+      "rolesMenu": "Roles…"
     },
     "success": {
       "lock": "{{email}} has been locked.",
@@ -91,6 +92,7 @@
       "assetsDocs": "Assets / documents",
       "deadline": "Claim deadline",
       "extensionsUsed": "Extensions used",
+      "unlockedAt": "Unlocked at",
       "maxReached": "The claim period has already been extended {{max}} times.",
       "auditNote": "Viewing a vault as admin is recorded in the audit log."
     },
@@ -132,7 +134,7 @@
     "ackError": "Could not acknowledge alert.",
     "acknowledgedMsg": "Alert acknowledged.",
     "empty": {
-      "openTitle": "All clear", "openText": "Failed notifications and stuck hand-overs will show up here.",
+      "openTitle": "All clear", "openText": "Repeated failed sign-ins, reused refresh tokens, mass downloads and new ADMIN grants will show up here.",
       "ackTitle": "No acknowledged alerts yet", "ackText": "Alerts you acknowledge will be listed here."
     },
     "severity": { "HIGH": "HIGH", "MEDIUM": "MEDIUM" },

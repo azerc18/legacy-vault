@@ -11,7 +11,9 @@
   },
   "password": {
     "rules": { "length": "8+ characters", "lower": "Lowercase letter", "upper": "Uppercase letter", "digit": "Number", "special": "Special character" },
-    "levels": ["Very weak", "Weak", "Medium", "Strong", "Very strong"]
+    "levels": ["Very weak", "Weak", "Medium", "Strong", "Very strong"],
+    "show": "Show password",
+    "hide": "Hide password"
   },
   "roles": {
     "OWNER": "Vault Owner", "BENEFICIARY": "Beneficiary", "EXECUTOR": "Executor",
