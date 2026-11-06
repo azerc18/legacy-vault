@@ -75,6 +75,10 @@
     "addBeneficiary": "Add beneficiary",
     "assetsTitle": "Assets ({{count}})",
     "assetItem": "Asset {{index}}",
+    "assetTypeLabel": "Asset type",
+    "secretHint": "Encrypted before it is stored. Beneficiaries can only see it after the vault is released.",
+    "assetsPartial": "The vault was created, but {{count}} asset(s) could not be saved. Open the vault to add them again.",
+    "openVault": "Open vault",
     "assetNamePlaceholder": "Asset name (e.g. Vietcombank)",
     "secretPlaceholder": "Secret (password, seed phrase, account number...)",
     "notesPlaceholder": "Notes for the beneficiary (optional)",
@@ -328,6 +332,38 @@
       "title": "Title",
       "description": "Description",
       "secret": "Secret"
+    },
+    "sections": {
+      "sealed": "Sealed section",
+      "sealedHint": "Encrypted before it is stored. Only released to beneficiaries when the vault is handed over."
+    },
+    "examples": {
+      "institutionName": "e.g. Vietcombank",
+      "accountNumber": "e.g. 0071000123456",
+      "branchName": "e.g. District 7 branch, HCMC",
+      "estimatedValue": "e.g. 150000000",
+      "legalInstruction": "e.g. Bring the death certificate and the inheritance dossier to the branch to close the account.",
+      "accountId": "e.g. 12345678",
+      "documentTitle": "e.g. Apartment land-use certificate",
+      "issuer": "e.g. District 7 People's Committee",
+      "location": "e.g. Home safe, top shelf",
+      "walletProvider": "e.g. Ledger Nano X",
+      "walletAddress": "e.g. 0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+      "seedPhrase": "12 or 24 words separated by spaces",
+      "usernameOrHandle": "e.g. nguyenvanan",
+      "deviceOrSimLocation": "e.g. Office desk drawer",
+      "title": "e.g. Website hosting account",
+      "description": "e.g. Renews every March."
+    },
+    "hints": {
+      "accountNumber": "6 to 19 digits, no spaces.",
+      "estimatedValue": "Only to give beneficiaries an idea; it does not need to be exact.",
+      "walletAddress": "Letters and digits only, 20 to 100 characters.",
+      "seedPhrase": "Keep the words in the right order.",
+      "wish": "Your Executor will follow this choice.",
+      "location": "The original is needed for the legal claim.",
+      "twoFactorRecoveryCodes": "Paste all recovery codes separated by spaces.",
+      "pinOrPasswordNote": "You can write a hint instead of the real password."
     },
     "keepCurrentPlaceholder": "Leave empty to keep current",
     "errors": {
