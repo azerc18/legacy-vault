@@ -188,7 +188,7 @@ html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
   background-position: 100% 0, 0 0;
   background-repeat: no-repeat;
   -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: lv-sweep 11s ease-in-out infinite;
+  animation: lv-sweep 8s ease-in-out infinite;
 }
-@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 70%, 100% { background-position: 0% 0, 0 0; } }
+@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 62.5%, 100% { background-position: 0% 0, 0 0; } } /* 62.5% của 8s = chạy 5s, nghỉ 3s */
 @media (prefers-reduced-motion: reduce) { .lv-wordmark { animation: none; } }
