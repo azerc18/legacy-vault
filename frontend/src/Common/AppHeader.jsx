@@ -125,7 +125,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
     const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-xl text-[15px] font-semibold whitespace-nowrap transition-colors';
     return (
         <header className="lv-side bg-brand text-white">
-            <div className="lv-side-top">
+            <div className="lv-side-top lg:flex lg:items-center lg:justify-between lg:gap-2">
                 <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
                     <BrandMark className="h-[30px] w-[30px] shrink-0" />
                     <span className="min-w-0 lv-label">
@@ -140,7 +140,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                         aria-label={collapsed ? t('header.expandSidebar', 'Expand sidebar') : t('header.collapseSidebar', 'Collapse sidebar')}
                         aria-expanded={!collapsed}
                         className="lv-side-toggle hidden lg:flex h-8 w-8 rounded-full items-center justify-center text-white/70 hover:text-white hover:bg-white/10">
-                    <Icon name={collapsed ? 'chevron_right' : 'chevron_left'} className="text-[20px]" />
+                    <Icon name={collapsed ? 'left_panel_open' : 'left_panel_close'} className="text-[22px]" />
                 </button>
             </div>
 
