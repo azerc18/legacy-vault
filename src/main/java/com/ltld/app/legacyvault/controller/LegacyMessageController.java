@@ -89,7 +89,7 @@ public class LegacyMessageController {
     }
 
     @PutMapping(value = "/api/vaults/{vaultId}/messages/{messageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('VAULT_UPDATE')")
+    @PreAuthorize("hasAuthority('VAULT_CREATE') or hasAuthority('VAULT_UPDATE')")
     public ResponseEntity<ApiResponse<LegacyMessageResponse>> updateMessage(
             Principal principal,
             @PathVariable UUID vaultId,
