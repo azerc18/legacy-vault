@@ -53,14 +53,13 @@ export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 
 /**
- * @param icon       icon trong ô logo (mặc định khiên)
  * @param workspace  dòng nhỏ dưới chữ LegacyVault, vd. "Administration"
  * @param home       logo dẫn về đâu
  * @param nav        [{ to, label, icon, badge }] — badge là số, > 0 thì hiện chấm đỏ
  * @param extra      phần tử thêm bên phải, trước avatar (vd. NotificationBell)
  * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
  */
-export default function AppHeader({ icon = 'shield_locked', workspace, home = '/home', nav: navProp, extra, userHome = false }) {
+export default function AppHeader({ workspace, home = '/home', nav: navProp, extra, userHome = false }) {
     const { pathname } = useLocation();
     const { t } = useTranslation();
     const user = getUser();

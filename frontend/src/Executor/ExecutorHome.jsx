@@ -166,7 +166,7 @@ export default function ExecutorHome() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader icon="badge" workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
+            <AppHeader workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 <div className="mb-8 rounded-3xl bg-brand text-white px-8 py-9 lv-rise"

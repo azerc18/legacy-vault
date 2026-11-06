@@ -95,7 +95,7 @@ export default function VerifierHome() {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             {/* Top bar */}
-            <AppHeader icon="verified_user" workspace={t('portal')} home="/verifier/home" userHome={hasOtherRoles}/>
+            <AppHeader workspace={t('portal')} home="/verifier/home" userHome={hasOtherRoles}/>
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
