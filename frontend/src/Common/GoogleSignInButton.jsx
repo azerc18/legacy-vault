@@ -111,6 +111,9 @@ export default function GoogleSignInButton({ onCredential, text = 'signin_with',
             {failed
                 ? <p className="text-xs text-center text-outline">{t('google.unavailable')}</p>
                 : <div ref={boxRef}
+                    // Iframe của Google luôn là "light"; trang đang "dark" thì Chrome tô nền iframe màu trắng.
+                    // Đặt vùng chứa về light để khớp -> nền iframe trong suốt.
+                       style={{ colorScheme: 'light' }}
                        className={`w-full flex justify-center min-h-[44px] ${disabled ? 'pointer-events-none opacity-60' : ''}`}
                        aria-busy={disabled} />}
         </div>
