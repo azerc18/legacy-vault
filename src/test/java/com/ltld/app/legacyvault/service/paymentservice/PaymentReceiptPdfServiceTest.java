@@ -19,7 +19,7 @@ class PaymentReceiptPdfServiceTest {
     private static PaymentReceiptData sample(String fullName, String bankCode) {
         return new PaymentReceiptData("LV-20261107-1A2B3C4D", UUID.randomUUID(), fullName, "owner@example.com",
                 "VIP_YEAR", "VIP Yearly", 365, 990_000L, "14512345", bankCode,
-                LocalDateTime.of(2026, 11, 7, 9, 55), LocalDateTime.of(2026, 11, 7, 10, 0), LocalDateTime.now());
+                LocalDateTime.of(2026, 11, 7, 9, 55), LocalDateTime.of(2026, 11, 7, 10, 0), LocalDateTime.of(2026, 11, 7, 10, 0));
     }
 
     private static String text(byte[] pdf) throws Exception {
@@ -37,7 +37,7 @@ class PaymentReceiptPdfServiceTest {
         assertThat(new String(pdf, 0, 5, StandardCharsets.US_ASCII)).isEqualTo("%PDF-");
         String text = text(pdf);
         assertThat(text).contains("BIÊN LAI THANH TOÁN", "LV-20261107-1A2B3C4D", "Nguyễn Văn Ông",
-                "owner@example.com", "VIP Yearly", "365 ngày", "990.000", "14512345", "NCB",
+                "owner@example.com", "VIP Yearly", "365 ngày", "990.000 ₫", "14512345", "NCB",
                 "07/11/2026 10:00", "GTGT");
     }
 

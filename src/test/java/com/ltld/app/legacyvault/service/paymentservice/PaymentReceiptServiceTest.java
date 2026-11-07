@@ -62,7 +62,7 @@ class PaymentReceiptServiceTest {
         assertThat(data.durationDays()).isEqualTo(30);
         assertThat(data.amountVnd()).isEqualTo(99_000L);
         assertThat(data.vnpTransactionNo()).isEqualTo("14512345");
-        assertThat(data.issuedAt()).isNotNull();
+        assertThat(data.issuedAt()).isEqualTo(LocalDateTime.of(2026, 11, 7, 10, 0));
     }
 
     @Test

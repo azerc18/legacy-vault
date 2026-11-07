@@ -54,7 +54,8 @@ public class PaymentReceiptService {
                 tx.getVnpBankCode(),
                 tx.getCreatedAt(),
                 tx.getPaidAt(),
-                LocalDateTime.now());
+                // Ngày lập = lúc thanh toán (không dùng now()) để mỗi lần tải lại biên lai vẫn y hệt
+                tx.getPaidAt() != null ? tx.getPaidAt() : tx.getCreatedAt());
     }
 
     /** Số biên lai ổn định cho mỗi giao dịch: LV-{ngày thanh toán}-{8 ký tự đầu của id}, vd. LV-20261107-1A2B3C4D. */

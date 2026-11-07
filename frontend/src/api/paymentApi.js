@@ -29,7 +29,8 @@ export const paymentApi = {
             a.href = href;
             a.download = fileNameFrom(res, 'bien-lai.pdf');
             a.click();
-            URL.revokeObjectURL(href);
+            // Safari có thể huỷ tải nếu thu hồi URL ngay sau click
+            setTimeout(() => URL.revokeObjectURL(href), 1000);
         } catch (err) {
             const blob = err.response?.data;
             if (blob instanceof Blob) {
