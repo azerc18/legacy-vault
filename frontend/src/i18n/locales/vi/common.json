@@ -1,5 +1,5 @@
 {
-  "header": { "userHome": "Trang người dùng", "logout": "Đăng xuất" },
+  "header": { "collapseSidebar": "Thu gọn thanh bên", "expandSidebar": "Mở rộng thanh bên", "userHome": "Trang người dùng", "logout": "Đăng xuất" },
   "nav": {"home": "Trang chủ", "profile": "Hồ sơ", "estates": "Di sản", "requests": "Yêu cầu", "history": "Lịch sử", "myVaults": "Két sắt của tôi", "guide": "Hướng dẫn", "dms": "Dead Man's Switch", "executors": "Người thi hành", "activity": "Nhật ký hoạt động", "billing": "Gói thuê bao & VIP", "admin": "Quản trị"},
   "actions": { "back": "Quay lại", "save": "Lưu", "cancel": "Huỷ", "confirm": "Xác nhận", "retry": "Thử lại" },
   "notifications": { "title": "Thông báo", "empty": "Chưa có thông báo nào." },

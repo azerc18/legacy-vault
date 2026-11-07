@@ -13,6 +13,7 @@ import BrandMark from './BrandMark.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
+const SIDE_KEY = 'lv_side_collapsed';
 // Menu mặc định khi trang không tự truyền nav: theo khu vực của URL, còn /me và /home thì theo vai trò chính của user
 const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
 function roleItems(role) {
@@ -115,30 +116,47 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
         return () => document.body.classList.remove('lv-has-side');
     }, []);
 
+    // Thu gọn thanh bên (chỉ desktop): còn icon. Nhớ trạng thái để đổi trang / tải lại không bị mở ra lại
+    const [collapsed, setCollapsed] = useState(() => {
+        try { return localStorage.getItem(SIDE_KEY) === '1'; } catch { return false; }
+    });
+    useEffect(() => {
+        try { localStorage.setItem(SIDE_KEY, collapsed ? '1' : '0'); } catch { /* bỏ qua */ }
+        document.body.classList.toggle('lv-side-collapsed', collapsed);
+        return () => document.body.classList.remove('lv-side-collapsed');
+    }, [collapsed]);
+
     const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-xl text-[15px] font-semibold whitespace-nowrap transition-colors';
     return (
         <header className="lv-side bg-brand text-white">
-            <div className="lv-side-top">
+            <div className="lv-side-top lg:flex lg:items-center lg:justify-between lg:gap-2">
                 <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
-                    <BrandMark className="h-[30px] w-[30px]" />
-                    <span className="min-w-0">
+                    <BrandMark className="h-[30px] w-[30px] shrink-0" />
+                    <span className="min-w-0 lv-label">
                         <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
                         {workspace && (
                             <span className="text-[11px] text-white/60 font-semibold tracking-wide uppercase block truncate">{workspace}</span>
                         )}
                     </span>
                 </Link>
+                <button type="button" onClick={() => setCollapsed((c) => !c)}
+                        title={collapsed ? t('header.expandSidebar', 'Expand sidebar') : t('header.collapseSidebar', 'Collapse sidebar')}
+                        aria-label={collapsed ? t('header.expandSidebar', 'Expand sidebar') : t('header.collapseSidebar', 'Collapse sidebar')}
+                        aria-expanded={!collapsed}
+                        className="lv-side-toggle hidden lg:flex h-8 w-8 rounded-full items-center justify-center text-white/70 hover:text-white hover:bg-white/10">
+                    <Icon name={collapsed ? 'left_panel_open' : 'left_panel_close'} className="text-[22px]" />
+                </button>
             </div>
 
             {nav?.length > 0 && (
                 <nav className="lv-side-nav">
                     {nav.map((n) => (
-                        <NavLink key={n.to} to={n.to} end={n.end}
+                        <NavLink key={n.to} to={n.to} end={n.end} title={n.label}
                                  className={({ isActive }) =>
                                      `${linkBase} ${isActive ? 'bg-brand-container text-white' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
-                            <Icon name={n.icon} className="text-[20px]" /> {n.label}
+                            <Icon name={n.icon} className="text-[20px]" /> <span className="lv-label">{n.label}</span>
                             {n.badge > 0 && (
-                                <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
+                                <span className="lv-badge ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
                                     {n.badge}
                                 </span>
                             )}
@@ -157,24 +175,24 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                         }`}
                     >
                         <Icon name="workspace_premium" className="text-[16px]" />
-                        <span>{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
+                        <span className="lv-label">{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
                     </Link>
                 )}
                 {userHome && (
                     <Link to="/home" title={t('header.userHome')}
                           className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold text-white/75 hover:text-white hover:bg-white/10">
-                        <Icon name="swap_horiz" className="text-[16px]" /><span>{t('header.userHome')}</span>
+                        <Icon name="swap_horiz" className="text-[16px]" /><span className="lv-label">{t('header.userHome')}</span>
                     </Link>
                 )}
-                <div className="flex items-center gap-2">
-                    <LanguageSwitch variant="dark" />
+                <div className="lv-side-tools flex items-center gap-2">
+                    <LanguageSwitch variant="dark" className="lv-lang" />
                     <ThemeToggle variant="dark" />
                     {extra}
                 </div>
-                <div className="flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
+                <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
                     <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1">
                         <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                        <span className="text-sm font-semibold text-white truncate">{user?.name}</span>
+                        <span className="lv-label text-sm font-semibold text-white truncate">{user?.name}</span>
                     </Link>
                     <button type="button" onClick={handleLogout} title={t('header.logout')} aria-label={t('header.logout')}
                             className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10">
