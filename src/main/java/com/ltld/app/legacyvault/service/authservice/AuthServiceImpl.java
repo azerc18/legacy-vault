@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.RevokedReason;
@@ -78,6 +79,7 @@ public class AuthServiceImpl implements AuthService{
                 .email(email)
                 .fullName(request.getFullName())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .preferredLanguage(AppLanguage.fromTag(request.getLanguage()))
                 .roles(new HashSet<>(Set.of(defaultRole, beneficiaryRole)))
                 .build());
 

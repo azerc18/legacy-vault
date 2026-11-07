@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.entity;
 
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.KycLevel;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import jakarta.persistence.*;
@@ -63,6 +64,11 @@ public class User {
 
     @Column(name = "locked_until")
     private Instant lockedUntil;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "preferred_language", nullable = false, length = 5)
+    private AppLanguage preferredLanguage = AppLanguage.DEFAULT;
 
     @Column(name = "avatar_path")
     private String avatarPath;

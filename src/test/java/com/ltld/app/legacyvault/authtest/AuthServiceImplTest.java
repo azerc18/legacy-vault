@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.TokenType;
@@ -164,6 +165,26 @@ public class AuthServiceImplTest {
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         assertThat(captor.getValue().getEmail()).isEqualTo("test@example.com");
+    }
+
+    @Test
+    void register_savesRequestedLanguage_andDefaultsToVietnamese() {
+        when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
+        when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RegisterRequest english = validRegisterRequest();
+        english.setLanguage("en");
+        authService.register(english);
+        RegisterRequest unspecified = validRegisterRequest();
+        authService.register(unspecified);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getPreferredLanguage()).isEqualTo(AppLanguage.EN);
+        assertThat(captor.getAllValues().get(1).getPreferredLanguage()).isEqualTo(AppLanguage.VI);
     }
 
     @Test
