@@ -65,10 +65,14 @@
       "plan": "Plan",
       "amount": "Amount",
       "status": "Status",
-      "ref": "VNPay Ref"
+      "ref": "VNPay Ref",
+      "receipt": "Receipt",
+      "downloadReceipt": "Download receipt",
+      "downloading": "Downloading..."
     },
     "errors": {
-      "loadFailed": "Could not load billing information."
+      "loadFailed": "Could not load billing information.",
+      "receiptFailed": "Could not download the receipt."
     }
   },
   "result": {
