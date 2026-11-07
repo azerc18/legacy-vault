@@ -37,3 +37,9 @@ build/
 
 ### Uploads ###
 uploads/
+
+### File cấu hình công cụ AI trên máy (không commit) ###
+.mcp.json
+CLAUDE.md
+AGENTS.md
+.codex/
