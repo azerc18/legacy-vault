@@ -1,9 +1,11 @@
 // Vaulty: chú cú gác đêm đeo kính một mắt, ôm cuốn sổ (nhân vật gốc của LegacyVault)
 // Giữ các class chibi-body / chibi-arm-r / chibi-eyes / chibi-mouth / chibi-antenna để assistant.css điều khiển animation
 export default function ChibiAvatar({ action = 'idle', mini = false }) {
+    // mini: idle -> still (đứng yên); live / talk / think -> có hiệu ứng (xem assistant.css)
+    const miniAction = action === 'idle' ? 'still' : action;
     return (
         <svg viewBox={mini ? '20 4 80 80' : '0 0 120 140'}
-             className={mini ? 'chibi-mini' : `chibi chibi--${action}`}
+             className={mini ? `chibi-mini chibi-mini--${miniAction}` : `chibi chibi--${action}`}
              aria-hidden="true">
             <ellipse cx="60" cy="134" rx="30" ry="5" fill="#000" opacity=".12" />
 

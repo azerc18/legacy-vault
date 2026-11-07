@@ -10,10 +10,13 @@ import './assistant.css';
 const PUBLIC_PATHS = ['/', '/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 const TIP_INTERVAL_MS = 45_000;
 const GREETED_KEY = 'lv_greeted';
+const COSTUME_KEY = (id) => `lv_owl_costume_${id}`;   // trang phục lưu theo từng user
 
 // sessionStorage có thể bị chặn (chế độ riêng tư) -> bọc try/catch
 const readGreeted = () => { try { return sessionStorage.getItem(GREETED_KEY); } catch { return null; } };
 const writeGreeted = (v) => { try { sessionStorage.setItem(GREETED_KEY, v); } catch { /* bỏ qua */ } };
+const readCostume = (id) => { try { return localStorage.getItem(COSTUME_KEY(id)) || 'none'; } catch { return 'none'; } };
+const writeCostume = (id, v) => { try { localStorage.setItem(COSTUME_KEY(id), v); } catch { /* bỏ qua */ } };
 
 export default function AssistantWidget() {
     const { pathname } = useLocation();
@@ -27,6 +30,8 @@ export default function AssistantWidget() {
     const [action, setAction] = useState('idle');
     const [bubble, setBubble] = useState(null);
     const [messages, setMessages] = useState([WELCOME]);
+    const [thinking, setThinking] = useState(false);   // đang chờ Vaulty trả lời
+    const [costume, setCostume] = useState('none');
 
     const bubbleTimer = useRef(null);
     const actionTimer = useRef(null);
@@ -81,6 +86,18 @@ export default function AssistantWidget() {
         setOpen(false);
     }, [userId]);
 
+    // Nạp trang phục đã lưu của user
+    useEffect(() => {
+        if (userId) setCostume(readCostume(userId));
+    }, [userId]);
+
+    const changeCostume = (id) => {
+        if (id === costume) return;
+        setCostume(id);
+        writeCostume(userId, id);
+        play('jump', 600);
+    };
+
     const toggle = () => {
         clearTimeout(bubbleTimer.current);
         bubbleRef.current = null;
@@ -99,7 +116,10 @@ export default function AssistantWidget() {
                         messages={messages}
                         setMessages={setMessages}
                         onClose={() => setOpen(false)}
-                        onReply={() => play('talk', 1500)}
+                        onReply={(ms) => play('talk', ms || 1500)}
+                        onThinking={setThinking}
+                        costume={costume}
+                        onCostumeChange={changeCostume}
                     />
                 </div>
             )}
@@ -117,7 +137,7 @@ export default function AssistantWidget() {
 
             <button type="button" onClick={toggle} aria-label={open ? 'Close assistant' : 'Open assistant'}
                     className="pointer-events-auto rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <ChibiAvatar action={action} />
+                <ChibiAvatar action={thinking ? 'think' : action} costume={costume} />
             </button>
         </div>
     );
