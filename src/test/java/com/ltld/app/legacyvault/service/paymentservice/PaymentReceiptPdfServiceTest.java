@@ -40,7 +40,8 @@ class PaymentReceiptPdfServiceTest {
         assertThat(text).contains("HÓA ĐƠN GIÁ TRỊ GIA TĂNG", "C26TLV", "0000042", "LV-20261107-1A2B3C4D",
                 "Nguyễn Văn Ông", "owner@example.com", "VIP Yearly", "365 ngày",
                 "900.000 ₫", "90.000 ₫", "990.000 ₫", "Chín trăm chín mươi nghìn đồng chẵn",
-                "14512345", "NCB", "07/11/2026 10:00", "MÔ PHỎNG", "giả lập");
+                "14512345", "NCB", "07/11/2026 10:00", "MÔ PHỎNG", "giả lập",
+                "VAT INVOICE", "Subtotal", "VAT rate", "In words", "SIMULATED INVOICE");
         assertThat(new PdfReader(pdf).getNumberOfPages()).isEqualTo(1);
     }
 
