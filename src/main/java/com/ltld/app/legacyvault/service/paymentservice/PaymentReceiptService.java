@@ -25,6 +25,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PaymentReceiptService {
 
+    // Hiện chỉ có VNPay; khi có thêm cổng khác thì suy ra từ provider của giao dịch
+    private static final String PAYMENT_METHOD_VNPAY = "VNPay";
     private static final DateTimeFormatter RECEIPT_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -41,6 +43,11 @@ public class PaymentReceiptService {
 
         User user = tx.getUser();
         SubscriptionPlan plan = tx.getPlan();
+        // Ngày lập = lúc thanh toán (không dùng now()) để mỗi lần tải lại hoá đơn vẫn y hệt
+        LocalDateTime issuedAt = tx.getPaidAt() != null ? tx.getPaidAt() : tx.getCreatedAt();
+        // Số hoá đơn mô phỏng = thứ tự của giao dịch trong các giao dịch SUCCESS (ổn định, không cần cột mới)
+        long invoiceNumber = Math.max(1L, paymentTransactionRepository
+                .countByStatusAndPaidAtLessThanEqual(PaymentStatus.SUCCESS, issuedAt));
         return new PaymentReceiptData(
                 receiptNo(tx),
                 tx.getId(),
@@ -54,8 +61,9 @@ public class PaymentReceiptService {
                 tx.getVnpBankCode(),
                 tx.getCreatedAt(),
                 tx.getPaidAt(),
-                // Ngày lập = lúc thanh toán (không dùng now()) để mỗi lần tải lại biên lai vẫn y hệt
-                tx.getPaidAt() != null ? tx.getPaidAt() : tx.getCreatedAt());
+                issuedAt,
+                invoiceNumber,
+                PAYMENT_METHOD_VNPAY);
     }
 
     /** Số biên lai ổn định cho mỗi giao dịch: LV-{ngày thanh toán}-{8 ký tự đầu của id}, vd. LV-20261107-1A2B3C4D. */
