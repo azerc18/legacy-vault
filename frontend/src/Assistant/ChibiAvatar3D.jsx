@@ -37,6 +37,7 @@ export const COSTUMES = [
     { id: 'fox', label: 'Fox', emoji: '🦊' },
     { id: 'soccer', label: 'Soccer', emoji: '⚽' },
     { id: 'cyber', label: 'Cyber', emoji: '🎧' },
+    { id: 'fpt', label: 'FPT', emoji: '🏫' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -669,6 +670,134 @@ function buildOwl() {
             k.cape('#1A1230', { bottom: 1.4 });
             k.ring(k.body, { R: 0.95, tube: 0.13, y: 0.38, sz: 0.98, color: dark });
             k.ring(k.body, { R: 0.99, tube: 0.035, y: 0.47, sz: 0.98, color: neon });
+        },
+        fpt(k) {
+            const ORANGE = '#F26B1D', CREAM = '#F6F1E8', NAVY = '#1F2A55', BLACK = '#1E1F26';
+            // --- tiện ích vẽ chữ/logo bằng canvas ---
+            const canvasTex = (w, hh, draw) => {
+                const cv = document.createElement('canvas');
+                cv.width = w; cv.height = hh;
+                draw(cv.getContext('2d'), w, hh);
+                const t = new THREE.CanvasTexture(cv);
+                t.colorSpace = THREE.SRGBColorSpace;
+                return t;
+            };
+            const plane = (w, hh, map) => new THREE.Mesh(
+                new THREE.PlaneGeometry(w, hh),
+                new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+            );
+            const logoTex = canvasTex(384, 160, (g) => {
+                g.scale(2, 2);
+                [['F', '#2D5FA8'], ['P', ORANGE], ['T', '#3AA33C']].forEach(([ch, col], i) => {
+                    g.fillStyle = col;
+                    g.fillRect(8 + i * 60, 8, 56, 64);
+                    g.fillStyle = '#FFFFFF';
+                    g.font = 'bold 46px sans-serif';
+                    g.textAlign = 'center';
+                    g.textBaseline = 'middle';
+                    g.fillText(ch, 36 + i * 60, 42);
+                });
+            });
+            const bookTex = canvasTex(256, 110, (g) => {
+                g.fillStyle = '#FFFFFF';
+                g.textAlign = 'center';
+                g.textBaseline = 'middle';
+                g.font = 'bold 56px sans-serif';
+                g.fillText('FPT', 128, 30);
+                g.font = 'bold 34px sans-serif';
+                g.fillText('UNIVERSITY', 128, 80);
+            });
+            const flagTex = canvasTex(256, 150, (g) => {
+                g.fillStyle = ORANGE;
+                g.beginPath();
+                g.moveTo(0, 0); g.lineTo(256, 0); g.lineTo(256, 150); g.lineTo(0, 150); g.lineTo(34, 75);
+                g.closePath();
+                g.fill();
+                g.fillStyle = '#FFFFFF';
+                g.textAlign = 'center';
+                g.textBaseline = 'middle';
+                g.font = 'bold 60px sans-serif';
+                g.fillText('FPT', 150, 52);
+                g.font = 'bold 32px sans-serif';
+                g.fillText('UNIVERSITY', 150, 102);
+            });
+
+            // --- nón lưỡi trai trắng, lưỡi cam, xoay lệch sang trái ---
+            const cap = new THREE.Group();
+            cap.position.set(...k.h(0, 1.97, 0.05));
+            k.head.add(cap);
+            cap.add(k.mk(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), CREAM, { s: [0.8, 0.58, 0.82] }));
+            cap.add(k.mk(k.sphere, ORANGE, { s: [0.5, 0.04, 0.56], p: [0, -0.02, 0.84], r: [0.2, 0, 0] }));
+            cap.add(k.mk(k.sphere, CREAM, { s: [0.46, 0.035, 0.5], p: [0, 0.015, 0.84], r: [0.2, 0, 0], outline: false }));
+            cap.add(k.mk(k.box, ORANGE, { s: [0.58, 0.16, 0.07], p: [0, 0.1, -0.78], outline: false }));
+            const capLogo = plane(0.64, 0.27, logoTex);
+            capLogo.position.set(0, 0.3, 0.8);
+            capLogo.rotation.x = -0.25;
+            cap.add(capLogo);
+            k.sway(cap, 'z', 0.02, 1.4);
+
+            // --- áo polo cam ---
+            k.tint('body', ORANGE); k.tint('belly', '#F47F2B'); k.tint('feet', '#F7F3EA');
+            k.ring(k.body, { R: 0.95, tube: 0.1, y: 0.38, sz: 0.98, color: ORANGE });
+            [-1, 1].forEach((sx) => k.body.add(k.mk(k.box, ORANGE, {
+                s: [0.3, 0.22, 0.06], p: [sx * 0.3, 0.38, 0.98], r: [0, -sx * 0.2, -sx * 0.45],
+            })));
+            k.wing.add(k.mk(k.sphere, ORANGE, { s: [0.24, 0.27, 0.42], p: [0.1, -0.12, 0] }));
+            k.body.add(k.mk(k.sphere, ORANGE, { s: [0.25, 0.27, 0.4], p: [-0.96, 0.5, 0.14] }));
+            const chestLogo = plane(0.2, 0.085, logoTex);
+            chestLogo.position.set(0.5, 0.12, 0.93);
+            chestLogo.rotation.y = 0.25;
+            k.body.add(chestLogo);
+
+            // --- dây đeo + thẻ sinh viên ---
+            const strap = (x1, y1, x2, y2) => {
+                const dx = x2 - x1, dy = y2 - y1;
+                k.body.add(k.mk(k.box, NAVY, {
+                    s: [0.04, Math.hypot(dx, dy), 0.02], p: [(x1 + x2) / 2, (y1 + y2) / 2, 0.99],
+                    r: [0, 0, Math.atan2(-dx, dy)], outline: false,
+                }));
+            };
+            strap(-0.22, 0.4, 0.38, -0.15);
+            strap(0.3, 0.4, 0.38, -0.15);
+            k.body.add(k.mk(k.box, '#F4F4F6', { s: [0.28, 0.36, 0.04], p: [0.38, -0.38, 1.0] }));
+            k.body.add(k.mk(k.box, '#B49A7C', { s: [0.22, 0.06, 0.02], p: [0.38, -0.5, 1.03], outline: false }));
+            const badgeLogo = plane(0.16, 0.07, logoTex);
+            badgeLogo.position.set(0.38, -0.33, 1.03);
+            k.body.add(badgeLogo);
+
+            // --- quần túi hộp đen + giày trắng mũi cam ---
+            k.body.add(k.mk(new THREE.CylinderGeometry(0.94, 0.52, 0.55, 24), BLACK, { p: [0, -0.68, 0], s: [1, 1, 0.93] }));
+            k.body.add(k.mk(k.box, BLACK, { s: [0.12, 0.3, 0.28], p: [0.88, -0.68, 0.25] }));
+            [-1, 1].forEach((sx) => k.body.add(k.mk(k.sphere, ORANGE, { s: [0.2, 0.08, 0.2], p: [sx * 0.38, -1.08, 0.66], outline: false })));
+
+            // --- balo đen sau lưng (lộ ra hai bên) ---
+            k.body.add(k.mk(k.sphere, BLACK, { s: [1.05, 1.05, 0.6], p: [-0.2, -0.05, -0.8] }));
+            k.body.add(k.mk(k.sphere, '#2B2D38', { s: [0.4, 0.5, 0.3], p: [-1.15, -0.4, -0.45] }));
+            const bagLogo = plane(0.3, 0.13, logoTex);
+            bagLogo.position.set(-1.2, -0.38, -0.18);
+            bagLogo.rotation.y = -0.9;
+            k.body.add(bagLogo);
+            [-1, 1].forEach((sx) => k.body.add(k.mk(k.box, BLACK, {
+                s: [0.14, 0.7, 0.07], p: [sx * 0.6, 0.05, 0.74], r: [0, 0, sx * 0.1], outline: false,
+            })));
+
+            // --- chữ "FPT UNIVERSITY" trên bìa sách xanh có sẵn ---
+            const bookText = plane(0.7, 0.3, bookTex);
+            bookText.position.set(-0.26, -0.62, 1.185);
+            bookText.rotation.z = 0.1;
+            k.body.add(bookText);
+
+            // --- cờ FPT University cắm sau lưng bên trái ---
+            const flagPole = new THREE.Group();
+            flagPole.position.set(-1.15, 0.2, -0.6);
+            flagPole.rotation.z = 0.06;
+            k.body.add(flagPole);
+            flagPole.add(k.mk(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 8), '#555A6B', { outline: false }));
+            flagPole.add(k.mk(k.sphere, '#555A6B', { s: [0.06, 0.06, 0.06], p: [0, 1.2, 0], outline: false }));
+            const flag = plane(0.85, 0.5, flagTex);
+            flag.position.set(-0.43, 0.88, 0);
+            flagPole.add(flag);
+            k.sway(flagPole, 'y', 0.25, 2.6);
         },
     };
 
