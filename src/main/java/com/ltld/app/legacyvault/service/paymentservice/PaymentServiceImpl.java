@@ -87,7 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
         tx = paymentTransactionRepository.save(tx);
 
-        String orderInfo = "Upgrade LegacyVault " + plan.getCode() + " - " + tx.getId();
+        String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
         String paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress);
 
         return CheckoutResponse.builder()
@@ -321,14 +321,7 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private static UUID parseTxnRef(String txnRef) {
-        if (txnRef == null || txnRef.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(txnRef.trim());
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
+        return VnpayClient.parseTxnRef(txnRef);
     }
 
     private long parseVnpAmountVnd(String rawAmount) {
