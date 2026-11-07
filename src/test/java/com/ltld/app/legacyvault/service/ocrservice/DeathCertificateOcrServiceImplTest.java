@@ -4,6 +4,9 @@ import com.ltld.app.legacyvault.dto.ocrdto.DeathCertificateOcrResponseDto;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAccessGuard;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
@@ -22,6 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +41,8 @@ class DeathCertificateOcrServiceImplTest {
     private FileStorageService fileStorageService;
     @Mock
     private CryptoService cryptoService;
+    @Mock
+    private AuditLogService auditLogService;
 
     private DeathCertificateOcrServiceImpl ocrService;
 
@@ -47,74 +55,134 @@ class DeathCertificateOcrServiceImplTest {
                 validator,
                 fileStorageService,
                 cryptoService,
-                new ObjectMapper()
+                new ObjectMapper(),
+                auditLogService
         );
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");
         ReflectionTestUtils.setField(ocrService, "model", "gemini-3.6-flash");
+        ReflectionTestUtils.setField(ocrService, "demoScenariosEnabled", false);
     }
 
     @Test
-    void analyzeForExecutor_returnsMatchedFallbackResult_forValidPdf() {
+    void analyzeForExecutor_returnsUnavailableWithoutFakeData_whenAiDisabledAndDemoFlagFalse() {
         UUID assignmentId = UUID.randomUUID();
+        UUID executorId = UUID.randomUUID();
         User owner = new User();
         owner.setFullName("Trần Long Vân");
+        User executor = new User();
+        executor.setId(executorId);
+
         ExecutorAssignment assignment = new ExecutorAssignment();
         assignment.setId(assignmentId);
         assignment.setOwner(owner);
+        assignment.setExecutorUser(executor);
 
         when(executorAccessGuard.requireActiveAssignment(assignmentId, "executor@example.com"))
                 .thenReturn(assignment);
 
         byte[] pdfBytes = "%PDF-1.4 sample death certificate".getBytes(StandardCharsets.UTF_8);
         MockMultipartFile file = new MockMultipartFile(
-                "file", "trich_luc_khai_tu.pdf", "application/pdf", pdfBytes);
-
-        DeathCertificateOcrResponseDto result =
-                ocrService.analyzeForExecutor(assignmentId, "executor@example.com", file);
-
-        assertThat(result).isNotNull();
-        assertThat(result.isOwnerNameMatched()).isTrue();
-        assertThat(result.getExpectedOwnerName()).isEqualTo("Trần Long Vân");
-        assertThat(result.getDeceasedFullName()).isEqualToIgnoringCase("TRẦN LONG VÂN");
-        assertThat(result.isHasOfficialSeal()).isTrue();
-        assertThat(result.getConfidenceScore()).isGreaterThanOrEqualTo(95);
-        assertThat(result.getImageQualityScore()).isGreaterThanOrEqualTo(90);
-        assertThat(result.getDetectedHeaderTitle()).contains("TRÍCH LỤC KHAI TỬ");
-        assertThat(result.getDeathProofRelevancePercent()).isGreaterThanOrEqualTo(95);
-        assertThat(result.getExecutorSuggestion()).contains("Tài liệu rõ nét");
-        assertThat(result.getVerifierSuggestion()).contains("Gợi ý cho Verifier");
-        assertThat(result.getSummaryNote()).contains("Khớp với Chủ két");
-        assertThat(result.getWarnings()).isEmpty();
-    }
-
-    @Test
-    void analyzeForExecutor_detectsNameMismatch_whenMismatchFilenameProvided() {
-        UUID assignmentId = UUID.randomUUID();
-        User owner = new User();
-        owner.setFullName("Trần Long Vân");
-        ExecutorAssignment assignment = new ExecutorAssignment();
-        assignment.setId(assignmentId);
-        assignment.setOwner(owner);
-
-        when(executorAccessGuard.requireActiveAssignment(assignmentId, "executor@example.com"))
-                .thenReturn(assignment);
-
-        byte[] pdfBytes = "%PDF-1.4 mismatch certificate".getBytes(StandardCharsets.UTF_8);
-        MockMultipartFile file = new MockMultipartFile(
                 "file", "giay_chung_tu_sai_ten.pdf", "application/pdf", pdfBytes);
 
         DeathCertificateOcrResponseDto result =
                 ocrService.analyzeForExecutor(assignmentId, "executor@example.com", file);
 
+        assertThat(result).isNotNull();
+        assertThat(result.getEngineSource()).isEqualTo("UNAVAILABLE");
+        assertThat(result.getUnavailableMessage()).contains("Chưa phân tích được bằng AI");
         assertThat(result.isOwnerNameMatched()).isFalse();
-        assertThat(result.getDeathProofRelevancePercent()).isLessThanOrEqualTo(20);
-        assertThat(result.getWarnings()).isNotEmpty();
-        assertThat(result.getSummaryNote()).contains("Không khớp với tên Chủ két");
+        assertThat(result.isHasOfficialSeal()).isFalse();
+        assertThat(result.getDeceasedFullName()).isNull();
+        assertThat(result.getCertificateNumber()).isNull();
+        assertThat(result.getIdNumber()).isNull();
+        assertThat(result.getConfidenceScore()).isNull();
+        assertThat(result.getImageQualityScore()).isNull();
+        assertThat(result.getSummaryNote()).isNull();
+
+        verify(auditLogService).log(
+                eq(AuditAction.LEGAL_DOCUMENT_OCR_ANALYZED),
+                eq(AuditResult.FAILURE),
+                eq(executorId),
+                eq("executor@example.com"),
+                eq("ExecutorAssignment"),
+                eq(assignmentId.toString()),
+                eq("engine=UNAVAILABLE")
+        );
     }
 
     @Test
-    void analyzeForExecutor_evaluatesBlurryAndRelatedDocuments_withAdvisorySuggestions() {
+    void parseGeminiJson_leavesMissingFieldsNull_andNeverFakesOwnerMatchOrSeal() throws Exception {
+        String partialGeminiJson = """
+                {
+                  "documentCategory": "SOMETHING_INVALID",
+                  "deceasedFullName": null,
+                  "certificateNumber": "",
+                  "idNumber": "unknown"
+                }
+                """;
+
+        DeathCertificateOcrResponseDto result =
+                ocrService.parseGeminiJson(partialGeminiJson, "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo("GEMINI_VISION_AI");
+        assertThat(result.getDocumentCategory()).isEqualTo("UNRELATED_DOCUMENT");
+        assertThat(result.getDeceasedFullName()).isNull();
+        assertThat(result.isOwnerNameMatched()).isFalse();
+        assertThat(result.isHasOfficialSeal()).isFalse();
+        assertThat(result.getCertificateNumber()).isNull();
+        assertThat(result.getIdNumber()).isNull();
+        assertThat(result.getIssuingAuthority()).isNull();
+        assertThat(result.getImageQualityScore()).isNull();
+        assertThat(result.getDeathProofRelevancePercent()).isEqualTo(0);
+        assertThat(result.getSummaryNote()).isNull();
+    }
+
+    @Test
+    void parseGeminiJson_parsesValidDeathCertificate_andDetectsInternalCccdBirthYearMismatch() throws Exception {
+        String validJsonWithForgedBirthYear = """
+                {
+                  "documentCategory": "VALID_DEATH_CERTIFICATE",
+                  "documentType": "Trích lục khai tử (Bản sao)",
+                  "detectedHeaderTitle": "TRÍCH LỤC KHAI TỬ (BẢN SAO)",
+                  "imageQualityScore": 94,
+                  "deathProofRelevancePercent": 95,
+                  "certificateNumber": "319/TLKT-BS",
+                  "deceasedFullName": "TRẦN LONG VÂN",
+                  "dateOfBirth": "18/04/1975",
+                  "gender": "Nam",
+                  "idNumber": "079065004812",
+                  "dateOfDeath": "02/11/2026",
+                  "issuingAuthority": "UBND Phường Bến Nghé",
+                  "hasOfficialSeal": true
+                }
+                """;
+
+        DeathCertificateOcrResponseDto result =
+                ocrService.parseGeminiJson(validJsonWithForgedBirthYear, "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo("GEMINI_VISION_AI");
+        assertThat(result.isOwnerNameMatched()).isTrue();
+        assertThat(result.isHasOfficialSeal()).isTrue();
+        assertThat(result.getSuggestedRejectionCode()).isEqualTo("SUSPECTED_FORGERY");
+        assertThat(result.getDeathProofRelevancePercent()).isLessThanOrEqualTo(38);
+        assertThat(result.getWarnings()).anyMatch(w -> w.contains("MÂU THUẪN NỘI TẠI"));
+        assertThat(result.getSummaryNote()).doesNotContain("100%");
+    }
+
+    @Test
+    void isNameMatching_requiresExactNormalizedFullName_andRejectsPartialSubstring() {
+        assertThat(DeathCertificateOcrServiceImpl.isNameMatching("TRẦN LONG VÂN", "Trần Long Vân")).isTrue();
+        assertThat(DeathCertificateOcrServiceImpl.isNameMatching("  Tran   Long Van ", "Trần Long Vân")).isTrue();
+        assertThat(DeathCertificateOcrServiceImpl.isNameMatching("Văn An", "Trần Văn An")).isFalse();
+        assertThat(DeathCertificateOcrServiceImpl.isNameMatching("Trần Văn An", "Văn An")).isFalse();
+        assertThat(DeathCertificateOcrServiceImpl.isNameMatching("Long Vân", "Trần Long Vân")).isFalse();
+    }
+
+    @Test
+    void analyzeForExecutor_usesDemoSimulationOnlyWhenDemoFlagExplicitlyEnabled() {
+        ReflectionTestUtils.setField(ocrService, "demoScenariosEnabled", true);
+
         UUID assignmentId = UUID.randomUUID();
         User owner = new User();
         owner.setFullName("Trần Long Vân");
@@ -132,33 +200,13 @@ class DeathCertificateOcrServiceImplTest {
         DeathCertificateOcrResponseDto blurryResult =
                 ocrService.analyzeForExecutor(assignmentId, "executor@example.com", blurryFile);
 
+        assertThat(blurryResult.getEngineSource()).isEqualTo("DEMO_SIMULATION");
         assertThat(blurryResult.getImageQualityScore()).isLessThan(60);
         assertThat(blurryResult.getSuggestedRejectionCode()).isEqualTo("DOCUMENT_UNREADABLE");
-
-        MockMultipartFile relatedFile = new MockMultipartFile(
-                "file", "giay_bao_tu_benh_vien.pdf", "application/pdf", pdfBytes);
-
-        DeathCertificateOcrResponseDto relatedResult =
-                ocrService.analyzeForExecutor(assignmentId, "executor@example.com", relatedFile);
-
-        assertThat(relatedResult.getDocumentCategory()).isEqualTo("RELATED_SUPPORTING_DOCUMENT");
-        assertThat(relatedResult.getDeathProofRelevancePercent()).isBetween(65, 85);
-
-        MockMultipartFile forgedSmallDetailFile = new MockMultipartFile(
-                "file", "giay_chung_tu_gia_mao_nam_sinh.pdf", "application/pdf", pdfBytes);
-
-        DeathCertificateOcrResponseDto forgedResult =
-                ocrService.analyzeForExecutor(assignmentId, "executor@example.com", forgedSmallDetailFile);
-
-        assertThat(forgedResult.isOwnerNameMatched()).isTrue();
-        assertThat(forgedResult.getImageQualityScore()).isGreaterThanOrEqualTo(90);
-        assertThat(forgedResult.getSuggestedRejectionCode()).isEqualTo("SUSPECTED_FORGERY");
-        assertThat(forgedResult.getDeathProofRelevancePercent()).isLessThanOrEqualTo(40);
-        assertThat(forgedResult.getWarnings()).anyMatch(w -> w.contains("MÂU THUẪN NỘI TẠI"));
     }
 
     @Test
-    void analyzeForVerifier_decryptsAndAnalyzesStoredDocument() throws Exception {
+    void analyzeForVerifier_decryptsAndAuditsWithoutExposingEncryptedPathAsFilename() throws Exception {
         UUID requestId = UUID.randomUUID();
         UUID verifierId = UUID.randomUUID();
         User owner = new User();
@@ -167,19 +215,27 @@ class DeathCertificateOcrServiceImplTest {
         LegalVerificationRequest request = new LegalVerificationRequest();
         request.setId(requestId);
         request.setOwner(owner);
-        request.setDeathCertificateFileUrlEncrypted("enc/cert-01.bin");
+        request.setDeathCertificateFileUrlEncrypted("enc/giay_chung_tu_sai_ten.bin");
 
         byte[] encrypted = new byte[]{1, 2, 3, 4};
         byte[] decrypted = "%PDF-1.4 decrypted cert".getBytes(StandardCharsets.UTF_8);
 
         when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(request);
-        when(fileStorageService.readFile("enc/cert-01.bin")).thenReturn(encrypted);
+        when(fileStorageService.readFile("enc/giay_chung_tu_sai_ten.bin")).thenReturn(encrypted);
         when(cryptoService.decryptBytes(encrypted)).thenReturn(decrypted);
 
         DeathCertificateOcrResponseDto result = ocrService.analyzeForVerifier(requestId, verifierId);
 
-        assertThat(result.isOwnerNameMatched()).isTrue();
+        assertThat(result.getEngineSource()).isEqualTo("UNAVAILABLE");
         assertThat(result.getExpectedOwnerName()).isEqualTo("Nguyễn Thị Mai");
-        assertThat(result.getCertificateNumber()).endsWith("/TLKT-BS");
+        verify(auditLogService).log(
+                eq(AuditAction.LEGAL_DOCUMENT_OCR_ANALYZED),
+                eq(AuditResult.FAILURE),
+                eq(verifierId),
+                isNull(),
+                eq("LegalVerificationRequest"),
+                eq(requestId.toString()),
+                eq("engine=UNAVAILABLE")
+        );
     }
 }

@@ -362,10 +362,12 @@ export default function VerificationRequestDetail() {
                                             disabled={busy || viewing || ocrLoading}
                                             className="h-11 px-5 rounded-xl border border-primary/40 bg-primary/10 text-primary font-semibold hover:bg-primary/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
+                                            <span className={`material-symbols-outlined text-[20px] ${ocrLoading ? 'animate-spin' : ''}`}>
+                                                {ocrLoading ? 'progress_activity' : 'auto_awesome'}
+                                            </span>
                                             {ocrLoading
-                                                ? t('detail.ocrScanning', 'Đang phân tích AI OCR...')
-                                                : t('detail.ocrDocument', '✨ Phân tích & Đối chiếu AI (OCR)')}
+                                                ? t('detail.ocrScanning')
+                                                : t('detail.ocrDocument')}
                                         </button>
                                     </div>
                                 )}
@@ -386,13 +388,18 @@ export default function VerificationRequestDetail() {
                                             disabled={busy || viewing || ocrLoading}
                                             className="h-11 px-5 rounded-xl border border-primary/40 bg-primary/10 text-primary font-semibold hover:bg-primary/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                                         >
-                                            <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
+                                            <span className={`material-symbols-outlined text-[20px] ${ocrLoading ? 'animate-spin' : ''}`}>
+                                                {ocrLoading ? 'progress_activity' : 'auto_awesome'}
+                                            </span>
                                             {ocrLoading
-                                                ? t('detail.ocrScanning', 'Đang phân tích AI OCR...')
-                                                : t('detail.ocrDocument', '✨ Phân tích & Đối chiếu AI (OCR)')}
+                                                ? t('detail.ocrScanning')
+                                                : t('detail.ocrDocument')}
                                         </button>
                                     </div>
                                 )}
+                                <p className="text-xs text-on-surface-variant">
+                                    {t('detail.ocrPrivacyHint')}
+                                </p>
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">{t('detail.noCertificate')}</p>

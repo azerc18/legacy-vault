@@ -7,13 +7,50 @@ export default function OcrAnalysisCard({
     onApplyNote,
     onSuggestRejectReason,
 }) {
-    const { i18n } = useTranslation();
+    const ns = role === 'verifier' ? 'verifier' : 'executor';
+    const { t } = useTranslation(ns);
     if (!data) return null;
 
-    const isVi = (i18n?.language || 'vi').startsWith('vi');
+    const engineSource = data.engineSource || 'UNAVAILABLE';
+
+    if (engineSource === 'UNAVAILABLE') {
+        return (
+            <div
+                data-testid="ocr-analysis-card"
+                className="mt-4 rounded-xl border border-amber-500/60 bg-amber-50/70 dark:bg-amber-950/30 p-4 shadow-sm"
+            >
+                <div
+                    data-testid="ocr-unavailable-banner"
+                    className="flex items-start gap-3 text-amber-950 dark:text-amber-200"
+                >
+                    <span className="material-symbols-outlined text-amber-600 text-2xl shrink-0">
+                        warning
+                    </span>
+                    <div className="space-y-1 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold">
+                                {data.unavailableMessage || t('ocr.unavailableTitle')}
+                            </p>
+                            <span
+                                data-testid="ocr-engine-source"
+                                className="inline-flex items-center gap-1 rounded-full bg-amber-200/80 dark:bg-amber-900/60 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 dark:text-amber-200"
+                            >
+                                {t('ocr.sourceLabel')}: {t('ocr.sourceUnavailable')}
+                            </span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant">
+                            {t('ocr.unavailableHint')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const unreadableText = t('ocr.unreadable');
     const matched = Boolean(data.ownerNameMatched);
     const hasSeal = Boolean(data.hasOfficialSeal);
-    const category = data.documentCategory || 'VALID_DEATH_CERTIFICATE';
+    const category = data.documentCategory || 'UNRELATED_DOCUMENT';
     const isRelatedDoc = category === 'RELATED_SUPPORTING_DOCUMENT';
     const isUnrelatedDoc = category === 'UNRELATED_DOCUMENT';
     const isValidCert = category === 'VALID_DEATH_CERTIFICATE';
@@ -21,158 +58,98 @@ export default function OcrAnalysisCard({
     const isFullyValid = isValidCert && matched && !isSuspectedForgery;
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
 
-    const imageQualityScore = typeof data.imageQualityScore === 'number' ? data.imageQualityScore : 96;
-    const deathProofPercent = typeof data.deathProofRelevancePercent === 'number' ? data.deathProofRelevancePercent : (matched ? 98 : 15);
+    const imageQualityScore = typeof data.imageQualityScore === 'number' ? data.imageQualityScore : null;
+    const deathProofPercent = typeof data.deathProofRelevancePercent === 'number' ? data.deathProofRelevancePercent : null;
+    const confidenceScore = typeof data.confidenceScore === 'number' ? data.confidenceScore : null;
+
     const roleSuggestion = role === 'verifier'
         ? (data.verifierSuggestion || data.executorSuggestion)
         : (data.executorSuggestion || data.verifierSuggestion);
 
-    const labels = isVi ? {
-        title: 'Kết quả bóc tách & Cố vấn thẩm định AI (OCR Pháp lý)',
-        advisoryTag: 'Trợ lý AI Cố vấn — Chỉ gợi ý tham khảo, quyết định cuối cùng thuộc về bạn',
-        confidence: 'Điểm tổng hợp AI',
-        matchedBadge: 'Khớp 100% Chủ két & Đúng mẫu',
-        relatedBadge: 'Tài liệu liên quan — Chưa phải Trích lục khai tử',
-        unrelatedBadge: 'Tài liệu không hợp lệ',
-        mismatchBadge: 'Cảnh báo: Sai lệch họ tên Chủ két',
-        evalSectionTitle: '4 Tiêu chí Đánh giá Chuyên sâu của AI',
-        imageQualityTitle: '1. Chất lượng ảnh & Độ rõ nét',
-        headerTitleLabel: '2. Tiêu đề bên trong tài liệu',
-        deathProofTitle: '3. Mức độ chứng minh sự qua đời',
-        suggestionTitle: role === 'verifier'
-            ? '4. Gợi ý tham khảo cho Thẩm định viên (Legal Verifier)'
-            : '4. Gợi ý tham khảo cho Người chấp hành (Executor)',
-        docType: 'Phân loại văn bản',
-        certNo: 'Số hiệu văn bản / Trích lục',
-        bookNo: 'Số vào sổ / Hồ sơ',
-        deceasedName: 'Họ và tên trên tài liệu',
-        expectedOwner: 'Họ và tên Chủ két (hệ thống)',
-        dobGender: 'Ngày sinh / Giới tính',
-        idNumber: 'Số CCCD / Định danh',
-        deathTime: 'Thời điểm tử vong / Sự kiện',
-        deathPlace: 'Địa điểm ghi nhận',
-        causeOfDeath: 'Nguyên nhân / Nội dung chính',
-        issuingAuthority: 'Cơ quan cấp',
-        issueDateSigner: 'Ngày cấp & Người ký',
-        officialSeal: 'Con dấu pháp nhân',
-        sealValid: 'Đã nhận diện dấu đỏ hợp lệ',
-        sealMissing: 'Chưa nhận diện rõ dấu đỏ',
-        warningsTitle: 'Lưu ý & Phân tích chi tiết từ AI',
-        applyNoteBtn: 'Chèn tóm tắt gợi ý AI vào Ghi chú nộp hồ sơ',
-        suggestRejectBtn: 'Áp dụng nhanh lý do từ chối gợi ý vào biểu mẫu (Tùy chọn)',
-    } : {
-        title: 'AI Legal OCR Extraction & Advisory Assessment',
-        advisoryTag: 'AI Advisory Assistant — Suggestions only, final decision is yours',
-        confidence: 'Overall AI Score',
-        matchedBadge: '100% Owner Match & Valid Form',
-        relatedBadge: 'Related Document — Not an Official Death Certificate',
-        unrelatedBadge: 'Invalid Document Type',
-        mismatchBadge: 'Warning: Owner Name Mismatch',
-        evalSectionTitle: '4 In-Depth AI Assessment Criteria',
-        imageQualityTitle: '1. Image Quality & Clarity',
-        headerTitleLabel: '2. Internal Document Header / Title',
-        deathProofTitle: '3. Death Proof Relevance (%)',
-        suggestionTitle: role === 'verifier'
-            ? '4. Advisory Suggestion for Legal Verifier'
-            : '4. Advisory Suggestion for Executor',
-        docType: 'Document Classification',
-        certNo: 'Certificate / Document No.',
-        bookNo: 'Registry / Dossier No.',
-        deceasedName: 'Full Name (Extracted)',
-        expectedOwner: 'Vault Owner Name (System)',
-        dobGender: 'Date of Birth / Gender',
-        idNumber: 'National ID Number',
-        deathTime: 'Date & Time of Death / Event',
-        deathPlace: 'Recorded Location',
-        causeOfDeath: 'Cause of Death / Summary',
-        issuingAuthority: 'Issuing Authority',
-        issueDateSigner: 'Issue Date & Signer',
-        officialSeal: 'Official Red Seal',
-        sealValid: 'Valid official seal detected',
-        sealMissing: 'Official seal unclear/missing',
-        warningsTitle: 'Detailed AI Notes & Warnings',
-        applyNoteBtn: 'Insert AI summary into submission notes',
-        suggestRejectBtn: 'Pre-select suggested rejection reason (Optional)',
-    };
+    const isDemoSource = engineSource === 'DEMO_SIMULATION';
+    const sourceBadgeText = isDemoSource ? t('ocr.sourceDemo') : t('ocr.sourceGemini');
 
-    let badgeText = labels.matchedBadge;
+    let badgeText = t('ocr.matchedBadge');
     let badgeClass = 'bg-emerald-600 text-white';
     let badgeIcon = 'verified';
     let containerClass = 'border-emerald-500/40 bg-emerald-50/40 dark:bg-emerald-950/20';
 
     if (!matched) {
-        badgeText = labels.mismatchBadge;
+        badgeText = t('ocr.mismatchBadge');
         badgeClass = 'bg-red-600 text-white';
         badgeIcon = 'warning';
         containerClass = 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20';
     } else if (isSuspectedForgery) {
-        badgeText = isVi
-            ? 'Cảnh báo: Đúng tên nhưng Mâu thuẫn Năm sinh ↔ CCCD'
-            : 'Warning: Name Matches but DOB ↔ ID Mismatch';
+        badgeText = t('ocr.forgeryBadge');
         badgeClass = 'bg-red-600 text-white';
         badgeIcon = 'gpp_maybe';
         containerClass = 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20';
-    } else if (isRelatedDoc || imageQualityScore < 65) {
-        badgeText = isRelatedDoc ? labels.relatedBadge : (isVi ? 'Cảnh báo: Ảnh mờ / khó đọc' : 'Warning: Blurry / Low Clarity');
+    } else if (isRelatedDoc || (imageQualityScore !== null && imageQualityScore < 65)) {
+        badgeText = isRelatedDoc ? t('ocr.relatedBadge') : t('ocr.blurryBadge');
         badgeClass = 'bg-amber-600 text-white';
         badgeIcon = 'info';
         containerClass = 'border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20';
     } else if (isUnrelatedDoc) {
-        badgeText = labels.unrelatedBadge;
+        badgeText = t('ocr.unrelatedBadge');
         badgeClass = 'bg-red-600 text-white';
         badgeIcon = 'cancel';
         containerClass = 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20';
     }
 
     const scoreBarColor = (score) => {
+        if (score === null) return 'bg-outline-variant';
         if (score >= 85) return 'bg-emerald-600';
         if (score >= 65) return 'bg-amber-500';
         return 'bg-red-600';
     };
 
     const scoreTextColor = (score) => {
+        if (score === null) return 'text-on-surface-variant';
         if (score >= 85) return 'text-emerald-700 dark:text-emerald-400';
         if (score >= 65) return 'text-amber-700 dark:text-amber-400';
         return 'text-red-700 dark:text-red-400';
     };
 
+    const dobGenderVal = [data.dateOfBirth, data.gender].filter(Boolean).join(' • ');
+    const issueSignerVal = [data.issueDate, data.signerName].filter(Boolean).join(' — ');
+
     const fields = [
         {
-            label: labels.docType,
+            label: t('ocr.docType'),
             value: data.documentType,
             highlight: isValidCert,
             warning: isRelatedDoc,
             danger: isUnrelatedDoc,
         },
-        { label: labels.certNo, value: data.certificateNumber, mono: true, highlight: true },
-        { label: labels.bookNo, value: data.bookNumber, mono: true },
+        { label: t('ocr.certNo'), value: data.certificateNumber, mono: true, highlight: Boolean(data.certificateNumber) },
+        { label: t('ocr.bookNo'), value: data.bookNumber, mono: true },
         {
-            label: labels.deceasedName,
+            label: t('ocr.deceasedName'),
             value: data.deceasedFullName,
             highlight: matched,
             danger: !matched,
         },
-        { label: labels.expectedOwner, value: data.expectedOwnerName, highlight: true },
+        { label: t('ocr.expectedOwner'), value: data.expectedOwnerName, highlight: true },
         {
-            label: labels.dobGender,
-            value: [data.dateOfBirth, data.gender].filter(Boolean).join(' • '),
+            label: t('ocr.dobGender'),
+            value: dobGenderVal || null,
             danger: isSuspectedForgery,
         },
         {
-            label: labels.idNumber,
+            label: t('ocr.idNumber'),
             value: data.idNumber,
             mono: true,
             danger: isSuspectedForgery,
         },
-        { label: labels.deathTime, value: data.dateOfDeath },
+        { label: t('ocr.deathTime'), value: data.dateOfDeath },
         {
-            label: labels.deathPlace,
+            label: t('ocr.deathPlace'),
             value: data.placeOfDeath,
             warning: isSuspectedForgery,
         },
-        { label: labels.causeOfDeath, value: data.causeOfDeath },
-        { label: labels.issuingAuthority, value: data.issuingAuthority },
-        { label: labels.issueDateSigner, value: [data.issueDate, data.signerName].filter(Boolean).join(' — ') },
+        { label: t('ocr.causeOfDeath'), value: data.causeOfDeath },
+        { label: t('ocr.issuingAuthority'), value: data.issuingAuthority },
+        { label: t('ocr.issueDateSigner'), value: issueSignerVal || null },
     ];
 
     return (
@@ -185,17 +162,29 @@ export default function OcrAnalysisCard({
                 <div>
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary text-xl">auto_awesome</span>
-                        <h4 className="text-sm font-bold text-on-surface">{labels.title}</h4>
+                        <h4 className="text-sm font-bold text-on-surface">{t('ocr.title')}</h4>
                     </div>
                     <p className="text-[11px] text-on-surface-variant mt-0.5 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[14px] text-primary">psychology</span>
-                        {labels.advisoryTag}
+                        {t('ocr.advisoryTag')}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-highest px-2.5 py-0.5 text-xs font-semibold text-on-surface-variant">
-                        {labels.confidence}: <strong className="text-primary">{data.confidenceScore ?? 98}/100</strong>
+                    <span
+                        data-testid="ocr-engine-source"
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            isDemoSource
+                                ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-900/50 dark:text-amber-200'
+                                : 'bg-surface-container-highest text-on-surface-variant'
+                        }`}
+                    >
+                        {t('ocr.sourceLabel')}: <strong>{sourceBadgeText}</strong>
                     </span>
+                    {confidenceScore !== null && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-surface-container-highest px-2.5 py-0.5 text-xs font-semibold text-on-surface-variant">
+                            {t('ocr.confidence')}: <strong className="text-primary">{confidenceScore}/100</strong>
+                        </span>
+                    )}
                     <span
                         data-testid="ocr-match-badge"
                         className={`inline-flex items-center gap-1 rounded-full px-3 py-0.5 text-xs font-bold ${badgeClass}`}
@@ -213,65 +202,69 @@ export default function OcrAnalysisCard({
             >
                 <p className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-base">analytics</span>
-                    {labels.evalSectionTitle}
+                    {t('ocr.evalSectionTitle')}
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                     {/* 1. Image Quality & Clarity */}
                     <div className="rounded-lg border border-outline-variant/30 bg-background/70 p-2.5">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-semibold text-on-surface">{labels.imageQualityTitle}</span>
+                            <span className="font-semibold text-on-surface">{t('ocr.imageQualityTitle')}</span>
                             <span
                                 data-testid="ocr-image-quality-score"
                                 className={`font-bold text-sm ${scoreTextColor(imageQualityScore)}`}
                             >
-                                {imageQualityScore}%
+                                {imageQualityScore !== null ? `${imageQualityScore}%` : unreadableText}
                             </span>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1.5">
-                            <div
-                                className={`h-full rounded-full transition-all ${scoreBarColor(imageQualityScore)}`}
-                                style={{ width: `${Math.min(100, Math.max(5, imageQualityScore))}%` }}
-                            />
-                        </div>
+                        {imageQualityScore !== null && (
+                            <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1.5">
+                                <div
+                                    className={`h-full rounded-full transition-all ${scoreBarColor(imageQualityScore)}`}
+                                    style={{ width: `${Math.min(100, Math.max(5, imageQualityScore))}%` }}
+                                />
+                            </div>
+                        )}
                         <p className="text-[11px] text-on-surface-variant leading-snug">
-                            {data.imageClarityLabel || 'Rõ nét, chữ và con dấu dễ đọc'}
+                            {data.imageClarityLabel || unreadableText}
                         </p>
                     </div>
 
                     {/* 2. Internal Header / Title Assessment */}
                     <div className="rounded-lg border border-outline-variant/30 bg-background/70 p-2.5">
-                        <p className="font-semibold text-on-surface mb-1">{labels.headerTitleLabel}</p>
+                        <p className="font-semibold text-on-surface mb-1">{t('ocr.headerTitleLabel')}</p>
                         <p
                             data-testid="ocr-detected-header"
                             className="font-mono font-bold text-primary text-xs break-words mb-1"
                         >
-                            “{data.detectedHeaderTitle || data.documentType || 'TRÍCH LỤC KHAI TỬ'}”
+                            {data.detectedHeaderTitle ? `“${data.detectedHeaderTitle}”` : unreadableText}
                         </p>
                         <p className="text-[11px] text-on-surface-variant leading-snug">
-                            {data.titleAssessment || 'Tiêu đề chuẩn mẫu Trích lục khai tử hộ tịch'}
+                            {data.titleAssessment || unreadableText}
                         </p>
                     </div>
 
                     {/* 3. Death Proof Relevance Percentage */}
                     <div className="rounded-lg border border-outline-variant/30 bg-background/70 p-2.5">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-semibold text-on-surface">{labels.deathProofTitle}</span>
+                            <span className="font-semibold text-on-surface">{t('ocr.deathProofTitle')}</span>
                             <span
                                 data-testid="ocr-death-proof-percent"
                                 className={`font-bold text-sm ${scoreTextColor(deathProofPercent)}`}
                             >
-                                {deathProofPercent}%
+                                {deathProofPercent !== null ? `${deathProofPercent}%` : unreadableText}
                             </span>
                         </div>
-                        <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1.5">
-                            <div
-                                className={`h-full rounded-full transition-all ${scoreBarColor(deathProofPercent)}`}
-                                style={{ width: `${Math.min(100, Math.max(5, deathProofPercent))}%` }}
-                            />
-                        </div>
+                        {deathProofPercent !== null && (
+                            <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1.5">
+                                <div
+                                    className={`h-full rounded-full transition-all ${scoreBarColor(deathProofPercent)}`}
+                                    style={{ width: `${Math.min(100, Math.max(5, deathProofPercent))}%` }}
+                                />
+                            </div>
+                        )}
                         <p className="text-[11px] text-on-surface-variant leading-snug">
-                            {data.deathProofExplanation || 'Chứng minh trực tiếp sự qua đời của Chủ két'}
+                            {data.deathProofExplanation || unreadableText}
                         </p>
                     </div>
                 </div>
@@ -285,7 +278,9 @@ export default function OcrAnalysisCard({
                         <div className="space-y-0.5">
                             <p className="font-bold text-primary flex items-center gap-1.5">
                                 <span className="material-symbols-outlined text-base">tips_and_updates</span>
-                                {labels.suggestionTitle}
+                                {role === 'verifier'
+                                    ? t('ocr.suggestionVerifierTitle')
+                                    : t('ocr.suggestionExecutorTitle')}
                             </p>
                             <p className="text-on-surface leading-relaxed">{roleSuggestion}</p>
                         </div>
@@ -298,7 +293,7 @@ export default function OcrAnalysisCard({
                                 className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-amber-600/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 dark:text-amber-200 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                             >
                                 <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-                                {labels.suggestRejectBtn}
+                                {t('ocr.suggestRejectBtn')}
                             </button>
                         )}
                     </div>
@@ -310,14 +305,14 @@ export default function OcrAnalysisCard({
                 <div
                     data-testid="ocr-warnings-box"
                     className={`mb-3 rounded-lg border p-3 text-xs ${
-                        !isFullyValid && (isRelatedDoc || imageQualityScore < 65) && matched
+                        !isFullyValid && (isRelatedDoc || (imageQualityScore !== null && imageQualityScore < 65)) && matched
                             ? 'border-amber-500/60 bg-amber-100/80 text-amber-950 dark:bg-amber-900/30 dark:text-amber-200'
                             : 'border-red-400/60 bg-red-100/80 text-red-900 dark:bg-red-900/30 dark:text-red-200'
                     }`}
                 >
                     <p className="font-bold flex items-center gap-1.5 mb-1">
                         <span className="material-symbols-outlined text-base">report</span>
-                        {labels.warningsTitle}
+                        {t('ocr.warningsTitle')}
                     </p>
                     <ul className="list-disc pl-5 space-y-0.5">
                         {warnings.map((w, idx) => (
@@ -346,7 +341,7 @@ export default function OcrAnalysisCard({
                                     : 'text-on-surface'
                             } ${f.mono ? 'font-mono' : ''}`}
                         >
-                            {f.value || '—'}
+                            {f.value || unreadableText}
                         </p>
                     </div>
                 ))}
@@ -362,9 +357,9 @@ export default function OcrAnalysisCard({
                     >
                         {hasSeal ? 'workspace_premium' : 'help'}
                     </span>
-                    <span className="text-on-surface-variant">{labels.officialSeal}:</span>
+                    <span className="text-on-surface-variant">{t('ocr.officialSeal')}:</span>
                     <span className={`font-semibold ${hasSeal ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700'}`}>
-                        {hasSeal ? labels.sealValid : labels.sealMissing}
+                        {hasSeal ? t('ocr.sealValid') : t('ocr.sealMissing')}
                     </span>
                 </div>
 
@@ -376,7 +371,7 @@ export default function OcrAnalysisCard({
                         className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                     >
                         <span className="material-symbols-outlined text-sm">edit_note</span>
-                        {labels.applyNoteBtn}
+                        {t('ocr.applyNoteBtn')}
                     </button>
                 )}
             </div>

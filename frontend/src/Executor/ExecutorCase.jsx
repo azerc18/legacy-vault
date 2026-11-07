@@ -224,9 +224,6 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
         try {
             const res = await executorApi.analyzeDeathCertificate(assignmentId, file);
             setOcrResult(res);
-            if (res?.summaryNote && (!notes.trim() || notes.trim().startsWith('[AI OCR'))) {
-                setNotes(res.summaryNote.slice(0, 1000));
-            }
         } catch (err) {
             setError(getErrorMessage(err, t('case.submit.ocrFailed', 'Không thể phân tích tài liệu bằng AI OCR.')));
         } finally {
@@ -281,13 +278,18 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
                             disabled={ocrLoading || loading}
                             className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all disabled:opacity-50 cursor-pointer"
                         >
-                            <Icon name="auto_awesome" className="text-[18px]" />
+                            <Icon name={ocrLoading ? 'progress_activity' : 'auto_awesome'} className={`text-[18px] ${ocrLoading ? 'animate-spin' : ''}`} />
                             {ocrLoading
-                                ? t('case.submit.ocrScanning', 'Đang quét & đối chiếu AI OCR...')
-                                : t('case.submit.ocrScan', '✨ Quét & Trích xuất bằng AI (OCR)')}
+                                ? t('case.submit.ocrScanning')
+                                : t('case.submit.ocrScan')}
                         </button>
                     )}
                 </div>
+                {file && (
+                    <p className="text-xs text-on-surface-variant">
+                        {t('case.submit.ocrPrivacyHint')}
+                    </p>
+                )}
 
                 {ocrResult && (
                     <OcrAnalysisCard

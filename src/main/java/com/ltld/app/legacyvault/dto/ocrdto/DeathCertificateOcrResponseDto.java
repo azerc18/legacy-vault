@@ -18,12 +18,12 @@ public class DeathCertificateOcrResponseDto {
     private String detectedHeaderTitle;
     /** Nhận xét về tiêu đề (VD: "Tiêu đề chuẩn mẫu hộ tịch TP/HT", "Tiêu đề y tế bổ trợ", ...) */
     private String titleAssessment;
-    /** Điểm chất lượng & độ sắc nét hình ảnh/tài liệu (0 - 100%) */
-    private int imageQualityScore;
+    /** Điểm chất lượng & độ sắc nét hình ảnh/tài liệu (0 - 100%, hoặc null khi không đọc được) */
+    private Integer imageQualityScore;
     /** Đánh giá độ rõ nét (VD: "Rõ nét cao - Chữ và dấu hiển thị rõ ràng") */
     private String imageClarityLabel;
-    /** Mức độ nội dung chứng minh được sự kiện qua đời của Chủ két (0 - 100%) */
-    private int deathProofRelevancePercent;
+    /** Mức độ nội dung chứng minh được sự kiện qua đời của Chủ két (0 - 100%, hoặc null khi không đọc được) */
+    private Integer deathProofRelevancePercent;
     /** Diễn giải mức độ chứng minh sự qua đời */
     private String deathProofExplanation;
     /** Gợi ý tham khảo dành cho Executor (không bắt buộc) */
@@ -46,9 +46,12 @@ public class DeathCertificateOcrResponseDto {
     private boolean hasOfficialSeal;
     private boolean ownerNameMatched;
     private String expectedOwnerName;
-    private int confidenceScore;
+    private Integer confidenceScore;
     private String suggestedRejectionCode;
+    /** GEMINI_VISION_AI | DEMO_SIMULATION | UNAVAILABLE */
     private String engineSource;
+    /** Thông báo khi AI không khả dụng (engineSource = UNAVAILABLE) */
+    private String unavailableMessage;
     private String summaryNote;
     private List<String> warnings;
 }
