@@ -17,6 +17,19 @@ export default function BillingPage() {
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [downloadingId, setDownloadingId] = useState(null);
+
+    const handleDownloadReceipt = async (txId) => {
+        setError('');
+        setDownloadingId(txId);
+        try {
+            await paymentApi.downloadReceipt(txId);
+        } catch (e) {
+            setError(getErrorMessage(e, t('billing.errors.receiptFailed')));
+        } finally {
+            setDownloadingId(null);
+        }
+    };
 
     useEffect(() => {
         Promise.all([paymentApi.getMySubscription(), paymentApi.getMyPayments()])
@@ -120,6 +133,7 @@ export default function BillingPage() {
                                             <th className="py-2.5 pr-4">{t('billing.history.amount')}</th>
                                             <th className="py-2.5 pr-4">{t('billing.history.status')}</th>
                                             <th className="py-2.5 pr-4">{t('billing.history.ref')}</th>
+                                            <th className="py-2.5 pr-4">{t('billing.history.receipt')}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -145,6 +159,21 @@ export default function BillingPage() {
                                                 </td>
                                                 <td className="py-3 pr-4 text-xs text-on-surface-variant">
                                                     {tx.vnpTransactionNo || tx.id}
+                                                </td>
+                                                <td className="py-3 pr-4">
+                                                    {tx.status === 'SUCCESS' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDownloadReceipt(tx.id)}
+                                                            disabled={downloadingId === tx.id}
+                                                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-60"
+                                                        >
+                                                            <Icon name="download" className="text-[16px]" />
+                                                            {downloadingId === tx.id
+                                                                ? t('billing.history.downloading')
+                                                                : t('billing.history.downloadReceipt')}
+                                                        </button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))}
