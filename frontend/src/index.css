@@ -1,7 +1,9 @@
 /* ===== Bảng màu (dùng trong tailwind.config ở index.html) =====
    Giá trị là "R G B" để Tailwind ghép được độ trong suốt: bg-primary/40.
    brand = nền thương hiệu luôn tối (sidebar, banner); primary đổi sang màu sáng khi nền tối. */
-:root {
+/* .lv-landing: trang chủ luôn dùng bảng màu sáng (nền đổi sáng/tối theo phần cuộn), kể cả khi cả app đang ở chế độ tối */
+:root,
+.lv-landing {
   --c-primary: 11 16 32;
   --c-on-primary: 255 255 255;
   --c-primary-container: 26 33 64;
@@ -150,13 +152,11 @@ html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba
 
 /* Cuộn tới thì hiện dần / dựng thẳng (chỉ chạy trên trình duyệt hỗ trợ scroll-driven animation) */
 @supports (animation-timeline: view()) {
-  .lv-reveal { animation: lv-reveal linear both; animation-timeline: view(); animation-range: entry 0% entry 55%; }
   .lv-tilt { animation: lv-tilt linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; transform-origin: 50% 100%; }
 }
-@keyframes lv-reveal { from { opacity: 0; transform: translateY(36px); } to { opacity: 1; transform: none; } }
 @keyframes lv-tilt { from { transform: perspective(1200px) rotateX(24deg) scale(.9); opacity: .6; } to { transform: perspective(1200px) rotateX(0) scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .lv-word, .lv-shine, .lv-reveal, .lv-tilt { animation: none !important; }
+  .lv-word, .lv-shine, .lv-tilt { animation: none !important; }
   .lv-shine { background-position: 0 0; }
 }
 
@@ -166,3 +166,29 @@ html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba
 html.dark .bg-surface-container-lowest.rounded-2xl,
 html.dark .bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -18px rgba(0,0,0,.7); }
 table th { letter-spacing: .04em; }
+
+/* Landing: tự khớp từng phần khi cuộn (bật bằng class lv-snap trên <html>) */
+html.lv-snap { scroll-snap-type: y proximity; scroll-padding-top: 64px; }
+html.lv-snap .lv-landing section[data-mode] { scroll-snap-align: start; }
+html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
+@media (prefers-reduced-motion: reduce) { html.lv-snap { scroll-snap-type: none; } }
+
+/* Landing: hiện dần khi cuộn tới (lớp lv-rv do Dashboard.jsx gắn, lv-in khi vào khung nhìn) */
+.lv-rv { opacity: 0; transform: translateY(28px) scale(.985);
+  transition: opacity .9s cubic-bezier(.2,.7,.2,1) var(--d,0s), transform .9s cubic-bezier(.2,.7,.2,1) var(--d,0s);
+  will-change: opacity, transform; }
+.lv-rv.lv-in { opacity: 1; transform: none; }
+
+/* Chữ LEGACYVAULT cuối trang: nền mờ + dải sáng chạy chậm qua các chữ (chỉ để bớt tĩnh) */
+.lv-wordmark {
+  background-image:
+    linear-gradient(100deg, transparent 0%, transparent 42%, rgba(150,175,255,.55) 50%, transparent 58%, transparent 100%),
+    linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,0));
+  background-size: 300% 100%, 100% 100%;
+  background-position: 100% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lv-sweep 9s ease-in-out infinite;
+}
+@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 33.333%, 100% { background-position: 0% 0, 0 0; } } /* chạy 3s, nghỉ 6s (vòng 9s) */
+@media (prefers-reduced-motion: reduce) { .lv-wordmark { animation: none; } }

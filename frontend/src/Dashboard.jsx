@@ -1,9 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
-import ThemeToggle from './Common/ThemeToggle.jsx';
 import BrandMark from './Common/BrandMark.jsx';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
@@ -79,6 +78,7 @@ export default function Dashboard() {
     const [openFaq, setOpenFaq] = useState(0);
     const [mode, setMode] = useState('dark');
     const rootRef = useRef(null);
+    const light = mode === 'light';
 
     // Nền đổi sáng/tối theo phần đang nằm giữa màn hình
     useEffect(() => {
@@ -91,28 +91,77 @@ export default function Dashboard() {
         return () => io.disconnect();
     }, []);
 
+    // Phần tử hiện dần khi cuộn tới (mờ -> rõ, trượt nhẹ lên), so le từng thẻ trong một lưới
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        if (!root || !('IntersectionObserver' in window)) return undefined;
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        const items = [];
+        const add = (el, delay) => {
+            if (!el || items.some((i) => i.el === el)) return;
+            el.style.setProperty('--d', `${delay}s`);
+            el.classList.add('lv-rv');
+            items.push({ el, delay });
+        };
+        // Hero: hiện sau khi tiêu đề chạy chữ xong
+        add(root.querySelector('.lv-hero-rv'), 0.8);
+        add(root.querySelectorAll('.lv-hero-rv')[1], 0.95);
+        root.querySelectorAll('.lv-hero-badges > *').forEach((el, i) => add(el, 1.1 + i * 0.08));
+        // Các phần còn lại: tiêu đề, rồi từng thẻ so le
+        root.querySelectorAll('.lv-reveal').forEach((el) => { if (!el.querySelector('.lv-stagger')) add(el, 0); }); // khối có lưới thì để từng thẻ tự hiện
+        root.querySelectorAll('.lv-stagger').forEach((grid) => {
+            Array.from(grid.children).forEach((el, i) => add(el, 0.1 + Math.min(i, 5) * 0.09));
+        });
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => {
+                if (!e.isIntersecting) return;
+                const el = e.target;
+                io.unobserve(el);
+                el.classList.add('lv-in');
+                const d = parseFloat(el.style.getPropertyValue('--d')) || 0;
+                // Xong thì gỡ lớp để không chặn hiệu ứng hover/transition riêng của phần tử
+                setTimeout(() => { el.classList.remove('lv-rv', 'lv-in'); el.style.removeProperty('--d'); }, (d + 1) * 1000);
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+        items.forEach(({ el }) => io.observe(el));
+        return () => {
+            io.disconnect();
+            items.forEach(({ el }) => { el.classList.remove('lv-rv', 'lv-in'); el.style.removeProperty('--d'); });
+        };
+    }, []);
+
+    // Tự khớp trang: dùng scroll-snap gốc của trình duyệt (êm, không giành quyền cuộn)
+    useEffect(() => {
+        const el = document.documentElement;
+        el.classList.add('lv-snap');
+        return () => el.classList.remove('lv-snap');
+    }, []);
+
     // Đã đăng nhập -> vào thẳng trang chủ người dùng
     if (getUser()) return <Navigate to="/home" replace />;
 
     return (
-        <div ref={rootRef} className="font-body-md text-on-surface antialiased min-h-screen relative">
+        <div ref={rootRef} className="lv-landing font-body-md text-on-surface antialiased min-h-screen relative">
             <div aria-hidden="true" className="lv-bg fixed inset-0 z-0" data-mode={mode} />
             {/* NAVBAR */}
-            <header className="sticky top-0 z-20 bg-brand/95 backdrop-blur border-b border-white/10 text-white">
+            <header className={`sticky top-0 z-20 backdrop-blur border-b transition-colors duration-500 ${light
+                ? 'bg-white/80 border-black/10 text-brand'
+                : 'bg-brand/95 border-white/10 text-white'}`}>
                 <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
-                        <BrandMark className="h-[30px] w-[30px]" />LEGACYVAULT
+                        <span className={`rounded-lg transition-colors duration-500 ${light ? 'bg-brand p-[3px]' : 'p-[3px]'}`}>
+                            <BrandMark className="h-[30px] w-[30px]" />
+                        </span>LEGACYVAULT
                     </Link>
-                    <nav className="hidden md:flex gap-8 text-sm font-semibold text-white/75">
+                    <nav className={`hidden md:flex gap-8 text-sm font-semibold ${light ? 'text-brand/70' : 'text-white/75'}`}>
                         {NAV.map((n) => (
-                            <a key={n.href} href={n.href} className="hover:text-white">{t(`nav.${n.key}`)}</a>
+                            <a key={n.href} href={n.href} className={light ? 'hover:text-brand' : 'hover:text-white'}>{t(`nav.${n.key}`)}</a>
                         ))}
                     </nav>
                     <div className="flex items-center gap-3">
-                        <ThemeToggle variant="dark" />
-                        <LanguageSwitch variant="dark" />
-                        <Link to="/login" className="hidden sm:block text-sm font-semibold text-white/85 hover:text-white">{t('signIn')}</Link>
-                        <Link to="/register" className="h-10 px-5 rounded-full bg-white text-brand text-sm font-bold flex items-center hover:bg-white/85">
+                        <LanguageSwitch variant={light ? 'light' : 'dark'} />
+                        <Link to="/login" className={`hidden sm:block text-sm font-semibold ${light ? 'text-brand/80 hover:text-brand' : 'text-white/85 hover:text-white'}`}>{t('signIn')}</Link>
+                        <Link to="/register" className={`h-10 px-5 rounded-full text-sm font-bold flex items-center ${light ? 'bg-brand text-white hover:bg-brand-container' : 'bg-white text-brand hover:bg-white/85'}`}>
                             {t('getStarted')}
                         </Link>
                     </div>
@@ -131,8 +180,8 @@ export default function Dashboard() {
                             <span key={i} className="lv-word lv-shine inline-block pb-[0.14em] mr-[0.25em]" style={{ animationDelay: `${0.12 * i}s, ${1.6 + 0.12 * i}s` }}>{w}</span>
                         ))}
                     </h1>
-                    <p className="mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
-                    <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+                    <p className="lv-hero-rv mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
+                    <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center">
                         <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
                             <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                         </Link>
@@ -142,7 +191,7 @@ export default function Dashboard() {
                     </div>
                 </div>
                 {/* Trust badges */}
-                <div className="relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
+                <div className="lv-hero-badges relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
                     {BADGES.map((b) => (
                         <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-white/10 border border-white/15 text-sm text-white/85 backdrop-blur">
                             <Icon name={b.icon} className="text-[18px] text-[#b9c9ff]" /> {t(`badges.${b.key}`)}
@@ -171,7 +220,7 @@ export default function Dashboard() {
 
             {/* 2. PROBLEM */}
             <Section eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {PROBLEMS.map((p) => (
                         <div key={p.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
                             <Icon name={p.icon} className="text-error text-[28px]" />
@@ -184,7 +233,7 @@ export default function Dashboard() {
 
             {/* 3. HOW IT WORKS */}
             <Section id="how" eyebrow={t('how.eyebrow')} title={t('how.title')}>
-                <div className="grid md:grid-cols-4 gap-6">
+                <div className="lv-stagger grid md:grid-cols-4 gap-6">
                     {STEPS.map((s, i) => (
                         <div key={s.key} className="relative">
                             <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center">
@@ -200,7 +249,7 @@ export default function Dashboard() {
 
             {/* 4. SECURITY */}
             <Section id="security" mode="dark" eyebrow={t('security.eyebrow')} title={t('security.title')}>
-                <div className="grid md:grid-cols-3 gap-5">
+                <div className="lv-stagger grid md:grid-cols-3 gap-5">
                     {SECURITY.map((s) => (
                         <div key={s.key} className="rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
                             <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
@@ -213,7 +262,7 @@ export default function Dashboard() {
 
             {/* 5. WHAT YOU CAN STORE */}
             <Section eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+                <div className="lv-stagger grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
                     {ASSETS.map((a) => (
                         <div key={a.key} className="flex items-center gap-3 p-4 rounded-xl border border-outline-variant/40">
                             <Icon name={a.icon} className="text-primary" />
@@ -225,7 +274,7 @@ export default function Dashboard() {
 
             {/* 6. ROLES — tên vai trò dùng chung common:roles */}
             <Section id="roles" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {ROLES.map((r) => (
                         <div key={r.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
                             <div className="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
@@ -240,7 +289,7 @@ export default function Dashboard() {
 
             {/* 7. FAQ */}
             <Section id="faq" eyebrow={t('faq.eyebrow')} title={t('faq.title')}>
-                <div className="max-w-2xl mx-auto divide-y divide-outline-variant/40 border-y border-outline-variant/40">
+                <div className="lv-stagger max-w-2xl mx-auto divide-y divide-outline-variant/40 border-y border-outline-variant/40">
                     {FAQS.map((k, i) => (
                         <div key={k}>
                             <button
@@ -306,8 +355,8 @@ export default function Dashboard() {
                         </div>
                         </div>
                     </div>
-                    <div aria-hidden="true" className="mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
-                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em', backgroundImage: 'linear-gradient(180deg,rgba(255,255,255,0.20),rgba(255,255,255,0))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>
+                    <div aria-hidden="true" className="lv-wordmark mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
+                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em' }}>
                         LEGACYVAULT
                     </div>
                     <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/50">
