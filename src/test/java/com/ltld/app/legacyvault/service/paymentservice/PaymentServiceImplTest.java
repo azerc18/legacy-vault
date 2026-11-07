@@ -238,6 +238,36 @@ class PaymentServiceImplTest {
         );
     }
 
+    // IPN với vnp_TxnRef dạng 32 hex (định dạng gửi VNPay từ bản sửa "Invalid data format") vẫn tìm được đơn và kích hoạt gói
+    @Test
+    void handleVnpayIpn_hexTxnRef_activatesAndReturns00() {
+        UUID txId = UUID.randomUUID();
+        PaymentTransaction tx = PaymentTransaction.builder()
+                .id(txId)
+                .user(owner)
+                .plan(vipMonthPlan)
+                .amountVnd(99_000L)
+                .status(PaymentStatus.PENDING)
+                .build();
+
+        when(paymentTransactionRepository.findByIdForUpdate(txId)).thenReturn(Optional.of(tx));
+        when(userRepository.findByIdForUpdate(owner.getId())).thenReturn(Optional.of(owner));
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+
+        Map<String, String> params = new HashMap<>();
+        params.put("vnp_TxnRef", txId.toString().replace("-", ""));
+        params.put("vnp_Amount", "9900000");
+        params.put("vnp_ResponseCode", "00");
+        params.put("vnp_TransactionStatus", "00");
+        params.put("vnp_SecureHash", vnpayClient.signParams(params));
+
+        Map<String, String> resp = paymentService.handleVnpayIpn(params);
+        assertEquals("00", resp.get("RspCode"));
+        assertEquals(PaymentStatus.SUCCESS, tx.getStatus());
+        verify(subscriptionRepository, times(1)).save(any(Subscription.class));
+    }
+
     // IPN Case 6: Cổng thanh toán báo lỗi (vnp_ResponseCode != "00" hoặc vnp_TransactionStatus != "00") -> lưu FAILED, trả 00
     @Test
     void handleVnpayIpn_gatewayFailed_marksFailedAndReturns00() {

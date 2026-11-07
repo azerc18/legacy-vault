@@ -93,18 +93,83 @@ public class VnpayClient {
         params.put("vnp_TmnCode", tmnCode);
         params.put("vnp_Amount", String.valueOf(amountVnd * 100L));
         params.put("vnp_CurrCode", "VND");
-        params.put("vnp_TxnRef", txnId.toString());
-        params.put("vnp_OrderInfo", orderInfo != null ? orderInfo : ("LegacyVault subscription " + txnId));
+        params.put("vnp_TxnRef", toTxnRef(txnId));
+        params.put("vnp_OrderInfo", sanitizeOrderInfo(orderInfo, txnId));
         params.put("vnp_OrderType", "other");
         params.put("vnp_Locale", "vn");
         params.put("vnp_ReturnUrl", returnUrl);
-        params.put("vnp_IpAddr", (ipAddress == null || ipAddress.isBlank()) ? "127.0.0.1" : ipAddress);
+        params.put("vnp_IpAddr", normalizeIpv4(ipAddress));
         params.put("vnp_CreateDate", now.format(VNP_TIME_FMT));
         params.put("vnp_ExpireDate", expire.format(VNP_TIME_FMT));
 
         String query = buildSortedQueryString(params);
         String secureHash = hmacSha512(hashSecret, query);
         return payUrl + "?" + query + "&vnp_SecureHash=" + secureHash;
+    }
+
+    // VNPay trả "Invalid data format" (mã 03) khi tham số có ký tự lạ: chỉ gửi chữ/số cho TxnRef và OrderInfo,
+    // và IPv4 thuần cho IpAddr (không IPv6 như 0:0:0:0:0:0:0:1 khi chạy local, không kèm :port như sau proxy Azure).
+
+    /** UUID -> 32 ký tự hex, không dấu gạch. */
+    static String toTxnRef(UUID txnId) {
+        return txnId.toString().replace("-", "");
+    }
+
+    /** Đọc lại vnp_TxnRef: nhận cả 32 hex (định dạng mới) lẫn UUID có gạch (đơn tạo trước bản sửa). Sai định dạng -> null. */
+    public static UUID parseTxnRef(String txnRef) {
+        if (txnRef == null || txnRef.isBlank()) {
+            return null;
+        }
+        String ref = txnRef.trim();
+        if (ref.matches("[0-9a-fA-F]{32}")) {
+            ref = ref.substring(0, 8) + "-" + ref.substring(8, 12) + "-" + ref.substring(12, 16) + "-"
+                    + ref.substring(16, 20) + "-" + ref.substring(20);
+        }
+        try {
+            return UUID.fromString(ref);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** Chỉ giữ chữ cái không dấu, số và khoảng trắng; trống thì dùng mô tả mặc định. */
+    static String sanitizeOrderInfo(String orderInfo, UUID txnId) {
+        String raw = (orderInfo == null || orderInfo.isBlank()) ? "LegacyVault subscription " + toTxnRef(txnId) : orderInfo;
+        String ascii = java.text.Normalizer.normalize(raw, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd').replace('Đ', 'D');
+        String cleaned = ascii.replaceAll("[^A-Za-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+        if (cleaned.isEmpty()) {
+            cleaned = "LegacyVault subscription " + toTxnRef(txnId);
+        }
+        return cleaned.length() > 255 ? cleaned.substring(0, 255).trim() : cleaned;
+    }
+
+    /**
+     * IPv4 thuần; bỏ ":port"; không phải IPv4 (IPv6, rỗng, rác) -> 127.0.0.1.
+     * Lưu ý production: người dùng IPv6 thật cũng bị gửi 127.0.0.1; VNPay dùng vnp_IpAddr để chấm rủi ro,
+     * nên trước khi lên production cần xác nhận với VNPay định dạng IPv6 được chấp nhận rồi cho đi qua.
+     */
+    static String normalizeIpv4(String ipAddress) {
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return "127.0.0.1";
+        }
+        String ip = ipAddress.trim();
+        if (ip.matches("\\d{1,3}(\\.\\d{1,3}){3}:\\d+")) {
+            ip = ip.substring(0, ip.indexOf(':'));
+        }
+        if (ip.startsWith("::ffff:") && ip.substring(7).matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            ip = ip.substring(7);
+        }
+        if (!ip.matches("\\d{1,3}(\\.\\d{1,3}){3}")) {
+            return "127.0.0.1";
+        }
+        for (String part : ip.split("\\.")) {
+            if (Integer.parseInt(part) > 255) {
+                return "127.0.0.1";
+            }
+        }
+        return ip;
     }
 
     public boolean verify(Map<String, String> rawParams) {

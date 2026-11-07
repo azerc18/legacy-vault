@@ -33,7 +33,7 @@ class VnpayClientTest {
 
         assertTrue(url.startsWith("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?"));
         assertTrue(url.contains("vnp_Amount=9900000"));
-        assertTrue(url.contains("vnp_TxnRef=" + txId));
+        assertTrue(url.contains("vnp_TxnRef=" + txId.toString().replace("-", "")));
         assertTrue(url.contains("vnp_SecureHash="));
     }
 
@@ -74,5 +74,37 @@ class VnpayClientTest {
                 () -> emptyClient.signParams(params)
         );
         assertEquals(ErrorCode.SERVICE_UNAVAILABLE, signEx.getErrorCode());
+    }
+
+    @Test
+    void buildPaymentUrl_sendsOnlyVnpaySafeValues() {
+        UUID txId = UUID.randomUUID();
+        String url = vnpayClient.buildPaymentUrl(txId, 99_000L, "Nâng cấp VIP_MONTH - #1: đơn", "0:0:0:0:0:0:0:1");
+
+        String hex = txId.toString().replace("-", "");
+        assertTrue(url.contains("vnp_TxnRef=" + hex + "&"));
+        assertTrue(url.contains("vnp_OrderInfo=Nang+cap+VIP+MONTH+1+don&"));
+        assertTrue(url.contains("vnp_IpAddr=127.0.0.1&"));
+    }
+
+    @Test
+    void parseTxnRef_acceptsHexAndLegacyUuid_rejectsGarbage() {
+        UUID id = UUID.randomUUID();
+        assertEquals(id, VnpayClient.parseTxnRef(id.toString().replace("-", "")));
+        assertEquals(id, VnpayClient.parseTxnRef(id.toString()));
+        assertNull(VnpayClient.parseTxnRef("abc"));
+        assertNull(VnpayClient.parseTxnRef(" "));
+        assertNull(VnpayClient.parseTxnRef(null));
+    }
+
+    @Test
+    void normalizeIpv4_handlesPortIpv6AndGarbage() {
+        assertEquals("1.2.3.4", VnpayClient.normalizeIpv4("1.2.3.4"));
+        assertEquals("1.2.3.4", VnpayClient.normalizeIpv4("1.2.3.4:56789"));
+        assertEquals("10.0.0.5", VnpayClient.normalizeIpv4("::ffff:10.0.0.5"));
+        assertEquals("127.0.0.1", VnpayClient.normalizeIpv4("0:0:0:0:0:0:0:1"));
+        assertEquals("127.0.0.1", VnpayClient.normalizeIpv4("2001:db8::1"));
+        assertEquals("127.0.0.1", VnpayClient.normalizeIpv4("999.1.1.1"));
+        assertEquals("127.0.0.1", VnpayClient.normalizeIpv4(null));
     }
 }
