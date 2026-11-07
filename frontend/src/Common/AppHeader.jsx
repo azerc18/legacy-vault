@@ -13,6 +13,7 @@ import BrandMark from './BrandMark.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
+const SIDE_KEY = 'lv_side_collapsed';
 // Menu mặc định khi trang không tự truyền nav: theo khu vực của URL, còn /me và /home thì theo vai trò chính của user
 const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
 function roleItems(role) {
@@ -115,9 +116,12 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
         return () => document.body.classList.remove('lv-has-side');
     }, []);
 
-    // Thu gọn thanh bên (chỉ desktop): còn icon, mặc định luôn mở
-    const [collapsed, setCollapsed] = useState(false);
+    // Thu gọn thanh bên (chỉ desktop): còn icon. Nhớ trạng thái để đổi trang / tải lại không bị mở ra lại
+    const [collapsed, setCollapsed] = useState(() => {
+        try { return localStorage.getItem(SIDE_KEY) === '1'; } catch { return false; }
+    });
     useEffect(() => {
+        try { localStorage.setItem(SIDE_KEY, collapsed ? '1' : '0'); } catch { /* bỏ qua */ }
         document.body.classList.toggle('lv-side-collapsed', collapsed);
         return () => document.body.classList.remove('lv-side-collapsed');
     }, [collapsed]);
