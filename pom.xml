@@ -12,7 +12,7 @@
     <artifactId>legacy-vault</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>legacy-vault</name>
-    <description>legacy-vault</description>
+    <description>LegacyVault - digital legacy management and Dead Man's Switch handover (SWP391)</description>
     <url/>
     <licenses>
         <license/>
