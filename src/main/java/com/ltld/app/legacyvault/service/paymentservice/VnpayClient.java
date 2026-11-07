@@ -145,7 +145,11 @@ public class VnpayClient {
         return cleaned.length() > 255 ? cleaned.substring(0, 255).trim() : cleaned;
     }
 
-    /** IPv4 thuần; bỏ ":port"; không phải IPv4 (IPv6, rỗng, rác) -> 127.0.0.1. */
+    /**
+     * IPv4 thuần; bỏ ":port"; không phải IPv4 (IPv6, rỗng, rác) -> 127.0.0.1.
+     * Lưu ý production: người dùng IPv6 thật cũng bị gửi 127.0.0.1; VNPay dùng vnp_IpAddr để chấm rủi ro,
+     * nên trước khi lên production cần xác nhận với VNPay định dạng IPv6 được chấp nhận rồi cho đi qua.
+     */
     static String normalizeIpv4(String ipAddress) {
         if (ipAddress == null || ipAddress.isBlank()) {
             return "127.0.0.1";

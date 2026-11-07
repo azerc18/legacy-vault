@@ -87,7 +87,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
         tx = paymentTransactionRepository.save(tx);
 
-        String orderInfo = "Nang cap LegacyVault " + plan.getCode().replace('_', ' ') + " ma " + VnpayClient.toTxnRef(tx.getId());
+        String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
         String paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress);
 
         return CheckoutResponse.builder()
