@@ -38,5 +38,61 @@
 }
 .chibi-mini { width: 32px; height: 32px; flex-shrink: 0; overflow: visible; }
 .chibi-mini * { transform-box: fill-box; }
-.chibi-mini .chibi-body { animation: none; }   /* avatar nhỏ không nhún, vẫn chớp mắt */
+
+/* ===== Avatar nhỏ trong chat: chỉ tin mới nhất cử động ===== */
+.chibi-mini--still, .chibi-mini--still * { animation: none !important; }
+.chibi-mini--live .chibi-body, .chibi-mini--talk .chibi-body { animation: mini-bob 3s ease-in-out infinite; }
+.chibi-mini--talk .chibi-mouth { transform-origin: center; animation: chibi-talk .25s ease-in-out 6 alternate; }
+.chibi-mini--think .chibi-body { transform-origin: 50% 100%; animation: mini-think 1.6s ease-in-out infinite; }
+@keyframes mini-bob   { 50% { transform: translateY(-1.5px); } }
+@keyframes mini-think { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+
+/* ===== Hiệu ứng quanh câu trả lời ===== */
+@property --ang { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+
+/* viền vàng chạy quanh bong bóng: --once = 1 vòng khi có câu trả lời, --loop = lặp khi đang chờ */
+.glow-ring { position: relative; }
+.glow-ring::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none;
+    background: conic-gradient(from var(--ang), transparent 0deg, transparent 190deg,
+    rgba(245, 208, 107, .08) 230deg, rgba(245, 208, 107, .25) 275deg,
+    rgba(245, 208, 107, .6) 320deg, #F5D06B 345deg, #D4A017 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+}
+.glow-ring--once::after { animation: ring-sweep 2.4s cubic-bezier(.45, .05, .35, 1) forwards; }
+.glow-ring--loop::after { animation: ring-spin 1.5s linear infinite; }
+@keyframes ring-sweep {
+    from { --ang: 0deg; opacity: 0; }
+    12%  { opacity: 1; }
+    80%  { opacity: 1; }
+    to   { --ang: 360deg; opacity: 0; }
+}
+@keyframes ring-spin  { to { --ang: 360deg; } }
+
+/* bong bóng bật ra từ phía avatar */
+.reply-fresh { transform-origin: 0 100%; animation: reply-pop .45s cubic-bezier(.2, 1.4, .4, 1) backwards; }
+@keyframes reply-pop { from { opacity: 0; transform: translate(-6px, 6px) scale(.7); } }
+
+/* từng khối chữ (đoạn / danh sách) hiện lần lượt */
+.reply-block { animation: block-in .38s ease-out backwards; }
+@keyframes block-in { from { opacity: 0; transform: translateY(5px); } }
+
+/* đốm ✦ bay lên */
+.spark {
+    position: absolute; left: 12px; bottom: 14px; color: #F5C842; font-size: 11px; line-height: 1;
+    pointer-events: none; opacity: 0; animation: spark-rise .9s ease-out forwards;
+}
+@keyframes spark-rise {
+    0%   { opacity: 0; transform: translate(0, 0) scale(.4) rotate(0); }
+    20%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(180deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chibi-mini *, .reply-fresh, .reply-block { animation: none !important; }
+    .glow-ring::after, .spark { display: none; }
+}
 

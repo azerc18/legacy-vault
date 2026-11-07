@@ -1,0 +1,22 @@
+// Danh sách trang phục cho bảng chọn (ChatPanel dùng) - tách riêng để không kéo `three` vào bundle chính
+export const COSTUMES = [
+    { id: 'none', label: 'Original', emoji: '🦉' },
+    { id: 'wizard', label: 'Wizard', emoji: '🧙' },
+    { id: 'king', label: 'King', emoji: '👑' },
+    { id: 'detective', label: 'Detective', emoji: '🕵️' },
+    { id: 'astronaut', label: 'Astronaut', emoji: '🚀' },
+    { id: 'ninja', label: 'Ninja', emoji: '🥷' },
+    { id: 'graduate', label: 'Graduate', emoji: '🎓' },
+    { id: 'santa', label: 'Santa', emoji: '🎅' },
+    { id: 'chef', label: 'Chef', emoji: '👨‍🍳' },
+    { id: 'knight', label: 'Knight', emoji: '🛡️' },
+    { id: 'devil', label: 'Devil', emoji: '😈' },
+    { id: 'spy', label: 'Spy', emoji: '🕶️' },
+    { id: 'panda', label: 'Panda', emoji: '🐼' },
+    { id: 'whitemage', label: 'White Mage', emoji: '🪄' },
+    { id: 'beach', label: 'Beach', emoji: '🏖️' },
+    { id: 'fox', label: 'Fox', emoji: '🦊' },
+    { id: 'soccer', label: 'Soccer', emoji: '⚽' },
+    { id: 'cyber', label: 'Cyber', emoji: '🎧' },
+    { id: 'fpt', label: 'FPT', emoji: '🏫' },
+];
