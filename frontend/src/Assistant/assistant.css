@@ -57,7 +57,6 @@
     background: conic-gradient(from var(--ang), transparent 0deg, transparent 190deg,
     rgba(245, 208, 107, .08) 230deg, rgba(245, 208, 107, .25) 275deg,
     rgba(245, 208, 107, .6) 320deg, #F5D06B 345deg, #D4A017 360deg);
-    rgba(245, 208, 107, .25) 280deg, #F5D06B 335deg, #D4A017 360deg);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);

@@ -1,11 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
-// import ChibiAvatar from './ChibiAvatar.jsx';
 import ChatPanel, { WELCOME } from './ChatPanel.jsx';
 import { pickGreeting, pickTip } from './assistantLines.js';
-import ChibiAvatar from './ChibiAvatar3D.jsx';
+import ChibiAvatar from './ChibiAvatar.jsx';
 import './assistant.css';
+
+// three (~590 KB) chỉ tải khi widget thật sự hiện; trong lúc chờ dùng bản SVG 2D
+const Owl3D = React.lazy(() => import('./ChibiAvatar3D.jsx'));
 
 const PUBLIC_PATHS = ['/', '/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
 const TIP_INTERVAL_MS = 45_000;
@@ -137,7 +139,9 @@ export default function AssistantWidget() {
 
             <button type="button" onClick={toggle} aria-label={open ? 'Close assistant' : 'Open assistant'}
                     className="pointer-events-auto rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <ChibiAvatar action={thinking ? 'think' : action} costume={costume} />
+                <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
+                    <Owl3D action={thinking ? 'think' : action} costume={costume} />
+                </Suspense>
             </button>
         </div>
     );

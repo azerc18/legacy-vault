@@ -17,29 +17,6 @@ const C = {
     orange: '#F2A33A', gold: '#D4A017', blue: '#2F5D8A', pink: '#F4A6A6', page: '#F7F1E3',
 };
 
-// Danh sách trang phục cho bảng chọn (ChatPanel dùng)
-export const COSTUMES = [
-    { id: 'none', label: 'Original', emoji: '🦉' },
-    { id: 'wizard', label: 'Wizard', emoji: '🧙' },
-    { id: 'king', label: 'King', emoji: '👑' },
-    { id: 'detective', label: 'Detective', emoji: '🕵️' },
-    { id: 'astronaut', label: 'Astronaut', emoji: '🚀' },
-    { id: 'ninja', label: 'Ninja', emoji: '🥷' },
-    { id: 'graduate', label: 'Graduate', emoji: '🎓' },
-    { id: 'santa', label: 'Santa', emoji: '🎅' },
-    { id: 'chef', label: 'Chef', emoji: '👨‍🍳' },
-    { id: 'knight', label: 'Knight', emoji: '🛡️' },
-    { id: 'devil', label: 'Devil', emoji: '😈' },
-    { id: 'spy', label: 'Spy', emoji: '🕶️' },
-    { id: 'panda', label: 'Panda', emoji: '🐼' },
-    { id: 'whitemage', label: 'White Mage', emoji: '🪄' },
-    { id: 'beach', label: 'Beach', emoji: '🏖️' },
-    { id: 'fox', label: 'Fox', emoji: '🦊' },
-    { id: 'soccer', label: 'Soccer', emoji: '⚽' },
-    { id: 'cyber', label: 'Cyber', emoji: '🎧' },
-    { id: 'fpt', label: 'FPT', emoji: '🏫' },
-];
-
 /* ------------------------------------------------------------------ */
 /* Dựng mô hình (toàn bộ từ hình khối cơ bản, không cần file .glb)     */
 /* ------------------------------------------------------------------ */
@@ -1002,7 +979,7 @@ function Owl3D({ action, costume }) {
             rig.scene.traverse((o) => {
                 o.geometry?.dispose?.();
                 const m = o.material;
-                if (m) (Array.isArray(m) ? m : [m]).forEach((xx) => { xx.gradientMap?.dispose?.(); xx.dispose(); });
+                if (m) (Array.isArray(m) ? m : [m]).forEach((xx) => { xx.map?.dispose?.(); xx.gradientMap?.dispose?.(); xx.dispose(); });
             });
             renderer.dispose();
             renderer.domElement.remove();

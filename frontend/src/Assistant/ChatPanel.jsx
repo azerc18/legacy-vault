@@ -3,7 +3,7 @@ import { assistantApi } from '../api/assistantApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon } from '../Owner/ownerUi.jsx';
 import ChibiAvatar from './ChibiAvatar.jsx';
-import { COSTUMES } from './ChibiAvatar3D.jsx';
+import { COSTUMES } from './costumes.js';
 
 export const WELCOME = { role: 'assistant', content: "Hi! I'm Vaulty. Ask me how to use LegacyVault." };
 const MAX_HISTORY = 10;   // khớp @Size(max = 10) ở ChatRequest
