@@ -108,8 +108,8 @@ export default function Dashboard() {
         add(root.querySelectorAll('.lv-hero-rv')[1], 0.95);
         root.querySelectorAll('.lv-hero-badges > *').forEach((el, i) => add(el, 1.1 + i * 0.08));
         // Các phần còn lại: tiêu đề, rồi từng thẻ so le
-        root.querySelectorAll('.lv-reveal').forEach((el) => { if (!el.querySelector('.grid, .divide-y')) add(el, 0); }); // khối có lưới thì để từng thẻ tự hiện
-        root.querySelectorAll('section .grid, footer .grid, .divide-y').forEach((grid) => {
+        root.querySelectorAll('.lv-reveal').forEach((el) => { if (!el.querySelector('.lv-stagger')) add(el, 0); }); // khối có lưới thì để từng thẻ tự hiện
+        root.querySelectorAll('.lv-stagger').forEach((grid) => {
             Array.from(grid.children).forEach((el, i) => add(el, 0.1 + Math.min(i, 5) * 0.09));
         });
         const io = new IntersectionObserver((entries) => {
@@ -220,7 +220,7 @@ export default function Dashboard() {
 
             {/* 2. PROBLEM */}
             <Section eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {PROBLEMS.map((p) => (
                         <div key={p.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
                             <Icon name={p.icon} className="text-error text-[28px]" />
@@ -233,7 +233,7 @@ export default function Dashboard() {
 
             {/* 3. HOW IT WORKS */}
             <Section id="how" eyebrow={t('how.eyebrow')} title={t('how.title')}>
-                <div className="grid md:grid-cols-4 gap-6">
+                <div className="lv-stagger grid md:grid-cols-4 gap-6">
                     {STEPS.map((s, i) => (
                         <div key={s.key} className="relative">
                             <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center">
@@ -249,7 +249,7 @@ export default function Dashboard() {
 
             {/* 4. SECURITY */}
             <Section id="security" mode="dark" eyebrow={t('security.eyebrow')} title={t('security.title')}>
-                <div className="grid md:grid-cols-3 gap-5">
+                <div className="lv-stagger grid md:grid-cols-3 gap-5">
                     {SECURITY.map((s) => (
                         <div key={s.key} className="rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
                             <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
@@ -262,7 +262,7 @@ export default function Dashboard() {
 
             {/* 5. WHAT YOU CAN STORE */}
             <Section eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+                <div className="lv-stagger grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
                     {ASSETS.map((a) => (
                         <div key={a.key} className="flex items-center gap-3 p-4 rounded-xl border border-outline-variant/40">
                             <Icon name={a.icon} className="text-primary" />
@@ -274,7 +274,7 @@ export default function Dashboard() {
 
             {/* 6. ROLES — tên vai trò dùng chung common:roles */}
             <Section id="roles" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {ROLES.map((r) => (
                         <div key={r.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
                             <div className="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
@@ -289,7 +289,7 @@ export default function Dashboard() {
 
             {/* 7. FAQ */}
             <Section id="faq" eyebrow={t('faq.eyebrow')} title={t('faq.title')}>
-                <div className="max-w-2xl mx-auto divide-y divide-outline-variant/40 border-y border-outline-variant/40">
+                <div className="lv-stagger max-w-2xl mx-auto divide-y divide-outline-variant/40 border-y border-outline-variant/40">
                     {FAQS.map((k, i) => (
                         <div key={k}>
                             <button
