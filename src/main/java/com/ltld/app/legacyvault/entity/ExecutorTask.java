@@ -55,6 +55,13 @@ public class ExecutorTask {
     @Column(length = 1000)
     private String note;
 
+    // C.4: bằng chứng hoàn tất. Bắt buộc có một trong hai để chuyển DONE (logic làm ở PR 2)
+    @Column(name = "evidence_ref", length = 200)
+    private String evidenceRef;
+
+    @Column(name = "evidence_document_id")
+    private UUID evidenceDocumentId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
