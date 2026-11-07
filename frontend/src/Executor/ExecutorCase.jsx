@@ -7,6 +7,7 @@ import { executorApi, caseStep, HANDOVER_CLASS, CLAIM_PROGRESS_CLASS } from '../
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
+import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
 import { tEnum } from '../i18n/format.js';
@@ -184,7 +185,7 @@ function latestProgress(progress, vaultId) {
         .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))[0];
 }
 
-/* ---------- FR-09: nộp giấy chứng tử ---------- */
+/* ---------- FR-09: nộp giấy chứng tử + AI OCR ---------- */
 function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
     const { t } = useTranslation('executor');
     // Chỉ nộp được cho vault ACTIVE và chưa nằm trong hồ sơ đang chờ / đã duyệt
@@ -199,12 +200,39 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
+    const [ocrLoading, setOcrLoading] = useState(false);
+    const [ocrResult, setOcrResult] = useState(null);
 
     useEffect(() => { setSelected(eligible.map((v) => v.vaultId)); }, [vaults, progress]); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (eligible.length === 0) return null;
 
     const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+
+    const handleFileSelect = (nextFile) => {
+        setFile(nextFile);
+        setOcrResult(null);
+        setError('');
+    };
+
+    const handleOcrScan = async () => {
+        if (!file) return setError(t('case.submit.errFile'));
+        if (!/\.(pdf|png|jpe?g)$/i.test(file.name)) return setError(t('case.submit.errType'));
+        if (file.size > MAX_SIZE) return setError(t('case.submit.errSize'));
+        setError('');
+        setOcrLoading(true);
+        try {
+            const res = await executorApi.analyzeDeathCertificate(assignmentId, file);
+            setOcrResult(res);
+            if (res?.summaryNote && (!notes.trim() || notes.trim().startsWith('[AI OCR'))) {
+                setNotes(res.summaryNote.slice(0, 1000));
+            }
+        } catch (err) {
+            setError(getErrorMessage(err, t('case.submit.ocrFailed', 'Không thể phân tích tài liệu bằng AI OCR.')));
+        } finally {
+            setOcrLoading(false);
+        }
+    };
 
     const submit = async (e) => {
         e.preventDefault();
@@ -218,7 +246,7 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
         try {
             await executorApi.submitVerification(assignmentId, { file, vaultIds: selected, notes: notes.trim() });
             setSuccess(t('case.submit.success'));
-            setFile(null); setNotes('');
+            setFile(null); setNotes(''); setOcrResult(null);
             onSubmitted();
         } catch (err) {
             setError(getErrorMessage(err, t('case.submit.failed')));
@@ -242,8 +270,33 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
                         </label>
                     ))}
                 </div>
-                <FilePicker file={file} onChange={setFile} accept={FILE_TYPES}
-                            label={t('case.submit.chooseFile')} hint={t('case.submit.fileHint')} />
+                <div className="flex flex-wrap items-center gap-3">
+                    <FilePicker file={file} onChange={handleFileSelect} accept={FILE_TYPES}
+                                label={t('case.submit.chooseFile')} hint={t('case.submit.fileHint')} />
+                    {file && (
+                        <button
+                            type="button"
+                            data-testid="executor-ocr-btn"
+                            onClick={handleOcrScan}
+                            disabled={ocrLoading || loading}
+                            className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/20 transition-all disabled:opacity-50 cursor-pointer"
+                        >
+                            <Icon name="auto_awesome" className="text-[18px]" />
+                            {ocrLoading
+                                ? t('case.submit.ocrScanning', 'Đang quét & đối chiếu AI OCR...')
+                                : t('case.submit.ocrScan', '✨ Quét & Trích xuất bằng AI (OCR)')}
+                        </button>
+                    )}
+                </div>
+
+                {ocrResult && (
+                    <OcrAnalysisCard
+                        data={ocrResult}
+                        role="executor"
+                        onApplyNote={(summary) => setNotes(summary.slice(0, 1000))}
+                    />
+                )}
+
                 <textarea rows={2} maxLength={1000} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('case.submit.notesPlaceholder')}
                     className="w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary" />
                 <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('case.submit.submitting') : t('case.submit.button')}</button>

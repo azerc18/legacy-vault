@@ -38,7 +38,10 @@ public class GeminiAiClient implements AiClient {
                 "contents", messages.stream().map(m -> Map.of(
                         "role", "assistant".equals(m.role()) ? "model" : "user",
                         "parts", List.of(Map.of("text", m.content())))).toList(),
-                "generationConfig", Map.of("temperature", 0.4, "maxOutputTokens", 2048));
+                "generationConfig", Map.of(
+                        "temperature", 0.4,
+                        "maxOutputTokens", 2048,
+                        "thinkingConfig", Map.of("thinkingBudget", 0)));
 
         GeminiResponse res = client.post()
                 .uri("/models/{model}:generateContent", model)
