@@ -24,6 +24,9 @@ export const getRequestById = (id) => http.get(`${BASE}/${id}`).then(unwrap);
 // UC13 + FR-13: kiểm tra giấy chứng tử (POST, bước đầu tiên của hồ sơ PENDING, chưa cần View) -> { requestId, valid, message }
 export const verifyDocument = (id) => http.post(`${BASE}/${id}/document/verify`).then(unwrap);
 
+// AI OCR: phân tích & đối chiếu giấy chứng tử bằng AI cho Legal Verifier
+export const analyzeDocumentOcr = (id) => http.post(`${BASE}/${id}/document/ocr`).then(unwrap);
+
 // D1: tải giấy chứng tử (trả về file, nên cần responseType blob)
 export const getDocumentBlob = (id) =>
     http.get(`${BASE}/${id}/document`, { responseType: 'blob' });

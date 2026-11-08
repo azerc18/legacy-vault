@@ -60,6 +60,13 @@ export const executorApi = {
         return http.post(`${BASE}/${assignmentId}/verification-requests`, form).then(unwrap);
     },
 
+    // AI OCR: quét & trích xuất thông tin giấy chứng tử (3-Layer Fail-Safe)
+    analyzeDeathCertificate: (assignmentId, file) => {
+        const form = new FormData();
+        form.append('file', file);
+        return http.post(`${BASE}/${assignmentId}/ocr-death-certificate`, form).then(unwrap);
+    },
+
     // FR-11: mọi hồ sơ xác minh đã gửi (kể cả bị từ chối), mới nhất trước
     // -> Page { content: [{ id, status, vaults: [{ id, name }], rejectionReason, createdAt, decidedAt, unreadMessageCount }], totalElements, ... }
     listVerificationRequests: (assignmentId, { page = 0, size = 20 } = {}) =>
