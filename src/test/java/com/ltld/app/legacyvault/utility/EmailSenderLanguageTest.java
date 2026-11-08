@@ -103,4 +103,54 @@ class EmailSenderLanguageTest {
 
         assertThat(SentMail.captureOne(javaMailSender).getHtml()).doesNotContain("<b>Owner</b>").contains("&lt;b&gt;");
     }
+
+    @Test
+    void welcome_vietnameseAndEnglish() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+        emailSender.sendWelcomeEmail("an@example.com", "An");
+        SentMail vi = SentMail.captureOne(javaMailSender);
+        assertThat(vi.getSubject()).isEqualTo("Chào mừng đến với LegacyVault");
+        assertThat(vi.getText()).contains("Xin chào An,", "https://legacyvault.test/login");
+    }
+
+    @Test
+    void welcome_english_fallsBackToEmailWhenNoName() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        emailSender.sendWelcomeEmail("an@example.com", null);
+        SentMail en = SentMail.captureOne(javaMailSender);
+        assertThat(en.getSubject()).isEqualTo("Welcome to LegacyVault");
+        assertThat(en.getText()).contains("Hello an@example.com,");
+    }
+
+    @Test
+    void passwordChanged_warnsAndLinksToReset() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        emailSender.sendPasswordChangedNotice("an@example.com", "An");
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Your password was changed - LegacyVault");
+        assertThat(mail.getText()).contains("If this was not you", "https://legacyvault.test/forgot-password");
+    }
+
+    @Test
+    void accountLocked_mentionsMinutes() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+        emailSender.sendAccountLockedNotice("an@example.com", "An", 15);
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Tài khoản tạm thời bị khóa - LegacyVault");
+        assertThat(mail.getText()).contains("khóa 15 phút");
+    }
+
+    @Test
+    void dmsCheckinConfirmation_showsNextDeadlineInVietnamTime() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            emailSender.sendDmsCheckinConfirmation("an@example.com", "An", LocalDateTime.of(2026, 12, 1, 10, 30));
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getText()).contains("01/12/2026 17:30 (GMT+7)", "/owner/dms");
+    }
 }

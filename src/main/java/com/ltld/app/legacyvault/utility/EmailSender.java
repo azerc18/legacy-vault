@@ -57,6 +57,68 @@ public class EmailSender {
                 MailMessages.get(lang, "mail.codeFooter", OTP_EXPIRE_SECONDS / 60));
     }
 
+    // N1: chào mừng sau khi xác minh email
+    @Async
+    public void sendWelcomeEmail(String email, String fullName) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.welcome.body"));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.signIn") + ": " + base + "/login");
+        }
+        paras.add(MailMessages.get(lang, "mail.welcome.hint"));
+        sendKeyed(email, lang, Style.INVITE, "mail.welcome", paras);
+    }
+
+    // N2: báo đã đổi mật khẩu (đặt lại thành công)
+    @Async
+    public void sendPasswordChangedNotice(String email, String fullName) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.pwChanged.body"));
+        paras.add(MailMessages.get(lang, "mail.pwChanged.warn"));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.resetPassword") + ": " + base + "/forgot-password");
+        }
+        sendKeyed(email, lang, Style.SECURITY, "mail.pwChanged", paras);
+    }
+
+    // N3: tài khoản bị khóa tạm do sai mật khẩu / mã 2FA nhiều lần
+    @Async
+    public void sendAccountLockedNotice(String email, String fullName, int lockMinutes) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.locked.body", lockMinutes));
+        paras.add(MailMessages.get(lang, "mail.locked.warn"));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.resetPassword") + ": " + base + "/forgot-password");
+        }
+        sendKeyed(email, lang, Style.SECURITY, "mail.locked", paras);
+    }
+
+    // N19: xác nhận check-in Công tắc người chết thành công (nextDueAt có thể null)
+    @Async
+    public void sendDmsCheckinConfirmation(String email, String fullName, LocalDateTime nextDueAt) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.checkin.body"));
+        if (nextDueAt != null) {
+            paras.add(MailMessages.get(lang, "mail.checkin.next", formatDeadline(nextDueAt)));
+        }
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.openDms") + ": " + base + "/owner/dms");
+        }
+        sendKeyed(email, lang, Style.SUCCESS, "mail.checkin", paras);
+    }
+
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
     @Async
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
@@ -406,6 +468,16 @@ public class EmailSender {
     // "Tên (email)"; không có tên thì chỉ "email".
     private static String ownerLabel(String ownerName, String ownerEmail) {
         return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName + " (" + ownerEmail + ")";
+    }
+
+    /** Mail theo khóa prefix.subject / prefix.title; các đoạn thân thư do người gọi dựng sẵn (đã dịch). */
+    private void sendKeyed(String to, AppLanguage lang, Style style, String prefix, List<String> paragraphs) {
+        deliver(to, lang, style, MailMessages.get(lang, prefix + ".subject"),
+                MailMessages.get(lang, prefix + ".title"), paragraphs, null, null);
+    }
+
+    private static String displayName(String fullName, String email) {
+        return fullName == null || fullName.isBlank() ? email : fullName;
     }
 
     /** Mail có mã OTP: chữ lấy từ mail_xx.properties theo khóa prefix.subject/.title/.body. */
