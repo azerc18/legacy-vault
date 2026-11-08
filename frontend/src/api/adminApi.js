@@ -4,6 +4,36 @@ import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
 
+function fileNameFrom(res, fallback) {
+    const cd = res.headers['content-disposition'] || '';
+    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (star) return decodeURIComponent(star[1]);
+    const plain = cd.match(/filename="?([^";]+)"?/i);
+    return plain ? plain[1] : fallback;
+}
+
+// Tải file (PDF/CSV). Lỗi trả về Blob JSON -> đọc lại để getErrorMessage lấy được message của BE
+async function downloadBlob(url, params, fallbackName) {
+    try {
+        const res = await http.get(url, { params, responseType: 'blob' });
+        const href = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = fileNameFrom(res, fallbackName);
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch (err) {
+        const blob = err.response?.data;
+        if (blob instanceof Blob) {
+            try { err.response.data = JSON.parse(await blob.text()); } catch { /* giữ nguyên */ }
+        }
+        throw err;
+    }
+}
+
+// Bỏ các tham số rỗng
+const clean = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+
 export const adminApi = {
     /* ---------- Người dùng ---------- */
     // q: tìm theo email/tên; role: OWNER | BENEFICIARY | EXECUTOR | LEGAL_VERIFIER | ADMIN; status: PENDING | ACTIVE | LOCKED
@@ -70,11 +100,67 @@ export const adminApi = {
     },
     listAuditActions: () => http.get('/admin/audit-logs/actions').then(unwrap),
 
-    // status: OPEN | ACKNOWLEDGED
-    listAlerts: ({ status = 'OPEN', page = 0, size = 20 } = {}) =>
-        http.get('/admin/security-alerts', { params: { status, page, size } }).then(unwrap),
+    // status: OPEN | ACKNOWLEDGED; severity: HIGH | MEDIUM | '' (mọi mức)
+    // -> Page { content: [{ ..., acknowledgeNote, relatedUserId, relatedUserEmail, relatedUserStatus }] }
+    listAlerts: ({ status = 'OPEN', severity, page = 0, size = 20 } = {}) =>
+        http.get('/admin/security-alerts', { params: clean({ status, severity, page, size }) }).then(unwrap),
     // -> { open: number }
     countOpenAlerts: () => http.get('/admin/security-alerts/count').then(unwrap),
     // 409 nếu đã được xác nhận
-    acknowledgeAlert: (alertId) => http.patch(`/admin/security-alerts/${alertId}/acknowledge`).then(unwrap),
+    // note: ghi chú tuỳ chọn (≤ 500 ký tự)
+    acknowledgeAlert: (alertId, note) =>
+        http.patch(`/admin/security-alerts/${alertId}/acknowledge`, { note: note || null }).then(unwrap),
+    // B4: CSV theo bộ lọc hiện tại (from/to là ISO string)
+    exportAuditLogs: ({ action, actorEmail, ip, from, to } = {}) =>
+        downloadBlob('/admin/audit-logs/export', clean({ action, actorEmail, ip, from, to }), 'audit-logs.csv'),
+
+    /* ---------- A1: tổng quan ---------- */
+    // -> { usersByStatus{}, vaultsByStatus{}, openAlerts, openHighAlerts, dmsPendingConfirmation, dmsTriggered,
+    //      executorRescueNeeded, revenueThisMonthVnd, successfulPaymentsThisMonth, vipUsers,
+    //      highAlerts[], claimDeadlines[], stalePendingPayments[] }
+    getStats: () => http.get('/admin/stats').then(unwrap),
+
+    /* ---------- A2: thanh toán (chỉ đọc) ---------- */
+    // status: PENDING | SUCCESS | FAILED; from/to: 'YYYY-MM-DD' (to bao gồm cả ngày đó)
+    // -> Page { content: [{ id, userId, userEmail, userFullName, planCode, planName, amountVnd, status, provider,
+    //      providerTransactionNo, bankCode, responseCode, createdAt, paidAt, currentPlanCode }] }
+    listPayments: ({ status, email, from, to, page = 0, size = 20 } = {}) =>
+        http.get('/admin/payments', { params: clean({ status, email, from, to, page, size }) }).then(unwrap),
+    // -> { totalRevenueVnd, successCount, pendingCount, failedCount } theo cùng bộ lọc
+    paymentSummary: ({ status, email, from, to } = {}) =>
+        http.get('/admin/payments/summary', { params: clean({ status, email, from, to }) }).then(unwrap),
+    // 409 nếu giao dịch chưa SUCCESS
+    downloadReceipt: (id) => downloadBlob(`/admin/payments/${id}/receipt`, undefined, `receipt-${id}.pdf`),
+    // B4: CSV theo bộ lọc hiện tại
+    exportPayments: ({ status, email, from, to } = {}) =>
+        downloadBlob('/admin/payments/export', clean({ status, email, from, to }), 'payments.csv'),
+
+    /* ---------- A3: chi tiết người dùng ---------- */
+    // -> { id, email, fullName, phoneNumber, status, kycLevel, mfaEnabled, failedLoginAttempts, lockedUntil, createdAt,
+    //      lastLoginAt, roles[], dmsStatus, dmsNextCheckinDueAt, planCode, planName, planExpiresAt,
+    //      vaults[{ id, name, status, claimDeadlineAt, createdAt }], recentLogs[AuditLog], alerts[{ id, rule, severity, status, message, lastSeenAt }] }
+    getUserDetail: (userId) => http.get(`/admin/users/${userId}`).then(unwrap),
+
+    /* ---------- B2: tìm kho ---------- */
+    // q: tên kho / email / tên chủ kho; expiringWithinDays: chỉ kho UNLOCKED có hạn nhận trong N ngày (bỏ qua status)
+    // -> Page { content: [{ id, name, description, status, ownerId, ownerEmail, ownerName, unlockedAt, claimDeadlineAt, claimExtensions, createdAt, updatedAt }] }
+    searchVaults: ({ q, status, expiringWithinDays, page = 0, size = 20 } = {}) =>
+        http.get('/admin/vaults', { params: clean({ q, status, expiringWithinDays, page, size }) }).then(unwrap),
+
+    /* ---------- C2: biểu đồ ---------- */
+    // -> { revenueByDay: [{ date, value }], newUsersByWeek: [{ date, value }] }
+    getCharts: () => http.get('/admin/stats/charts').then(unwrap),
+
+    /* ---------- B1: email gửi lỗi ---------- */
+    // -> Page { content: [{ id, recipientId, recipientEmail, type, status, attemptCount, lastAttemptAt, createdAt, sentAt }] }
+    listNotifications: ({ status = 'FAILED', page = 0, size = 20 } = {}) =>
+        http.get('/admin/notifications', { params: { status, page, size } }).then(unwrap),
+    // 409 nếu không còn FAILED / vừa thử lại < 1 phút / loại email chưa hỗ trợ; 503 nếu gửi vẫn lỗi
+    retryNotification: (id) => http.post(`/admin/notifications/${id}/retry`).then(unwrap),
+
+    /* ---------- C1: gói ---------- */
+    // -> [{ id, code, name, priceVnd, durationDays, maxVaults, maxBeneficiaries, storageQuotaBytes, legacyMessagesEnabled, activeSubscribers }]
+    listPlans: () => http.get('/admin/plans').then(unwrap),
+    // Chỉ đổi giá/tên cho lần mua sau. body: { priceVnd, name?, reason? }
+    updatePlan: (code, body) => http.patch(`/admin/plans/${encodeURIComponent(code)}`, body).then(unwrap),
 };

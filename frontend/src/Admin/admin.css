@@ -1,0 +1,160 @@
+/* =====================================================================
+   PHONG CÁCH "HỒ SƠ CÔNG CHỨNG" CHO KHU QUẢN TRỊ
+   Chỉ áp dụng bên trong .lv-admin (AdminLayout) -> không ảnh hưởng trang khác.
+   Dùng lại token màu --c-* sẵn có (sáng/tối), chỉ thêm vài biến riêng:
+     giấy (paper), mực (ink), viền kẻ (rule), dấu mộc (seal).
+   ===================================================================== */
+
+.lv-admin {
+  --adm-paper: var(--c-surface-container-lowest);
+  --adm-paper-2: var(--c-surface-container-low);
+  --adm-ink: var(--c-on-surface);
+  --adm-ink-soft: var(--c-on-surface-variant);
+  --adm-rule: var(--c-outline-variant);
+  --adm-seal: 168 38 38;           /* đỏ son của con dấu */
+  --adm-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+  --adm-label: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+  --adm-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+html.dark .lv-admin { --adm-seal: 255 138 128; }
+
+/* Tiêu đề trang: chữ có chân như văn bản hành chính + đường kẻ đôi bên dưới */
+.lv-admin main h1 {
+  font-family: var(--adm-serif);
+  letter-spacing: -0.01em;
+}
+.lv-admin .lv-adm-head {
+  border-bottom: 3px double rgb(var(--adm-rule));
+  padding-bottom: 1rem;
+}
+.lv-admin .lv-adm-kicker {
+  font: 700 11px/1 var(--adm-label);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: rgb(var(--adm-ink-soft));
+}
+
+/* ---------- Tờ hồ sơ (thẻ giấy) ---------- */
+.lv-dossier {
+  position: relative;
+  background: rgb(var(--adm-paper));
+  border: 1px solid rgb(var(--adm-rule) / .8);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgb(var(--adm-rule) / .5), 0 14px 30px -24px rgb(11 16 32 / .45);
+}
+/* Mép trên kẻ đôi như bìa hồ sơ */
+.lv-dossier::before {
+  content: ""; position: absolute; left: 14px; right: 14px; top: 6px; height: 4px; pointer-events: none;
+  border-top: 1px solid rgb(var(--adm-rule)); border-bottom: 1px solid rgb(var(--adm-rule));
+  opacity: .7;
+}
+.lv-dossier-title {
+  font-family: var(--adm-serif);
+  font-size: 1.05rem; font-weight: 700;
+}
+.lv-dossier-tab {
+  display: inline-block;
+  font: 700 10px/1 var(--adm-label);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgb(var(--adm-ink-soft));
+  padding: 4px 8px; border: 1px dashed rgb(var(--adm-rule)); border-radius: 4px;
+}
+
+/* Thẻ giấy cũ của các trang (bg-surface-container-lowest rounded-2xl) cũng mang dáng hồ sơ */
+.lv-admin main .bg-surface-container-lowest.rounded-2xl {
+  border-color: rgb(var(--adm-rule) / .8);
+  box-shadow: 0 14px 30px -26px rgb(11 16 32 / .45);
+}
+
+/* ---------- Sổ cái (bảng) ---------- */
+.lv-ledger { width: 100%; border-collapse: collapse; font-size: .875rem; text-align: left; }
+.lv-ledger thead th {
+  font: 700 11px/1.2 var(--adm-label);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgb(var(--adm-ink-soft));
+  background: rgb(var(--adm-paper-2));
+  border-bottom: 2px solid rgb(var(--adm-rule));
+  padding: .85rem 1rem;
+  white-space: nowrap;
+}
+.lv-ledger tbody td { padding: .9rem 1rem; border-top: 1px solid rgb(var(--adm-rule) / .55); vertical-align: top; }
+.lv-ledger tbody tr:first-child td { border-top: 0; }
+.lv-ledger tbody tr.is-row:hover td { background: rgb(var(--adm-paper-2) / .7); }
+.lv-num, .lv-mono { font-family: var(--adm-mono); font-variant-numeric: tabular-nums; }
+.lv-num { text-align: right; white-space: nowrap; }
+
+/* Điện thoại: mỗi dòng thành một phiếu, nhãn cột lấy từ data-label */
+@media (max-width: 767px) {
+  .lv-ledger.is-stack thead { display: none; }
+  .lv-ledger.is-stack, .lv-ledger.is-stack tbody, .lv-ledger.is-stack tr, .lv-ledger.is-stack td { display: block; width: 100%; }
+  .lv-ledger.is-stack tbody tr { padding: .75rem 1rem; border-top: 1px solid rgb(var(--adm-rule)); }
+  .lv-ledger.is-stack tbody tr:first-child { border-top: 0; }
+  .lv-ledger.is-stack tbody td { border: 0; padding: .25rem 0; text-align: left; }
+  .lv-ledger.is-stack tbody td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font: 700 10px/1.4 var(--adm-label); letter-spacing: .14em; text-transform: uppercase;
+    color: rgb(var(--adm-ink-soft));
+  }
+  .lv-ledger.is-stack tbody td.lv-num { text-align: left; }
+  .lv-ledger.is-stack tbody td .items-end { align-items: flex-start; }
+}
+
+/* ---------- Con dấu trạng thái ---------- */
+.lv-stamp {
+  --stamp: var(--adm-ink-soft);
+  display: inline-flex; align-items: center; gap: .3rem;
+  font: 800 10.5px/1 var(--adm-label);
+  letter-spacing: .12em; text-transform: uppercase; white-space: nowrap;
+  color: rgb(var(--stamp));
+  border: 1.5px solid rgb(var(--stamp) / .85);
+  border-radius: 5px;
+  padding: 4px 7px 3px;
+  background: rgb(var(--stamp) / .07);
+  transform: rotate(-1.5deg);
+}
+.lv-stamp.is-ok      { --stamp: var(--c-success); }
+.lv-stamp.is-warn    { --stamp: var(--c-warning); }
+.lv-stamp.is-danger  { --stamp: var(--adm-seal); }
+.lv-stamp.is-info    { --stamp: var(--c-secondary); }
+.lv-stamp.is-muted   { --stamp: var(--c-outline); }
+.lv-stamp.is-flat    { transform: none; }
+
+/* ---------- Thẻ số liệu (con dấu tròn + con số) ---------- */
+.lv-stat { display: flex; gap: 1rem; align-items: flex-start; padding: 1.25rem 1.25rem 1.1rem; }
+.lv-stat-seal {
+  flex: none; width: 46px; height: 46px; border-radius: 999px;
+  display: grid; place-items: center;
+  color: rgb(var(--seal, var(--c-secondary)));
+  border: 1.5px solid rgb(var(--seal, var(--c-secondary)) / .7);
+  box-shadow: inset 0 0 0 4px rgb(var(--adm-paper)), inset 0 0 0 5px rgb(var(--seal, var(--c-secondary)) / .35);
+}
+.lv-stat-seal.is-danger { --seal: var(--adm-seal); }
+.lv-stat-seal.is-ok { --seal: var(--c-success); }
+.lv-stat-seal.is-warn { --seal: var(--c-warning); }
+.lv-stat-value { font: 700 1.7rem/1.1 var(--adm-serif); font-variant-numeric: tabular-nums; }
+.lv-stat-label { font: 700 10.5px/1.3 var(--adm-label); letter-spacing: .12em; text-transform: uppercase; color: rgb(var(--adm-ink-soft)); }
+.lv-stat-foot { margin-top: .4rem; font-size: .78rem; color: rgb(var(--adm-ink-soft)); }
+
+/* Thanh tỉ lệ trạng thái (users/vault theo trạng thái) */
+.lv-split { display: flex; height: 6px; border-radius: 999px; overflow: hidden; background: rgb(var(--adm-rule) / .6); margin-top: .6rem; }
+.lv-split > span { display: block; height: 100%; }
+
+/* ---------- Danh sách việc cần xử lý ---------- */
+.lv-todo li + li { border-top: 1px dashed rgb(var(--adm-rule)); }
+
+/* Ngăn kéo chi tiết (A3) */
+.lv-drawer-backdrop { position: fixed; inset: 0; z-index: 38; background: rgb(0 0 0 / .4); }
+.lv-drawer {
+  position: fixed; z-index: 39; top: 0; right: 0; bottom: 0; width: min(560px, 100vw);
+  background: rgb(var(--adm-paper)); border-left: 1px solid rgb(var(--adm-rule));
+  overflow-y: auto; box-shadow: -30px 0 60px -40px rgb(0 0 0 / .6);
+  animation: lv-drawer-in .22s ease-out;
+}
+@keyframes lv-drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lv-drawer { animation: none; } .lv-stamp { transform: none; } }
+
+/* Biểu đồ cột đơn giản (C2) */
+.lv-bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; }
+.lv-bars > div { flex: 1; min-width: 4px; background: rgb(var(--c-secondary) / .75); border-radius: 3px 3px 0 0; position: relative; }
+.lv-bars > div:hover { background: rgb(var(--c-secondary)); }

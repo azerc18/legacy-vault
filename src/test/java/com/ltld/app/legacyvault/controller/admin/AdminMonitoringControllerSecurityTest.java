@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.controller.admin;
 
 import com.ltld.app.legacyvault.controller.AdminMonitoringController;
+import com.ltld.app.legacyvault.dto.auditdto.AdminAuditLogResponse;
 import com.ltld.app.legacyvault.dto.auditdto.SecurityAlertResponse;
+import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.exception.AdminException;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.auditservice.AdminAuditLogService;
@@ -12,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -19,8 +22,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
@@ -29,6 +34,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -97,20 +104,69 @@ class AdminMonitoringControllerSecurityTest {
     @Test
     void acknowledge_admin_passesAdminIdFromJwt() throws Exception {
         UUID alertId = UUID.randomUUID();
-        when(securityAlertService.acknowledge(any(), any())).thenReturn(SecurityAlertResponse.builder().build());
+        when(securityAlertService.acknowledge(any(), any(), any())).thenReturn(SecurityAlertResponse.builder().build());
 
         mockMvc.perform(patch("/api/admin/security-alerts/{id}/acknowledge", alertId).with(admin()))
                 .andExpect(status().isOk());
 
-        verify(securityAlertService).acknowledge(ADMIN_ID, alertId);
+        verify(securityAlertService).acknowledge(ADMIN_ID, alertId, null);
     }
 
     @Test
     void acknowledge_alreadyAcknowledged_returns409() throws Exception {
-        when(securityAlertService.acknowledge(any(), any()))
+        when(securityAlertService.acknowledge(any(), any(), any()))
                 .thenThrow(new AdminException("The alert has already been acknowledged", HttpStatus.CONFLICT));
 
         mockMvc.perform(patch("/api/admin/security-alerts/{id}/acknowledge", UUID.randomUUID()).with(admin()))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void acknowledge_withNote_passesNote() throws Exception {
+        UUID alertId = UUID.randomUUID();
+        when(securityAlertService.acknowledge(any(), any(), any())).thenReturn(SecurityAlertResponse.builder().build());
+
+        mockMvc.perform(patch("/api/admin/security-alerts/{id}/acknowledge", alertId).with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"Đã gọi xác minh\"}"))
+                .andExpect(status().isOk());
+
+        verify(securityAlertService).acknowledge(ADMIN_ID, alertId, "Đã gọi xác minh");
+    }
+
+    @Test
+    void acknowledge_noteTooLong_returns400() throws Exception {
+        String longNote = "x".repeat(501);
+        mockMvc.perform(patch("/api/admin/security-alerts/{id}/acknowledge", UUID.randomUUID()).with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"" + longNote + "\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(securityAlertService);
+    }
+
+    @Test
+    void listAlerts_passesSeverity() throws Exception {
+        when(securityAlertService.list(any(), any(), anyInt(), anyInt())).thenReturn(Page.empty());
+
+        mockMvc.perform(get("/api/admin/security-alerts").param("severity", "HIGH").with(admin()))
+                .andExpect(status().isOk());
+
+        verify(securityAlertService).list(null, "HIGH", 0, 20);
+    }
+
+    @Test
+    void exportAuditLogs_admin_returnsCsv() throws Exception {
+        when(adminAuditLogService.export(any(), any(), any(), any(), any())).thenReturn(List.of(
+                AdminAuditLogResponse.builder().action(AuditAction.LOGIN).actorEmail("a@b.vn").build()));
+
+        mockMvc.perform(get("/api/admin/audit-logs/export").with(admin()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", containsString("text/csv")))
+                .andExpect(content().string(containsString("a@b.vn")));
+    }
+
+    @Test
+    void exportAuditLogs_owner_returns403() throws Exception {
+        mockMvc.perform(get("/api/admin/audit-logs/export").with(token(UUID.randomUUID(), "ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(adminAuditLogService);
     }
 }
