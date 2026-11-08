@@ -329,29 +329,26 @@ export default function Dashboard() {
                         <div className="flex-[2_1_520px] flex flex-wrap gap-9">
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
                             <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.product')}</div>
-                            <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.features')}</a>
                             <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.how')}</a>
                             <a href="#security" className="text-white/70 hover:text-white">{t('footerNav.security')}</a>
-                            <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
+                            <a href="#faq" className="text-white/70 hover:text-white">{t('footerNav.faq')}</a>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
                             <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.forWho')}</div>
-                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.owner')}</Link>
-                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.beneficiary')}</Link>
-                            <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.executor')}</Link>
+                            <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.owner')}</a>
+                            <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.beneficiary')}</a>
+                            <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.executor')}</a>
                             <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.verifier')}</a>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
-                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.account')}</div>
-                            <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.start')}</div>
                             <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.signUp')}</Link>
-                            <Link to="/forgot-password" className="text-white/70 hover:text-white">{t('footerNav.forgot')}</Link>
+                            <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
                             <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.project')}</div>
-                            <span className="text-white/70">SWP391, FPT University</span>
                             <a href="https://github.com/azerc18/legacy-vault" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">GitHub</a>
-                            <a href="#faq" className="text-white/70 hover:text-white">{t('footerNav.contact')}</a>
+                            <a href="https://github.com/azerc18/legacy-vault/issues" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">{t('footerNav.contact')}</a>
                         </div>
                         </div>
                     </div>
