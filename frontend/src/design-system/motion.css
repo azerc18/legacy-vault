@@ -1,0 +1,56 @@
+/* =====================================================================
+   LEGACYVAULT DESIGN SYSTEM — APPLE-INSPIRED MOTION & REDUCED MOTION
+   Chỉ biến đổi transform và opacity để đạt hiệu suất 60/120fps ổn định
+   ===================================================================== */
+
+.lv-rise {
+  animation: lv-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+main {
+  animation: lv-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.lv-route-bar {
+  transform-origin: left center;
+  animation: lv-route-sweep 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes lv-route-sweep {
+  0% {
+    transform: scaleX(0.08);
+    opacity: 1;
+  }
+  75% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-rise,
+  main,
+  .lv-route-bar,
+  .lv-word,
+  .lv-shine,
+  .lv-tilt {
+    animation: none;
+    transition: none;
+  }
+}
+

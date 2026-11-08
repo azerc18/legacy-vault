@@ -94,7 +94,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
         <>
             <div className="lv-drawer-backdrop" onClick={onClose} />
             <aside className="lv-drawer lv-admin" role="dialog" aria-modal="true" aria-label={t('drawer.title')}>
-                <div className="sticky top-0 z-10 bg-surface-container-lowest/95 backdrop-blur px-6 pt-6 pb-4 border-b-[3px] border-double border-outline-variant">
+                <div className="sticky top-0 z-10 bg-surface-container-lowest/95 backdrop-blur px-6 pt-6 pb-4 border-b border-outline-variant">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="lv-adm-kicker">{t('drawer.kicker')}</p>

@@ -1,0 +1,112 @@
+{
+  "badge": {
+    "SELF_DECLARED": { "label": "Tự khai", "hint": "Chủ sở hữu tự khai, chưa được xác thực" },
+    "PENDING": { "label": "Đang chờ xác thực", "hint": "Đã bắt đầu xác thực nhưng chưa hoàn tất" },
+    "VERIFIED": { "label": "Đã xác thực", "hint": "Đã được xác thực" },
+    "VERIFIED_SANDBOX": { "label": "Mô phỏng", "hint": "Xác thực mô phỏng, chưa phải xác thực thật" },
+    "FAILED": { "label": "Xác thực thất bại", "hint": "Lần xác thực gần nhất không thành công" },
+    "EXPIRED": { "label": "Cần xác thực lại", "hint": "Xác thực đã hết hạn" }
+  },
+  "methods": {
+    "FILE_HASH": { "label": "Dấu vân tay tệp (SHA-256)", "desc": "Tải bản gốc lên két, hệ thống lưu dấu vân tay SHA-256 của tệp.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống lưu dấu vân tay SHA-256 của tệp để sau này phát hiện nếu tệp bị thay. Cách này chưa chứng minh tài liệu là thật." },
+    "SECOND_PERSON_CONFIRM": { "label": "Xác nhận của người thứ hai", "desc": "Gửi mã xác nhận cho nhân chứng hoặc đồng sở hữu." },
+    "OTP_EMAIL": { "label": "Mã OTP qua email", "desc": "Nhận mã gửi tới email của tài sản và nhập lại." },
+    "GOOGLE_LOGIN": { "label": "Đăng nhập Google", "desc": "Đăng nhập đúng tài khoản Google đã khai." },
+    "SMS_CODE_MOCK": { "label": "Mã SMS (mô phỏng)", "desc": "Nhập mã SMS mô phỏng gửi tới số điện thoại đã khai." },
+    "PAYPAL_LOGIN": { "label": "PayPal (mô phỏng)", "desc": "Xác nhận tài khoản PayPal bằng mã thử thách." },
+    "BANK_NAME_LOOKUP_MOCK": { "label": "Tra cứu tên tài khoản ngân hàng (mô phỏng)", "desc": "Đối chiếu tên chủ tài khoản ngân hàng đã khai." },
+    "BANK_FORMAT_CHECK": { "label": "Kiểm tra định dạng số tài khoản", "desc": "Kiểm tra định dạng hợp lệ của số tài khoản ngân hàng." },
+    "STATEMENT_UPLOAD": { "label": "Sao kê ngân hàng", "desc": "Tải tệp sao kê ngân hàng lên két để đối chiếu.", "fileIntro": "Tải bản sao kê ngân hàng (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB) để lưu vào tài liệu của két." },
+    "MICRO_DEPOSIT_MOCK": { "label": "Giao dịch nhỏ (mô phỏng)", "desc": "Nhập mã giao dịch thử nghiệm gửi vào tài khoản ngân hàng." },
+    "EXCHANGE_EMAIL_CODE": { "label": "Mã xác thực email sàn giao dịch", "desc": "Nhận mã xác thực gửi tới email đăng ký sàn giao dịch." },
+    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (mô phỏng)", "desc": "Kiểm tra kết nối chỉ đọc tới tài khoản sàn giao dịch." },
+    "ADDRESS_CHECKSUM": { "label": "Kiểm tra địa chỉ ví", "desc": "Kiểm tra định dạng và checksum của địa chỉ ví." },
+    "BIP39_CHECK": { "label": "Kiểm tra cụm từ khôi phục", "desc": "Kiểm tra cụm từ khôi phục đã lưu có hợp lệ theo BIP-39." },
+    "PUBLIC_BALANCE": { "label": "Tra số dư công khai", "desc": "Tra số dư công khai của địa chỉ ví trên blockchain." },
+    "WALLET_SIGNATURE": { "label": "Ký bằng ví", "desc": "Ký thông điệp bằng ví để chứng minh bạn nắm khóa." },
+    "BIO_CHALLENGE_MOCK": { "label": "Mã trong tiểu sử (mô phỏng)", "desc": "Đặt mã thử thách vào phần tiểu sử của tài khoản." },
+    "SCREENSHOT_UPLOAD": { "label": "Ảnh chụp hồ sơ", "desc": "Tải ảnh chụp trang hồ sơ tài khoản lên két." }
+  },
+  "button": { "verify": "Xác thực", "reverify": "Xác thực lại", "details": "Trạng thái xác thực" },
+  "dialog": {
+    "title": "Xác thực tài sản",
+    "loading": "Đang tải...",
+    "noMethods": "Loại tài sản này hiện chưa hỗ trợ xác thực.",
+    "chooseHint": "Chọn một cách xác thực:",
+    "resume": "Tiếp tục lần xác thực đang chờ",
+    "alreadyVerified": "Tài sản đã được xác thực, hiệu lực đến {{date}}. Nếu bạn sửa thông tin quan trọng, tài sản sẽ về trạng thái tự khai và cần xác thực lại.",
+    "codeSent": "Mã đã được gửi tới {{target}}.",
+    "codeEnter": "Nhập mã bạn đã nhận.",
+    "codeLabel": "Mã xác thực",
+    "codePlaceholder": "Nhập mã",
+    "sandboxNotice": "Chế độ mô phỏng: kết quả sẽ hiện nhãn \"Mô phỏng\", chưa phải xác thực thật.",
+    "sandboxCode": "Mã mô phỏng của bạn: {{code}}",
+    "challengeLabel": "Thông điệp cần ký",
+    "copy": "Sao chép",
+    "signatureLabel": "Chữ ký",
+    "signaturePlaceholder": "Dán chữ ký (0x...)",
+    "bioIntro": "Đặt mã sau vào phần tiểu sử của tài khoản, rồi dán lại vào ô bên dưới:",
+    "bioLabel": "Nội dung tiểu sử hoặc mã",
+    "bioPlaceholder": "LV-XXXXXX",
+    "fileIntro": "Tải ảnh chụp trang hồ sơ (PNG hoặc JPG, tối đa 10 MB). Ảnh được lưu vào tài liệu của két.",
+    "autoIntro": "Không cần nhập gì thêm, bấm Kiểm tra để hệ thống thực hiện.",
+    "googleIntro": "Đăng nhập bằng đúng tài khoản Google đã khai cho tài sản này.",
+    "submit": "Hoàn tất xác thực",
+    "check": "Kiểm tra",
+    "working": "Đang xử lý...",
+    "back": "Chọn cách khác",
+    "close": "Đóng",
+    "retry": "Thử lại",
+    "result": {
+      "verified": "Đã xác thực thành công.",
+      "sandbox": "Đã xác thực ở chế độ mô phỏng.",
+      "failed": "Xác thực chưa thành công.",
+      "expires": "Có hiệu lực đến {{date}}."
+    },
+    "errors": {
+      "load": "Không tải được trạng thái xác thực.",
+      "start": "Không bắt đầu được xác thực.",
+      "confirm": "Không hoàn tất được xác thực.",
+      "fileTooBig": "Tệp tối đa 10 MB."
+    }
+  },
+  "executor": {
+    "refLabel": "Mã tham chiếu",
+    "refPlaceholder": "Mã yêu cầu hoặc số hồ sơ của nhà cung cấp",
+    "fileLabel": "Tệp bằng chứng",
+    "fileHint": "PDF, JPG, PNG, tối đa 10 MB. Tệp được mã hóa khi lưu.",
+    "fileCurrent": "Tệp hiện có: {{name}}",
+    "sha": "SHA-256: {{hash}}...",
+    "download": "Tải về",
+    "needEvidence": "Cần nhập mã tham chiếu hoặc đính kèm tệp bằng chứng trước khi chọn \"Đã xong\".",
+    "fileTooBig": "Tệp tối đa 10 MB.",
+    "downloadError": "Không tải được tệp bằng chứng.",
+    "locked": "Việc này đã được xác nhận nên không thể thay đổi.",
+    "editHint": "Chuyển về \"Đang làm\" và lưu trước khi đổi bằng chứng."
+  },
+  "confirm": {
+    "PENDING": "Chờ người thụ hưởng xác nhận (hạn phản đối: {{date}}).",
+    "CONFIRMED": "Người thụ hưởng đã xác nhận kết quả.",
+    "DISPUTED": "Người thụ hưởng đã phản đối: {{reason}}. Cần mã tham chiếu mới hoặc tệp mới để hoàn tất lại.",
+    "autoConfirmed": "Đã hết hạn phản đối, kết quả được xem là đã chấp nhận."
+  },
+  "beneficiary": {
+    "evidenceRef": "Mã tham chiếu: {{ref}}",
+    "evidenceFile": "Tệp bằng chứng: {{name}}",
+    "sha": "SHA-256: {{hash}}...",
+    "confirmBtn": "Xác nhận",
+    "disputeBtn": "Phản đối",
+    "reasonLabel": "Lý do phản đối",
+    "reasonPlaceholder": "Mô tả vì sao bạn không đồng ý (5 đến 500 ký tự)",
+    "reasonInvalid": "Lý do phản đối từ 5 đến 500 ký tự.",
+    "submitDispute": "Gửi phản đối",
+    "cancel": "Hủy",
+    "confirmError": "Không xác nhận được.",
+    "disputeError": "Không gửi được phản đối."
+  },
+  "readiness": {
+    "reverify": "{{n}} tài sản cần xác thực lại",
+    "expiringSoon": "{{n}} tài sản sắp hết hạn xác thực (trong 14 ngày)",
+    "action": "Xác thực ngay"
+  }
+}
