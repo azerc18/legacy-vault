@@ -8,10 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 @Repository
-public interface    ExecutorTaskRepository extends JpaRepository<ExecutorTask, UUID> {
+public interface ExecutorTaskRepository extends JpaRepository<ExecutorTask, UUID> {
 
     // Kèm vault + asset (tên vault, loại tài sản) để không N+1 và đọc được sau khi transaction đóng
     @Query("""
