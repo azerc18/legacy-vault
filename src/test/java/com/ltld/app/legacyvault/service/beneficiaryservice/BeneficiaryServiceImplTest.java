@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.AcceptClaimResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryClaimResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.SendIdentityOtpRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryNotificationResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.BeneficiaryVaultSummaryResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.ClaimProgressResponse;
@@ -177,6 +178,14 @@ public class BeneficiaryServiceImplTest {
                 .email("beneficiary@example.com").status(BeneficiaryInviteStatus.INVITED).build();
         lenient().when(vaultBeneficiaryRepository.findByVaultIdAndUserId(vaultId, currentUserId))
                 .thenReturn(Optional.of(beneficiaryRow));
+        // #19: mặc định giữ chỗ gửi OTP thành công (không có request song song)
+        lenient().when(verificationRepository.claimOtpSendSlot(any(), any(), any())).thenReturn(1);
+    }
+
+    private SendIdentityOtpRequest otpRequest() {
+        SendIdentityOtpRequest r = new SendIdentityOtpRequest();
+        r.setVaultId(vaultId);
+        return r;
     }
 
     private BeneficiaryClaim claim(ClaimStatus status, LocalDateTime deadline) {
@@ -513,15 +522,34 @@ public class BeneficiaryServiceImplTest {
     // ===================== FR-17: gửi OTP =====================
 
 
+    // #19: request song song khác vừa giữ chỗ gửi (UPDATE có điều kiện trả 0) -> 429, không gửi mã thứ hai
     @Test
-    void sendIdentityOtp_methodIsNotOtp_throws400() {
-        request.setVerificationMethod(VerificationMethod.EKYC_MOCK);
+    void sendIdentityOtp_concurrentResendLostSlot_throws429WithoutSending() {
         stubAccessibleVault();
+        stubPendingSession(pendingSession(VerificationMethod.OTP));
+        when(verificationRepository.claimOtpSendSlot(any(), any(), any())).thenReturn(0);
 
-        expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+        expectError(HttpStatus.TOO_MANY_REQUESTS,
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
 
         verify(emailSender, never()).sendEmail(any(), any());
+        verify(verificationRepository, never()).save(any());
+        verifyNoInteractions(otpGenerator);
+    }
+
+    // #10: số lần thử tối đa đọc từ cấu hình
+    @Test
+    void verifyIdentity_configuredMaxAttempts_locksEarlier() {
+        org.springframework.test.util.ReflectionTestUtils.setField(beneficiaryService, "maxVerifyAttempts", 2);
+        IdentityVerification session = pendingSession(VerificationMethod.OTP);
+        session.setOtpCode(otpHasher.hash(session.getId(), "123456"));
+        session.setOtpExpiresAt(LocalDateTime.now().plusMinutes(5));
+        stubAccessibleVault();
+        stubPendingSession(session);
+        when(verificationRepository.findAttemptCountById(session.getId())).thenReturn(2);
+
+        expectError(HttpStatus.LOCKED, () -> beneficiaryService.verifyIdentity(
+                verifyRequest(VerificationMethod.OTP, "000000", null), currentUserId));
     }
 
     @Test
@@ -533,7 +561,7 @@ public class BeneficiaryServiceImplTest {
                 .thenReturn(Optional.empty());
 
         expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
     }
 
     @Test
@@ -542,7 +570,7 @@ public class BeneficiaryServiceImplTest {
         stubLocked(true);
 
         expectError(HttpStatus.LOCKED,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
 
         verify(emailSender, never()).sendEmail(any(), any());
     }
@@ -555,7 +583,7 @@ public class BeneficiaryServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
 
         expectError(HttpStatus.NOT_FOUND,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
     }
 
     @Test
@@ -564,7 +592,7 @@ public class BeneficiaryServiceImplTest {
         when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
 
         expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
     }
 
     @Test
@@ -573,7 +601,7 @@ public class BeneficiaryServiceImplTest {
         when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.empty());
 
         expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
     }
 
     @Test
@@ -583,7 +611,7 @@ public class BeneficiaryServiceImplTest {
                 claim(ClaimStatus.PENDING, LocalDateTime.now().minusMinutes(1))));
 
         expectError(HttpStatus.GONE,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
     }
 
     // ===================== FR-17: xác thực danh tính =====================
@@ -768,7 +796,7 @@ public class BeneficiaryServiceImplTest {
         stubPendingSession(session);
         when(otpGenerator.generate()).thenReturn("123456");
 
-        beneficiaryService.sendIdentityOtp(request, currentUserId);
+        beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId);
 
         ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
         verify(verificationRepository).save(captor.capture());
@@ -788,7 +816,7 @@ public class BeneficiaryServiceImplTest {
         when(otpGenerator.generate()).thenReturn("123456");
         doThrow(new RuntimeException("smtp down")).when(emailSender).sendEmail(any(), any());
 
-        assertThatCode(() -> beneficiaryService.sendIdentityOtp(request, currentUserId))
+        assertThatCode(() -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId))
                 .doesNotThrowAnyException();
 
         verify(auditLogService).log(eq(AuditAction.IDENTITY_OTP_SENT), eq(AuditResult.FAILURE),
@@ -804,7 +832,7 @@ public class BeneficiaryServiceImplTest {
 
         TransactionSynchronizationManager.initSynchronization();
         try {
-            beneficiaryService.sendIdentityOtp(request, currentUserId);
+            beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId);
             verify(emailSender, never()).sendEmail(any(), any());
 
             TransactionSynchronizationManager.getSynchronizations()
@@ -825,7 +853,7 @@ public class BeneficiaryServiceImplTest {
         stubPendingSession(session);
 
         expectError(HttpStatus.TOO_MANY_REQUESTS,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
 
         verify(emailSender, never()).sendEmail(any(), any());
         verify(verificationRepository, never()).save(any());
@@ -843,7 +871,7 @@ public class BeneficiaryServiceImplTest {
         stubPendingSession(session);
         when(otpGenerator.generate()).thenReturn("654321");
 
-        beneficiaryService.sendIdentityOtp(request, currentUserId);
+        beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId);
 
         ArgumentCaptor<IdentityVerification> captor = ArgumentCaptor.forClass(IdentityVerification.class);
         verify(verificationRepository).save(captor.capture());
@@ -1033,7 +1061,7 @@ public class BeneficiaryServiceImplTest {
         stubPendingSession(session);
 
         expectError(HttpStatus.BAD_REQUEST,
-                () -> beneficiaryService.sendIdentityOtp(request, currentUserId));
+                () -> beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId));
 
         verify(emailSender, never()).sendEmail(any(), any());
     }
@@ -1045,7 +1073,7 @@ public class BeneficiaryServiceImplTest {
         stubPendingSession(session);
         when(otpGenerator.generate()).thenReturn("123456");
 
-        beneficiaryService.sendIdentityOtp(request, currentUserId);
+        beneficiaryService.sendIdentityOtp(otpRequest(), currentUserId);
 
         verify(auditLogService).log(eq(AuditAction.IDENTITY_OTP_SENT), eq(AuditResult.SUCCESS),
                 eq(currentUserId), any(), eq("Vault"), eq(vaultId.toString()), isNull());
