@@ -4,16 +4,13 @@ import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass, btnPrimary } from '../Owner/ownerUi.jsx';
-import { AdminLayout, Pager, isAdmin } from './adminUi.jsx';
+import { AdminLayout, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 
 // Nhãn ở admin.json > vaults.status.<code>
-const STATUS_CLS = {
-    ACTIVE: 'bg-secondary-fixed text-on-secondary-fixed',
-    UNLOCKED: 'bg-warning-container text-on-warning-container',
-    CLAIMED: 'bg-success-container text-on-success-container',
-    ARCHIVED_LOCKED: 'bg-surface-container text-outline',
-};
+const VAULT_STATUSES = ['ACTIVE', 'UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'];
+// Vault ACTIVE là bình thường -> dấu xanh nhạt; UNLOCKED cần chú ý thời hạn nhận
+const vaultTone = (s) => (s === 'ACTIVE' ? 'info' : s === 'UNLOCKED' ? 'warn' : toneOf(s));
 const MAX_EXTENSIONS = 2;           // khớp AdminClaimServiceImpl.MAX_EXTENSIONS
 const EXTEND_DAYS = [7, 14, 30];
 
@@ -54,7 +51,7 @@ export default function AdminVaults() {
             <div className="flex flex-wrap items-center gap-3 mb-6">
                 <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} className={`${inputClass} max-w-xs`}>
                     <option value="">{t('allStatuses')}</option>
-                    {Object.keys(STATUS_CLS).map((k) => <option key={k} value={k}>{statusLabel(k)}</option>)}
+                    {VAULT_STATUSES.map((k) => <option key={k} value={k}>{statusLabel(k)}</option>)}
                 </select>
                 {data && <span className="text-sm text-on-surface-variant">{t('vaults.total', { count: data.totalElements })}</span>}
             </div>
@@ -64,28 +61,28 @@ export default function AdminVaults() {
             {data && rows.length === 0 && <EmptyState bordered icon="inventory_2" title={t('vaults.empty.title')} text={t('vaults.empty.text')} />}
 
             {rows.length > 0 && (
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-surface-container-low text-on-surface-variant">
+                <div className="lv-dossier overflow-x-auto">
+                    <table className="lv-ledger is-stack">
+                        <thead>
                         <tr>
-                            <th className="p-4">{t('vaults.cols.vault')}</th>
-                            <th className="p-4">{t('vaults.cols.status')}</th>
-                            <th className="p-4">{t('vaults.cols.created')}</th>
-                            <th className="p-4">{t('vaults.cols.updated')}</th>
-                            <th className="p-4" />
+                            <th>{t('vaults.cols.vault')}</th>
+                            <th>{t('vaults.cols.status')}</th>
+                            <th>{t('vaults.cols.created')}</th>
+                            <th>{t('vaults.cols.updated')}</th>
+                            <th />
                         </tr>
                         </thead>
                         <tbody>
                         {rows.map((v) => (
-                            <tr key={v.id} className="border-t border-outline-variant/20 hover:bg-surface-container-low">
-                                <td className="p-4">
+                            <tr key={v.id} className="is-row">
+                                <td data-label={t('vaults.cols.vault')}>
                                     <p className="font-semibold">{v.name}</p>
                                     {v.description && <p className="text-xs text-outline line-clamp-1">{v.description}</p>}
                                 </td>
-                                <td className="p-4"><span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${STATUS_CLS[v.status] || ''}`}>{statusLabel(v.status)}</span></td>
-                                <td className="p-4 whitespace-nowrap">{formatDate(v.createdAt)}</td>
-                                <td className="p-4 whitespace-nowrap">{formatDate(v.updatedAt)}</td>
-                                <td className="p-4 text-right">
+                                <td data-label={t('vaults.cols.status')}><Stamp tone={vaultTone(v.status)}>{statusLabel(v.status)}</Stamp></td>
+                                <td data-label={t('vaults.cols.created')} className="whitespace-nowrap">{formatDate(v.createdAt)}</td>
+                                <td data-label={t('vaults.cols.updated')} className="whitespace-nowrap">{formatDate(v.updatedAt)}</td>
+                                <td className="text-right">
                                     <button onClick={() => open(v)} className="text-sm font-semibold text-secondary hover:text-primary">{t('vaults.details')}</button>
                                 </td>
                             </tr>
@@ -98,7 +95,7 @@ export default function AdminVaults() {
 
             {detail && (
                 <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={() => setDetail(null)}>
-                    <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+                    <div className="lv-dossier p-6 pt-8 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-start">
                             <div>
                                 <h3 className="font-title-lg text-title-lg">{detail.name}</h3>

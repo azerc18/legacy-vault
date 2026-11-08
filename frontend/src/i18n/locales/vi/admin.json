@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -8,7 +8,58 @@
   "allStatuses": "Mọi trạng thái",
   "actionFailed": "Thao tác thất bại.",
   "dialog": { "reasonPlaceholder": "Lý do (không bắt buộc, tối đa 255 ký tự)" },
+  "kicker": "Hồ sơ quản trị · LegacyVault",
+  "exportCsv": "Xuất CSV",
+  "exportError": "Không xuất được file.",
   "pager": { "prev": "Trước", "next": "Sau", "page": "Trang {{page}} / {{total}}" },
+
+  "overview": {
+    "title": "Tổng quan",
+    "subtitle": "Tình hình hệ thống hôm nay và những việc cần admin xử lý.",
+    "refresh": "Làm mới",
+    "loadError": "Không tải được số liệu tổng quan.",
+    "updatedAt": "Cập nhật lúc {{time}}",
+    "cards": {
+      "users": "Người dùng",
+      "vaults": "Kho",
+      "alerts": "Cảnh báo đang mở",
+      "alertsFoot_other": "{{count}} cảnh báo mức CAO",
+      "dms": "DMS cần chú ý",
+      "dmsFoot": "{{pending}} chờ xác nhận · {{rescue}} cần chỉ định người thi hành · {{triggered}} đã kích hoạt",
+      "revenue": "Doanh thu tháng này",
+      "revenueFoot_other": "{{count}} giao dịch thành công",
+      "vip": "Người dùng VIP",
+      "vipFoot": "Đang có gói trả phí còn hạn"
+    },
+    "todo": {
+      "title": "Việc cần xử lý",
+      "alerts": "Cảnh báo mức CAO",
+      "deadlines": "Kho sắp hết hạn nhận (7 ngày)",
+      "payments": "Giao dịch treo quá 30 phút",
+      "deadlineAt": "Hạn {{date}}",
+      "viewAll": "Xem tất cả",
+      "none": "Không có mục nào.",
+      "emptyTitle": "Mọi thứ đều ổn",
+      "emptyText": "Không có cảnh báo mức CAO, kho sắp hết hạn nhận hay giao dịch bị treo."
+    }
+  },
+
+  "payments": {
+    "title": "Thanh toán",
+    "subtitle": "Lịch sử giao dịch của mọi người dùng. Trang chỉ để xem, không thay đổi giao dịch hay gói.",
+    "emailPlaceholder": "Email người dùng",
+    "loadError": "Không tải được danh sách giao dịch.",
+    "receiptError": "Không tải được biên lai.",
+    "ledger": "Sổ giao dịch",
+    "total_other": "{{count}} giao dịch",
+    "paidAt": "Thanh toán {{date}}",
+    "currentPlan": "Gói hiện tại: {{plan}}",
+    "receipt": "Biên lai",
+    "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại" },
+    "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay" },
+    "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
+    "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
+  },
 
   "users": {
     "title": "Người dùng",

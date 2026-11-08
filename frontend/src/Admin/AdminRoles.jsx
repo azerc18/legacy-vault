@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, ConfirmDialog, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
-import { AdminLayout } from './adminUi.jsx';
+import { AdminLayout, Stamp } from './adminUi.jsx';
 
 // Khớp @Pattern của CreateRoleRequest ở BE
 const CODE_PATTERN = /^[A-Z][A-Z0-9_]{2,49}$/;
@@ -104,36 +104,36 @@ export default function AdminRoles() {
             {!roles && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
 
             {roles && (
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-surface-container-low text-on-surface-variant">
+                <div className="lv-dossier overflow-x-auto">
+                    <table className="lv-ledger is-stack">
+                        <thead>
                         <tr>
-                            <th className="p-4">{t('roles.cols.role')}</th>
-                            <th className="p-4">{t('roles.cols.permissions')}</th>
-                            <th className="p-4 text-right">{t('roles.cols.actions')}</th>
+                            <th>{t('roles.cols.role')}</th>
+                            <th>{t('roles.cols.permissions')}</th>
+                            <th className="text-right">{t('roles.cols.actions')}</th>
                         </tr>
                         </thead>
                         <tbody>
                         {roles.map((r) => (
-                            <tr key={r.code} className="border-t border-outline-variant/20 align-top">
-                                <td className="p-4">
+                            <tr key={r.code} className="is-row">
+                                <td data-label={t('roles.cols.role')}>
                                     <p className="font-semibold flex items-center gap-2">
                                         {t(`common:roles.${r.code}`, { defaultValue: r.name })}
                                         {r.system && (
-                                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-outline">{t('roles.system')}</span>
+                                            <Stamp tone="muted" icon="lock">{t('roles.system')}</Stamp>
                                         )}
                                     </p>
                                     <p className="text-xs text-outline font-mono">{r.code}</p>
                                     {r.description && <p className="mt-1 text-on-surface-variant">{r.description}</p>}
                                 </td>
-                                <td className="p-4">
+                                <td data-label={t('roles.cols.permissions')}>
                                     <div className="flex flex-wrap gap-1">
                                         {(r.authorities || []).map((a) => (
-                                            <span key={a} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">{a}</span>
+                                            <span key={a} className="lv-mono text-[11px] font-semibold px-2 py-0.5 rounded border border-outline-variant bg-surface-container-low">{a}</span>
                                         ))}
                                     </div>
                                 </td>
-                                <td className="p-4">
+                                <td>
                                     <div className="flex flex-col items-end gap-1.5">
                                         <button onClick={() => openEdit(r)} className="text-xs font-semibold text-secondary hover:text-primary">{t('roles.edit')}</button>
                                         {!r.system && (
@@ -196,7 +196,7 @@ function RoleForm({ mode, initial, authorities, busy, onSave, onCancel }) {
     const fieldError = (msg) => submitted && msg && <p className="mt-1 text-xs text-error">{msg}</p>;
 
     return (
-        <form onSubmit={submit} className="mb-8 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
+        <form onSubmit={submit} className="mb-8 lv-dossier p-6 pt-8">
             <h2 className="font-title-lg text-title-lg mb-4">{isCreate ? t('roles.newRole') : t('roles.form.editTitle', { code: form.code })}</h2>
 
             <div className="grid sm:grid-cols-2 gap-4">

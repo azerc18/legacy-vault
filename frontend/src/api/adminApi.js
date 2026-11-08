@@ -4,6 +4,36 @@ import http from './http.js';
 
 const unwrap = (res) => res.data?.data;
 
+function fileNameFrom(res, fallback) {
+    const cd = res.headers['content-disposition'] || '';
+    const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if (star) return decodeURIComponent(star[1]);
+    const plain = cd.match(/filename="?([^";]+)"?/i);
+    return plain ? plain[1] : fallback;
+}
+
+// Tải file (PDF/CSV). Lỗi trả về Blob JSON -> đọc lại để getErrorMessage lấy được message của BE
+async function downloadBlob(url, params, fallbackName) {
+    try {
+        const res = await http.get(url, { params, responseType: 'blob' });
+        const href = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = href;
+        a.download = fileNameFrom(res, fallbackName);
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch (err) {
+        const blob = err.response?.data;
+        if (blob instanceof Blob) {
+            try { err.response.data = JSON.parse(await blob.text()); } catch { /* giữ nguyên */ }
+        }
+        throw err;
+    }
+}
+
+// Bỏ các tham số rỗng
+const clean = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+
 export const adminApi = {
     /* ---------- Người dùng ---------- */
     // q: tìm theo email/tên; role: OWNER | BENEFICIARY | EXECUTOR | LEGAL_VERIFIER | ADMIN; status: PENDING | ACTIVE | LOCKED
@@ -77,4 +107,25 @@ export const adminApi = {
     countOpenAlerts: () => http.get('/admin/security-alerts/count').then(unwrap),
     // 409 nếu đã được xác nhận
     acknowledgeAlert: (alertId) => http.patch(`/admin/security-alerts/${alertId}/acknowledge`).then(unwrap),
+
+    /* ---------- A1: tổng quan ---------- */
+    // -> { usersByStatus{}, vaultsByStatus{}, openAlerts, openHighAlerts, dmsPendingConfirmation, dmsTriggered,
+    //      executorRescueNeeded, revenueThisMonthVnd, successfulPaymentsThisMonth, vipUsers,
+    //      highAlerts[], claimDeadlines[], stalePendingPayments[] }
+    getStats: () => http.get('/admin/stats').then(unwrap),
+
+    /* ---------- A2: thanh toán (chỉ đọc) ---------- */
+    // status: PENDING | SUCCESS | FAILED; from/to: 'YYYY-MM-DD' (to bao gồm cả ngày đó)
+    // -> Page { content: [{ id, userId, userEmail, userFullName, planCode, planName, amountVnd, status, provider,
+    //      providerTransactionNo, bankCode, responseCode, createdAt, paidAt, currentPlanCode }] }
+    listPayments: ({ status, email, from, to, page = 0, size = 20 } = {}) =>
+        http.get('/admin/payments', { params: clean({ status, email, from, to, page, size }) }).then(unwrap),
+    // -> { totalRevenueVnd, successCount, pendingCount, failedCount } theo cùng bộ lọc
+    paymentSummary: ({ status, email, from, to } = {}) =>
+        http.get('/admin/payments/summary', { params: clean({ status, email, from, to }) }).then(unwrap),
+    // 409 nếu giao dịch chưa SUCCESS
+    downloadReceipt: (id) => downloadBlob(`/admin/payments/${id}/receipt`, undefined, `receipt-${id}.pdf`),
+    // B4: CSV theo bộ lọc hiện tại
+    exportPayments: ({ status, email, from, to } = {}) =>
+        downloadBlob('/admin/payments/export', clean({ status, email, from, to }), 'payments.csv'),
 };
