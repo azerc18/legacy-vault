@@ -28,7 +28,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** T2: quyền và header của GET /api/payments/{id}/receipt. */
+/** T2: quyền và header của GET /api/payments/{id}/invoice (và đường dẫn cũ /receipt). */
 @WebMvcTest(PaymentController.class)
 @Import(SecurityConfig.class)
 class PaymentReceiptControllerSecurityTest {
@@ -52,7 +52,7 @@ class PaymentReceiptControllerSecurityTest {
     private static PaymentReceiptData data() {
         LocalDateTime paid = LocalDateTime.of(2026, 11, 7, 10, 0);
         return new PaymentReceiptData("LV-20261107-1A2B3C4D", TX_ID, "Owner", "owner@example.com",
-                "VIP_MONTH", "VIP Monthly", 30, 99_000L, "14512345", "NCB", paid, paid, paid);
+                "VIP_MONTH", "VIP Monthly", 30, 99_000L, "14512345", "NCB", paid, paid, paid, 1L, "VNPay");
     }
 
     @Test
@@ -77,9 +77,20 @@ class PaymentReceiptControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
                 .andExpect(header().string("Content-Disposition",
-                        containsString("bien-lai-LV-20261107-1A2B3C4D.pdf")))
+                        containsString("hoa-don-LV-20261107-1A2B3C4D.pdf")))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Cache-Control", containsString("no-store")));
+    }
+
+    @Test
+    void invoicePath_worksLikeReceiptPath() throws Exception {
+        when(paymentReceiptService.getReceiptData(TX_ID, OWNER_ID)).thenReturn(data());
+        when(paymentReceiptPdfService.render(any())).thenReturn("%PDF-1.4 test".getBytes());
+
+        mockMvc.perform(get("/api/payments/" + TX_ID + "/invoice").with(token("ROLE_OWNER")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF));
+        mockMvc.perform(get("/api/payments/" + TX_ID + "/invoice")).andExpect(status().isUnauthorized());
     }
 
     @Test

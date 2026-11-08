@@ -20,14 +20,14 @@ export const paymentApi = {
     checkout: (planCode) =>
         http.post('/payments/checkout', { planCode }).then((r) => r.data.data),
 
-    // T2: tải biên lai PDF của giao dịch SUCCESS. Lỗi trả về dạng Blob JSON -> đọc lại để lấy message
+    // T2: tải hoá đơn mô phỏng (PDF) của giao dịch SUCCESS. Lỗi trả về dạng Blob JSON -> đọc lại để lấy message
     downloadReceipt: async (transactionId) => {
         try {
-            const res = await http.get(`/payments/${transactionId}/receipt`, { responseType: 'blob' });
+            const res = await http.get(`/payments/${transactionId}/invoice`, { responseType: 'blob' });
             const href = URL.createObjectURL(res.data);
             const a = document.createElement('a');
             a.href = href;
-            a.download = fileNameFrom(res, 'bien-lai.pdf');
+            a.download = fileNameFrom(res, 'hoa-don.pdf');
             a.click();
             // Safari có thể huỷ tải nếu thu hồi URL ngay sau click
             setTimeout(() => URL.revokeObjectURL(href), 1000);

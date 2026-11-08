@@ -81,14 +81,14 @@ public class PaymentController {
                 paymentService.getMyPayments(userId)));
     }
 
-    // T2: biên lai PDF cho giao dịch thành công của chính Owner
-    @GetMapping("/{transactionId}/receipt")
+    // T2: hoá đơn mô phỏng (PDF) cho giao dịch thành công của chính Owner; /receipt giữ lại cho client cũ
+    @GetMapping({"/{transactionId}/invoice", "/{transactionId}/receipt"})
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<byte[]> downloadReceipt(Principal principal, @PathVariable UUID transactionId) {
         UUID userId = UUID.fromString(principal.getName());
         PaymentReceiptData data = paymentReceiptService.getReceiptData(transactionId, userId);
         byte[] pdf = paymentReceiptPdfService.render(data);
-        String fileName = "bien-lai-" + data.receiptNo() + ".pdf";
+        String fileName = "hoa-don-" + data.receiptNo() + ".pdf";
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)

@@ -66,13 +66,13 @@
       "amount": "Amount",
       "status": "Status",
       "ref": "VNPay Ref",
-      "receipt": "Receipt",
-      "downloadReceipt": "Download receipt",
+      "receipt": "Invoice",
+      "downloadReceipt": "Download invoice",
       "downloading": "Downloading..."
     },
     "errors": {
       "loadFailed": "Could not load billing information.",
-      "receiptFailed": "Could not download the receipt."
+      "receiptFailed": "Could not download the invoice."
     }
   },
   "result": {
