@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
@@ -60,6 +61,7 @@ class AssetAllocationServiceTest {
     @Mock private AssetAllocationRepository assetAllocationRepository;
     @Mock private VaultBeneficiaryRepository vaultBeneficiaryRepository;
     @Mock private EntitlementService entitlementService;
+    @Mock private AssetVerificationService assetVerificationService;
 
     @InjectMocks private DigitalAssetServiceImpl assetService;
 

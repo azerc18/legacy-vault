@@ -102,6 +102,7 @@ class AssetVerificationServiceImplTest {
                 .method(AssetVerificationMethod.BANK_FORMAT_CHECK)
                 .provider(VerificationProvider.SANDBOX)
                 .status(AssetVerificationStatus.VERIFIED_SANDBOX)
+                .fingerprint(AssetFingerprint.compute(mockAsset))
                 .verifiedAt(verifiedAt)
                 .expiresAt(expiresAt)
                 .build();
