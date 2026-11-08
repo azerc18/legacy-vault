@@ -1306,6 +1306,84 @@ public class BeneficiaryServiceImplTest {
         verifyNoInteractions(auditLogService);
     }
 
+    // ===================== #22: sau CLAIMED vẫn xem metadata =====================
+
+    @Test
+    void getInheritedAssets_afterClose_returnsMetadataWithoutViewSession() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
+                claim(ClaimStatus.CLAIMED, LocalDateTime.now().minusDays(1))));
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(UUID.randomUUID(), "Vietcombank", AssetType.BANK_ACCOUNT)));
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getAssetName).containsExactly("Vietcombank");
+        assertThat(result.get(0).getConsensus()).isNull();
+        // Không cần phiên xem, không giải mã, không ghi nhận lượt xem
+        verify(verificationRepository, never()).existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
+                any(), any(), any(), any());
+        verifyNoInteractions(cryptoService);
+        verifyNoInteractions(assetAccessRecordRepository);
+    }
+
+    @Test
+    void getInheritedAssets_myPartClosedVaultStillUnlocked_returnsOnlyMyAssets() {
+        // N2b: vault còn UNLOCKED vì người khác chưa đóng, nhưng phần của mình đã CLAIMED
+        UUID mine = UUID.randomUUID();
+        UUID others = UUID.randomUUID();
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
+                claim(ClaimStatus.CLAIMED, LocalDateTime.now().plusDays(5))));
+        when(assetAllocationRepository.findAssetIdsNotHeldBy(vaultId, beneficiaryRow.getId()))
+                .thenReturn(List.of(others));
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(
+                asset(mine, "Của tôi", AssetType.BANK_ACCOUNT),
+                asset(others, "Của người khác", AssetType.BANK_ACCOUNT)));
+
+        List<InheritedAssetSummaryResponse> result =
+                beneficiaryService.getInheritedAssets(vaultId, currentUserId);
+
+        assertThat(result).extracting(InheritedAssetSummaryResponse::getId).containsExactly(mine);
+    }
+
+    @Test
+    void getInheritedAssets_declinedOnClaimedVault_throws409() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(vaultId, currentUserId)).thenReturn(Optional.of(
+                claim(ClaimStatus.DECLINED, LocalDateTime.now().plusDays(5))));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.getInheritedAssets(vaultId, currentUserId));
+
+        verifyNoInteractions(digitalAssetRepository);
+    }
+
+    @Test
+    void getInheritedAssets_archivedVault_throws410() {
+        unlockedVault.setStatus(VaultStatus.ARCHIVED_LOCKED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.GONE,
+                () -> beneficiaryService.getInheritedAssets(vaultId, currentUserId));
+
+        verifyNoInteractions(digitalAssetRepository);
+    }
+
+    @Test
+    void getInheritedAssetDetail_afterClose_throws409AndNoDecrypt() {
+        unlockedVault.setStatus(VaultStatus.CLAIMED);
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(unlockedVault));
+
+        expectError(HttpStatus.CONFLICT,
+                () -> beneficiaryService.getInheritedAssetDetail(vaultId, UUID.randomUUID(), currentUserId));
+
+        verifyNoInteractions(cryptoService);
+    }
+
     // ===================== FR-19 =====================
 
     // Vault UNLOCKED + claim còn hạn + chưa bị khóa; trả về claim để test kiểm tra thay đổi

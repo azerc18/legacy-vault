@@ -76,6 +76,7 @@
     "verifyError": "Xác minh thất bại."
   },
   "assets": {
+    "closedHint": "Hồ sơ đã đóng: bạn chỉ xem được danh sách tài sản, không xem hay tải nội dung được nữa.",
     "title": "Tài sản ({{count}})",
     "empty": "Két này không có tài sản nào.",
     "consensusDone": "Đã đủ đồng thuận ({{approved}}/{{total}} người đã đồng ý)",

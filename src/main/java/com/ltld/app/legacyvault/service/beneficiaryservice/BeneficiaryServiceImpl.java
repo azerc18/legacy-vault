@@ -417,12 +417,19 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     @Transactional(readOnly = true)
     public List<InheritedAssetSummaryResponse> getInheritedAssets(UUID vaultId, UUID currentUserId) {
+        // #22 (Q1): đọc vault / người thụ hưởng / claim một lần rồi rẽ nhánh.
+        // Đã đóng phần của mình (claim CLAIMED) thì vẫn xem được danh sách metadata; xem chi tiết / tải vẫn 409.
+        Vault found = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+        VaultBeneficiary me = requireBeneficiary(found.getId(), currentUserId);
+        if (isMyPartClosed(found, currentUserId)) {
+            return closedAssetMetadata(found, me);
+        }
         Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
         // N2-access: bỏ tài sản đã phân bổ cho người khác
-        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
         Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
         List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
                 .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
@@ -1104,6 +1111,33 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         return claimRepository.findByVaultIdAndBeneficiaryId(vaultId, vb.getUser().getId())
                 .map(c -> c.getStatus() == ClaimStatus.PENDING)
                 .orElse(true);
+    }
+
+    // #22: người này đã đóng phần nhận (claim CLAIMED) và vault chưa bị lưu trữ (UNLOCKED / CLAIMED).
+    // Người từ chối / chưa có claim / vault ARCHIVED_LOCKED trả false và đi luồng FR-17 thường.
+    private boolean isMyPartClosed(Vault vault, UUID currentUserId) {
+        return (vault.getStatus() == VaultStatus.UNLOCKED || vault.getStatus() == VaultStatus.CLAIMED)
+                && claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId)
+                        .map(c -> c.getStatus() == ClaimStatus.CLAIMED)
+                        .orElse(false);
+    }
+
+    /**
+     * #22: danh sách metadata (id, loại, tên) sau khi đã đóng phần nhận.
+     * CỐ Ý không gọi assertNotLocked / assertViewSession: nhánh này không giải mã và không trả nội dung nào,
+     * nên không cần phiên xem. Đừng "thêm lại cho đồng bộ" với luồng FR-17; nội dung vẫn bị chặn 409
+     * ở loadAccessibleVault (chi tiết, tải xuống, hồ sơ PDF).
+     */
+    private List<InheritedAssetSummaryResponse> closedAssetMetadata(Vault vault, VaultBeneficiary me) {
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
+        return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(asset -> !hidden.contains(asset.getId()))
+                .map(asset -> InheritedAssetSummaryResponse.builder()
+                        .id(asset.getId())
+                        .assetType(asset.getAssetType())
+                        .assetName(asset.getAssetName())
+                        .build())
+                .toList();
     }
 
     // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
