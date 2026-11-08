@@ -193,9 +193,25 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
         if (note != null && note.length() > 1000) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED, "Ghi chú tối đa 1000 ký tự.");
         }
+
+        // C.4: DONE cần bằng chứng. Kiểm TRƯỚC khi đổi bất kỳ field nào của task,
+        // để khi bị từ chối thì task giữ nguyên (trạng thái, ghi chú, mã tham chiếu).
+        String evidenceRef = request.getEvidenceRef() == null || request.getEvidenceRef().isBlank()
+                ? null : request.getEvidenceRef().trim();
+        if (request.getStatus() == ExecutorTaskStatus.DONE
+                && evidenceRef == null
+                && task.getEvidenceRef() == null
+                && task.getEvidenceDocumentId() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "Cần nhập mã tham chiếu hoặc đính kèm bằng chứng trước khi đánh dấu hoàn tất.");
+        }
+
         ExecutorTaskStatus previous = task.getStatus();
         task.setStatus(request.getStatus());
         task.setNote(note);
+        if (evidenceRef != null) {
+            task.setEvidenceRef(evidenceRef);
+        }
         if (request.getStatus() == ExecutorTaskStatus.DONE) {
             if (task.getCompletedAt() == null) {
                 task.setCompletedAt(LocalDateTime.now());
@@ -208,6 +224,11 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
         auditLogService.log(AuditAction.EXECUTOR_TASK_UPDATED, AuditResult.SUCCESS,
                 assignment.getExecutorUser().getId(), assignment.getExecutorUser().getEmail(), task.getVault().getId(),
                 "ExecutorTask", task.getId().toString(), previous + " -> " + request.getStatus());
+        if (evidenceRef != null) {
+            auditLogService.log(AuditAction.EXECUTOR_EVIDENCE_ADDED, AuditResult.SUCCESS,
+                    assignment.getExecutorUser().getId(), assignment.getExecutorUser().getEmail(),
+                    task.getVault().getId(), "ExecutorTask", task.getId().toString(), "evidenceRef");
+        }
         return toResponse(saved);
     }
 
@@ -267,6 +288,8 @@ public class ExecutorTaskServiceImpl implements ExecutorTaskService {
                 .helpUrl(helpUrl(t.getPlatform(), t.getWish()))
                 .updatedAt(t.getUpdatedAt())
                 .completedAt(t.getCompletedAt())
+                .evidenceRef(t.getEvidenceRef())
+                .hasEvidenceDocument(t.getEvidenceDocumentId() != null)
                 .build();
     }
 }

@@ -25,4 +25,6 @@ public class ExecutorTaskResponse {
     private final String helpUrl;
     private final LocalDateTime updatedAt;
     private final LocalDateTime completedAt;
+    private final String evidenceRef;
+    private final boolean hasEvidenceDocument;
 }
