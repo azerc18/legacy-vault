@@ -14,6 +14,8 @@
     "viewBilling": "View billing history",
     "loading": "Loading plans...",
     "retry": "Try again",
+    "providerLabel": "Payment method",
+    "paypalNote": "PayPal charges the USD equivalent at a fixed rate. The exact amount is shown on PayPal before you pay.",
     "savePercent": "Save {{percent}}%",
     "free": "Free",
     "perDays": "/ {{days}} days",
@@ -28,19 +30,19 @@
     "buttons": {
       "currentPlan": "Current Plan",
       "included": "Included by Default",
-      "redirecting": "Redirecting to VNPay...",
-      "extend": "Extend with VNPay",
-      "upgrade": "Upgrade with VNPay"
+      "redirecting": "Redirecting to {{provider}}...",
+      "extend": "Extend with {{provider}}",
+      "upgrade": "Upgrade with {{provider}}"
     },
     "errors": {
       "loadFailed": "Could not load subscription plans.",
       "noPlans": "No subscription plans are available right now.",
-      "checkoutFailed": "Could not initiate VNPay checkout."
+      "checkoutFailed": "Could not initiate checkout."
     }
   },
   "billing": {
     "title": "Billing & Subscription",
-    "subtitle": "Manage your LegacyVault plan, entitlements, and VNPay payment history.",
+    "subtitle": "Manage your LegacyVault plan, entitlements, and payment history.",
     "extendVip": "Extend VIP",
     "upgradeToVip": "Upgrade to VIP",
     "loading": "Loading billing details...",
@@ -65,7 +67,7 @@
       "plan": "Plan",
       "amount": "Amount",
       "status": "Status",
-      "ref": "VNPay Ref",
+      "ref": "Transaction Ref",
       "receipt": "Invoice",
       "downloadReceipt": "Download invoice",
       "downloading": "Downloading..."
@@ -80,8 +82,8 @@
     "failedTitle": "Payment Failed",
     "confirmingTitle": "Confirming Payment",
     "successSubtitle": "Your VIP subscription has been activated.",
-    "failedSubtitle": "Your VNPay transaction could not be completed.",
-    "confirmingSubtitle": "Please wait while we confirm your payment with VNPay.",
+    "failedSubtitle": "Your transaction could not be completed.",
+    "confirmingSubtitle": "Please wait while we confirm your payment.",
     "successHeading": "Welcome to LegacyVault VIP!",
     "confirmingHeading": "Confirming your VIP subscription...",
     "failedHeading": "We could not confirm your payment",
@@ -95,11 +97,11 @@
     "myVaults": "Go to My Vaults",
     "tryAgain": "Try Again",
     "processingTitle": "Payment Received",
-    "processingSubtitle": "VNPay reported a successful payment.",
+    "processingSubtitle": "The payment gateway reported a successful payment.",
     "processingHeading": "Your VIP plan is still being activated",
     "processingMessage": "This can take a few minutes. Check the Billing page shortly; you do not need to pay again.",
     "loginRequiredTitle": "Payment Successful",
-    "loginRequiredSubtitle": "VNPay reported a successful payment.",
+    "loginRequiredSubtitle": "The payment gateway reported a successful payment.",
     "loginRequiredHeading": "Sign in to see your plan",
     "loginRequiredMessage": "Payment successful. Sign in to view your plan and billing details.",
     "login": "Sign in"

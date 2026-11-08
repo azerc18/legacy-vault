@@ -73,7 +73,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/sessions", "/api/auth/sessions/**").authenticated()
                         .requestMatchers("/error", "/api/auth/**").permitAll()
                         // VNPay và link trong email không có JWT; xác thực bằng chữ ký / token riêng tại controller.
-                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-ipn", "/api/payments/vnpay-return").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-ipn", "/api/payments/vnpay-return",
+                                "/api/payments/paypal-return", "/api/payments/paypal-cancel").permitAll()
                         // X2: link email chỉ mở trang FE; đổi trạng thái phải là POST (máy quét link tự gọi GET).
                         .requestMatchers(HttpMethod.POST, "/api/dms/checkin-link").permitAll()
                         // X2: người xác nhận chéo (không đăng nhập) gửi quyết định từ trang FE /dms/confirm; chỉ POST, GET vẫn chặn

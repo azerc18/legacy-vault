@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.PaymentProvider;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.exception.BusinessException;
@@ -31,7 +32,9 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,6 +61,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final EntitlementServiceImpl entitlementService;
     private final VnpayClient vnpayClient;
     private final VnpayProperties vnpayProperties;
+    private final PaypalClient paypalClient;
     private final AuditLogService auditLogService;
 
     @Value("${app.frontend.base-url}")
@@ -66,7 +70,12 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public CheckoutResponse checkout(UUID userId, CheckoutRequest request, String ipAddress) {
-        vnpayClient.ensureConfigured();
+        PaymentProvider provider = parseProvider(request.getProvider());
+        if (provider == PaymentProvider.PAYPAL) {
+            paypalClient.ensureConfigured();
+        } else {
+            vnpayClient.ensureConfigured();
+        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "User not found."));
@@ -84,11 +93,22 @@ public class PaymentServiceImpl implements PaymentService {
                 .plan(plan)
                 .amountVnd(plan.getPriceVnd())
                 .status(PaymentStatus.PENDING)
+                .provider(provider)
                 .build();
         tx = paymentTransactionRepository.save(tx);
 
-        String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
-        String paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress);
+        String paymentUrl;
+        if (provider == PaymentProvider.PAYPAL) {
+            long usdCents = paypalClient.toUsdCents(plan.getPriceVnd());
+            PaypalClient.Order order = paypalClient.createOrder(tx.getId(), usdCents, "LegacyVault " + plan.getCode());
+            tx.setAmountUsdCents(usdCents);
+            tx.setGatewayTxnRef(order.id());
+            paymentTransactionRepository.save(tx);
+            paymentUrl = order.approveUrl();
+        } else {
+            String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
+            paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress);
+        }
 
         return CheckoutResponse.builder()
                 .transactionId(tx.getId())
@@ -202,6 +222,113 @@ public class PaymentServiceImpl implements PaymentService {
         }
         // Đã ghi nhận kết quả từ VNPay (kể cả giao dịch thất bại): trả 00 để VNPay ngừng gọi lại
         return response("00", "Confirm Success");
+    }
+
+    /** Giữ khóa dòng giao dịch trong lúc capture để hai lần quay về song song không gia hạn gói hai lần. */
+    @Override
+    @Transactional
+    public String handlePaypalReturn(String orderId) {
+        PaymentTransaction tx = findPaypalTransactionForUpdate(orderId);
+        if (tx == null) {
+            return buildFrontendResultUrl("failed", null, ErrorCode.NOT_FOUND.name());
+        }
+        String ref = tx.getId().toString();
+        if (tx.getStatus() != PaymentStatus.PENDING) {
+            return buildFrontendResultUrl(tx.getStatus() == PaymentStatus.SUCCESS ? "success" : "failed", ref, null);
+        }
+
+        PaypalClient.Capture capture;
+        try {
+            capture = paypalClient.capture(orderId);
+        } catch (RuntimeException ex) {
+            // Chưa biết PayPal đã trừ tiền chưa: giữ PENDING để lần quay về sau capture lại an toàn
+            log.warn("PayPal: capture of order {} failed: {}", orderId, ex.getMessage());
+            return buildFrontendResultUrl("failed", ref, ErrorCode.SERVICE_UNAVAILABLE.name());
+        }
+
+        User user = tx.getUser();
+        tx.setVnpResponseCode(capture.status());
+        // Hóa đơn và lịch sử giao dịch đọc mã giao dịch / ngân hàng từ hai cột này
+        tx.setVnpTransactionNo(capture.captureId());
+        tx.setVnpBankCode(PaymentProvider.PAYPAL.name());
+        if (!capture.completed()) {
+            markFailed(tx, user, "PayPal capture status=" + capture.status());
+            return buildFrontendResultUrl("failed", ref, null);
+        }
+        if (!"USD".equals(capture.currency()) || tx.getAmountUsdCents() == null
+                || capture.cents() != tx.getAmountUsdCents()) {
+            markFailed(tx, user, "Amount mismatch: expected " + tx.getAmountUsdCents() + " USD cents, got "
+                    + capture.cents() + " " + capture.currency());
+            return buildFrontendResultUrl("failed", ref, ErrorCode.PAYMENT_AMOUNT_MISMATCH.name());
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        tx.setStatus(PaymentStatus.SUCCESS);
+        tx.setPaidAt(now);
+        paymentTransactionRepository.save(tx);
+        activateOrExtendSubscription(user, tx.getPlan(), now);
+        auditLogService.log(
+                AuditAction.PAYMENT_SUCCEEDED,
+                AuditResult.SUCCESS,
+                user != null ? user.getId() : null,
+                user != null ? user.getEmail() : null,
+                "PaymentTransaction",
+                tx.getId().toString(),
+                tx.getPlan() != null ? tx.getPlan().getCode() : "VIP"
+        );
+        return buildFrontendResultUrl("success", ref, null);
+    }
+
+    @Override
+    @Transactional
+    public String handlePaypalCancel(String orderId) {
+        PaymentTransaction tx = findPaypalTransactionForUpdate(orderId);
+        if (tx == null) {
+            return buildFrontendResultUrl("failed", null, null);
+        }
+        if (tx.getStatus() == PaymentStatus.PENDING) {
+            tx.setVnpResponseCode("CANCELLED");
+            markFailed(tx, tx.getUser(), "PayPal checkout cancelled by payer");
+        }
+        return buildFrontendResultUrl("failed", tx.getId().toString(), null);
+    }
+
+    @Override
+    public List<String> getAvailableProviders() {
+        List<String> providers = new ArrayList<>();
+        if (vnpayClient.isConfigured()) {
+            providers.add(PaymentProvider.VNPAY.name());
+        }
+        if (paypalClient.isConfigured()) {
+            providers.add(PaymentProvider.PAYPAL.name());
+        }
+        return providers;
+    }
+
+    private PaymentTransaction findPaypalTransactionForUpdate(String orderId) {
+        if (orderId == null || orderId.isBlank()) {
+            return null;
+        }
+        return paymentTransactionRepository.findByGatewayTxnRefForUpdate(orderId)
+                .filter(tx -> tx.getProvider() == PaymentProvider.PAYPAL)
+                .orElse(null);
+    }
+
+    private void markFailed(PaymentTransaction tx, User user, String detail) {
+        tx.setStatus(PaymentStatus.FAILED);
+        paymentTransactionRepository.save(tx);
+        logFailure(tx, user, detail);
+    }
+
+    private static PaymentProvider parseProvider(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return PaymentProvider.VNPAY;
+        }
+        try {
+            return PaymentProvider.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "Unsupported payment provider: " + raw);
+        }
     }
 
     @Override

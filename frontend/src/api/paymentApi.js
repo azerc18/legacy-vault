@@ -17,8 +17,11 @@ export const paymentApi = {
     getMyPayments: () =>
         http.get('/payments/me').then((r) => r.data.data),
 
-    checkout: (planCode) =>
-        http.post('/payments/checkout', { planCode }).then((r) => r.data.data),
+    checkout: (planCode, provider) =>
+        http.post('/payments/checkout', { planCode, provider }).then((r) => r.data.data),
+
+    getProviders: () =>
+        http.get('/payments/providers').then((r) => r.data.data),
 
     // T2: tải hoá đơn mô phỏng (PDF) của giao dịch SUCCESS. Lỗi trả về dạng Blob JSON -> đọc lại để lấy message
     downloadReceipt: async (transactionId) => {

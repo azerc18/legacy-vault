@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.entity;
 
+import com.ltld.app.legacyvault.enums.PaymentProvider;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -43,6 +44,20 @@ public class PaymentTransaction {
     @Column(nullable = false, length = 30)
     @Builder.Default
     private PaymentStatus status = PaymentStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private PaymentProvider provider = PaymentProvider.VNPAY;
+
+    // PayPal: order id, dùng để tìm lại giao dịch khi người mua quay về
+    @Column(name = "gateway_txn_ref", length = 100)
+    private String gatewayTxnRef;
+
+    // PayPal không nhận VND: số USD đã tính lúc checkout, để đối chiếu khi capture và in hóa đơn
+    @Column(name = "amount_usd_cents")
+    private Long amountUsdCents;
 
     @Column(name = "vnp_transaction_no", length = 100)
     private String vnpTransactionNo;
