@@ -17,7 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.JsonNode;
@@ -51,6 +52,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     private static final int MAX_OUTPUT_TOKENS = 2048;
     private static final int MAX_CALLS_PER_MINUTE = 5;
     private static final long CACHE_TTL_SECONDS = 30 * 60;
+    /** Quá ngưỡng này thì dọn key hết hạn để map trong bộ nhớ không phình mãi. */
+    private static final int MAX_IN_MEMORY_KEYS = 500;
 
     public static final String CAT_VALID_DEATH_CERT = "VALID_DEATH_CERTIFICATE";
     public static final String CAT_RELATED_DOC = "RELATED_SUPPORTING_DOCUMENT";
@@ -70,6 +73,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     private final CryptoService cryptoService;
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
+    private final PlatformTransactionManager transactionManager;
 
     private final Map<String, CachedOcrEntry> verifierCache = new ConcurrentHashMap<>();
     private final Map<String, Deque<Long>> rateLimitBuckets = new ConcurrentHashMap<>();
@@ -90,15 +94,23 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     @Value("${app.ai.ocr.demo-scenarios:false}")
     private boolean demoScenariosEnabled;
 
+    /*
+     * Không đặt @Transactional cho cả hàm: lời gọi Gemini có thể mất tới 25 giây, giữ transaction
+     * suốt lúc đó sẽ chiếm 1 kết nối DB và dễ làm cạn pool Hikari khi nhiều người quét cùng lúc.
+     * Chỉ kiểm quyền và đọc dữ liệu cần thiết trong một transaction ngắn (chỉ đọc), phần đọc file,
+     * gọi AI và ghi audit chạy ngoài transaction (AuditEventListener có fallbackExecution = true).
+     */
     @Override
-    @Transactional
     public DeathCertificateOcrResponseDto analyzeForExecutor(UUID assignmentId, String executorLogin, MultipartFile file) {
-        ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
+        ExecutorContext ctx = readOnlyTx().execute(status -> {
+            ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
+            return new ExecutorContext(
+                    ownerNameOf(assignment.getOwner() != null ? assignment.getOwner().getFullName() : null),
+                    assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null);
+        });
         byte[] plainBytes = uploadedDocumentValidator.readAndValidate(file);
-        String ownerFullName = assignment.getOwner() != null && assignment.getOwner().getFullName() != null
-                ? assignment.getOwner().getFullName()
-                : "Chủ két";
-        UUID actorId = assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null;
+        String ownerFullName = ctx.ownerFullName();
+        UUID actorId = ctx.actorId();
         String rateKey = "executor:" + (actorId != null ? actorId : executorLogin);
 
         if (!allowCall(rateKey)) {
@@ -114,13 +126,15 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     }
 
     @Override
-    @Transactional
     public DeathCertificateOcrResponseDto analyzeForVerifier(UUID requestId, UUID verifierId) {
-        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
-        String ownerFullName = request.getOwner() != null && request.getOwner().getFullName() != null
-                ? request.getOwner().getFullName()
-                : "Chủ két";
-        String cacheKey = requestId + ":" + String.valueOf(request.getDeathCertificateFileUrlEncrypted());
+        VerifierContext ctx = readOnlyTx().execute(status -> {
+            LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
+            return new VerifierContext(
+                    ownerNameOf(request.getOwner() != null ? request.getOwner().getFullName() : null),
+                    request.getDeathCertificateFileUrlEncrypted());
+        });
+        String ownerFullName = ctx.ownerFullName();
+        String cacheKey = requestId + ":" + String.valueOf(ctx.fileUrlEncrypted());
 
         CachedOcrEntry cached = verifierCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
@@ -134,17 +148,34 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                     "Bạn đã yêu cầu phân tích AI quá số lần cho phép trong 1 phút. Vui lòng tự kiểm tra hoặc thử lại sau.");
         }
 
-        byte[] plainBytes = readDecryptedDocument(request, requestId);
+        byte[] plainBytes = readDecryptedDocument(ctx.fileUrlEncrypted(), requestId);
         String documentRef = "verification-request-" + requestId;
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, documentRef, ownerFullName);
 
         if (ENGINE_GEMINI.equals(result.getEngineSource())) {
+            if (verifierCache.size() >= MAX_IN_MEMORY_KEYS) {
+                verifierCache.values().removeIf(CachedOcrEntry::isExpired);
+            }
             verifierCache.put(cacheKey, new CachedOcrEntry(result, Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
         }
 
         recordAudit(verifierId, null, "LegalVerificationRequest", requestId.toString(), result);
         return result;
     }
+
+    private TransactionTemplate readOnlyTx() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.setReadOnly(true);
+        return tx;
+    }
+
+    private static String ownerNameOf(String fullName) {
+        return fullName != null ? fullName : "Chủ két";
+    }
+
+    private record ExecutorContext(String ownerFullName, UUID actorId) {}
+
+    private record VerifierContext(String ownerFullName, String fileUrlEncrypted) {}
 
     private void recordAudit(UUID actorId, String email, String targetType, String targetId, DeathCertificateOcrResponseDto result) {
         if (auditLogService == null) {
@@ -167,6 +198,9 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     boolean allowCall(String key) {
         long now = System.currentTimeMillis();
         long windowStart = now - 60_000L;
+        if (rateLimitBuckets.size() >= MAX_IN_MEMORY_KEYS) {
+            pruneStaleBuckets(windowStart);
+        }
         Deque<Long> timestamps = rateLimitBuckets.computeIfAbsent(key, k -> new ArrayDeque<>());
         synchronized (timestamps) {
             while (!timestamps.isEmpty() && timestamps.peekFirst() < windowStart) {
@@ -180,10 +214,20 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         }
     }
 
-    private byte[] readDecryptedDocument(LegalVerificationRequest request, UUID requestId) {
+    /** Xoá các bucket không còn lượt gọi nào trong cửa sổ 1 phút. */
+    private void pruneStaleBuckets(long windowStart) {
+        rateLimitBuckets.entrySet().removeIf(e -> {
+            Deque<Long> timestamps = e.getValue();
+            synchronized (timestamps) {
+                Long last = timestamps.peekLast();
+                return last == null || last < windowStart;
+            }
+        });
+    }
+
+    private byte[] readDecryptedDocument(String fileUrlEncrypted, UUID requestId) {
         try {
-            return cryptoService.decryptBytes(
-                    fileStorageService.readFile(request.getDeathCertificateFileUrlEncrypted()));
+            return cryptoService.decryptBytes(fileStorageService.readFile(fileUrlEncrypted));
         } catch (StorageUnavailableException e) {
             throw e;
         } catch (Exception e) {
@@ -349,16 +393,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         boolean hasSeal = extracted.path("hasOfficialSeal").isBoolean()
                 && extracted.path("hasOfficialSeal").asBoolean(false);
 
+        // AI không trả thì để null (giao diện hiện "không có"), không tự đoán một con số.
         Integer deathProofPct = intOrNull(extracted, "deathProofRelevancePercent");
-        if (deathProofPct == null) {
-            if (!matched || deceasedName == null || CAT_UNRELATED_DOC.equals(category)) {
-                deathProofPct = 0;
-            } else if (CAT_RELATED_DOC.equals(category)) {
-                deathProofPct = 70;
-            } else {
-                deathProofPct = 90;
-            }
-        }
 
         String deathProofExp = textOrNull(extracted, "deathProofExplanation");
         if (deathProofExp == null) {
@@ -429,7 +465,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         String cccdMismatchWarning = detectInternalCccdBirthYearMismatch(dobStr, genderStr, idNumberStr);
         if (cccdMismatchWarning != null) {
             suggestedRejection = "SUSPECTED_FORGERY";
-            deathProofPct = Math.min(deathProofPct, 38);
+            deathProofPct = deathProofPct != null ? Math.min(deathProofPct, 38) : null;
             score = Math.min(score, 42);
             warnings.add(0, cccdMismatchWarning);
             deathProofExp = "Dù Họ tên trùng khớp với Chủ két (" + expectedOwnerName

@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -43,6 +44,8 @@ class DeathCertificateOcrServiceImplTest {
     private CryptoService cryptoService;
     @Mock
     private AuditLogService auditLogService;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private DeathCertificateOcrServiceImpl ocrService;
 
@@ -56,7 +59,8 @@ class DeathCertificateOcrServiceImplTest {
                 fileStorageService,
                 cryptoService,
                 new ObjectMapper(),
-                auditLogService
+                auditLogService,
+                transactionManager
         );
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");
@@ -134,7 +138,7 @@ class DeathCertificateOcrServiceImplTest {
         assertThat(result.getIdNumber()).isNull();
         assertThat(result.getIssuingAuthority()).isNull();
         assertThat(result.getImageQualityScore()).isNull();
-        assertThat(result.getDeathProofRelevancePercent()).isEqualTo(0);
+        assertThat(result.getDeathProofRelevancePercent()).isNull();
         assertThat(result.getSummaryNote()).isNull();
     }
 
