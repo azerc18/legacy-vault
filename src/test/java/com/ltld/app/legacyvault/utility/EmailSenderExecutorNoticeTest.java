@@ -1,13 +1,16 @@
 package com.ltld.app.legacyvault.utility;
 
+import com.ltld.app.legacyvault.enums.AppLanguage;
+import com.ltld.app.legacyvault.service.userservice.UserLanguageResolver;
+import jakarta.mail.internet.MimeMessage;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -17,6 +20,12 @@ import static org.mockito.Mockito.verify;
 class EmailSenderExecutorNoticeTest {
 
     @Mock private JavaMailSender javaMailSender;
+    @Mock private UserLanguageResolver languageResolver;
+
+    @BeforeEach
+    void stubMail() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+    }
 
     @InjectMocks
     private EmailSender emailSender;
@@ -26,7 +35,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",
                 ExecutorType.BACKUP);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("exec@example.test");
         assertThat(message.getText())
                 .contains("Owner A", "owner@example.test", "BACKUP", "Dead Man's Switch")
@@ -38,7 +47,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorRevokedNotice("old@example.test", "Owner A", "owner@example.test",
                 ExecutorType.PRIMARY);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("old@example.test");
         assertThat(message.getSubject()).contains("revoked");
         assertThat(message.getText())
@@ -51,7 +60,7 @@ class EmailSenderExecutorNoticeTest {
     void timeoutRevokedNotice_saysSystemNotOwner_withWaitDays() {
         emailSender.sendExecutorTimeoutRevokedNotice("old@example.test", "Owner A", "owner@example.test", 14);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("old@example.test");
         assertThat(message.getText())
                 .contains("Owner A", "owner@example.test", "14 days", "backup executor")
@@ -63,7 +72,7 @@ class EmailSenderExecutorNoticeTest {
         emailSender.sendExecutorReplacedByAdminNotice("old@example.test", "Owner A", "owner@example.test",
                 ExecutorType.BACKUP);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("old@example.test");
         assertThat(message.getText())
                 .contains("Owner A", "owner@example.test", "BACKUP", "administrator",
@@ -108,9 +117,7 @@ class EmailSenderExecutorNoticeTest {
                 .doesNotContain("null");
     }
 
-    private SimpleMailMessage sentMessage() {
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        return captor.getValue();
+    private SentMail sentMessage() {
+        return SentMail.captureOne(javaMailSender);
     }
 }
