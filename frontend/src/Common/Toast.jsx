@@ -57,7 +57,7 @@ export function ToastProvider({ children }) {
     return (
         <ToastContext.Provider value={api}>
             {children}
-            <div className="pointer-events-none fixed z-[100] inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-4 sm:bottom-auto sm:w-96 flex flex-col gap-2">
+            <div className="pointer-events-none fixed z-[100] inset-x-3 bottom-3 sm:inset-x-auto sm:right-4 sm:top-20 sm:bottom-auto sm:w-96 flex flex-col gap-2">
                 {items.map((item) => <ToastItem key={item.id} toast={item} onClose={close} />)}
             </div>
         </ToastContext.Provider>

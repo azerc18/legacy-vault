@@ -159,7 +159,8 @@ export default function Dashboard() {
                 if (next && next.top - y < view * (1 - THRESHOLD)) target = next.top;
             } else {
                 const cur = [...tops].reverse().find((s) => s.top < y - 8);
-                if (cur) {
+                // Phần cao hơn khung nhìn: để cuộn tự do, nếu kéo về đáy phần đó thì người dùng không cuộn lên nổi
+                if (cur && cur.h <= view) {
                     const curBottom = cur.top + cur.h;
                     // phần trên đang hiện >=30% khung nhìn thì lùi về vừa khít phần đó
                     if (y - curBottom < 0 && curBottom - y >= view * THRESHOLD) target = Math.max(cur.top, curBottom - view);
