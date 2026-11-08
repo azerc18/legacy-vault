@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "plans": "Plans", "notifications": "Failed emails" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -43,6 +43,14 @@
       "none": "Nothing here.",
       "emptyTitle": "All clear",
       "emptyText": "No HIGH alerts, vaults close to their claim deadline or stuck payments."
+    },
+    "charts": {
+      "revenue": "Revenue per day",
+      "users": "New users per week",
+      "last30": "30 days",
+      "last12w": "12 weeks",
+      "max": "Peak: {{value}}",
+      "noData": "No data in this period yet."
     }
   },
 
@@ -62,6 +70,71 @@
     "summary": { "revenue": "Total revenue", "filtered": "For the current filters", "allTime": "All time" },
     "cols": { "time": "Time", "user": "User", "plan": "Plan", "amount": "Amount", "status": "Status", "provider": "Gateway" },
     "empty": { "title": "No payments yet", "text": "Plan upgrade payments will appear here.", "filtered": "No payments match these filters. Try removing some." }
+  },
+
+  "drawer": {
+    "title": "User profile",
+    "kicker": "User dossier",
+    "open": "Open profile",
+    "close": "Close",
+    "loadError": "Could not load this user.",
+    "allLogs": "All logs",
+    "payments": "Payments",
+    "profile": "Details",
+    "vaults": "Vaults",
+    "alerts": "Related alerts",
+    "logs": "10 latest log entries",
+    "noVaults": "No vaults yet.",
+    "noAlerts": "No alerts.",
+    "noLogs": "No log entries yet.",
+    "on": "On",
+    "off": "Off",
+    "until": "until {{date}}",
+    "fields": { "roles": "Roles", "phone": "Phone", "joined": "Joined", "lastLogin": "Last sign-in", "mfa": "Two-factor", "failedLogins": "Failed sign-ins", "plan": "Plan", "nextCheckin": "DMS check-in due" }
+  },
+
+  "notifications": {
+    "title": "Failed emails",
+    "subtitle": "System notification emails that could not be delivered. They are retried on a schedule; you can resend now once mail is fixed.",
+    "loadError": "Could not load emails.",
+    "retryError": "Could not resend the email.",
+    "retried": "Email resent to {{email}}.",
+    "retry": "Resend",
+    "notRetryable": "Resend not supported",
+    "ledger": "Email ledger",
+    "total_one": "{{count}} email",
+    "total_other": "{{count}} emails",
+    "lastAttempt": "Last attempt {{date}}",
+    "status": { "FAILED": "Failed", "QUEUED": "Queued", "SENT": "Sent", "READ": "Read" },
+    "types": { "EXECUTOR_ACTIVATED": "Executor activated", "VAULT_UNLOCKED": "Vault unlocked", "VERIFIER_REPLY": "Verifier reply", "VERIFICATION_DECIDED": "Verification decided", "ASSET_REASSIGNED": "Asset reassigned", "LEGACY_MESSAGE_DELIVERED": "Legacy message" },
+    "cols": { "created": "Time", "recipient": "Recipient", "type": "Type", "attempts": "Attempts", "status": "Status" },
+    "empty": { "failedTitle": "No failed emails", "failedText": "Every notification email was delivered.", "title": "No emails" }
+  },
+
+  "plans": {
+    "title": "Plans",
+    "subtitle": "Price and limits of each plan. Price changes only apply to future purchases.",
+    "loadError": "Could not load plans.",
+    "saveError": "Could not save the plan.",
+    "saved": "{{code}} updated: new price {{price}} for future purchases.",
+    "subscribers_one": "{{count}} active user",
+    "subscribers_other": "{{count}} active users",
+    "free": "Free",
+    "duration_one": "{{count}} day per purchase",
+    "duration_other": "{{count}} days per purchase",
+    "noExpiry": "Never expires",
+    "edit": "Change price / name",
+    "limits": { "vaults": "Max vaults", "beneficiaries": "Beneficiaries / vault", "storage": "Storage", "messages": "Legacy messages" },
+    "form": {
+      "name": "Display name",
+      "price": "Price (VND)",
+      "priceHint": "From 10,000 to 100,000,000 VND.",
+      "reason": "Reason (written to the audit log)",
+      "reasonPlaceholder": "e.g. November promotion",
+      "futureOnly": "Only applies to payments created after saving. Current subscribers and pending payments keep their amount.",
+      "save": "Save new price"
+    },
+    "limitsLocked": "Plan limits are locked because running subscriptions read them directly from here — changing them would affect people who already paid. Plan versioning is needed first."
   },
 
   "users": {
@@ -139,7 +212,9 @@
     "openError": "Could not open this vault.",
     "empty": { "title": "No vaults found", "text": "Try another status filter." },
     "status": { "ACTIVE": "Active", "UNLOCKED": "Unlocked", "CLAIMED": "Claimed", "ARCHIVED_LOCKED": "Archived" },
-    "cols": { "vault": "Vault", "status": "Status", "created": "Created", "updated": "Updated" },
+    "cols": { "vault": "Vault", "owner": "Owner", "status": "Status", "created": "Created", "updated": "Updated", "deadline": "Claim deadline" },
+    "searchPlaceholder": "Search by vault name, owner email or name",
+    "expiringFilter": "Only vaults whose claim deadline is within 7 days",
     "details": "Details",
     "detail": {
       "owner": "Owner: {{email}}",
@@ -203,6 +278,12 @@
     "meta_other": "{{count}} events · first {{first}} · last {{last}}",
     "acknowledgedAt": "acknowledged {{date}}",
     "viewLogs": "View logs",
-    "acknowledge": "Acknowledge"
+    "acknowledge": "Acknowledge",
+    "severityFilter": "Filter by severity",
+    "allSeverities": "All severities",
+    "relatedUser": "Related user:",
+    "lockUser": "Lock this user",
+    "lockReason": "Locked from alert {{rule}}",
+    "ackDialog": { "title": "Acknowledge this alert?", "message": "Note what you did (e.g. called the user, locked the account). The note is saved with the alert and in the audit log." }
   }
 }

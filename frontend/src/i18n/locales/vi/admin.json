@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "plans": "Gói", "notifications": "Email lỗi" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -41,6 +41,14 @@
       "none": "Không có mục nào.",
       "emptyTitle": "Mọi thứ đều ổn",
       "emptyText": "Không có cảnh báo mức CAO, kho sắp hết hạn nhận hay giao dịch bị treo."
+    },
+    "charts": {
+      "revenue": "Doanh thu theo ngày",
+      "users": "Người dùng mới theo tuần",
+      "last30": "30 ngày",
+      "last12w": "12 tuần",
+      "max": "Cao nhất: {{value}}",
+      "noData": "Chưa có dữ liệu trong khoảng này."
     }
   },
 
@@ -59,6 +67,68 @@
     "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay" },
     "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
     "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
+  },
+
+  "drawer": {
+    "title": "Hồ sơ người dùng",
+    "kicker": "Hồ sơ người dùng",
+    "open": "Xem hồ sơ",
+    "close": "Đóng",
+    "loadError": "Không tải được hồ sơ người dùng.",
+    "allLogs": "Toàn bộ nhật ký",
+    "payments": "Giao dịch",
+    "profile": "Thông tin",
+    "vaults": "Kho",
+    "alerts": "Cảnh báo liên quan",
+    "logs": "10 nhật ký gần nhất",
+    "noVaults": "Chưa có kho nào.",
+    "noAlerts": "Không có cảnh báo nào.",
+    "noLogs": "Chưa có nhật ký.",
+    "on": "Bật",
+    "off": "Tắt",
+    "until": "đến {{date}}",
+    "fields": { "roles": "Vai trò", "phone": "Điện thoại", "joined": "Tham gia", "lastLogin": "Đăng nhập gần nhất", "mfa": "Xác thực 2 lớp", "failedLogins": "Lần đăng nhập sai", "plan": "Gói", "nextCheckin": "Hạn check-in DMS" }
+  },
+
+  "notifications": {
+    "title": "Email gửi lỗi",
+    "subtitle": "Email thông báo hệ thống không gửi được. Hệ thống tự thử lại theo lịch; bạn có thể gửi lại ngay khi đã sửa cấu hình mail.",
+    "loadError": "Không tải được danh sách email.",
+    "retryError": "Không gửi lại được email.",
+    "retried": "Đã gửi lại email cho {{email}}.",
+    "retry": "Gửi lại",
+    "notRetryable": "Chưa hỗ trợ gửi lại",
+    "ledger": "Sổ email",
+    "total_other": "{{count}} email",
+    "lastAttempt": "Lần thử gần nhất {{date}}",
+    "status": { "FAILED": "Lỗi", "QUEUED": "Đang chờ", "SENT": "Đã gửi", "READ": "Đã đọc" },
+    "types": { "EXECUTOR_ACTIVATED": "Kích hoạt người thi hành", "VAULT_UNLOCKED": "Kho được mở khoá", "VERIFIER_REPLY": "Phản hồi xác minh", "VERIFICATION_DECIDED": "Kết quả xác minh", "ASSET_REASSIGNED": "Tài sản được chuyển", "LEGACY_MESSAGE_DELIVERED": "Lời nhắn di nguyện" },
+    "cols": { "created": "Thời gian", "recipient": "Người nhận", "type": "Loại", "attempts": "Số lần thử", "status": "Trạng thái" },
+    "empty": { "failedTitle": "Không có email lỗi", "failedText": "Mọi email thông báo đều đã gửi được.", "title": "Không có email nào" }
+  },
+
+  "plans": {
+    "title": "Gói thuê bao",
+    "subtitle": "Giá và giới hạn của từng gói. Đổi giá chỉ áp dụng cho lần mua sau.",
+    "loadError": "Không tải được danh sách gói.",
+    "saveError": "Không lưu được gói.",
+    "saved": "Đã cập nhật {{code}}: giá mới {{price}} cho các lần mua sau.",
+    "subscribers_other": "{{count}} người đang dùng",
+    "free": "Miễn phí",
+    "duration_other": "{{count}} ngày mỗi lần mua",
+    "noExpiry": "Không hết hạn",
+    "edit": "Đổi giá / tên",
+    "limits": { "vaults": "Số kho tối đa", "beneficiaries": "Người thụ hưởng / kho", "storage": "Dung lượng", "messages": "Lời nhắn di nguyện" },
+    "form": {
+      "name": "Tên hiển thị",
+      "price": "Giá (VND)",
+      "priceHint": "Từ 10.000 đến 100.000.000 VND.",
+      "reason": "Lý do (ghi vào nhật ký)",
+      "reasonPlaceholder": "VD: khuyến mãi tháng 11",
+      "futureOnly": "Chỉ áp dụng cho giao dịch tạo sau khi lưu. Người đang dùng gói và giao dịch đang chờ giữ nguyên số tiền.",
+      "save": "Lưu giá mới"
+    },
+    "limitsLocked": "Giới hạn của gói đang khoá vì gói đang chạy đọc trực tiếp từ đây — đổi sẽ ảnh hưởng người đã mua. Cần thêm cơ chế phiên bản gói trước khi cho sửa."
   },
 
   "users": {
@@ -135,7 +205,9 @@
     "openError": "Không mở được kho này.",
     "empty": { "title": "Không có kho nào", "text": "Thử bộ lọc trạng thái khác." },
     "status": { "ACTIVE": "Hoạt động", "UNLOCKED": "Đã mở khoá", "CLAIMED": "Đã nhận", "ARCHIVED_LOCKED": "Đã lưu trữ" },
-    "cols": { "vault": "Kho", "status": "Trạng thái", "created": "Ngày tạo", "updated": "Cập nhật" },
+    "cols": { "vault": "Kho", "owner": "Chủ kho", "status": "Trạng thái", "created": "Ngày tạo", "updated": "Cập nhật", "deadline": "Hạn nhận" },
+    "searchPlaceholder": "Tìm theo tên kho, email hoặc tên chủ kho",
+    "expiringFilter": "Chỉ kho sắp hết hạn nhận (7 ngày)",
     "details": "Chi tiết",
     "detail": {
       "owner": "Chủ kho: {{email}}",
@@ -196,6 +268,12 @@
     "meta_other": "{{count}} sự kiện · đầu tiên {{first}} · gần nhất {{last}}",
     "acknowledgedAt": "xác nhận lúc {{date}}",
     "viewLogs": "Xem nhật ký",
-    "acknowledge": "Xác nhận"
+    "acknowledge": "Xác nhận",
+    "severityFilter": "Lọc theo mức độ",
+    "allSeverities": "Mọi mức độ",
+    "relatedUser": "Người dùng liên quan:",
+    "lockUser": "Khoá người này",
+    "lockReason": "Khoá từ cảnh báo {{rule}}",
+    "ackDialog": { "title": "Xác nhận đã xử lý cảnh báo?", "message": "Ghi lại bạn đã làm gì (VD: đã gọi xác minh, đã khoá tài khoản). Ghi chú được lưu cùng cảnh báo và vào nhật ký." }
   }
 }
