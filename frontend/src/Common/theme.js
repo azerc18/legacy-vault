@@ -55,3 +55,14 @@ export function useTheme() {
 
     return [theme, setTheme];
 }
+
+// Trang Hồ sơ: lựa chọn giao diện gồm cả "theo hệ thống" (system = xoá lựa chọn đã lưu).
+export const getThemePreference = () => getStoredTheme() ?? 'system';
+
+export function setThemePreference(pref) {
+    if (pref === 'light' || pref === 'dark') return setTheme(pref);
+    try { localStorage.removeItem(KEY); } catch { /* bỏ qua */ }
+    const next = resolveTheme();
+    applyTheme(next);
+    window.dispatchEvent(new CustomEvent(EVENT, { detail: next }));
+}

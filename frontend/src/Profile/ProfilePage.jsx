@@ -13,6 +13,10 @@ import { isPasswordValid } from '../Common/passwordPolicy.js';
 import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import TwoFactorCard from './TwoFactorCard.jsx';
+import CompletenessCard from './CompletenessCard.jsx';
+import LegacyOverviewCard from './LegacyOverviewCard.jsx';
+import SessionsCard from './SessionsCard.jsx';
+import PreferencesCard from './PreferencesCard.jsx';
 
 const STATUS_STYLE = {
     ACTIVE: 'bg-success-container text-on-success-container',
@@ -319,11 +323,25 @@ export default function ProfilePage() {
 
                 {profile && (
                     <div className="grid lg:grid-cols-3 gap-6 items-start">
-                        <SummaryCard profile={profile} onChanged={handleSaved} />
-                        <div className="lg:col-span-2 space-y-6">
-                            <ProfileForm profile={profile} onSaved={handleSaved} />
+                        <div className="min-w-0 space-y-6 lg:sticky lg:top-6">
+                            <div id="profile-summary" className="scroll-mt-6">
+                                <SummaryCard profile={profile} onChanged={handleSaved} />
+                            </div>
+                            <CompletenessCard profile={profile} />
+                        </div>
+                        <div className="min-w-0 lg:col-span-2 space-y-6">
+                            {profile.roles?.includes('OWNER') && <LegacyOverviewCard />}
+                            <div id="profile-info" className="scroll-mt-6">
+                                <ProfileForm profile={profile} onSaved={handleSaved} />
+                            </div>
+                            <PreferencesCard />
                             <ChangePasswordForm />
-                            <TwoFactorCard profile={profile} onChanged={setProfile} />
+                            <div id="profile-2fa" className="scroll-mt-6">
+                                <TwoFactorCard profile={profile} onChanged={setProfile} />
+                            </div>
+                            <div id="profile-sessions" className="scroll-mt-6">
+                                <SessionsCard />
+                            </div>
                         </div>
                     </div>
                 )}

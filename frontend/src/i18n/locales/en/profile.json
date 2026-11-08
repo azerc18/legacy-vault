@@ -82,5 +82,102 @@
     "saved": "I have saved them",
     "fileHeader": "LegacyVault backup codes ({{email}})\nEach code can be used once.",
     "failed": "Something went wrong."
+  },
+  "completeness": {
+    "title": "Profile strength",
+    "hint": "{{done}} of {{total}} done. Finish the rest to keep your account safer.",
+    "allDone": "Your account is complete and well protected.",
+    "fix": "Do it",
+    "estateScore": "Estate readiness score",
+    "items": {
+      "verified": "Email verified",
+      "avatar": "Add a profile photo",
+      "phone": "Add a phone number",
+      "mfa": "Turn on two-step verification"
+    }
+  },
+  "legacy": {
+    "title": "My legacy",
+    "vaults": "Vaults",
+    "assets": "Digital assets",
+    "dms": "Dead Man's Switch",
+    "dmsOff": "Off",
+    "plan": "Current plan",
+    "planFree": "Free",
+    "dmsStatus": {
+      "ACTIVE": "On",
+      "PENDING_CONFIRMATION": "Awaiting confirmation",
+      "TRIGGERED": "Triggered",
+      "SUSPENDED": "Paused"
+    },
+    "dmsWarning": "DMS has been triggered",
+    "peopleTitle_one": "People in my legacy ({{count}})",
+    "peopleTitle_other": "People in my legacy ({{count}})",
+    "empty": "No one yet. Create a vault and add a beneficiary to get started.",
+    "createVault": "Create a vault",
+    "roleBeneficiary_one": "Beneficiary ({{count}} vault)",
+    "roleBeneficiary_other": "Beneficiary ({{count}} vaults)",
+    "roleConfirmer": "DMS confirmer",
+    "executor": {
+      "PRIMARY": "Primary executor",
+      "BACKUP": "Backup executor"
+    },
+    "beneficiaryStatus": {
+      "PENDING_REGISTRATION": "Awaiting sign-up",
+      "INVITED": "Invited",
+      "VERIFIED": "Verified",
+      "ACCEPTED": "Accepted",
+      "DECLINED": "Declined",
+      "WAIVED": "Waived"
+    },
+    "executorStatus": {
+      "INACTIVE": "Assigned",
+      "ACTIVE": "Acting"
+    },
+    "confirmerStatus": {
+      "ACTIVE": "Ready",
+      "CONFIRMED_ALIVE": "Confirmed",
+      "CONFIRMED_UNREACHABLE": "Reported unreachable"
+    },
+    "manageExecutors": "Manage executors",
+    "manageDms": "DMS settings",
+    "viewActivity": "Activity log"
+  },
+  "prefs": {
+    "title": "Personal preferences",
+    "description": "Applies to this browser.",
+    "theme": "Appearance",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "uiLanguage": "Interface language",
+    "uiLanguageHint": "Email language is set under Personal information.",
+    "idle": "Sign out when idle",
+    "idleHint": "Useful on shared computers.",
+    "idleOff": "Never",
+    "idleMinutes_one": "After {{count}} minute",
+    "idleMinutes_other": "After {{count}} minutes",
+    "idleSignedOut": "You were signed out after a period of inactivity."
+  },
+  "sessions": {
+    "title": "Signed-in devices",
+    "description": "Browsers and devices currently signed in to your account.",
+    "thisDevice": "This device",
+    "unknownDevice": "Unknown device",
+    "lastActive": "Active {{time}}",
+    "signOut": "Sign out",
+    "working": "Working...",
+    "signOutOthers": "Sign out all other devices",
+    "confirmTitle": "Sign out all other devices?",
+    "confirmMessage_one": "{{count}} other device will need to sign in again. This device stays signed in.",
+    "confirmMessage_other": "{{count}} other devices will need to sign in again. This device stays signed in.",
+    "note": "Signed-out devices lose access within 15 minutes.",
+    "revoked": "Device signed out.",
+    "revokedOthers_one": "Signed out {{count}} device.",
+    "revokedOthers_other": "Signed out {{count}} devices.",
+    "errors": {
+      "load": "Could not load your devices.",
+      "failed": "Something went wrong. Please try again."
+    }
   }
 }
