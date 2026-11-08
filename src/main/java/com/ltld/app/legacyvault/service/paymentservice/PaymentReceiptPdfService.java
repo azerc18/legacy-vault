@@ -124,7 +124,7 @@ public class PaymentReceiptPdfService {
             doc.add(sectionTitle("NGƯỜI MUA HÀNG (BUYER)"));
             PdfPTable buyer = table(new float[]{30, 70});
             row(buyer, "Họ tên người mua (Buyer name)", blankToDash(d.customerName()));
-            row(buyer, "Đơn vị / MST (Company)", "—");
+            row(buyer, "Đơn vị / MST (Company)", "— (minh họa / sample)");
             row(buyer, "Email (Invoice email)", d.customerEmail());
             doc.add(buyer);
 

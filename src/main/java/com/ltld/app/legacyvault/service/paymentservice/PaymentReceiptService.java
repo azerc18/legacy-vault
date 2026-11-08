@@ -45,7 +45,10 @@ public class PaymentReceiptService {
         SubscriptionPlan plan = tx.getPlan();
         // Ngày lập = lúc thanh toán (không dùng now()) để mỗi lần tải lại hoá đơn vẫn y hệt
         LocalDateTime issuedAt = tx.getPaidAt() != null ? tx.getPaidAt() : tx.getCreatedAt();
-        // Số hoá đơn mô phỏng = thứ tự của giao dịch trong các giao dịch SUCCESS (ổn định, không cần cột mới)
+        // Số hoá đơn mô phỏng = thứ tự của giao dịch trong các giao dịch SUCCESS (ổn định, không cần cột mới).
+        // Giới hạn đã biết (chấp nhận được vì hoá đơn chỉ mô phỏng): hai giao dịch có cùng paidAt sẽ trùng số,
+        // và nếu sau này có hoàn tiền/xoá giao dịch SUCCESS thì số của các hoá đơn sau đó bị xê dịch.
+        // Cần số duy nhất thật thì thay bằng bảng/sequence; khi dữ liệu lớn thì thêm chỉ mục (status, paid_at).
         long invoiceNumber = Math.max(1L, paymentTransactionRepository
                 .countByStatusAndPaidAtLessThanEqual(PaymentStatus.SUCCESS, issuedAt));
         return new PaymentReceiptData(
