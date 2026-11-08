@@ -76,6 +76,7 @@
     "verifyError": "Verification failed."
   },
   "assets": {
+    "closedHint": "This case is closed: you can still see the list of assets, but their contents can no longer be viewed or downloaded.",
     "title": "Assets ({{count}})",
     "empty": "This vault has no assets.",
     "consensusDone": "Joint approval complete ({{approved}} of {{total}} approved)",

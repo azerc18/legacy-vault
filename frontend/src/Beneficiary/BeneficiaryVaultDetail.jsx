@@ -83,6 +83,12 @@ export default function BeneficiaryVaultDetail() {
         })();
     }, [vaultId, loadContent]);
 
+    // Vừa đóng hồ sơ trên trang này: tải lại danh sách ở dạng chỉ xem
+    useEffect(() => {
+        if (stage !== 'claimed') return;
+        beneficiaryApi.listAssets(vaultId).then(setAssets).catch(() => setAssets([]));
+    }, [stage, vaultId]);
+
     if (!user) return <Navigate to="/login" replace />;
 
     return (
@@ -106,6 +112,9 @@ export default function BeneficiaryVaultDetail() {
                         ? t('detail.claimedAt', { date: formatDate(vault.claimedAt, true) })
                         : t('detail.claimed')}
                 </Alert>
+            )}
+            {stage === 'claimed' && assets.length > 0 && (
+                <AssetList vaultId={vaultId} assets={assets} readOnly onError={() => {}} />
             )}
             {stage === 'declined' && (
                 <>
@@ -304,7 +313,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 }
 
 /* ---------- Bước 2a: tài sản (FR-17 xem, FR-18 tải) ---------- */
-function AssetList({ vaultId, assets, onError }) {
+function AssetList({ vaultId, assets, onError, readOnly = false }) {
     const { t } = useTranslation('beneficiary');
     const label = useEnumLabels();
     const [detail, setDetail] = useState(null);
@@ -347,6 +356,7 @@ function AssetList({ vaultId, assets, onError }) {
     return (
         <section className="mb-10">
             <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('assets.title', { count: assets.length })}</h2>
+            {readOnly && <p className="text-sm text-on-surface-variant mb-4">{t('assets.closedHint')}</p>}
             {assets.length === 0 ? (
                 <p className="text-sm text-on-surface-variant">{t('assets.empty')}</p>
             ) : (
@@ -374,7 +384,7 @@ function AssetList({ vaultId, assets, onError }) {
                                         <p className="mt-1 text-xs text-outline">{t('assets.refreshHint')}</p>
                                     )}
                                 </div>
-                                {locked && (
+                                {!readOnly && locked && (
                                     <>
                                         {c.myApproved ? (
                                             <span className="text-xs font-semibold text-primary">{t('assets.youApproved')}</span>
@@ -388,12 +398,14 @@ function AssetList({ vaultId, assets, onError }) {
                                         </button>
                                     </>
                                 )}
+                                {!readOnly && (<>
                                 <button onClick={() => view(a)} disabled={busyId === a.id || locked} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50">
                                     {t('assets.view')}
                                 </button>
                                 <button onClick={() => download(a)} disabled={busyId === a.id || locked} aria-label={t('assets.download')} title={t('assets.download')} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-1">
                                     <Icon name="download" className="text-[18px]" />
                                 </button>
+                                </>)}
                             </li>
                         );
                     })}

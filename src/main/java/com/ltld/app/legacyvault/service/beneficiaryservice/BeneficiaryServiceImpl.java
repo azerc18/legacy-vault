@@ -401,6 +401,12 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     @Override
     @Transactional(readOnly = true)
     public List<InheritedAssetSummaryResponse> getInheritedAssets(UUID vaultId, UUID currentUserId) {
+        // #22 (Q1): đã đóng phần của mình (claim CLAIMED) thì vẫn xem được danh sách metadata,
+        // không cần phiên xem và không giải mã. Xem chi tiết / tải xuống vẫn bị chặn 409.
+        List<InheritedAssetSummaryResponse> closed = closedAssetMetadata(vaultId, currentUserId);
+        if (closed != null) {
+            return closed;
+        }
         Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
@@ -1088,6 +1094,32 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         return claimRepository.findByVaultIdAndBeneficiaryId(vaultId, vb.getUser().getId())
                 .map(c -> c.getStatus() == ClaimStatus.PENDING)
                 .orElse(true);
+    }
+
+    // #22: trả về metadata nếu người này đã đóng phần nhận (claim CLAIMED) và vault chưa bị lưu trữ;
+    // null nghĩa là chưa đóng, đi theo luồng FR-17 thường. Người từ chối / chưa có claim không vào nhánh này.
+    private List<InheritedAssetSummaryResponse> closedAssetMetadata(UUID vaultId, UUID currentUserId) {
+        Vault vault = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
+        if (vault.getStatus() != VaultStatus.UNLOCKED && vault.getStatus() != VaultStatus.CLAIMED) {
+            return null;
+        }
+        boolean claimed = claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId)
+                .map(c -> c.getStatus() == ClaimStatus.CLAIMED)
+                .orElse(false);
+        if (!claimed) {
+            return null;
+        }
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
+        return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(asset -> !hidden.contains(asset.getId()))
+                .map(asset -> InheritedAssetSummaryResponse.builder()
+                        .id(asset.getId())
+                        .assetType(asset.getAssetType())
+                        .assetName(asset.getAssetName())
+                        .build())
+                .toList();
     }
 
     // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
