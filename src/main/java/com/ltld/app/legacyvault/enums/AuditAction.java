@@ -74,5 +74,8 @@ public enum AuditAction {
     ASSET_CONSENSUS_APPROVED,
     // F5: Executor cập nhật checklist xử lý tài khoản số
     EXECUTOR_TASK_UPDATED,
+    // C.5: xác thực tài sản
+    ASSET_VERIFICATION_STARTED, ASSET_VERIFICATION_VERIFIED, ASSET_VERIFICATION_FAILED,
+    EXECUTOR_EVIDENCE_ADDED,
     LEGAL_DOCUMENT_OCR_ANALYZED
 }

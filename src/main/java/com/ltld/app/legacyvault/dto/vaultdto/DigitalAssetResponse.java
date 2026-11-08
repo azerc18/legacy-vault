@@ -3,6 +3,8 @@ package com.ltld.app.legacyvault.dto.vaultdto;
 import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AssetType;
+import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
+import com.ltld.app.legacyvault.enums.AssetVerificationStatus;
 import com.ltld.app.legacyvault.enums.TransferMechanism;
 import lombok.Builder;
 import lombok.Getter;
@@ -26,6 +28,10 @@ public class DigitalAssetResponse {
     private final String assetName;
     private final AssetStatus status;
     private final TransferMechanism transferMechanism;
+    /** C.5: null cho tới khi bước "nền tảng" nối vào toResponse; FE coi null như SELF_DECLARED. */
+    private final AssetVerificationStatus verificationStatus;
+    private final AssetVerificationMethod verificationMethod;
+    private final LocalDateTime verifiedAt;
     /** N3: các trường không bí mật (null với tài sản kiểu cũ). */
     private final Map<String, String> publicFields;
     private final LocalDateTime createdAt;
