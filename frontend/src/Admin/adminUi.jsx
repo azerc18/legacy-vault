@@ -18,6 +18,7 @@ const NAV = [
     {to: '/admin/payments', key: 'payments', icon: 'receipt_long'},
     {to: '/admin/plans', key: 'plans', icon: 'sell'},
     {to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe'},
+    {to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open'},
 ];
 
 export const isAdmin = (user) => (user?.roles || []).includes('ADMIN');

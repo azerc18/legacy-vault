@@ -157,6 +157,10 @@ export const adminApi = {
         http.get('/admin/notifications', { params: { status, page, size } }).then(unwrap),
     // 409 nếu không còn FAILED / vừa thử lại < 1 phút / loại email chưa hỗ trợ; 503 nếu gửi vẫn lỗi
     retryNotification: (id) => http.post(`/admin/notifications/${id}/retry`).then(unwrap),
+    // #10: người thụ hưởng bị khóa xác minh danh tính
+    listBeneficiaryLocks: () => http.get('/admin/beneficiary-locks').then(unwrap),
+    unlockBeneficiary: ({ vaultId, beneficiaryId, reason }) =>
+        http.post('/admin/beneficiary-locks/unlock', { vaultId, beneficiaryId, reason }).then(unwrap),
 
     /* ---------- C1: gói ---------- */
     // -> [{ id, code, name, priceVnd, durationDays, maxVaults, maxBeneficiaries, storageQuotaBytes, legacyMessagesEnabled, activeSubscribers }]
