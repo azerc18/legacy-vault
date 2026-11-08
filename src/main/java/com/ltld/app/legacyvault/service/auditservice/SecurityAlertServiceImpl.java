@@ -10,9 +10,10 @@ import com.ltld.app.legacyvault.enums.SecurityAlertRule;
 import com.ltld.app.legacyvault.enums.SecurityAlertSeverity;
 import com.ltld.app.legacyvault.enums.SecurityAlertStatus;
 import com.ltld.app.legacyvault.exception.AdminException;
-import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.SecurityAlertRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,8 +41,11 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
 
     private final SecurityAlertRepository alertRepository;
     private final AuditLogService auditLogService;
-    private final AuditLogRepository auditLogRepository;
     private final UserRepository userRepository;
+
+    // AuditLogRepository cố ý chỉ cho ghi/tra cứu hẹp (append-only), nên đọc audit log theo id bằng JPQL
+    @PersistenceContext
+    private EntityManager em;
 
     @Override
     @Transactional(readOnly = true)
@@ -107,7 +111,10 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
         }
         Map<UUID, String> emailByAlert = new HashMap<>();
         if (!logIdByAlert.isEmpty()) {
-            Map<UUID, AuditLog> logs = auditLogRepository.findAllById(new HashSet<>(logIdByAlert.values())).stream()
+            Map<UUID, AuditLog> logs = em.createQuery(
+                            "SELECT l FROM AuditLog l LEFT JOIN FETCH l.actor WHERE l.id IN :ids", AuditLog.class)
+                    .setParameter("ids", new HashSet<>(logIdByAlert.values()))
+                    .getResultList().stream()
                     .collect(Collectors.toMap(AuditLog::getId, Function.identity()));
             for (SecurityAlert a : alerts) {
                 AuditLog log = logs.get(logIdByAlert.get(a.getId()));
