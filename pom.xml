@@ -145,6 +145,12 @@
             <artifactId>openpdf</artifactId>
             <version>2.0.3</version>
         </dependency>
+        <!-- C.3.5: Keccak-256 (EIP-55, EIP-191) và secp256k1 ecRecover cho xác thực ví crypto -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
 
     </dependencies>
 
