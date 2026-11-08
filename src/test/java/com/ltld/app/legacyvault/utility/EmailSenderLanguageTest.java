@@ -153,4 +153,45 @@ class EmailSenderLanguageTest {
         SentMail mail = SentMail.captureOne(javaMailSender);
         assertThat(mail.getText()).contains("01/12/2026 17:30 (GMT+7)", "/owner/dms");
     }
+
+    @Test
+    void englishAndVietnamesePropertiesHaveTheSameKeys() {
+        java.util.ResourceBundle.Control control = java.util.ResourceBundle.Control.getNoFallbackControl(
+                java.util.ResourceBundle.Control.FORMAT_PROPERTIES);
+        java.util.ResourceBundle en = java.util.ResourceBundle.getBundle("mail/mail", AppLanguage.EN.toLocale(), control);
+        java.util.ResourceBundle vi = java.util.ResourceBundle.getBundle("mail/mail", AppLanguage.VI.toLocale(), control);
+
+        assertThat(en.keySet()).containsExactlyInAnyOrderElementsOf(vi.keySet());
+    }
+
+    @Test
+    void dmsReminder_vietnameseKeepsLinkAndCounts() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            emailSender.sendDmsCheckinReminder("an@example.com",
+                    LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 2, 3, "tok");
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Nhắc check-in Công tắc người chết (2/3) - LegacyVault");
+        assertThat(mail.getText()).contains("Hạn check-in: 01/11/2026 09:00 (giờ Việt Nam)",
+                "https://legacyvault.test/dms/checkin?token=tok", "thứ 2 trên 3");
+    }
+
+    @Test
+    void executorAssigned_vietnameseUsesVietnameseRole() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendExecutorAssignedNotice("ex@example.com", "Owner A", "owner@example.com",
+                com.ltld.app.legacyvault.enums.ExecutorType.BACKUP);
+
+        assertThat(SentMail.captureOne(javaMailSender).getText())
+                .contains("Owner A (owner@example.com) đã chỉ định bạn làm Người thực thi dự phòng (BACKUP)",
+                        "Công tắc người chết của Owner A");
+    }
 }

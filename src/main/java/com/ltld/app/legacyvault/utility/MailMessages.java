@@ -2,8 +2,6 @@ package com.ltld.app.legacyvault.utility;
 
 import com.ltld.app.legacyvault.enums.AppLanguage;
 
-import java.text.MessageFormat;
-import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -26,7 +24,13 @@ public final class MailMessages {
         if (pattern == null) {
             return key;
         }
-        return args == null || args.length == 0 ? pattern : new MessageFormat(pattern, Locale.ROOT).format(args);
+        // Thay {0}, {1}... bằng chuỗi: không dùng MessageFormat để dấu nháy đơn (Dead Man's Switch) không bị nuốt
+        if (args != null) {
+            for (int i = 0; i < args.length; i++) {
+                pattern = pattern.replace("{" + i + "}", String.valueOf(args[i]));
+            }
+        }
+        return pattern;
     }
 
     public static boolean has(AppLanguage language, String key) {

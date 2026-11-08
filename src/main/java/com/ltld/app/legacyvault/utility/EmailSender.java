@@ -122,30 +122,32 @@ public class EmailSender {
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
     @Async
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.invite.p1", ownerName, vaultName));
+        paras.add(MailMessages.get(lang, "mail.invite.p2"));
         String link = registerLink();
-        sendWithoutOtpFooter(email,
-                "Invitation to become a beneficiary - LegacyVault",
-                ownerName + " has named you the beneficiary of vault \"" + vaultName + "\" on LegacyVault."
-                        + "\nPlease register an account (or finish verifying your email if you have already registered) using this email address"
-                        + " so you can be linked to the vault."
-                        + (link != null ? "\nRegister at: " + link : ""));
+        if (link != null) {
+            paras.add(MailMessages.get(lang, "mail.register") + ": " + link);
+        }
+        sendKeyed(email, lang, Style.INVITE, "mail.invite", paras);
     }
 
     // FR-02: thông báo cho người thụ hưởng đã có tài khoản
     @Async
     public void sendBeneficiaryAssignedNotice(String email, String ownerName, String vaultName) {
-        sendWithoutOtpFooter(email,
-                "You have been named a beneficiary - LegacyVault",
-                ownerName + " has named you the beneficiary of vault \"" + vaultName + "\" on LegacyVault."
-                        + "\nYou will be notified when the vault is unlocked for handover.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.INVITE, "mail.assigned", List.of(
+                MailMessages.get(lang, "mail.assigned.p1", ownerName, vaultName),
+                MailMessages.get(lang, "mail.assigned.p2")));
     }
 
     // N2-owner: báo cho người bị gỡ khỏi vault
     @Async
     public void sendBeneficiaryRemovedNotice(String email, String ownerName, String vaultName) {
-        sendWithoutOtpFooter(email,
-                "You are no longer a beneficiary - LegacyVault",
-                ownerName + " has removed you as a beneficiary of vault \"" + vaultName + "\" on LegacyVault.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.NOTICE, "mail.removed", List.of(
+                MailMessages.get(lang, "mail.removed.p1", ownerName, vaultName)));
     }
 
     /**
@@ -155,29 +157,30 @@ public class EmailSender {
     @Async
     public void sendAssetsReassignedNotice(String email, String fullName, String ownerName, String vaultName,
                                            int assetCount, boolean noResponse, UUID vaultId) {
-        StringBuilder body = new StringBuilder()
-                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
-                .append(assetCount).append(" asset(s) in the vault \"").append(vaultName).append("\" of ")
-                .append(ownerName).append(" have been reassigned to you because another beneficiary ")
-                .append(noResponse ? "did not respond in time" : "declined their share").append(".\n\n");
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.reassigned.p1", assetCount, vaultName, ownerName,
+                MailMessages.get(lang, noResponse ? "mail.reassigned.noResponse" : "mail.reassigned.declined")));
         String link = vaultLink(vaultId);
         if (link != null) {
-            body.append("Open the vault: ").append(link).append("\n\n");
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
         }
-        body.append("Please sign in, verify your identity, then view and confirm receipt of the assets allocated to you.");
-        sendWithoutOtpFooter(email, "Assets reassigned to you - LegacyVault", body.toString());
+        paras.add(MailMessages.get(lang, "mail.reassigned.p2"));
+        sendKeyed(email, lang, Style.NOTICE, "mail.reassigned", paras);
     }
 
     // FR-02 (bước 7): xác nhận cho Owner
     @Async
     public void sendBeneficiaryAssignmentConfirmation(String ownerEmail, String vaultName,
                                                       String beneficiaryEmail, boolean pendingRegistration) {
-        sendWithoutOtpFooter(ownerEmail,
-                "Beneficiary assignment confirmed - LegacyVault",
-                "You have named " + beneficiaryEmail + " as the beneficiary of vault \"" + vaultName + "\"."
-                        + (pendingRegistration
-                        ? "\nThis person does not have a verified account yet; a sign-up invitation has been sent."
-                        : ""));
+        AppLanguage lang = languageResolver.forEmail(ownerEmail);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.assignConfirm.p1", beneficiaryEmail, vaultName));
+        if (pendingRegistration) {
+            paras.add(MailMessages.get(lang, "mail.assignConfirm.pending"));
+        }
+        sendKeyed(ownerEmail, lang, Style.SUCCESS, "mail.assignConfirm", paras);
     }
 
     /** Hạn nhận theo giờ Việt Nam: claimDeadlineAt là LocalDateTime theo múi giờ máy chủ nên đổi sang GMT+7. */
@@ -224,20 +227,17 @@ public class EmailSender {
     @Async
     public void sendBeneficiaryClaimReminder(String email, String fullName, String ownerName, String vaultName,
                                              LocalDateTime claimDeadlineAt, UUID vaultId) {
-        StringBuilder body = new StringBuilder()
-                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
-                .append("This is a reminder from the executor of ").append(ownerName)
-                .append(": the vault \"").append(vaultName)
-                .append("\" has been handed over to you and is still waiting for your response on LegacyVault.\n\n");
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.claimReminder.p1", ownerName, vaultName));
         String link = vaultLink(vaultId);
         if (link != null) {
-            body.append("Open the vault: ").append(link).append("\n\n");
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
         }
-        body.append("Please sign in, verify your identity, then accept or decline the assets allocated to you.\n")
-                .append("Claim deadline: ").append(formatDeadline(claimDeadlineAt)).append(" (GMT+7).\n\n")
-                .append("Please do not share this email with anyone.");
-
-        sendWithoutOtpFooter(email, "Reminder: assets waiting for you - LegacyVault", body.toString());
+        paras.add(MailMessages.get(lang, "mail.claimReminder.p2", formatDeadline(claimDeadlineAt)));
+        paras.add(MailMessages.get(lang, "mail.noShare"));
+        sendKeyed(email, lang, Style.URGENT, "mail.claimReminder", paras);
     }
 
     // F4b: thông báo khi lời nhắn di nguyện / Time-Capsule đến hạn mở cho người thụ hưởng
@@ -245,36 +245,30 @@ public class EmailSender {
     @Async
     public void sendLegacyMessageDeliveredNotification(String email, String fullName, String ownerName,
                                                        String vaultName, UUID vaultId, boolean hasAccount) {
-        StringBuilder body = new StringBuilder()
-                .append("Hello ").append(fullName == null || fullName.isBlank() ? "" : fullName).append(",\n\n")
-                .append("You have a new legacy message from ").append(ownerName)
-                .append(" in vault \"").append(vaultName).append("\" on LegacyVault.\n\n");
-
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.legacyMsg.p1", ownerName, vaultName));
         if (!hasAccount) {
-            body.append("Your account has not been activated yet. ")
-                    .append("Please complete registration and verify your email first, then sign in to read your message.\n");
+            paras.add(MailMessages.get(lang, "mail.legacyMsg.inactive"));
             String regLink = registerLink();
             if (regLink != null) {
-                body.append("Register at: ").append(regLink).append("\n");
+                paras.add(MailMessages.get(lang, "mail.register") + ": " + regLink);
             }
-            body.append("\n");
         }
-
         String link = vaultLink(vaultId);
         if (link != null) {
-            body.append("Open the vault: ").append(link).append("\n\n");
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
         }
-        body.append("Sign in to your LegacyVault account and open the vault to read the message and download any attached media.\n\n")
-                .append("Please do not share this email with anyone.");
-
-        sendWithoutOtpFooter(email, "A legacy message for you - LegacyVault", body.toString());
+        paras.add(MailMessages.get(lang, "mail.legacyMsg.p2"));
+        paras.add(MailMessages.get(lang, "mail.noShare"));
+        sendKeyed(email, lang, Style.LEGACY, "mail.legacyMsg", paras);
     }
 
     public void sendVerificationRequestNotification(String email, UUID requestId) {
-        sendWithoutOtpFooter(email,
-                "New verification request - LegacyVault",
-                "A new verification request needs review. Request ID: " + requestId
-                        + "\nPlease sign in to view the details.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.CASE, "mail.verifyRequest",
+                List.of(MailMessages.get(lang, "mail.verifyRequest.body", requestId)));
     }
 
     private String frontendBase() {
@@ -310,20 +304,20 @@ public class EmailSender {
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount, String checkinToken) {
+        AppLanguage lang = languageResolver.forEmail(email);
         String base = frontendBase();
-        String linkSection = (base != null && checkinToken != null && !checkinToken.isBlank())
-                ? "\n\nStill here? Open this link and press \"I'm OK\" to check in without signing in: "
-                        + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8)
-                : "";
-        sendWithoutOtpFooter(email,
-                "Dead Man's Switch check-in reminder (" + reminderNumber + "/" + reminderCount + ") - LegacyVault",
-                "You have not checked in to your Dead Man's Switch on LegacyVault."
-                        + "\nCheck-in deadline: " + formatDeadline(checkinDueAt) + " (Vietnam time)"
-                        + "\nIf you do not respond, the system will start the handover process at "
-                        + formatDeadline(triggerAt) + " (Vietnam time) and notify your Digital Executor."
-                        + linkSection
-                        + "\n\nTo check in, sign in to LegacyVault and choose \"Check-in\" in the Dead Man's Switch settings."
-                        + "\nThis is reminder " + reminderNumber + " of " + reminderCount + ".");
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.dmsReminder.p1", formatDeadline(checkinDueAt), formatDeadline(triggerAt)));
+        if (base != null && checkinToken != null && !checkinToken.isBlank()) {
+            paras.add(MailMessages.get(lang, "mail.dmsReminder.link"));
+            paras.add(MailMessages.get(lang, "mail.dmsReminder.button") + ": "
+                    + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8));
+        }
+        paras.add(MailMessages.get(lang, "mail.dmsReminder.p2", reminderNumber, reminderCount));
+        deliver(email, lang, Style.URGENT,
+                MailMessages.get(lang, "mail.dmsReminder.subject", reminderNumber, reminderCount),
+                MailMessages.get(lang, "mail.dmsReminder.title", reminderNumber, reminderCount),
+                paras, null, null);
     }
 
     /**
@@ -344,21 +338,17 @@ public class EmailSender {
         if (base == null) {
             throw new IllegalStateException("app.frontend.base-url is not configured; cannot build the confirmation link");
         }
+        AppLanguage lang = languageResolver.forEmail(confirmerEmail);
         String confirmUrl = base + "/dms/confirm?token=" + URLEncoder.encode(confirmationToken, StandardCharsets.UTF_8);
-        String ownerText = ownerLabel(ownerName, ownerEmail);
-        String body = "Hello " + (confirmerName == null ? "" : confirmerName) + ",\n\n"
-                + ownerText + " designated you as a Trusted Social Confirmer on LegacyVault.\n"
-                + "Their Dead Man's Switch check-in and grace period have expired without response.\n\n"
-                + "Before the system notifies their Digital Executor, please open the link below and tell us whether "
-                + "they are safe, before " + formatDeadline(deadlineAt) + " (Vietnam time):\n\n"
-                + confirmUrl + "\n\n"
-                + "Opening the link does not change anything; your answer is only recorded when you press a button on that page.\n"
-                + "If no confirmer responds within 72 hours, the system will automatically proceed with the handover.";
-        sendWithoutOtpFooter(
-                confirmerEmail,
-                "URGENT: Please confirm safety status for " + ownerDisplayName(ownerName, ownerEmail) + " - LegacyVault",
-                body
-        );
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", confirmerName == null ? "" : confirmerName));
+        paras.add(MailMessages.get(lang, "mail.crossConfirm.p1", ownerLabel(ownerName, ownerEmail)));
+        paras.add(MailMessages.get(lang, "mail.crossConfirm.p2", formatDeadline(deadlineAt)));
+        paras.add(MailMessages.get(lang, "mail.crossConfirm.button") + ": " + confirmUrl);
+        paras.add(MailMessages.get(lang, "mail.crossConfirm.p3"));
+        deliver(confirmerEmail, lang, Style.URGENT,
+                MailMessages.get(lang, "mail.crossConfirm.subject", ownerDisplayName(ownerName, ownerEmail)),
+                MailMessages.get(lang, "mail.crossConfirm.title"), paras, null, null);
     }
 
     /**
@@ -366,98 +356,79 @@ public class EmailSender {
      */
     public void sendOwnerConfirmationPendingNotice(String ownerEmail, String ownerName, List<String> confirmerNames,
                                                    LocalDateTime deadlineAt) {
+        AppLanguage lang = languageResolver.forEmail(ownerEmail);
         String base = frontendBase();
-        String dmsLink = base == null ? null : base + "/owner/dms";
         String names = confirmerNames == null || confirmerNames.isEmpty()
-                ? "your trusted confirmers" : String.join(", ", confirmerNames);
-        sendWithoutOtpFooter(ownerEmail,
-                "Your trusted confirmers are being contacted - LegacyVault",
-                "Hello " + ownerDisplayName(ownerName, ownerEmail) + ",\n\n"
-                        + "Your Dead Man's Switch check-in and grace period have expired.\n"
-                        + "Your trusted confirmers (" + names + ") are being contacted to confirm whether you are safe.\n"
-                        + "Check in before " + formatDeadline(deadlineAt)
-                        + " (Vietnam time) to cancel this and return your Dead Man's Switch to normal."
-                        + (dmsLink != null ? "\nCheck in: " + dmsLink : ""));
+                ? MailMessages.get(lang, "mail.pendingConfirm.names") : String.join(", ", confirmerNames);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", ownerDisplayName(ownerName, ownerEmail)));
+        paras.add(MailMessages.get(lang, "mail.pendingConfirm.body", names, formatDeadline(deadlineAt)));
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.pendingConfirm.button") + ": " + base + "/owner/dms");
+        }
+        sendKeyed(ownerEmail, lang, Style.URGENT, "mail.pendingConfirm", paras);
     }
 
     /**
      * X2: thông báo cho Owner biết người xác nhận chéo vừa báo "Owner vẫn bình an" và hoãn DMS 7 ngày.
      */
     public void sendOwnerConfirmedSafeNotice(String ownerEmail, String confirmerName, LocalDateTime postponedUntil) {
-        String body = "Your Trusted Social Confirmer (" + (confirmerName == null ? "Trusted Contact" : confirmerName)
-                + ") confirmed that you are safe.\n"
-                + "Your Dead Man's Switch activation has been postponed until "
-                + formatDeadline(postponedUntil) + " (Vietnam time).\n"
-                + "Please sign in to LegacyVault and check in as soon as possible.";
-        sendWithoutOtpFooter(
-                ownerEmail,
-                "Dead Man's Switch postponed by Trusted Confirmer - LegacyVault",
-                body
-        );
+        AppLanguage lang = languageResolver.forEmail(ownerEmail);
+        String name = confirmerName == null ? MailMessages.get(lang, "mail.confirmedSafe.name") : confirmerName;
+        sendKeyed(ownerEmail, lang, Style.SUCCESS, "mail.confirmedSafe", List.of(
+                MailMessages.get(lang, "mail.confirmedSafe.body", name, formatDeadline(postponedUntil))));
     }
 
     public void sendVerificationMessageNotification(String email, UUID requestId) {
-        sendWithoutOtpFooter(email,
-                "New message in a verification request - LegacyVault",
-                "There is a new message or supporting file in a verification request. Request ID: " + requestId
-                        + "\nPlease sign in to view the details.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.CASE, "mail.verifyMessage",
+                List.of(MailMessages.get(lang, "mail.verifyMessage.body", requestId)));
     }
 
     // FR-06: method đồng bộ; bản thân listener AFTER_COMMIT đã chạy @Async, lỗi do listener bắt và log.
     // Không nêu tên Executor còn lại của Owner.
     public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
-        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
-        sendWithoutOtpFooter(to,
-                "You have been assigned as a Digital Executor - LegacyVault",
-                ownerLabel(ownerName, ownerEmail) + " has assigned you as " + role + " on LegacyVault."
-                        + "\nYou do not need to do anything now. When the Dead Man's Switch of " + ownerDisplayName(ownerName, ownerEmail)
-                        + " is triggered, the system will notify you to sign in and accept the handover process."
-                        + "\nIf you do not know this person, please contact LegacyVault support.");
+        AppLanguage lang = languageResolver.forEmail(to);
+        sendKeyed(to, lang, Style.CASE, "mail.execAssigned", List.of(MailMessages.get(lang, "mail.execAssigned.body",
+                ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), ownerDisplayName(ownerName, ownerEmail))));
     }
 
     public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
-        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
-        sendWithoutOtpFooter(to,
-                "Your Digital Executor role has been revoked - LegacyVault",
-                ownerLabel(ownerName, ownerEmail) + " has revoked your " + role + " role on LegacyVault."
-                        + "\nFrom now on you can no longer carry out the handover process for "
-                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+        AppLanguage lang = languageResolver.forEmail(to);
+        sendKeyed(to, lang, Style.NOTICE, "mail.execRevoked", List.of(MailMessages.get(lang, "mail.execRevoked.body",
+                ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), ownerDisplayName(ownerName, ownerEmail))));
     }
 
     // FR-07 / BR-03: hệ thống tự thu hồi vì Primary không xác nhận trong hạn, Owner không làm gì (thường đã mất)
     public void sendExecutorTimeoutRevokedNotice(String to, String ownerName, String ownerEmail, int waitDays) {
-        sendWithoutOtpFooter(to,
-                "Your Digital Executor role has ended - LegacyVault",
-                "You did not confirm the handover for " + ownerLabel(ownerName, ownerEmail)
-                        + " within " + waitDays + " days, so the role was passed to the backup executor."
-                        + "\nYou can no longer carry out the handover process for "
-                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+        AppLanguage lang = languageResolver.forEmail(to);
+        sendKeyed(to, lang, Style.NOTICE, "mail.execTimeout", List.of(MailMessages.get(lang, "mail.execTimeout.body",
+                ownerLabel(ownerName, ownerEmail), waitDays, ownerDisplayName(ownerName, ownerEmail))));
     }
 
     // FR-07: Admin chỉ định Executor mới để tiếp tục bàn giao (người cũ bỏ dở hoặc không còn dùng được)
     public void sendExecutorReplacedByAdminNotice(String to, String ownerName, String ownerEmail,
                                                   ExecutorType type) {
-        String role = type == ExecutorType.PRIMARY ? "Primary executor (PRIMARY)" : "Backup executor (BACKUP)";
-        sendWithoutOtpFooter(to,
-                "Your Digital Executor role has ended - LegacyVault",
-                "An administrator has assigned a new " + role + " for " + ownerLabel(ownerName, ownerEmail)
-                        + " to continue the handover process."
-                        + "\nYou can no longer carry out the handover process for "
-                        + ownerDisplayName(ownerName, ownerEmail) + ".");
+        AppLanguage lang = languageResolver.forEmail(to);
+        sendKeyed(to, lang, Style.NOTICE, "mail.execReplaced", List.of(MailMessages.get(lang, "mail.execReplaced.body",
+                roleLabel(lang, type), ownerLabel(ownerName, ownerEmail), ownerDisplayName(ownerName, ownerEmail))));
     }
 
     // T1: Nhắc Owner trước 7 ngày khi gói VIP sắp hết hạn
     public void sendSubscriptionExpiryReminder(String to, String ownerName, String planName, LocalDateTime expiresAt) {
+        AppLanguage lang = languageResolver.forEmail(to);
         String base = frontendBase();
-        String billingLink = base == null ? null : base + "/billing";
-        sendWithoutOtpFooter(to,
-                "Your VIP subscription is expiring soon - LegacyVault",
-                "Hello " + ownerDisplayName(ownerName, to) + ",\n\n"
-                        + "Your \"" + planName + "\" subscription on LegacyVault will expire on "
-                        + formatDeadline(expiresAt) + " (GMT+7).\n"
-                        + "Even if your subscription expires, your existing vaults, Dead Man's Switch, and handover process will continue to work normally.\n"
-                        + "Renew your plan to keep creating new vaults and adding more beneficiaries."
-                        + (billingLink != null ? "\nManage billing: " + billingLink : ""));
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", ownerDisplayName(ownerName, to)));
+        paras.add(MailMessages.get(lang, "mail.subExpiry.body", planName, formatDeadline(expiresAt)));
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.subExpiry.button") + ": " + base + "/billing");
+        }
+        sendKeyed(to, lang, Style.URGENT, "mail.subExpiry", paras);
+    }
+
+    private static String roleLabel(AppLanguage lang, ExecutorType type) {
+        return MailMessages.get(lang, type == ExecutorType.PRIMARY ? "mail.role.PRIMARY" : "mail.role.BACKUP");
     }
 
     // FR-06: Owner tạo trước khi có fullName (null/rỗng) thì hiển thị email, không in chữ "null".
@@ -490,47 +461,6 @@ public class EmailSender {
         paras.addAll(extraParagraphs);
         deliver(to, lang, style, MailMessages.get(lang, prefix + ".subject"),
                 MailMessages.get(lang, prefix + ".title"), paras, code, footerNote);
-    }
-
-    /**
-     * Mail thường chưa có bản dịch: giữ nguyên chữ do hàm gọi dựng (tiếng Anh), chỉ khoác giao diện HTML.
-     * Đoạn cách nhau bằng dòng trống; tiêu đề lấy từ chủ đề bỏ đuôi " - LegacyVault".
-     */
-    private void sendWithoutOtpFooter(String to, String subject, String body) {
-        AppLanguage lang = languageResolver.forEmail(to);
-        List<String> paras = new ArrayList<>();
-        for (String p : body.split("\n\\s*\n")) {
-            if (!p.isBlank()) {
-                paras.add(p.strip());
-            }
-        }
-        deliver(to, lang, styleFor(subject), subject, titleOf(subject), paras, null, null);
-    }
-
-    private static String titleOf(String subject) {
-        String suffix = " - LegacyVault";
-        return subject.endsWith(suffix) ? subject.substring(0, subject.length() - suffix.length()) : subject;
-    }
-
-    /** Chọn nhóm giao diện theo chủ đề cho các mail chưa có bản dịch riêng. */
-    private static Style styleFor(String subject) {
-        String s = subject.toLowerCase();
-        if (s.startsWith("urgent") || s.contains("reminder") || s.contains("expiring")) {
-            return Style.URGENT;
-        }
-        if (s.contains("invitation")) {
-            return Style.INVITE;
-        }
-        if (s.contains("legacy message")) {
-            return Style.LEGACY;
-        }
-        if (s.contains("verification")) {
-            return Style.CASE;
-        }
-        if (s.contains("postponed") || s.contains("confirmed")) {
-            return Style.SUCCESS;
-        }
-        return Style.NOTICE;
     }
 
     private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
