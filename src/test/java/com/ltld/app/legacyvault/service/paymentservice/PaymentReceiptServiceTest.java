@@ -53,9 +53,13 @@ class PaymentReceiptServiceTest {
     void successfulOwnPayment_returnsReceiptData() {
         PaymentTransaction tx = tx(PaymentStatus.SUCCESS);
         when(paymentTransactionRepository.findById(tx.getId())).thenReturn(Optional.of(tx));
+        when(paymentTransactionRepository.countByStatusAndPaidAtLessThanEqual(
+                PaymentStatus.SUCCESS, LocalDateTime.of(2026, 11, 7, 10, 0))).thenReturn(42L);
 
         PaymentReceiptData data = service.getReceiptData(tx.getId(), owner.getId());
 
+        assertThat(data.invoiceNumber()).isEqualTo(42L);
+        assertThat(data.paymentMethod()).isEqualTo("VNPay");
         assertThat(data.receiptNo()).isEqualTo("LV-20261107-1A2B3C4D");
         assertThat(data.customerEmail()).isEqualTo("owner@example.com");
         assertThat(data.planCode()).isEqualTo("VIP_MONTH");

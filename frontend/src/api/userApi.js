@@ -2,10 +2,11 @@ import http from './http.js';
 
 // Hồ sơ của người dùng đang đăng nhập (BE: UserController /api/users/me)
 export const userApi = {
-    // { id, email, fullName, phoneNumber, status, roles[], createdAt, lastLoginAt, hasAvatar, avatarUpdatedAt }
+    // { id, email, fullName, phoneNumber, preferredLanguage, status, roles[], createdAt, lastLoginAt, hasAvatar, avatarUpdatedAt }
     getMe: () => http.get('/users/me').then((r) => r.data.data),
-    updateMe: (fullName, phoneNumber) =>
-        http.put('/users/me', { fullName, phoneNumber }).then((r) => r.data.data),
+    // preferredLanguage: 'vi' | 'en' (ngôn ngữ email/hóa đơn gửi cho người dùng); bỏ trống = giữ nguyên
+    updateMe: (fullName, phoneNumber, preferredLanguage) =>
+        http.put('/users/me', { fullName, phoneNumber, preferredLanguage }).then((r) => r.data.data),
     changePassword: (currentPassword, newPassword, passwordConfirm) =>
         http.post('/users/me/change-password', { currentPassword, newPassword, passwordConfirm }),
 

@@ -77,5 +77,7 @@ public enum AuditAction {
     // C.5: xác thực tài sản
     ASSET_VERIFICATION_STARTED, ASSET_VERIFICATION_VERIFIED, ASSET_VERIFICATION_FAILED,
     EXECUTOR_EVIDENCE_ADDED,
-    LEGAL_DOCUMENT_OCR_ANALYZED
+    LEGAL_DOCUMENT_OCR_ANALYZED,
+    // #10: Admin mở khóa xác minh danh tính của người thụ hưởng
+    IDENTITY_UNLOCKED_BY_ADMIN
 }

@@ -13,4 +13,8 @@ public class UpdateProfileRequest {
 
     @Pattern(regexp = "^$|^[0-9+()\\-\\s]{8,20}$", message = "Invalid phone number")
     private String phoneNumber;
+
+    // Ngôn ngữ nhận email: "vi" hoặc "en". Không gửi thì giữ nguyên.
+    @Pattern(regexp = "^(vi|en)$", message = "Language must be vi or en")
+    private String preferredLanguage;
 }

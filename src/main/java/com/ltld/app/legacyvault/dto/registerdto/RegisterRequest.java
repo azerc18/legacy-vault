@@ -26,4 +26,8 @@ public class RegisterRequest {
         if(password == null || passwordConfirm == null) return true;
         return passwordConfirm.equals(password);
     }
+
+    // Ngôn ngữ giao diện lúc đăng ký, dùng làm ngôn ngữ nhận email mặc định: "vi" hoặc "en". Không gửi thì dùng tiếng Việt.
+    @Pattern(regexp = "^(vi|en)?$", message = "Language must be vi or en")
+    private String language;
 }

@@ -12,7 +12,10 @@ import java.util.UUID;
 
 @Entity
 @DynamicUpdate
-@Table(name = "identity_verifications")
+@Table(name = "identity_verifications",
+        // #19: khớp migration V20261108_2000 (index ghép cho các truy vấn FR-17)
+        indexes = @Index(name = "idx_identity_verification_lookup",
+                columnList = "vault_id, beneficiary_id, status, created_at"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -66,4 +69,8 @@ public class IdentityVerification {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // #10: Admin mở khóa sớm phiên FAILED; khác null thì phiên này không còn tính là đang khóa
+    @Column(name = "admin_unlocked_at")
+    private LocalDateTime adminUnlockedAt;
 }

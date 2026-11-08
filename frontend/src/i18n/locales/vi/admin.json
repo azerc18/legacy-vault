@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "plans": "Gói", "notifications": "Email lỗi" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -275,5 +275,26 @@
     "lockUser": "Khoá người này",
     "lockReason": "Khoá từ cảnh báo {{rule}}",
     "ackDialog": { "title": "Xác nhận đã xử lý cảnh báo?", "message": "Ghi lại bạn đã làm gì (VD: đã gọi xác minh, đã khoá tài khoản). Ghi chú được lưu cùng cảnh báo và vào nhật ký." }
+  },
+
+  "beneficiaryLocks": {
+    "title": "Người thụ hưởng bị khóa",
+    "subtitle": "Người nhập sai mã xác minh danh tính 5 lần bị khóa 24 giờ. Mở khóa sớm khi đã xác nhận đúng người qua kênh khác.",
+    "loadError": "Không tải được danh sách bị khóa.",
+    "emptyTitle": "Không có ai đang bị khóa",
+    "emptyText": "Khi người thụ hưởng nhập sai 5 lần, họ sẽ hiện ở đây trong 24 giờ.",
+    "ledger": "Đang bị khóa",
+    "total": "{{count}} người",
+    "cols": {
+      "beneficiary": "Người thụ hưởng",
+      "vault": "Két",
+      "lockedAt": "Bị khóa lúc",
+      "lockedUntil": "Tự mở lúc"
+    },
+    "unlock": "Mở khóa",
+    "confirmTitle": "Mở khóa xác minh danh tính?",
+    "confirmText": "{{email}} sẽ được thử lại ngay với két \"{{vault}}\" (đủ 5 lượt). Hành động được ghi vào nhật ký.",
+    "unlocked": "Đã mở khóa cho {{email}}.",
+    "unlockError": "Không mở khóa được."
   }
 }

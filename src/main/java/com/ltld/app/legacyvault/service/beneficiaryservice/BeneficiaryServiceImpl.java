@@ -62,7 +62,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
     // FR-17 3b: khóa tạm; hết hạn sau LOCK_HOURS (cùng cửa sổ 24 giờ với bộ đếm lượt thử)
-    private static final int LOCK_HOURS = 24;
+    static final int LOCK_HOURS = 24;   // dùng chung với BeneficiaryLockAdminService (#10)
     private static final int VIEW_SESSION_MINUTES = 30;
 
     private static final String ALREADY_CLAIMED_MSG = "These assets have already been claimed.";
@@ -242,7 +242,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         // 4. Chống spam: chỉ dùng lại phiên PENDING còn đủ thời gian cho một OTP trọn vẹn.
         //    Phiên cũ hơn mốc này không dùng lại (sendIdentityOtp sẽ từ chối), nên tạo phiên mới.
         //    Phiên cũ vẫn là PENDING để lượt thử sai của nó còn được cộng vào giới hạn 5 lần / 24h.
-        LocalDateTime reusableAfter = LocalDateTime.now().minusMinutes(SESSION_REUSE_WINDOW_MINUTES);
+        LocalDateTime reusableAfter = LocalDateTime.now().minusMinutes(VERIFICATION_TTL_MINUTES - otpTtlMinutes);
         IdentityVerification verification = verificationRepository
                 .findFirstByVaultIdAndBeneficiaryIdAndMethodAndStatusAndCreatedAtAfterOrderByCreatedAtDesc(
                         vault.getId(), currentUserId, request.getVerificationMethod(),
@@ -268,16 +268,24 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     // ===================== FR-17 =====================
 
+    // #10: các tham số FR-17 đọc từ cấu hình app.beneficiary.verification.*; hằng số ở đầu lớp là giá trị mặc định
+    // (cũng là giá trị khi chạy unit test không có Spring).
+    @Value("${app.beneficiary.verification.otp-ttl-minutes:" + OTP_TTL_MINUTES + "}")
+    private int otpTtlMinutes = OTP_TTL_MINUTES;
+    @Value("${app.beneficiary.verification.otp-resend-seconds:" + OTP_RESEND_SECONDS + "}")
+    private int otpResendSeconds = OTP_RESEND_SECONDS;
+    @Value("${app.beneficiary.verification.max-attempts:" + MAX_VERIFY_ATTEMPTS + "}")
+    private int maxVerifyAttempts = MAX_VERIFY_ATTEMPTS;
+    @Value("${app.beneficiary.verification.view-session-minutes:" + VIEW_SESSION_MINUTES + "}")
+    private int viewSessionMinutes = VIEW_SESSION_MINUTES;
+
     @Override
     @Transactional
-    public void sendIdentityOtp(BeneficiaryClaimRequest request, UUID currentUserId) {
+    public void sendIdentityOtp(SendIdentityOtpRequest request, UUID currentUserId) {
         Vault vault = loadAccessibleVault(request.getVaultId(), currentUserId).vault();
         assertNotLocked(vault.getId(), currentUserId);
 
-        if (request.getVerificationMethod() != VerificationMethod.OTP) {
-            throw new BeneficiaryException("This verification method does not use OTP.", HttpStatus.BAD_REQUEST);
-        }
-
+        // #19: DTO riêng chỉ có vaultId, phương thức luôn là OTP nên không cần kiểm tra verificationMethod nữa
         IdentityVerification verification =
                 findPendingSession(vault.getId(), currentUserId, VerificationMethod.OTP);
 
@@ -285,14 +293,21 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // Không gửi OTP khi phiên không còn đủ thời gian cho một OTP trọn vẹn
         LocalDateTime sessionEnd = verification.getCreatedAt().plusMinutes(VERIFICATION_TTL_MINUTES);
-        if (now.plusMinutes(OTP_TTL_MINUTES).isAfter(sessionEnd)) {
+        if (now.plusMinutes(otpTtlMinutes).isAfter(sessionEnd)) {
             throw new BeneficiaryException(
                     "The verification session is about to expire. Please start the claim request again.", HttpStatus.BAD_REQUEST);
         }
 
         // Chặn gửi lại quá nhanh, dựa vào thời điểm gửi lần trước được lưu tường minh
         if (verification.getOtpSentAt() != null
-                && now.isBefore(verification.getOtpSentAt().plusSeconds(OTP_RESEND_SECONDS))) {
+                && now.isBefore(verification.getOtpSentAt().plusSeconds(otpResendSeconds))) {
+            throw new BeneficiaryException(
+                    "Please wait a moment before requesting another OTP.", HttpStatus.TOO_MANY_REQUESTS);
+        }
+
+        // #19: 2 request gửi lại song song cùng qua kiểm tra trên (đọc cùng otpSentAt cũ) thì gửi 2 mã và mã đầu
+        // vô hiệu. Giữ chỗ bằng UPDATE có điều kiện: UPDATE khóa dòng và đọc giá trị mới nhất, nên chỉ 1 request thắng.
+        if (verificationRepository.claimOtpSendSlot(verification.getId(), now, now.minusSeconds(otpResendSeconds)) == 0) {
             throw new BeneficiaryException(
                     "Please wait a moment before requesting another OTP.", HttpStatus.TOO_MANY_REQUESTS);
         }
@@ -301,7 +316,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         String otp = otpGenerator.generate();
         verification.setOtpCode(otpHasher.hash(verification.getId(), otp)); // DB chỉ giữ hash
         verification.setOtpSentAt(now);
-        verification.setOtpExpiresAt(now.plusMinutes(OTP_TTL_MINUTES));
+        verification.setOtpExpiresAt(now.plusMinutes(otpTtlMinutes));
         verificationRepository.save(verification);
 
         // OTP gốc chỉ tồn tại trong bộ nhớ và email, không bao giờ ghi DB hay log.
@@ -367,7 +382,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 vault.getId(), currentUserId, verification.getId(), now.minusHours(24));
 
         // 3. Hết lượt: không chấm đáp án nữa, kể cả khi đáp án đúng
-        if (totalAttempts > MAX_VERIFY_ATTEMPTS) {
+        if (totalAttempts > maxVerifyAttempts) {
             lockSession(verification);
             auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
                     emailOf(vault, currentUserId), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
@@ -383,14 +398,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             auditLogService.log(AuditAction.IDENTITY_VERIFY_FAILED, AuditResult.FAILURE, currentUserId,
                     emailOf(vault, currentUserId), "Vault", vault.getId().toString(),
                     "method=" + request.getVerificationMethod() + ", attempt=" + totalAttempts);
-            if (totalAttempts >= MAX_VERIFY_ATTEMPTS) {
+            if (totalAttempts >= maxVerifyAttempts) {
                 lockSession(verification);
                 auditLogService.log(AuditAction.IDENTITY_LOCKED, AuditResult.FAILURE, currentUserId,
                         emailOf(vault, currentUserId), "Vault", vault.getId().toString(), "attempts=" + totalAttempts);
                 throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
             }
             throw new BeneficiaryException(
-                    "Verification failed. Attempts left: " + (MAX_VERIFY_ATTEMPTS - totalAttempts) + ".",
+                    "Verification failed. Attempts left: " + (maxVerifyAttempts - totalAttempts) + ".",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -408,19 +423,26 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .verificationId(verification.getId())
                 .status(VerificationStatus.SUCCESS)
                 .verifiedAt(now)
-                .viewSessionExpiresAt(now.plusMinutes(VIEW_SESSION_MINUTES))
+                .viewSessionExpiresAt(now.plusMinutes(viewSessionMinutes))
                 .build();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<InheritedAssetSummaryResponse> getInheritedAssets(UUID vaultId, UUID currentUserId) {
+        // #22 (Q1): đọc vault / người thụ hưởng / claim một lần rồi rẽ nhánh.
+        // Đã đóng phần của mình (claim CLAIMED) thì vẫn xem được danh sách metadata; xem chi tiết / tải vẫn 409.
+        Vault found = vaultRepository.findById(vaultId)
+                .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
+        VaultBeneficiary me = requireBeneficiary(found.getId(), currentUserId);
+        if (isMyPartClosed(found, currentUserId)) {
+            return closedAssetMetadata(found, me);
+        }
         Vault vault = loadAccessibleVault(vaultId, currentUserId).vault();
         assertNotLocked(vault.getId(), currentUserId);
         assertViewSession(vault.getId(), currentUserId);
 
         // N2-access: bỏ tài sản đã phân bổ cho người khác
-        VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
         Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
         List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
                 .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
@@ -1104,6 +1126,33 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .orElse(true);
     }
 
+    // #22: người này đã đóng phần nhận (claim CLAIMED) và vault chưa bị lưu trữ (UNLOCKED / CLAIMED).
+    // Người từ chối / chưa có claim / vault ARCHIVED_LOCKED trả false và đi luồng FR-17 thường.
+    private boolean isMyPartClosed(Vault vault, UUID currentUserId) {
+        return (vault.getStatus() == VaultStatus.UNLOCKED || vault.getStatus() == VaultStatus.CLAIMED)
+                && claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), currentUserId)
+                        .map(c -> c.getStatus() == ClaimStatus.CLAIMED)
+                        .orElse(false);
+    }
+
+    /**
+     * #22: danh sách metadata (id, loại, tên) sau khi đã đóng phần nhận.
+     * CỐ Ý không gọi assertNotLocked / assertViewSession: nhánh này không giải mã và không trả nội dung nào,
+     * nên không cần phiên xem. Đừng "thêm lại cho đồng bộ" với luồng FR-17; nội dung vẫn bị chặn 409
+     * ở loadAccessibleVault (chi tiết, tải xuống, hồ sơ PDF).
+     */
+    private List<InheritedAssetSummaryResponse> closedAssetMetadata(Vault vault, VaultBeneficiary me) {
+        Set<UUID> hidden = new HashSet<>(assetAllocationRepository.findAssetIdsNotHeldBy(vault.getId(), me.getId()));
+        return digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE).stream()
+                .filter(asset -> !hidden.contains(asset.getId()))
+                .map(asset -> InheritedAssetSummaryResponse.builder()
+                        .id(asset.getId())
+                        .assetType(asset.getAssetType())
+                        .assetName(asset.getAssetName())
+                        .build())
+                .toList();
+    }
+
     // Kiểm tra quyền và trạng thái dùng chung cho FR-17 (cùng quy tắc với FR-16)
     private AccessContext loadAccessibleVault(UUID vaultId, UUID currentUserId) {
         Vault vault = vaultRepository.findById(vaultId)
@@ -1202,7 +1251,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo
     // phiên mới để lách; phiên FAILED cũ hơn mốc đó không còn khóa nữa.
     private void assertNotLocked(UUID vaultId, UUID currentUserId) {
-        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+        // #10: phiên FAILED đã được Admin mở khóa (adminUnlockedAt) không còn khóa nữa
+        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfterAndAdminUnlockedAtIsNull(
                 vaultId, currentUserId, VerificationStatus.FAILED, LocalDateTime.now().minusHours(LOCK_HOURS))) {
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }
@@ -1223,7 +1273,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private void assertViewSession(UUID vaultId, UUID currentUserId) {
         boolean valid = verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndVerifiedAtAfter(
                 vaultId, currentUserId, VerificationStatus.SUCCESS,
-                LocalDateTime.now().minusMinutes(VIEW_SESSION_MINUTES));
+                LocalDateTime.now().minusMinutes(viewSessionMinutes));
         if (!valid) {
             throw new BeneficiaryException(ErrorCode.IDENTITY_NOT_VERIFIED,
                     "Identity verification is required before viewing assets.");

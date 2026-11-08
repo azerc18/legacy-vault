@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * T2: dữ liệu để vẽ biên lai thanh toán PDF (chỉ giao dịch SUCCESS của chính Owner).
+ * T2: dữ liệu để vẽ hoá đơn mô phỏng (PDF) (chỉ giao dịch SUCCESS của chính Owner).
  * Không chứa thông tin thẻ hay bí mật VNPay.
  */
 public record PaymentReceiptData(
@@ -20,5 +20,7 @@ public record PaymentReceiptData(
         String vnpBankCode,
         LocalDateTime createdAt,
         LocalDateTime paidAt,
-        LocalDateTime issuedAt) {
+        LocalDateTime issuedAt,
+        long invoiceNumber,
+        String paymentMethod) {
 }

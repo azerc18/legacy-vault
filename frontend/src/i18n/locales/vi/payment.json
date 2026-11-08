@@ -66,13 +66,13 @@
       "amount": "Số tiền",
       "status": "Trạng thái",
       "ref": "Mã giao dịch VNPay",
-      "receipt": "Biên lai",
-      "downloadReceipt": "Tải biên lai",
+      "receipt": "Hóa đơn",
+      "downloadReceipt": "Tải hóa đơn",
       "downloading": "Đang tải..."
     },
     "errors": {
       "loadFailed": "Không thể tải thông tin thanh toán.",
-      "receiptFailed": "Không thể tải biên lai."
+      "receiptFailed": "Không thể tải hóa đơn."
     }
   },
   "result": {

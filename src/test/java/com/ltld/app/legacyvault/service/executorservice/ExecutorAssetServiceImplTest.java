@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.exception.ExecutorAssignmentNotFoundException;
 import com.ltld.app.legacyvault.exception.ExecutorNotActiveException;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class ExecutorAssetServiceImplTest {
     @Mock private ExecutorAccessGuard executorAccessGuard;
     @Mock private VaultRepository vaultRepository;
     @Mock private DigitalAssetRepository digitalAssetRepository;
+    @Mock private AssetVerificationService assetVerificationService;
     @InjectMocks private ExecutorAssetServiceImpl executorAssetService;
 
     private UUID assignmentId;

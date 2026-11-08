@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.executorservice;
 
+import com.ltld.app.legacyvault.dto.assetverificationdto.AssetVerificationSummary;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorVaultAssetResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorVaultBeneficiaryResponse;
@@ -8,8 +9,10 @@ import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetStatus;
+import com.ltld.app.legacyvault.enums.AssetVerificationStatus;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,7 @@ public class ExecutorAssetServiceImpl implements ExecutorAssetService {
     private final ExecutorAccessGuard executorAccessGuard;
     private final VaultRepository vaultRepository;
     private final DigitalAssetRepository digitalAssetRepository;
+    private final AssetVerificationService assetVerificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,8 +55,13 @@ public class ExecutorAssetServiceImpl implements ExecutorAssetService {
                 .filter(a -> a.getVault() != null && a.getVault().getId() != null)
                 .collect(Collectors.groupingBy(a -> a.getVault().getId()));
 
+        // C.5: trạng thái xác thực của mọi tài sản trong 1 query
+        Map<UUID, AssetVerificationSummary> verification = assetVerificationService.summarize(
+                assetsByVaultId.values().stream().flatMap(List::stream).toList());
+
         List<ExecutorVaultResponse> vaultResponses = vaults.stream()
-                .map(vault -> toVaultResponse(vault, assetsByVaultId.getOrDefault(vault.getId(), Collections.emptyList())))
+                .map(vault -> toVaultResponse(vault,
+                        assetsByVaultId.getOrDefault(vault.getId(), Collections.emptyList()), verification))
                 .toList();
 
         return ExecutorAssignedVaultsResponse.builder()
@@ -62,7 +71,8 @@ public class ExecutorAssetServiceImpl implements ExecutorAssetService {
                 .build();
     }
 
-    private static ExecutorVaultResponse toVaultResponse(Vault vault, List<DigitalAsset> assets) {
+    private static ExecutorVaultResponse toVaultResponse(Vault vault, List<DigitalAsset> assets,
+                                                         Map<UUID, AssetVerificationSummary> verification) {
         ExecutorVaultBeneficiaryResponse beneficiary = vault.getBeneficiary() == null ? null
                 : ExecutorVaultBeneficiaryResponse.builder()
                         .id(vault.getBeneficiary().getId())
@@ -70,11 +80,17 @@ public class ExecutorAssetServiceImpl implements ExecutorAssetService {
                         .build();
 
         List<ExecutorVaultAssetResponse> assetResponses = assets.stream()
-                .map(asset -> ExecutorVaultAssetResponse.builder()
-                        .assetId(asset.getId())
-                        .assetType(asset.getAssetType())
-                        .assetName(asset.getAssetName())
-                        .build())
+                .map(asset -> {
+                    AssetVerificationSummary v = verification.get(asset.getId());
+                    return ExecutorVaultAssetResponse.builder()
+                            .assetId(asset.getId())
+                            .assetType(asset.getAssetType())
+                            .assetName(asset.getAssetName())
+                            .verificationStatus(v == null ? AssetVerificationStatus.SELF_DECLARED : v.status())
+                            .verificationMethod(v == null ? null : v.method())
+                            .verifiedAt(v == null ? null : v.verifiedAt())
+                            .build();
+                })
                 .toList();
 
         return ExecutorVaultResponse.builder()
