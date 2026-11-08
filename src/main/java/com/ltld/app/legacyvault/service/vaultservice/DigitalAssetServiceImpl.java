@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.vaultservice;
 
+import com.ltld.app.legacyvault.dto.assetverificationdto.AssetVerificationSummary;
 import com.ltld.app.legacyvault.dto.vaultdto.DigitalAssetDetailResponse;
 import com.ltld.app.legacyvault.dto.vaultdto.DigitalAssetRequest;
 import com.ltld.app.legacyvault.dto.vaultdto.DigitalAssetResponse;
@@ -7,19 +8,14 @@ import com.ltld.app.legacyvault.entity.AssetAllocation;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
-import com.ltld.app.legacyvault.enums.AllocationMode;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.AssetType;
-import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AuditResult;
-import com.ltld.app.legacyvault.enums.TransferMechanism;
-import com.ltld.app.legacyvault.enums.VaultStatus;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
@@ -58,6 +54,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
     private final AssetAllocationRepository assetAllocationRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final EntitlementService entitlementService;
+    private final AssetVerificationService assetVerificationService;
 
     // X1: nguồn ngẫu nhiên an toàn để sinh khóa gốc và hệ số đa thức Shamir
     private static final java.security.SecureRandom CONSENSUS_RANDOM = new java.security.SecureRandom();
@@ -73,8 +70,10 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         Map<UUID, List<AssetAllocation>> byAsset = assetAllocationRepository
                 .findByAssetIdIn(assets.stream().map(DigitalAsset::getId).toList()).stream()
                 .collect(Collectors.groupingBy(al -> al.getAsset().getId()));
+        // C.5: lấy trạng thái xác thực của cả danh sách trong 1 query
+        Map<UUID, AssetVerificationSummary> verification = assetVerificationService.summarize(assets);
         return assets.stream()
-                .map(a -> toResponse(a, byAsset.getOrDefault(a.getId(), List.of())))
+                .map(a -> toResponse(a, byAsset.getOrDefault(a.getId(), List.of()), verification.get(a.getId())))
                 .toList();
     }
 
@@ -168,7 +167,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         auditLogService.log(AuditAction.ASSET_CREATED, AuditResult.SUCCESS,
                 ownerId, ownerEmail, vaultId, "DigitalAsset", asset.getId().toString(), null);
 
-        return toResponse(asset, assetAllocationRepository.findByAssetId(asset.getId()));
+        return toResponse(asset, assetAllocationRepository.findByAssetId(asset.getId()), null);
     }
 
     // =========================================================
@@ -232,7 +231,7 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         auditLogService.log(AuditAction.ASSET_UPDATED, AuditResult.SUCCESS,
                 ownerId, ownerEmail, vaultId, "DigitalAsset", assetId.toString(), null);
 
-        return toResponse(asset, assetAllocationRepository.findByAssetId(asset.getId()));
+        return toResponse(asset, assetAllocationRepository.findByAssetId(asset.getId()), verificationOf(asset));
     }
 
     // =========================================================
@@ -428,13 +427,23 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                 .orElseThrow(() -> new VaultException("Digital asset not found", HttpStatus.NOT_FOUND));
     }
 
-    private static DigitalAssetResponse toResponse(DigitalAsset asset, List<AssetAllocation> rows) {
+    // C.5: tài sản mới tạo (verification == null) hoặc chưa có thông tin đều coi là SELF_DECLARED
+    private AssetVerificationSummary verificationOf(DigitalAsset asset) {
+        return assetVerificationService.summarize(List.of(asset)).get(asset.getId());
+    }
+
+    private static DigitalAssetResponse toResponse(DigitalAsset asset, List<AssetAllocation> rows,
+                                                   AssetVerificationSummary verification) {
         return DigitalAssetResponse.builder()
                 .id(asset.getId())
                 .assetType(asset.getAssetType())
                 .assetName(asset.getAssetName())
                 .status(asset.getStatus())
                 .transferMechanism(asset.getTransferMechanism())
+                .verificationStatus(verification == null
+                        ? AssetVerificationStatus.SELF_DECLARED : verification.status())
+                .verificationMethod(verification == null ? null : verification.method())
+                .verifiedAt(verification == null ? null : verification.verifiedAt())
                 .publicFields(maskPublicFields(asset.getPublicFieldsJson()))
                 .createdAt(asset.getCreatedAt())
                 .updatedAt(asset.getUpdatedAt())

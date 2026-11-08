@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,7 @@ class DigitalAssetFieldsTest {
     @Mock private AuditLogService auditLogService;
     @Mock private VaultModificationGuard vaultModificationGuard;
     @Mock private AssetAllocationRepository assetAllocationRepository;
+    @Mock private AssetVerificationService assetVerificationService;
     @InjectMocks private DigitalAssetServiceImpl service;
 
     private UUID ownerId;
