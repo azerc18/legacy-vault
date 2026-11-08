@@ -99,9 +99,8 @@ export default function VerifierHome() {
 
             <main className={`${PAGE_WIDTH} py-10`}>
                 {/* Lời chào */}
-                <div className="mb-8 rounded-3xl bg-brand text-white px-8 py-9 lv-rise"
-                     style={{ backgroundImage: 'radial-gradient(700px 260px at 85% 0%, rgba(80,105,230,.45), transparent 70%)' }}>
-                    <h1 className="font-headline-md text-headline-md">{t('home.welcome', {name: user.name})}</h1>
+                <div className="mb-8 lv-page-hero lv-rise">
+                    <h1 className="font-headline-md text-headline-md text-white">{t('home.welcome', {name: user.name})}</h1>
                     <div className="mt-3 flex flex-wrap gap-2">
                         <span
                             className="text-xs font-semibold px-3 py-1 rounded-full bg-white/15 text-white border border-white/20">

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'motion/react';
+import { ReducedMotionConfig, useMotionTokens } from '@animate-ui/react/utils/motion';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
-import EmptyState from "../Common/EmptyState.jsx";
+import { OwnerLayout, Card, Icon, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
+import EmptyState from '../Common/EmptyState.jsx';
 
 // Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
 // F6: tab thứ hai "Ai đã xem di sản" (Executor / Beneficiary / Admin / Khẩn cấp xem hoặc tải), chữ ở namespace accessLog.
@@ -34,6 +36,7 @@ const actorLabel = (t, name) => {
 export default function OwnerActivity() {
     const { t, i18n } = useTranslation('activity');
     const { t: tAccess } = useTranslation('accessLog');
+    const { spring } = useMotionTokens();
     const [tab, setTab] = useState('dms');
     const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
@@ -55,14 +58,14 @@ export default function OwnerActivity() {
             .then((res) => { if (!cancelled) setData(res); })
             .catch((e) => { if (!cancelled) setError(getErrorMessage(e, t('errors.load'))); });
         return () => { cancelled = true; };
-    }, [tab, days, page]);
+    }, [tab, days, page, t]);
 
     const rows = data?.content ?? [];
     const totalPages = data?.totalPages ?? 0;
     const isAccess = tab === 'access';
     const tabs = [
-        { id: 'dms', label: tAccess('tabDms') },
-        { id: 'access', label: tAccess('tab') },
+        { id: 'dms', icon: 'history', label: tAccess('tabDms') },
+        { id: 'access', icon: 'visibility', label: tAccess('tab') },
     ];
 
     return (
@@ -75,22 +78,35 @@ export default function OwnerActivity() {
                 </select>
             }
         >
-            <div className="flex gap-2 mb-4 border-b border-outline-variant/20 pb-2">
-                {tabs.map((tabItem) => (
-                    <button
-                        key={tabItem.id}
-                        type="button"
-                        onClick={() => { setTab(tabItem.id); setPage(0); }}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                            tab === tabItem.id
-                                ? 'bg-secondary text-on-secondary'
-                                : 'text-on-surface-variant hover:bg-surface-container-high'
-                        }`}
-                    >
-                        {tabItem.label}
-                    </button>
-                ))}
-            </div>
+            <ReducedMotionConfig>
+                <div className="mb-6 flex flex-wrap gap-2 bg-surface-container-low p-1 rounded-xl w-fit">
+                    {tabs.map((tabItem) => {
+                        const active = tab === tabItem.id;
+                        return (
+                            <button
+                                key={tabItem.id}
+                                type="button"
+                                onClick={() => { setTab(tabItem.id); setPage(0); }}
+                                className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                                    active ? 'text-on-secondary' : 'text-on-surface-variant hover:text-on-surface'
+                                }`}
+                            >
+                                {active && (
+                                    <motion.span
+                                        layoutId="owner-activity-tab-pill"
+                                        transition={spring.selection}
+                                        className="absolute inset-0 rounded-lg bg-secondary"
+                                    />
+                                )}
+                                <span className="relative z-10 inline-flex items-center gap-1.5">
+                                    <Icon name={tabItem.icon} className="text-[18px]" />
+                                    {tabItem.label}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </ReducedMotionConfig>
             <Alert>{error}</Alert>
             <Card>
                 {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}

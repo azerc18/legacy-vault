@@ -3,6 +3,7 @@ import React from 'react';
 import {useTranslation} from 'react-i18next';
 import ProtectionBanner from './ProtectionBanner.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 
 
 export function Icon({name, className = ''}) {
@@ -70,7 +71,7 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
+            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
@@ -96,7 +97,7 @@ export function OwnerLayout({title, subtitle, back, actions, children}) {
     ];
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader nav={nav}/>
+            <AppHeader nav={nav} extra={<NotificationBell source="owner" />}/>
             <main className={`${PAGE_WIDTH} py-10`}>
                 <ProtectionBanner/>
                 <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>

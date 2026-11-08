@@ -1,0 +1,55 @@
+/* =====================================================================
+   LEGACYVAULT DESIGN SYSTEM — AMBIENT MIDNIGHT CANVAS & WATERMARK LAYER
+   ===================================================================== */
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--lv-bg);
+  background-image:
+    radial-gradient(620px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgba(61, 90, 224, 0.08), transparent 68%),
+    radial-gradient(1100px 520px at 88% -8%, rgba(160, 175, 235, 0.48), transparent 62%);
+  color: var(--lv-fg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.dark body {
+  background-image:
+    radial-gradient(640px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgba(143, 164, 255, 0.09), transparent 68%),
+    radial-gradient(1100px 520px at 88% -8%, rgba(61, 90, 224, 0.18), transparent 62%);
+}
+
+/* Khung bao trang trong suốt để lộ nhẹ nhàng lớp chạm khắc nền và ánh sáng ambient */
+#root > div.min-h-screen.bg-background:not(.lv-landing) {
+  background-color: transparent;
+  position: relative;
+  z-index: 10;
+}
+
+/* Tầng biểu tượng Cú - Ổ Khóa xoay chìm tinh tế (Watermark) phía sau lớp kính */
+.lv-backdrop-vault {
+  z-index: 1;
+  color: rgb(var(--c-primary));
+  opacity: 0.24;
+  transition: padding-left 0.22s ease, opacity 0.3s ease;
+}
+
+html.dark .lv-backdrop-vault {
+  color: #8fa4ff;
+  opacity: 0.28;
+}
+
+@media (min-width: 1024px) {
+  body.lv-has-side .lv-backdrop-vault {
+    padding-left: 248px;
+  }
+  body.lv-side-collapsed.lv-has-side .lv-backdrop-vault {
+    padding-left: 76px;
+  }
+}
+
+/* Thanh bên (Sidebar): giữ nguyên nền xanh Navy đặc sang trọng */
+.lv-side.bg-brand {
+  background-color: rgb(var(--c-brand));
+}
+

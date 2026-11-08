@@ -70,21 +70,29 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
     const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
-    const [vipStatus, setVipStatus] = useState(null);
+    const [vipStatus, setVipStatus] = useState(() => {
+        if (!isOwner) return null;
+        try {
+            const cached = sessionStorage.getItem('lv_sub_cache');
+            if (cached) {
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < 5 * 60 * 1000) return data;
+            }
+        } catch {
+            // ignore sessionStorage error
+        }
+        return null;
+    });
 
     useEffect(() => {
         if (!isOwner) return;
         let mounted = true;
 
-        // n3: cache /subscriptions/me trong sessionStorage 5 phút (try/catch)
         try {
             const cached = sessionStorage.getItem('lv_sub_cache');
             if (cached) {
-                const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < 5 * 60 * 1000) {
-                    setVipStatus(data);
-                    return;
-                }
+                const { timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < 5 * 60 * 1000) return undefined;
             }
         } catch {
             // ignore sessionStorage error
@@ -205,24 +213,27 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
 }
 
 /**
- * Tiêu đề trang đặt trong <main>: link quay lại (tuỳ chọn) + h1 + mô tả + nút bên phải.
+ * Tiêu đề trang đặt trong <main>: khung Hero tương phản cao tách biệt rõ với phần nội dung bên dưới.
+ * Tích hợp sẵn huy hiệu ổ khóa cơ khí nhỏ gọn bên phải để không bao giờ nổi đè lên bảng hay nội dung trang.
  * @param back { to, label }  vd. { to: '/executor/home', label: 'All estates' }
+ * @param kicker dòng nhãn nhỏ phía trên tiêu đề (vd. "HỒ SƠ QUẢN TRỊ · LEGACYVAULT")
  */
-export function PageTitle({ back, title, subtitle, right, className = 'mb-8' ,}) {
+export function PageTitle({ back, kicker, title, subtitle, right, className = 'mb-8' }) {
     const { t } = useTranslation();
     return (
-        <div className={className}>
+        <div className={`lv-page-hero lv-rise ${className}`.trim()}>
             {back && (
-                <Link to={back.to} className="inline-flex items-center gap-1 text-sm font-semibold text-secondary hover:text-primary mb-3">
+                <Link to={back.to} className="lv-page-hero-back inline-flex items-center gap-1.5 text-sm font-semibold mb-3 transition-colors">
                     <Icon name="arrow_back" className="text-[18px]" /> {back.label || t('actions.back')}
                 </Link>
             )}
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0">
-                    <h1 className="font-headline-md text-[30px] md:text-[34px] leading-tight font-bold tracking-tight break-words">{title}</h1>
-                    {subtitle && <p className="mt-1 text-on-surface-variant">{subtitle}</p>}
+            {kicker && <p className="lv-page-hero-kicker mb-1.5">{kicker}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                    <h1 className="font-headline-md text-[28px] md:text-[32px] leading-tight font-bold tracking-tight text-white break-words">{title}</h1>
+                    {subtitle && <p className="lv-page-hero-sub mt-1.5 text-sm md:text-[15px] max-w-3xl">{subtitle}</p>}
                 </div>
-                {right && <div className="flex flex-wrap items-center gap-3">{right}</div>}
+                {right && <div className="flex flex-wrap items-center gap-3 shrink-0">{right}</div>}
             </div>
         </div>
     );

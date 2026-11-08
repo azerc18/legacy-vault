@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import InfoTip from '../Common/InfoTip.jsx';
+import { useToast } from '../Common/Toast.jsx';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
@@ -24,6 +26,7 @@ const STATUS = {
 
 export default function DeadMansSwitch() {
     const { t } = useTranslation('dms');
+    const toast = useToast();
     const user = getUser();
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
@@ -35,7 +38,6 @@ export default function DeadMansSwitch() {
     const [addingConfirmer, setAddingConfirmer] = useState(false);
     const [removingId, setRemovingId] = useState('');
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
 
     const applyConfig = (c) => {
         setConfig(c);
@@ -71,7 +73,7 @@ export default function DeadMansSwitch() {
 
     const save = async (e) => {
         e.preventDefault();
-        setError(''); setSuccess('');
+        setError('');
         for (const [k, l] of Object.entries(LIMITS)) {
             const v = Number(form[k]);
             if (!Number.isInteger(v) || v < l.min || v > l.max) {
@@ -87,7 +89,7 @@ export default function DeadMansSwitch() {
             });
             applyConfig(saved);
             loadConfirmers(saved);
-            setSuccess(t('dms.saved'));
+            toast.success(t('dms.saved'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.errors.save')));
         } finally {
@@ -96,10 +98,10 @@ export default function DeadMansSwitch() {
     };
 
     const checkIn = async () => {
-        setError(''); setSuccess(''); setChecking(true);
+        setError(''); setChecking(true);
         try {
             applyConfig(await ownerApi.checkIn());
-            setSuccess(t('dms.checkedIn'));
+            toast.success(t('dms.checkedIn'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.errors.checkIn')));
         } finally {
@@ -109,7 +111,7 @@ export default function DeadMansSwitch() {
 
     const handleAddConfirmer = async (e) => {
         e.preventDefault();
-        setError(''); setSuccess('');
+        setError('');
         if (!confirmerForm.name.trim() || !confirmerForm.email.trim()) {
             setError(t('dms.confirmers.missingFields'));
             return;
@@ -123,7 +125,7 @@ export default function DeadMansSwitch() {
             });
             setConfirmers((prev) => [...prev, added]);
             setConfirmerForm({ name: '', email: '', relationship: '' });
-            setSuccess(t('dms.confirmers.added'));
+            toast.success(t('dms.confirmers.added'));
         } catch (err) {
             // PLAN_LIMIT_REACHED (gói FREE): getErrorMessage hiện câu đã dịch; PlanLimitUpgradeDialog chung (T1) tự mở
             setError(getErrorMessage(err, t('dms.confirmers.addFailed')));
@@ -133,12 +135,12 @@ export default function DeadMansSwitch() {
     };
 
     const handleRemoveConfirmer = async (id) => {
-        setError(''); setSuccess('');
+        setError('');
         setRemovingId(id);
         try {
             await ownerApi.removeDmsConfirmer(id);
             setConfirmers((prev) => prev.filter((c) => c.id !== id));
-            setSuccess(t('dms.confirmers.removed'));
+            toast.success(t('dms.confirmers.removed'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.confirmers.removeFailed')));
         } finally {
@@ -153,7 +155,6 @@ export default function DeadMansSwitch() {
 
     return (
         <OwnerLayout title={t('dms.title')} subtitle={t('dms.subtitle')}>
-            <Alert type="success">{success}</Alert>
             <Alert>{error}</Alert>
             {needVault && (
                 <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">{t('dms.createVaultFirst')}</Link></p>
@@ -217,7 +218,7 @@ export default function DeadMansSwitch() {
 
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
-                        <Card title={t('dms.confirmers.title')} icon="verified_user">
+                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
                             <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
                             {confirmers.length === 0 ? (
@@ -292,7 +293,7 @@ export default function DeadMansSwitch() {
                     </div>
 
                     {/* Cấu hình */}
-                    <Card title={t('dms.schedule')} icon="tune">
+                    <Card title={<>{t('dms.schedule')} <InfoTip term="dms" /></>} icon="tune">
                         <form onSubmit={save} className="space-y-4">
                             {Object.entries(LIMITS).map(([k, l]) => (
                                 <label key={k} className="block">

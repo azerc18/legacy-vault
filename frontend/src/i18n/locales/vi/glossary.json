@@ -1,0 +1,21 @@
+{
+  "aboutTerm": "Giải thích: {{term}}",
+  "terms": {
+    "dms": {
+      "title": "Dead Man's Switch",
+      "text": "Công tắc an toàn: nếu bạn lâu không check-in, hệ thống nhắc bạn trước, rồi mới báo người thi hành để bắt đầu bàn giao. Bạn check-in lại là mọi thứ dừng."
+    },
+    "crossConfirm": {
+      "title": "Người xác nhận chéo",
+      "text": "Người thân tin cậy được hỏi \"bạn ấy còn ổn không?\" trước khi bàn giao bắt đầu, để tránh kích hoạt nhầm khi bạn chỉ quên check-in."
+    },
+    "executor": {
+      "title": "Người thi hành",
+      "text": "Người bạn tin tưởng lo phần thủ tục sau khi bạn mất, ví dụ đóng hoặc chuyển tài khoản số."
+    },
+    "kOfN": {
+      "title": "K trên N người",
+      "text": "Cần ít nhất K trong N người nhận cùng đồng ý thì tài sản mới được mở. Ví dụ 2 trên 3: chỉ cần 2 người trong 3 người gật đầu."
+    }
+  }
+}

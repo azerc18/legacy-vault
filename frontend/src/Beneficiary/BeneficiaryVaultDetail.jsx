@@ -5,6 +5,8 @@ import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
 import ClaimProgress from '../Common/ClaimProgress.jsx';
+import VerificationBadge from '../Common/VerificationBadge.jsx';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
     ASSET_ICON, useEnumLabels, inputClass, btnPrimary, btnOutline,
@@ -21,7 +23,7 @@ export default function BeneficiaryVaultDetail() {
     const { vaultId } = useParams();
     const { t } = useTranslation('beneficiary');
     const tRef = useRef(t);          // callback/effect đọc t qua ref để đổi ngôn ngữ không kích hoạt tải lại
-    tRef.current = t;
+    useEffect(() => { tRef.current = t; }, [t]);
     const user = getUser();
 
     const [vault, setVault] = useState(null);       // BeneficiaryVaultSummaryResponse
@@ -244,7 +246,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
     };
 
     return (
-        <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 max-w-lg">
+        <section className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 max-w-lg">
             <div className="flex items-center gap-3">
                 <Icon name="verified_user" className="text-secondary text-[28px]" />
                 <h2 className="font-title-lg text-title-lg">{t('verify.title')}</h2>
@@ -373,6 +375,11 @@ function AssetList({ vaultId, assets, onError, readOnly = false }) {
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold truncate">{a.assetName}</p>
                                     <p className="text-xs text-outline">{label.assetType(a.assetType)}</p>
+                                    {a.verificationStatus && (
+                                        <div className="mt-1">
+                                            <VerificationBadge status={a.verificationStatus} method={a.verificationMethod} />
+                                        </div>
+                                    )}
                                     {c && (
                                         <p className="mt-1 text-xs text-on-surface-variant">
                                             {c.reached
@@ -430,7 +437,7 @@ function AssetDetailModal({ detail, onClose }) {
 
     return (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>
                         <p className="text-xs text-outline">{label.assetType(detail.assetType)}</p>
@@ -504,13 +511,44 @@ const TASK_STATUS_CLS = {
 };
 
 function ExecutorTasksCard({ vaultId }) {
-    const { t } = useTranslation('beneficiary');
+    const { t } = useTranslation(['beneficiary', 'verification']);
     const [tasks, setTasks] = useState([]);
+    const [disputing, setDisputing] = useState(null);   // task đang nhập lý do phản đối
+    const [reason, setReason] = useState('');
+    const [busyId, setBusyId] = useState('');
+    const [error, setError] = useState('');
 
     // Không có task hoặc lỗi thì ẩn khối này, không chặn phần còn lại của trang
     useEffect(() => {
         beneficiaryApi.listExecutorTasks(vaultId).then(setTasks).catch(() => setTasks([]));
     }, [vaultId]);
+
+    const replace = (u) => setTasks((prev) => prev.map((x) => (x.id === u.id ? u : x)));
+
+    const confirm = async (task) => {
+        setBusyId(task.id); setError('');
+        try {
+            replace(await beneficiaryApi.confirmExecutorTask(vaultId, task.id));
+        } catch (e) {
+            setError(getErrorMessage(e, t('verification:beneficiary.confirmError')));
+        } finally {
+            setBusyId('');
+        }
+    };
+
+    const dispute = async () => {
+        const text = reason.trim();
+        if (text.length < 5 || text.length > 500) return setError(t('verification:beneficiary.reasonInvalid'));
+        setBusyId(disputing.id); setError('');
+        try {
+            replace(await beneficiaryApi.disputeExecutorTask(vaultId, disputing.id, text));
+            setDisputing(null); setReason('');
+        } catch (e) {
+            setError(getErrorMessage(e, t('verification:beneficiary.disputeError')));
+        } finally {
+            setBusyId('');
+        }
+    };
 
     if (tasks.length === 0) return null;
     const done = tasks.filter((x) => x.status === 'DONE').length;
@@ -522,19 +560,68 @@ function ExecutorTasksCard({ vaultId }) {
             <p className="mt-1 text-sm text-on-surface-variant">
                 {t('executor.intro', { done, total: tasks.length })}
             </p>
-            <ul className="mt-4 divide-y divide-outline-variant/20">
-                {tasks.map((task) => (
-                    <li key={task.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="font-semibold">{task.platform || t('executor.account')}{task.accountHandle && ` · ${task.accountHandle}`}</p>
-                            <p className="text-sm text-on-surface-variant">{t(`executor.wish.${task.wish}`, { defaultValue: task.wish })}</p>
-                            {task.note && <p className="text-sm text-on-surface-variant mt-1">{t('executor.note', { note: task.note })}</p>}
-                        </div>
-                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${TASK_STATUS_CLS[task.status] || ''}`}>
-                            {t(`executor.taskStatus.${task.status}`, { defaultValue: task.status })}
-                        </span>
-                    </li>
-                ))}
+            <div className="mt-3"><Alert>{error}</Alert></div>
+            <ul className="mt-1 divide-y divide-outline-variant/20">
+                {tasks.map((task) => {
+                    // PENDING còn trong hạn phản đối thì mới xác nhận / phản đối được
+                    const canRespond = task.status === 'DONE' && task.confirmationStatus === 'PENDING' && !task.autoConfirmed;
+                    const confirmKey = task.autoConfirmed ? 'autoConfirmed' : task.confirmationStatus;
+                    return (
+                        <li key={task.id} className="py-3 flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <p className="font-semibold">{task.platform || t('executor.account')}{task.accountHandle && ` · ${task.accountHandle}`}</p>
+                                <p className="text-sm text-on-surface-variant">{t(`executor.wish.${task.wish}`, { defaultValue: task.wish })}</p>
+                                {task.note && <p className="text-sm text-on-surface-variant mt-1">{t('executor.note', { note: task.note })}</p>}
+                                {task.evidenceRef && <p className="text-sm text-on-surface-variant mt-1">{t('verification:beneficiary.evidenceRef', { ref: task.evidenceRef })}</p>}
+                                {task.hasEvidenceDocument && (
+                                    <p className="text-sm text-on-surface-variant mt-1">
+                                        {t('verification:beneficiary.evidenceFile', { name: task.evidenceFileName })}
+                                        {task.evidenceSha256 && <span className="ml-2 text-xs font-mono text-outline">{t('verification:beneficiary.sha', { hash: task.evidenceSha256.slice(0, 16) })}</span>}
+                                    </p>
+                                )}
+                                {confirmKey && (
+                                    <p className="text-sm mt-2 text-on-surface-variant">
+                                        {t(`verification:confirm.${confirmKey}`, { date: formatDate(task.confirmDeadlineAt), reason: task.disputeReason })}
+                                    </p>
+                                )}
+                            </div>
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${TASK_STATUS_CLS[task.status] || ''}`}>
+                                {t(`executor.taskStatus.${task.status}`, { defaultValue: task.status })}
+                            </span>
+
+                            {canRespond && disputing?.id !== task.id && (
+                                <div className="w-full flex flex-wrap justify-end gap-2">
+                                    <button type="button" disabled={busyId === task.id} onClick={() => { setDisputing(task); setReason(''); setError(''); }} className={btnOutline}>
+                                        {t('verification:beneficiary.disputeBtn')}
+                                    </button>
+                                    <button type="button" disabled={busyId === task.id} onClick={() => confirm(task)} className={btnPrimary}>
+                                        {t('verification:beneficiary.confirmBtn')}
+                                    </button>
+                                </div>
+                            )}
+
+                            <AutoHeight className="w-full">
+                                {disputing?.id === task.id && (
+                                    <div className="w-full pt-1">
+                                        <label className="block">
+                                            <span className="text-sm font-semibold text-on-surface-variant">{t('verification:beneficiary.reasonLabel')}</span>
+                                            <textarea rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)}
+                                                      placeholder={t('verification:beneficiary.reasonPlaceholder')} className={`${inputClass} mt-1 h-auto py-2`} />
+                                        </label>
+                                        <div className="flex justify-end gap-2 mt-2">
+                                            <button type="button" disabled={busyId === task.id} onClick={() => { setDisputing(null); setError(''); }} className={btnOutline}>
+                                                {t('verification:beneficiary.cancel')}
+                                            </button>
+                                            <button type="button" disabled={busyId === task.id} onClick={dispute} className={btnPrimary}>
+                                                {t('verification:beneficiary.submitDispute')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </AutoHeight>
+                        </li>
+                    );
+                })}
             </ul>
         </section>
     );
@@ -701,7 +788,6 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
 /* ---------- N2-notify: tiến độ phần của mình ---------- */
 function ProgressPanel({ progress }) {
     const { t } = useTranslation('beneficiary');
-    const label = useEnumLabels();
     if (!progress) return null;
     return (
         <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">

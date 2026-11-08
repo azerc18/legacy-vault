@@ -454,13 +454,21 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Map<UUID, JointConsensusService.Info> consensus = jointConsensusService.infoByAsset(
                 assetAllocationRepository.findByAssetIdIn(visible.stream().map(DigitalAsset::getId).toList()), myId);
 
+        final Map<UUID, AssetVerificationSummary> verification = snapshotVerification(vault.getId());
+
         return visible.stream()
-                .map(asset -> InheritedAssetSummaryResponse.builder()
-                        .id(asset.getId())
-                        .assetType(asset.getAssetType())
-                        .assetName(asset.getAssetName())
-                        .consensus(toConsensusResponse(asset.getId(), consensus.get(asset.getId())))
-                        .build())
+                .map(asset -> {
+                    AssetVerificationSummary vs = verification.get(asset.getId());
+                    return InheritedAssetSummaryResponse.builder()
+                            .id(asset.getId())
+                            .assetType(asset.getAssetType())
+                            .assetName(asset.getAssetName())
+                            .consensus(toConsensusResponse(asset.getId(), consensus.get(asset.getId())))
+                            .verificationStatus(vs == null ? null : vs.status())
+                            .verificationMethod(vs == null ? null : vs.method())
+                            .verifiedAt(vs == null ? null : vs.verifiedAt())
+                            .build();
+                })
                 .toList();
     }
 
@@ -1182,6 +1190,16 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
             throw new BeneficiaryException(CLAIM_ENDED_MSG, HttpStatus.GONE);
         }
         return new AccessContext(vault, claim, me);
+    }
+
+    private Map<UUID, AssetVerificationSummary> snapshotVerification(UUID vaultId) {
+        try {
+            return handoverSnapshotService.ensureSnapshot(vaultId)
+                    .map(HandoverSnapshotView::verification).orElse(Map.of());
+        } catch (RuntimeException e) {
+            log.warn("C.6: bản chụp vault {} chưa dùng được, danh sách tài sản không có huy hiệu: {}", vaultId, e.getMessage());
+            return Map.of();
+        }
     }
 
     @Override
