@@ -23,5 +23,10 @@ public class SecurityAlertResponse {
     private Instant lastSeenAt;
     private UUID acknowledgedBy;
     private Instant acknowledgedAt;
+    private String acknowledgeNote;
+    // B3: người dùng liên quan (để Admin khoá nhanh). null với cảnh báo theo IP
+    private UUID relatedUserId;
+    private String relatedUserEmail;
+    private String relatedUserStatus;
     private Instant createdAt;
 }

@@ -60,6 +60,8 @@ public enum AuditAction {
     PROFILE_UPDATED, PASSWORD_CHANGED, PASSWORD_CHANGE_FAILED, AVATAR_DELETED, AVATAR_UPDATED,
     //Admin xác nhận đã xử lý cảnh báo bảo mật
     SECURITY_ALERT_ACKNOWLEDGED,    EXECUTOR_ASSIGNED_BY_ADMIN,
+    // Toàn (PR admin 08/11): Admin gửi lại email lỗi, Admin đổi giá gói
+    ADMIN_NOTIFICATION_RETRIED, ADMIN_PLAN_UPDATED,
     MFA_ENABLED, MFA_DISABLED, MFA_VERIFY_FAILED, MFA_BACKUP_CODE_USED,
     // N2b: người thụ hưởng từ chối, quyền nhận chuyển sang người dự phòng / không còn người nhận
     ASSET_ALLOCATION_FALLBACK, CLAIM_DECLINED, CLAIM_STALLED, CLAIM_ACCEPTED,

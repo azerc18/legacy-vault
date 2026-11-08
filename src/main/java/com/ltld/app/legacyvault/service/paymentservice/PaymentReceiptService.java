@@ -35,6 +35,19 @@ public class PaymentReceiptService {
                 .filter(t -> t.getUser() != null && t.getUser().getId().equals(userId))
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Payment not found."));
 
+        return toReceiptData(tx);
+    }
+
+    /** A2: Admin (ADMIN_MANAGE) tải lại biên lai của bất kỳ giao dịch SUCCESS nào. Chỉ đọc. */
+    @Transactional(readOnly = true)
+    public PaymentReceiptData getReceiptDataForAdmin(UUID transactionId) {
+        PaymentTransaction tx = paymentTransactionRepository.findById(transactionId)
+                .filter(t -> t.getUser() != null)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Payment not found."));
+        return toReceiptData(tx);
+    }
+
+    private static PaymentReceiptData toReceiptData(PaymentTransaction tx) {
         if (tx.getStatus() != PaymentStatus.SUCCESS) {
             throw new BusinessException(ErrorCode.CONFLICT, "A receipt is only available for successful payments.");
         }
