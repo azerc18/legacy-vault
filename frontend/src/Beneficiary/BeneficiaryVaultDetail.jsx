@@ -83,7 +83,7 @@ export default function BeneficiaryVaultDetail() {
         })();
     }, [vaultId, loadContent]);
 
-    // Vừa đóng hồ sơ trên trang này: tải lại danh sách ở dạng chỉ xem
+    // #22: ở bước 'claimed' (vừa đóng hồ sơ trên trang này, hoặc mở lại trang đã đóng) tải danh sách ở dạng chỉ xem
     useEffect(() => {
         if (stage !== 'claimed') return;
         beneficiaryApi.listAssets(vaultId).then(setAssets).catch(() => setAssets([]));
