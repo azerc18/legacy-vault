@@ -41,6 +41,7 @@ import AdminDashboard from './Admin/AdminDashboard.jsx';
 import AdminPayments from './Admin/AdminPayments.jsx';
 import AdminPlans from './Admin/AdminPlans.jsx';
 import AdminNotifications from './Admin/AdminNotifications.jsx';
+import AdminBeneficiaryLocks from './Admin/AdminBeneficiaryLocks.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import { useTranslation } from 'react-i18next';
@@ -112,6 +113,7 @@ function App() {
                 <Route path="/admin/payments" element={guard(ADMIN, <AdminPayments />)} />
                 <Route path="/admin/plans" element={guard(ADMIN, <AdminPlans />)} />
                 <Route path="/admin/notifications" element={guard(ADMIN, <AdminNotifications />)} />
+                <Route path="/admin/beneficiary-locks" element={guard(ADMIN, <AdminBeneficiaryLocks />)} />
 
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
 

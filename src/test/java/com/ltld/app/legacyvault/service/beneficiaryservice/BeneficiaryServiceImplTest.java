@@ -238,7 +238,7 @@ public class BeneficiaryServiceImplTest {
     }
 
     private void stubLocked(boolean locked) {
-        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+        when(verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfterAndAdminUnlockedAtIsNull(
                 eq(vaultId), eq(currentUserId), eq(VerificationStatus.FAILED), any(LocalDateTime.class)))
                 .thenReturn(locked);
     }

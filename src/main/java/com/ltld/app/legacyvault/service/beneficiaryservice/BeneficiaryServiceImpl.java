@@ -63,7 +63,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final int OTP_RESEND_SECONDS = 60;
     private static final int MAX_VERIFY_ATTEMPTS = 5;
     // FR-17 3b: khóa tạm; hết hạn sau LOCK_HOURS (cùng cửa sổ 24 giờ với bộ đếm lượt thử)
-    private static final int LOCK_HOURS = 24;
+    static final int LOCK_HOURS = 24;   // dùng chung với BeneficiaryLockAdminService (#10)
     private static final int VIEW_SESSION_MINUTES = 30;
 
     private static final String ALREADY_CLAIMED_MSG = "These assets have already been claimed.";
@@ -1204,7 +1204,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo
     // phiên mới để lách; phiên FAILED cũ hơn mốc đó không còn khóa nữa.
     private void assertNotLocked(UUID vaultId, UUID currentUserId) {
-        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfter(
+        // #10: phiên FAILED đã được Admin mở khóa (adminUnlockedAt) không còn khóa nữa
+        if (verificationRepository.existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfterAndAdminUnlockedAtIsNull(
                 vaultId, currentUserId, VerificationStatus.FAILED, LocalDateTime.now().minusHours(LOCK_HOURS))) {
             throw new BeneficiaryException(LOCKED_MSG, HttpStatus.LOCKED);
         }

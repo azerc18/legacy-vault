@@ -69,4 +69,8 @@ public class IdentityVerification {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    // #10: Admin mở khóa sớm phiên FAILED; khác null thì phiên này không còn tính là đang khóa
+    @Column(name = "admin_unlocked_at")
+    private LocalDateTime adminUnlockedAt;
 }

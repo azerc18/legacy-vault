@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,5 +73,32 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM IdentityVerification v WHERE v.vault.id = :vaultId")
     int deleteByVaultId(@Param("vaultId") UUID vaultId);
+
+    // #10: như existsBy...CreatedAtAfter nhưng bỏ qua phiên FAILED đã được Admin mở khóa
+    boolean existsByVaultIdAndBeneficiaryIdAndStatusAndCreatedAtAfterAndAdminUnlockedAtIsNull(
+            UUID vaultId, UUID beneficiaryId, VerificationStatus status, LocalDateTime createdAfter);
+
+    // #10: các phiên đang khóa (FAILED, tạo sau mốc, chưa được Admin mở) cho màn hình Admin, mới nhất trước
+    @Query("SELECT v FROM IdentityVerification v JOIN FETCH v.vault JOIN FETCH v.beneficiary " +
+            "WHERE v.status = com.ltld.app.legacyvault.enums.VerificationStatus.FAILED " +
+            "AND v.createdAt > :after AND v.adminUnlockedAt IS NULL ORDER BY v.createdAt DESC")
+    List<IdentityVerification> findActiveLocks(@Param("after") LocalDateTime after);
+
+    // #10: Admin mở khóa: đánh dấu mọi phiên FAILED còn hiệu lực của (vault, beneficiary)
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE IdentityVerification v SET v.adminUnlockedAt = :now " +
+            "WHERE v.vault.id = :vaultId AND v.beneficiary.id = :beneficiaryId " +
+            "AND v.status = com.ltld.app.legacyvault.enums.VerificationStatus.FAILED " +
+            "AND v.createdAt > :after AND v.adminUnlockedAt IS NULL")
+    int markLocksUnlocked(@Param("vaultId") UUID vaultId, @Param("beneficiaryId") UUID beneficiaryId,
+                          @Param("after") LocalDateTime after, @Param("now") LocalDateTime now);
+
+    // #10: Admin mở khóa: xóa lượt thử của các phiên PENDING trong cửa sổ 24h để không bị khóa lại ngay
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE IdentityVerification v SET v.attemptCount = 0 " +
+            "WHERE v.vault.id = :vaultId AND v.beneficiary.id = :beneficiaryId " +
+            "AND v.status = com.ltld.app.legacyvault.enums.VerificationStatus.PENDING AND v.createdAt > :after")
+    int resetPendingAttempts(@Param("vaultId") UUID vaultId, @Param("beneficiaryId") UUID beneficiaryId,
+                             @Param("after") LocalDateTime after);
 
 }
