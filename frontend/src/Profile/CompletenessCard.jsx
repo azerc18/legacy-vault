@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { CountingNumber } from '@animate-ui/react/primitives/texts/counting-number';
+import { useMotionTokens } from '@animate-ui/react/utils/motion';
 import { ownerApi } from '../api/ownerApi.js';
 import { Card, Icon } from '../Owner/ownerUi.jsx';
 
@@ -15,6 +17,7 @@ const accountItems = (profile) => [
 ];
 
 function Ring({ value }) {
+    const { spring } = useMotionTokens();
     const r = 30;
     const c = 2 * Math.PI * r;
     const tone = value >= 80 ? 'text-success' : value >= 50 ? 'text-secondary' : 'text-error';
@@ -26,7 +29,9 @@ function Ring({ value }) {
                         strokeDasharray={c} strokeDashoffset={c - (value / 100) * c}
                         className={`${tone} transition-all duration-500`} />
             </svg>
-            <span className="absolute inset-0 flex items-center justify-center font-title-lg text-title-lg">{value}%</span>
+            <span className="absolute inset-0 flex items-center justify-center font-title-lg text-title-lg tabular-nums">
+                <CountingNumber number={value} transition={spring.number} />%
+            </span>
         </div>
     );
 }

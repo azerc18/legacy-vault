@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import { userApi } from '../api/userApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, inputClass, btnPrimary, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
@@ -57,7 +58,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
     // --- Vừa bật: hiện mã dự phòng đúng 1 lần ---
     if (backupCodes) {
         return (
-            <Card title={t('mfa.backupTitle')} icon="key">
+            <Card title={t('mfa.backupTitle')} icon="key" className="lv-surface-secure">
                 <Alert type="warning">{t('mfa.backupWarning')}</Alert>
                 <div className="grid grid-cols-2 gap-2 font-mono text-center my-4">
                     {backupCodes.map((c) => (
@@ -77,7 +78,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
     }
 
     return (
-        <Card title={t('mfa.title')} icon="phonelink_lock">
+        <Card title={t('mfa.title')} icon="phonelink_lock" className={setup || disabling ? 'lv-surface-secure' : ''}>
             <Alert>{error}</Alert>
 
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -89,63 +90,65 @@ export default function TwoFactorCard({ profile, onChanged }) {
                 </span>
             </div>
 
-            {/* --- Đang tắt, chưa thiết lập --- */}
-            {!profile.mfaEnabled && !setup && (
-                <div className="flex justify-end">
-                    <button type="button" onClick={startSetup} disabled={busy} className={btnPrimary}>
-                        {busy ? t('mfa.wait') : t('mfa.turnOn')}
-                    </button>
-                </div>
-            )}
+            <AutoHeight>
+                {/* --- Đang tắt, chưa thiết lập --- */}
+                {!profile.mfaEnabled && !setup && (
+                    <div className="flex justify-end">
+                        <button type="button" onClick={startSetup} disabled={busy} className={btnPrimary}>
+                            {busy ? t('mfa.wait') : t('mfa.turnOn')}
+                        </button>
+                    </div>
+                )}
 
-            {/* --- Đang thiết lập: quét QR + nhập mã --- */}
-            {!profile.mfaEnabled && setup && (
-                <form onSubmit={confirmEnable} className="space-y-4">
-                    <ol className="text-sm list-decimal pl-5 space-y-1">
-                        <li>{t('mfa.step1')}</li>
-                        <li>{t('mfa.step2')}</li>
-                    </ol>
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <img src={setup.qrDataUri} alt={t('mfa.qrAlt')} className="w-44 h-44 rounded-xl border border-outline-variant bg-white p-2" />
-                        <div className="text-sm min-w-0">
-                            <p className="text-on-surface-variant">{t('mfa.manualKey')}</p>
-                            <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
+                {/* --- Đang thiết lập: quét QR + nhập mã --- */}
+                {!profile.mfaEnabled && setup && (
+                    <form onSubmit={confirmEnable} className="space-y-4">
+                        <ol className="text-sm list-decimal pl-5 space-y-1">
+                            <li>{t('mfa.step1')}</li>
+                            <li>{t('mfa.step2')}</li>
+                        </ol>
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <img src={setup.qrDataUri} alt={t('mfa.qrAlt')} className="w-44 h-44 rounded-xl border border-outline-variant bg-white p-2" />
+                            <div className="text-sm min-w-0">
+                                <p className="text-on-surface-variant">{t('mfa.manualKey')}</p>
+                                <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
+                            </div>
                         </div>
-                    </div>
-                    {codeInput('123456')}
-                    <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
-                            {t('common:actions.cancel')}
-                        </button>
-                        <button type="submit" disabled={busy || code.trim().length !== 6} className={btnPrimary}>
-                            {busy ? t('mfa.verifying') : t('mfa.verifyOn')}
-                        </button>
-                    </div>
-                </form>
-            )}
+                        {codeInput('123456')}
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
+                                {t('common:actions.cancel')}
+                            </button>
+                            <button type="submit" disabled={busy || code.trim().length !== 6} className={btnPrimary}>
+                                {busy ? t('mfa.verifying') : t('mfa.verifyOn')}
+                            </button>
+                        </div>
+                    </form>
+                )}
 
-            {/* --- Đang bật: nút tắt (cần nhập mã) --- */}
-            {profile.mfaEnabled && !disabling && (
-                <div className="flex justify-end">
-                    <button type="button" onClick={() => { setDisabling(true); setCode(''); setError(''); }} className={btnDanger}>
-                        {t('mfa.turnOff')}
-                    </button>
-                </div>
-            )}
-            {profile.mfaEnabled && disabling && (
-                <form onSubmit={confirmDisable} className="space-y-4">
-                    <p className="text-sm">{t('mfa.disableHint')}</p>
-                    {codeInput(t('mfa.disablePlaceholder'))}
-                    <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>
-                            {t('common:actions.cancel')}
-                        </button>
-                        <button type="submit" disabled={busy || !code.trim()} className={btnDanger}>
-                            {busy ? t('mfa.wait') : t('mfa.confirmOff')}
+                {/* --- Đang bật: nút tắt (cần nhập mã) --- */}
+                {profile.mfaEnabled && !disabling && (
+                    <div className="flex justify-end">
+                        <button type="button" onClick={() => { setDisabling(true); setCode(''); setError(''); }} className={btnDanger}>
+                            {t('mfa.turnOff')}
                         </button>
                     </div>
-                </form>
-            )}
+                )}
+                {profile.mfaEnabled && disabling && (
+                    <form onSubmit={confirmDisable} className="space-y-4">
+                        <p className="text-sm">{t('mfa.disableHint')}</p>
+                        {codeInput(t('mfa.disablePlaceholder'))}
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>
+                                {t('common:actions.cancel')}
+                            </button>
+                            <button type="submit" disabled={busy || !code.trim()} className={btnDanger}>
+                                {busy ? t('mfa.wait') : t('mfa.confirmOff')}
+                            </button>
+                        </div>
+                    </form>
+                )}
+            </AutoHeight>
         </Card>
     );
 }

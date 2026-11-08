@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { CountingNumber } from '@animate-ui/react/primitives/texts/counting-number';
+import { useMotionTokens } from '@animate-ui/react/utils/motion';
 import { ownerApi } from '../api/ownerApi.js';
 import { paymentApi } from '../api/paymentApi.js';
 import { Card, Icon } from '../Owner/ownerUi.jsx';
@@ -23,10 +25,14 @@ const CONFIRMER_TONE = { ACTIVE: 'good', CONFIRMED_ALIVE: 'good', CONFIRMED_UNRE
 const DMS_TONE = { ACTIVE: 'good', PENDING_CONFIRMATION: 'wait', TRIGGERED: 'bad', SUSPENDED: 'idle' };
 
 function Stat({ icon, label, value, to }) {
+    const { spring } = useMotionTokens();
+    const isNum = typeof value === 'number';
     return (
-        <Link to={to} className="p-3 rounded-xl bg-surface-container-low hover:bg-surface-container transition-colors min-w-0">
+        <Link to={to} className="lv-glass-clear p-3.5 rounded-xl bg-surface-container-low/70 hover:bg-surface-container transition-all duration-200 hover:-translate-y-0.5 min-w-0">
             <Icon name={icon} className="text-[18px] text-secondary" />
-            <span className="block mt-1 font-title-lg text-title-lg truncate">{value}</span>
+            <span className="block mt-1 font-title-lg text-title-lg truncate tabular-nums">
+                {isNum ? <CountingNumber number={value} transition={spring.number} /> : value}
+            </span>
             <span className="block text-xs text-on-surface-variant truncate">{label}</span>
         </Link>
     );

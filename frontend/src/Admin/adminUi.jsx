@@ -143,7 +143,7 @@ export function Stamp({tone = 'muted', icon, flat, children, title}) {
 // Màu con dấu theo trạng thái nghiệp vụ (dùng chung cho mọi trang admin)
 export const STATUS_TONE = {
     // user
-    ACTIVE: 'ok', LOCKED: 'danger', PENDING: 'warn',
+    ACTIVE: 'ok', LOCKED: 'danger', PENDING: 'warn', DELETED: 'muted',
     // vault
     UNLOCKED: 'info', CLAIMED: 'ok', ARCHIVED_LOCKED: 'muted',
     // DMS
