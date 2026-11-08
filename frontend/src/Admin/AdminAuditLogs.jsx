@@ -35,6 +35,15 @@ export default function AdminAuditLogs() {
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [expanded, setExpanded] = useState(null);
+    const [exporting, setExporting] = useState(false);
+
+    // B4: xuất đúng bộ lọc đang áp dụng
+    const exportCsv = async () => {
+        setExporting(true); setError('');
+        try { await adminApi.exportAuditLogs({ ...query, from: toIso(query.from), to: toIso(query.to) }); }
+        catch (e) { setError(getErrorMessage(e, t('exportError'))); }
+        finally { setExporting(false); }
+    };
 
     useEffect(() => { adminApi.listAuditActions().then(setActions).catch(() => {}); }, []);
 
@@ -56,7 +65,13 @@ export default function AdminAuditLogs() {
     const rows = data?.content ?? [];
 
     return (
-        <AdminLayout title={t('audit.title')} subtitle={t('audit.subtitle')}>
+        <AdminLayout title={t('audit.title')} subtitle={t('audit.subtitle')}
+                     actions={(
+                         <button onClick={exportCsv} disabled={exporting}
+                                 className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold inline-flex items-center gap-2 hover:bg-surface-container-low disabled:opacity-60">
+                             <Icon name="download" className="text-[18px]" /> {exporting ? t('wait') : t('exportCsv')}
+                         </button>
+                     )}>
             <form onSubmit={search} className="grid gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-[200px_1fr_160px_190px_190px_auto]">
                 <select value={filters.action} onChange={set('action')} className={inputClass}>
                     <option value="">{t('audit.allActions')}</option>

@@ -7,14 +7,16 @@ import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, StatCard, formatVnd, toneOf } from './adminUi.jsx';
+import UserDrawer from './UserDrawer.jsx';
 
 const STATUSES = ['SUCCESS', 'PENDING', 'FAILED'];
 const EMPTY = { status: '', email: '', from: '', to: '' };
 
-export default function AdminPayments({ onOpenUser }) {
+export default function AdminPayments() {
     const { t } = useTranslation('admin');
     const [params] = useSearchParams();
-    const initial = { ...EMPTY, status: STATUSES.includes(params.get('status')) ? params.get('status') : '' };
+    const initial = { ...EMPTY, status: STATUSES.includes(params.get('status')) ? params.get('status') : '', email: params.get('email') || '' };
+    const [openUserId, setOpenUserId] = useState(null);
 
     const [filters, setFilters] = useState(initial);   // ô đang nhập
     const [applied, setApplied] = useState(initial);   // bộ lọc đã áp dụng
@@ -115,9 +117,7 @@ export default function AdminPayments({ onOpenUser }) {
                                     {p.paidAt && <p className="text-[11px] text-outline">{t('payments.paidAt', { date: formatDate(p.paidAt, true) })}</p>}
                                 </td>
                                 <td data-label={t('payments.cols.user')}>
-                                    {onOpenUser
-                                        ? <button onClick={() => onOpenUser(p.userId)} className="font-semibold text-secondary hover:underline text-left">{p.userEmail}</button>
-                                        : <p className="font-semibold">{p.userEmail}</p>}
+                                    <button onClick={() => setOpenUserId(p.userId)} className="font-semibold text-left hover:text-secondary hover:underline" title={t('drawer.open')}>{p.userEmail}</button>
                                     {p.userFullName && <p className="text-xs text-on-surface-variant">{p.userFullName}</p>}
                                 </td>
                                 <td data-label={t('payments.cols.plan')}>
@@ -145,6 +145,7 @@ export default function AdminPayments({ onOpenUser }) {
                 </Dossier>
             )}
             <Pager page={page} totalPages={data?.totalPages} onChange={setPage} />
+            <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} />
         </AdminLayout>
     );
 }

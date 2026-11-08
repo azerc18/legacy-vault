@@ -100,13 +100,19 @@ export const adminApi = {
     },
     listAuditActions: () => http.get('/admin/audit-logs/actions').then(unwrap),
 
-    // status: OPEN | ACKNOWLEDGED
-    listAlerts: ({ status = 'OPEN', page = 0, size = 20 } = {}) =>
-        http.get('/admin/security-alerts', { params: { status, page, size } }).then(unwrap),
+    // status: OPEN | ACKNOWLEDGED; severity: HIGH | MEDIUM | '' (mọi mức)
+    // -> Page { content: [{ ..., acknowledgeNote, relatedUserId, relatedUserEmail, relatedUserStatus }] }
+    listAlerts: ({ status = 'OPEN', severity, page = 0, size = 20 } = {}) =>
+        http.get('/admin/security-alerts', { params: clean({ status, severity, page, size }) }).then(unwrap),
     // -> { open: number }
     countOpenAlerts: () => http.get('/admin/security-alerts/count').then(unwrap),
     // 409 nếu đã được xác nhận
-    acknowledgeAlert: (alertId) => http.patch(`/admin/security-alerts/${alertId}/acknowledge`).then(unwrap),
+    // note: ghi chú tuỳ chọn (≤ 500 ký tự)
+    acknowledgeAlert: (alertId, note) =>
+        http.patch(`/admin/security-alerts/${alertId}/acknowledge`, { note: note || null }).then(unwrap),
+    // B4: CSV theo bộ lọc hiện tại (from/to là ISO string)
+    exportAuditLogs: ({ action, actorEmail, ip, from, to } = {}) =>
+        downloadBlob('/admin/audit-logs/export', clean({ action, actorEmail, ip, from, to }), 'audit-logs.csv'),
 
     /* ---------- A1: tổng quan ---------- */
     // -> { usersByStatus{}, vaultsByStatus{}, openAlerts, openHighAlerts, dmsPendingConfirmation, dmsTriggered,
@@ -128,4 +134,33 @@ export const adminApi = {
     // B4: CSV theo bộ lọc hiện tại
     exportPayments: ({ status, email, from, to } = {}) =>
         downloadBlob('/admin/payments/export', clean({ status, email, from, to }), 'payments.csv'),
+
+    /* ---------- A3: chi tiết người dùng ---------- */
+    // -> { id, email, fullName, phoneNumber, status, kycLevel, mfaEnabled, failedLoginAttempts, lockedUntil, createdAt,
+    //      lastLoginAt, roles[], dmsStatus, dmsNextCheckinDueAt, planCode, planName, planExpiresAt,
+    //      vaults[{ id, name, status, claimDeadlineAt, createdAt }], recentLogs[AuditLog], alerts[{ id, rule, severity, status, message, lastSeenAt }] }
+    getUserDetail: (userId) => http.get(`/admin/users/${userId}`).then(unwrap),
+
+    /* ---------- B2: tìm kho ---------- */
+    // q: tên kho / email / tên chủ kho; expiringWithinDays: chỉ kho UNLOCKED có hạn nhận trong N ngày (bỏ qua status)
+    // -> Page { content: [{ id, name, description, status, ownerId, ownerEmail, ownerName, unlockedAt, claimDeadlineAt, claimExtensions, createdAt, updatedAt }] }
+    searchVaults: ({ q, status, expiringWithinDays, page = 0, size = 20 } = {}) =>
+        http.get('/admin/vaults', { params: clean({ q, status, expiringWithinDays, page, size }) }).then(unwrap),
+
+    /* ---------- C2: biểu đồ ---------- */
+    // -> { revenueByDay: [{ date, value }], newUsersByWeek: [{ date, value }] }
+    getCharts: () => http.get('/admin/stats/charts').then(unwrap),
+
+    /* ---------- B1: email gửi lỗi ---------- */
+    // -> Page { content: [{ id, recipientId, recipientEmail, type, status, attemptCount, lastAttemptAt, createdAt, sentAt }] }
+    listNotifications: ({ status = 'FAILED', page = 0, size = 20 } = {}) =>
+        http.get('/admin/notifications', { params: { status, page, size } }).then(unwrap),
+    // 409 nếu không còn FAILED / vừa thử lại < 1 phút / loại email chưa hỗ trợ; 503 nếu gửi vẫn lỗi
+    retryNotification: (id) => http.post(`/admin/notifications/${id}/retry`).then(unwrap),
+
+    /* ---------- C1: gói ---------- */
+    // -> [{ id, code, name, priceVnd, durationDays, maxVaults, maxBeneficiaries, storageQuotaBytes, legacyMessagesEnabled, activeSubscribers }]
+    listPlans: () => http.get('/admin/plans').then(unwrap),
+    // Chỉ đổi giá/tên cho lần mua sau. body: { priceVnd, name?, reason? }
+    updatePlan: (code, body) => http.patch(`/admin/plans/${encodeURIComponent(code)}`, body).then(unwrap),
 };

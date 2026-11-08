@@ -39,6 +39,33 @@ function StatusSplit({ counts, order, label }) {
     );
 }
 
+// C2: biểu đồ cột tối giản (không thêm thư viện). Nhãn trục: điểm đầu, giữa, cuối.
+function BarChart({ points, format, labelOf, empty }) {
+    const { t } = useTranslation('admin');
+    const max = Math.max(0, ...points.map((p) => p.value));
+    if (max === 0) return <p className="text-sm text-on-surface-variant py-10 text-center">{empty}</p>;
+    const marks = [0, Math.floor(points.length / 2), points.length - 1];
+    return (
+        <div>
+            <div className="lv-bars" role="img" aria-label={points.map((p) => `${labelOf(p.date)}: ${format(p.value)}`).join(', ')}>
+                {points.map((p) => (
+                    <div key={p.date} title={`${labelOf(p.date)} · ${format(p.value)}`}
+                         style={{ height: `${Math.max(p.value > 0 ? 3 : 0, (p.value / max) * 100)}%` }} />
+                ))}
+            </div>
+            <div className="flex justify-between mt-2 text-[11px] text-outline lv-mono">
+                {marks.map((i) => <span key={i}>{labelOf(points[i].date)}</span>)}
+            </div>
+            <p className="mt-1 text-[11px] text-outline">{t('overview.charts.max', { value: format(max) })}</p>
+        </div>
+    );
+}
+
+const shortDate = (iso) => {
+    const [, m, d] = String(iso).split('-');
+    return `${d}/${m}`;
+};
+
 function TodoList({ items, empty, render }) {
     if (!items || items.length === 0) {
         return <p className="text-sm text-on-surface-variant py-2 flex items-center gap-2"><Icon name="task_alt" className="text-[18px] text-success" />{empty}</p>;
@@ -51,12 +78,14 @@ export default function AdminDashboard() {
     const [stats, setStats] = useState(null);
     const [error, setError] = useState('');
     const [loadedAt, setLoadedAt] = useState(null);
+    const [charts, setCharts] = useState(null);
 
     const load = useCallback(() => {
         setError('');
         adminApi.getStats()
             .then((s) => { setStats(s); setLoadedAt(new Date()); })
             .catch((e) => setError(getErrorMessage(e, t('overview.loadError'))));
+        adminApi.getCharts().then(setCharts).catch(() => setCharts(null));
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { load(); }, [load]);
@@ -99,6 +128,17 @@ export default function AdminDashboard() {
                                   foot={t('overview.cards.vipFoot')} to="/admin/payments" />
                     </div>
 
+                    {charts && (
+                        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                            <Dossier title={t('overview.charts.revenue')} tab={t('overview.charts.last30')}>
+                                <BarChart points={charts.revenueByDay} format={formatVnd} labelOf={shortDate} empty={t('overview.charts.noData')} />
+                            </Dossier>
+                            <Dossier title={t('overview.charts.users')} tab={t('overview.charts.last12w')}>
+                                <BarChart points={charts.newUsersByWeek} format={(v) => String(v)} labelOf={shortDate} empty={t('overview.charts.noData')} />
+                            </Dossier>
+                        </div>
+                    )}
+
                     <div className="mt-8 flex items-end justify-between gap-3 flex-wrap">
                         <h2 className="lv-dossier-title text-xl">{t('overview.todo.title')}</h2>
                         <span className="text-xs text-outline">
@@ -127,7 +167,7 @@ export default function AdminDashboard() {
                             </Dossier>
 
                             <Dossier title={t('overview.todo.deadlines')} tab={`${s.claimDeadlines.length}`}
-                                     right={<Link to="/admin/vaults?status=UNLOCKED" className="text-xs font-semibold text-secondary">{t('overview.todo.viewAll')}</Link>}>
+                                     right={<Link to="/admin/vaults?expiring=7" className="text-xs font-semibold text-secondary">{t('overview.todo.viewAll')}</Link>}>
                                 <TodoList items={s.claimDeadlines} empty={t('overview.todo.none')} render={(v) => (
                                     <li key={v.id} className="py-3">
                                         <p className="text-sm font-semibold truncate">{v.name}</p>

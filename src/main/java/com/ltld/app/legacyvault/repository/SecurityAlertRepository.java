@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.SecurityAlert;
 import com.ltld.app.legacyvault.enums.SecurityAlertRule;
+import com.ltld.app.legacyvault.enums.SecurityAlertSeverity;
 import com.ltld.app.legacyvault.enums.SecurityAlertStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +20,10 @@ public interface SecurityAlertRepository extends JpaRepository<SecurityAlert, UU
     boolean existsByRuleAndSubject(SecurityAlertRule rule, String subject);
 
     Page<SecurityAlert> findByStatusOrderByCreatedAtDesc(SecurityAlertStatus status, Pageable pageable);
+
+    // B3: lọc thêm theo mức độ
+    Page<SecurityAlert> findByStatusAndSeverityOrderByCreatedAtDesc(SecurityAlertStatus status,
+                                                                   SecurityAlertSeverity severity, Pageable pageable);
 
     long countByStatus(SecurityAlertStatus status);
 }

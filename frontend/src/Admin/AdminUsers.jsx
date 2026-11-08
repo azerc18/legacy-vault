@@ -6,6 +6,7 @@ import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import UserDrawer from './UserDrawer.jsx';
 
 const STATUSES = ['ACTIVE', 'LOCKED', 'PENDING'];
 // Role admin được phép cấp/gỡ (khớp MANAGEABLE_ROLES của BE)
@@ -23,6 +24,7 @@ export default function AdminUsers() {
     const [success, setSuccess] = useState('');
     const [busy, setBusy] = useState(false);
     const [dialog, setDialog] = useState(null); // { kind, user, roleCode? }
+    const [openUserId, setOpenUserId] = useState(null); // A3: ngăn kéo chi tiết
 
     const [roles, setRoles] = useState([]);
     useEffect(() => { adminApi.listRoles().then(setRoles).catch(() => {}); }, []);
@@ -111,13 +113,15 @@ export default function AdminUsers() {
                         </thead>
                         <tbody>
                         {rows.map((u) => (
-                            <UserRow key={u.id} u={u} isMe={u.id === me?.id} manageable={manageable} labelOf={labelOf} onAction={setDialog} />
+                            <UserRow key={u.id} u={u} isMe={u.id === me?.id} manageable={manageable} labelOf={labelOf} onAction={setDialog} onOpen={setOpenUserId} />
                         ))}
                         </tbody>
                     </table>
                 </div>
             )}
             <Pager page={page} totalPages={data?.totalPages} onChange={setPage} />
+
+            <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} onChanged={replaceRow} />
 
             <ReasonDialog
                 open={!!dialog}
@@ -130,7 +134,7 @@ export default function AdminUsers() {
     );
 }
 
-function UserRow({ u, isMe, manageable, labelOf, onAction }) {
+function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
     const { t } = useTranslation('admin');
     const allRoles = u.roles || [];
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
@@ -150,7 +154,9 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
     return (
         <tr className="is-row">
             <td data-label={t('users.cols.user')}>
-                <p className="font-semibold">{u.fullName || '—'}{isMe && <span className="ml-1 text-xs text-outline">({t('users.you')})</span>}</p>
+                <button type="button" onClick={() => onOpen(u.id)} className="font-semibold text-left hover:text-secondary hover:underline" title={t('drawer.open')}>
+                    {u.fullName || '—'}{isMe && <span className="ml-1 text-xs text-outline">({t('users.you')})</span>}
+                </button>
                 <p className="text-on-surface-variant">{u.email}</p>
                 <p className="text-xs text-outline">{t('users.joined', { date: formatDate(u.createdAt) })}</p>
             </td>

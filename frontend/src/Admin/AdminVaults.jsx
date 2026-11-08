@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
@@ -6,6 +7,7 @@ import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass, btnPrimary } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import UserDrawer from './UserDrawer.jsx';
 
 // Nhãn ở admin.json > vaults.status.<code>
 const VAULT_STATUSES = ['ACTIVE', 'UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'];
@@ -17,7 +19,13 @@ const EXTEND_DAYS = [7, 14, 30];
 export default function AdminVaults() {
     const { t } = useTranslation('admin');
     const me = getUser();
-    const [status, setStatus] = useState('');
+    const [params] = useSearchParams();
+    // B2: mở sẵn bộ lọc từ trang Tổng quan: /admin/vaults?status=UNLOCKED hoặc ?expiring=7
+    const [status, setStatus] = useState(VAULT_STATUSES.includes(params.get('status')) ? params.get('status') : '');
+    const [q, setQ] = useState('');                 // ô đang nhập
+    const [query, setQuery] = useState('');         // đã áp dụng
+    const [expiring, setExpiring] = useState(params.get('expiring') === '7');
+    const [openUserId, setOpenUserId] = useState(null);
     const [page, setPage] = useState(0);
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
@@ -28,10 +36,12 @@ export default function AdminVaults() {
     useEffect(() => {
         if (!isAdmin(me)) return;
         setError('');
-        adminApi.listVaults({ status, page, size: 20 })
+        adminApi.searchVaults({ q: query, status: expiring ? undefined : status, expiringWithinDays: expiring ? 7 : undefined, page, size: 20 })
             .then(setData)
             .catch((e) => setError(getErrorMessage(e, t('vaults.loadError'))));
-    }, [status, page]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [status, query, expiring, page]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const submit = (e) => { e.preventDefault(); setPage(0); setQuery(q.trim()); };
 
     const open = async (v) => {
         setError('');
@@ -48,11 +58,21 @@ export default function AdminVaults() {
 
     return (
         <AdminLayout title={t('vaults.title')} subtitle={t('vaults.subtitle')}>
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-                <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} className={`${inputClass} max-w-xs`}>
+            <form onSubmit={submit} className="grid gap-3 mb-3 sm:grid-cols-[1fr_200px_auto]">
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('vaults.searchPlaceholder')} className={inputClass} />
+                <select value={status} disabled={expiring} onChange={(e) => { setStatus(e.target.value); setPage(0); }} className={`${inputClass} disabled:opacity-50`}>
                     <option value="">{t('allStatuses')}</option>
                     {VAULT_STATUSES.map((k) => <option key={k} value={k}>{statusLabel(k)}</option>)}
                 </select>
+                <button type="submit" className="h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 lv-pill">
+                    <Icon name="search" className="text-[18px]" /> {t('search')}
+                </button>
+            </form>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold cursor-pointer select-none">
+                    <input type="checkbox" checked={expiring} onChange={(e) => { setExpiring(e.target.checked); setPage(0); }} className="w-4 h-4 accent-current" />
+                    <Icon name="hourglass_bottom" className="text-[18px] text-warning" /> {t('vaults.expiringFilter')}
+                </label>
                 {data && <span className="text-sm text-on-surface-variant">{t('vaults.total', { count: data.totalElements })}</span>}
             </div>
 
@@ -66,9 +86,10 @@ export default function AdminVaults() {
                         <thead>
                         <tr>
                             <th>{t('vaults.cols.vault')}</th>
+                            <th>{t('vaults.cols.owner')}</th>
                             <th>{t('vaults.cols.status')}</th>
                             <th>{t('vaults.cols.created')}</th>
-                            <th>{t('vaults.cols.updated')}</th>
+                            <th>{t('vaults.cols.deadline')}</th>
                             <th />
                         </tr>
                         </thead>
@@ -79,9 +100,19 @@ export default function AdminVaults() {
                                     <p className="font-semibold">{v.name}</p>
                                     {v.description && <p className="text-xs text-outline line-clamp-1">{v.description}</p>}
                                 </td>
+                                <td data-label={t('vaults.cols.owner')}>
+                                    <button type="button" onClick={() => setOpenUserId(v.ownerId)} className="text-left font-semibold hover:text-secondary hover:underline" title={t('drawer.open')}>
+                                        {v.ownerEmail}
+                                    </button>
+                                    {v.ownerName && <p className="text-xs text-outline">{v.ownerName}</p>}
+                                </td>
                                 <td data-label={t('vaults.cols.status')}><Stamp tone={vaultTone(v.status)}>{statusLabel(v.status)}</Stamp></td>
                                 <td data-label={t('vaults.cols.created')} className="whitespace-nowrap">{formatDate(v.createdAt)}</td>
-                                <td data-label={t('vaults.cols.updated')} className="whitespace-nowrap">{formatDate(v.updatedAt)}</td>
+                                <td data-label={t('vaults.cols.deadline')} className="whitespace-nowrap">
+                                    {v.status === 'UNLOCKED' && v.claimDeadlineAt
+                                        ? <Stamp tone="warn" icon="hourglass_bottom" flat>{formatDate(v.claimDeadlineAt)}</Stamp>
+                                        : <span className="text-outline">—</span>}
+                                </td>
                                 <td className="text-right">
                                     <button onClick={() => open(v)} className="text-sm font-semibold text-secondary hover:text-primary">{t('vaults.details')}</button>
                                 </td>
@@ -92,6 +123,7 @@ export default function AdminVaults() {
                 </div>
             )}
             <Pager page={page} totalPages={data?.totalPages} onChange={setPage} />
+            <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} />
 
             {detail && (
                 <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={() => setDetail(null)}>

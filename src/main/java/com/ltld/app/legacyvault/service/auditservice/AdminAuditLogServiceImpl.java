@@ -28,6 +28,7 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
     static final int MAX_PAGE_SIZE = 100;
     static final int DEFAULT_RANGE_DAYS = 30;
     static final int MAX_RANGE_DAYS = 365;
+    static final int MAX_EXPORT_ROWS = 10_000;
 
     private final AuditLogRepository auditLogRepository;
 
@@ -35,6 +36,18 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
     @Transactional(readOnly = true)
     public Page<AdminAuditLogResponse> search(String action, String actorEmail, String ip,
                                               Instant from, Instant to, int page, int size) {
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+        return doSearch(action, actorEmail, ip, from, to, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AdminAuditLogResponse> export(String action, String actorEmail, String ip, Instant from, Instant to) {
+        return doSearch(action, actorEmail, ip, from, to, PageRequest.of(0, MAX_EXPORT_ROWS)).getContent();
+    }
+
+    private Page<AdminAuditLogResponse> doSearch(String action, String actorEmail, String ip,
+                                                 Instant from, Instant to, PageRequest pageable) {
         Instant end = to != null ? to : Instant.now();
         Instant start = from != null ? from : end.minus(DEFAULT_RANGE_DAYS, ChronoUnit.DAYS);
         if (start.isAfter(end)) {
@@ -46,7 +59,6 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
 
         String emailPattern = isBlank(actorEmail) ? null : "%" + actorEmail.trim().toLowerCase(Locale.ROOT) + "%";
         String ipFilter = isBlank(ip) ? null : ip.trim();
-        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
         return auditLogRepository
                 .searchForAdmin(parseAction(action), emailPattern, ipFilter, start, end, pageable)
@@ -67,7 +79,8 @@ public class AdminAuditLogServiceImpl implements AdminAuditLogService {
         }
     }
 
-    private static AdminAuditLogResponse toResponse(AuditLog log) {
+    // Dùng lại ở chi tiết người dùng (A3)
+    public static AdminAuditLogResponse toResponse(AuditLog log) {
         Map<String, Object> meta = log.getMetadata() == null ? Map.of() : log.getMetadata();
         User actor = log.getActor();
         return AdminAuditLogResponse.builder()
