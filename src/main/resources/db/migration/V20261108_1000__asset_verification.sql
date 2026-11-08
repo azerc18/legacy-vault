@@ -6,7 +6,7 @@ CREATE TABLE `asset_verifications` (
   `provider` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   `fingerprint` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `challenge_hash` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `challenge_hash` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `evidence_json` text COLLATE utf8mb4_unicode_ci,
   `verified_at` datetime(6) DEFAULT NULL,
   `expires_at` datetime(6) DEFAULT NULL,

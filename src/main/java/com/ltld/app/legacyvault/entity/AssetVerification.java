@@ -45,7 +45,7 @@ public class AssetVerification {
     @Column(length = 64)
     private String fingerprint;
 
-    @Column(name = "challenge_hash")
+    @Column(name = "challenge_hash", length = 64)
     private String challengeHash;
 
     // bằng chứng KHÔNG nhạy cảm (nhạy cảm thì lưu qua kho tài liệu mã hóa)
