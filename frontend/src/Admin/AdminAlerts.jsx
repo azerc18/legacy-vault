@@ -4,13 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
-import { AdminLayout, Pager } from './adminUi.jsx';
+import { AdminLayout, Pager, Stamp, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
-
-const SEVERITY_CLS = {
-    HIGH: 'bg-error-container text-on-error-container',
-    MEDIUM: 'bg-warning-container text-on-warning-container',
-};
 
 export default function AdminAlerts() {
     const { t } = useTranslation('admin');
@@ -73,11 +68,11 @@ export default function AdminAlerts() {
 
             <div className="space-y-3">
                 {rows.map((a) => (
-                    <div key={a.id} className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30">
+                    <div key={a.id} className="lv-dossier p-5 pt-7">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${SEVERITY_CLS[a.severity] || ''}`}>{t(`alerts.severity.${a.severity}`, { defaultValue: a.severity })}</span>
+                                    <Stamp tone={toneOf(a.severity)}>{t(`alerts.severity.${a.severity}`, { defaultValue: a.severity })}</Stamp>
                                     <span className="font-semibold">{t(`alerts.rules.${a.rule}`, { defaultValue: a.rule })}</span>
                                 </div>
                                 <p className="mt-2 text-sm">{a.message}</p>
