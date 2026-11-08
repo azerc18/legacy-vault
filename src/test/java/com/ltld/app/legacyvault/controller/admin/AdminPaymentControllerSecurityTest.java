@@ -129,7 +129,8 @@ class AdminPaymentControllerSecurityTest {
     void receipt_admin_returnsPdf() throws Exception {
         UUID id = UUID.randomUUID();
         PaymentReceiptData data = new PaymentReceiptData("LV-20261108-ABCDEF12", id, "A", "a@b.vn", "VIP_MONTH",
-                "VIP tháng", 30, 99_000, "123", "NCB", LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now());
+                "VIP tháng", 30, 99_000, "123", "NCB", LocalDateTime.now(), LocalDateTime.now(), LocalDateTime.now(),
+                1L, "VNPay");
         when(paymentReceiptService.getReceiptDataForAdmin(id)).thenReturn(data);
         when(paymentReceiptPdfService.render(data)).thenReturn(new byte[]{'%', 'P', 'D', 'F'});
 

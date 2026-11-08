@@ -49,7 +49,7 @@ public class PaymentReceiptService {
         return toReceiptData(tx);
     }
 
-    private static PaymentReceiptData toReceiptData(PaymentTransaction tx) {
+    private PaymentReceiptData toReceiptData(PaymentTransaction tx) {
         if (tx.getStatus() != PaymentStatus.SUCCESS) {
             throw new BusinessException(ErrorCode.CONFLICT, "A receipt is only available for successful payments.");
         }
