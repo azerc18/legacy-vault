@@ -194,4 +194,44 @@ class EmailSenderLanguageTest {
                 .contains("Owner A (owner@example.com) đã chỉ định bạn làm Người thực thi dự phòng (BACKUP)",
                         "Công tắc người chết của Owner A");
     }
+
+    @Test
+    void vaultDeleted_vietnamese() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendVaultDeletedNotice("an@example.com", "An", "Hồ sơ A");
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Két sắt của bạn đã bị xóa - LegacyVault");
+        assertThat(mail.getText()).contains("Két sắt \"Hồ sơ A\" đã bị xóa");
+    }
+
+    @Test
+    void accountLockedByAdmin_showsReasonOnlyWhenLocking() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+
+        emailSender.sendAccountStatusNotice("an@example.com", "An", true, "spam");
+
+        assertThat(SentMail.captureOne(javaMailSender).getText()).contains("Reason: spam", "locked your LegacyVault account");
+    }
+
+    @Test
+    void roleGranted_namesTheRole() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+
+        emailSender.sendRoleChangedNotice("an@example.com", "An", true, "VERIFIER");
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("A role was added to your account - LegacyVault");
+        assertThat(mail.getText()).contains("the role VERIFIER");
+    }
+
+    @Test
+    void dmsPaused_includesReason() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendDmsAdminActionNotice("an@example.com", "An", true, "bảo trì");
+
+        assertThat(SentMail.captureOne(javaMailSender).getText()).contains("Lý do: bảo trì", "tạm dừng");
+    }
 }

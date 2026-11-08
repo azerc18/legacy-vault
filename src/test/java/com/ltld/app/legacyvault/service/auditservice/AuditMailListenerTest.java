@@ -2,7 +2,9 @@ package com.ltld.app.legacyvault.service.auditservice;
 
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,12 +28,14 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuditMailListenerTest {
 
     @Mock private EmailSender emailSender;
     @Mock private UserRepository userRepository;
+    @Mock private VaultRepository vaultRepository;
     @InjectMocks private AuditMailListener listener;
 
     private final UUID userId = UUID.randomUUID();
@@ -114,5 +118,101 @@ class AuditMailListenerTest {
         assertThat(AuditMailListener.nextCheckin("nextCheckinDueAt=not-a-date")).isNull();
         assertThat(AuditMailListener.nextCheckin(null)).isNull();
         assertThat(AuditMailListener.lockMinutes("locked until garbage")).isEqualTo(15);
+    }
+
+    private AuditEvent eventFor(AuditAction action, UUID actor, UUID vaultId, String entityType, UUID entityId,
+                                String detail) {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("result", "SUCCESS");
+        if (detail != null) {
+            meta.put("detail", detail);
+        }
+        return new AuditEvent(action, actor, vaultId, entityType, entityId, null, meta);
+    }
+
+    @Test
+    void vaultDeleted_mailsOwnerWithVaultName() {
+        listener.handle(event(AuditAction.VAULT_DELETED, "SUCCESS", "name=Hồ sơ A"));
+
+        verify(emailSender).sendVaultDeletedNotice("an@example.com", "An", "Hồ sơ A");
+    }
+
+    @Test
+    void dmsConfigured_parsesSettings() {
+        listener.handle(event(AuditAction.DMS_CONFIGURED, "SUCCESS",
+                "ownerId=" + userId + ", created=true, checkinIntervalDays=30, gracePeriodDays=7, reminderCount=3"));
+
+        verify(emailSender).sendDmsConfiguredNotice("an@example.com", "An", 30, 7, 3);
+    }
+
+    @Test
+    void dmsSuspendedByAdmin_mailsTheOwnerNotTheAdmin() {
+        UUID adminId = UUID.randomUUID();
+
+        listener.handle(eventFor(AuditAction.DMS_SUSPENDED, adminId, null, "DmsConfig", UUID.randomUUID(),
+                "ownerId=" + userId + ", reason=maintenance"));
+
+        verify(emailSender).sendDmsAdminActionNotice("an@example.com", "An", true, "maintenance");
+    }
+
+    @Test
+    void dmsResumedByAdmin_hasNoReason() {
+        listener.handle(eventFor(AuditAction.DMS_RESUMED, UUID.randomUUID(), null, "DmsConfig", UUID.randomUUID(),
+                "ownerId=" + userId + ", nextCheckinDueAt=2026-12-01T10:30"));
+
+        verify(emailSender).sendDmsAdminActionNotice("an@example.com", "An", false, null);
+    }
+
+    @Test
+    void claimCompleted_mailsBeneficiaryWithVaultName() {
+        UUID vaultId = UUID.randomUUID();
+        Vault vault = new Vault();
+        vault.setName("Hồ sơ A");
+        when(vaultRepository.findById(vaultId)).thenReturn(Optional.of(vault));
+
+        listener.handle(eventFor(AuditAction.CLAIM_COMPLETED, userId, vaultId, "Vault", vaultId, "unviewedCount=0"));
+
+        verify(emailSender).sendClaimCompletedNotice("an@example.com", "An", "Hồ sơ A");
+    }
+
+    @Test
+    void adminLocksUser_mailsTheTargetWithReason() {
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "User", userId,
+                "STATUS ACTIVE->LOCKED reason=spam"));
+
+        verify(emailSender).sendAccountStatusNotice("an@example.com", "An", true, "spam");
+    }
+
+    @Test
+    void adminUnlocksUser_mailsTheTarget() {
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "User", userId,
+                "STATUS LOCKED->ACTIVE"));
+
+        verify(emailSender).sendAccountStatusNotice("an@example.com", "An", false, null);
+    }
+
+    @Test
+    void statusChangeNotInvolvingLock_sendsNothing() {
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "User", userId,
+                "STATUS PENDING->ACTIVE"));
+
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    void roleGrantAndRevoke_mailTheTarget() {
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "User", userId, "GRANT VERIFIER"));
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "User", userId, "REVOKE OWNER"));
+
+        verify(emailSender).sendRoleChangedNotice("an@example.com", "An", true, "VERIFIER");
+        verify(emailSender).sendRoleChangedNotice("an@example.com", "An", false, "OWNER");
+    }
+
+    @Test
+    void roleDefinitionChange_isNotAUserMail() {
+        listener.handle(eventFor(AuditAction.RBAC_CHANGE, UUID.randomUUID(), null, "Role", UUID.randomUUID(),
+                "GRANT x"));
+
+        verifyNoInteractions(emailSender);
     }
 }

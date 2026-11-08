@@ -119,6 +119,91 @@ public class EmailSender {
         sendKeyed(email, lang, Style.SUCCESS, "mail.checkin", paras);
     }
 
+    // N14: báo Owner két sắt đã bị xóa
+    @Async
+    public void sendVaultDeletedNotice(String email, String fullName, String vaultName) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.SECURITY, "mail.vaultDeleted", List.of(
+                MailMessages.get(lang, "mail.greeting", displayName(fullName, email)),
+                MailMessages.get(lang, "mail.vaultDeleted.body", vaultName),
+                MailMessages.get(lang, "mail.ifNotYou")));
+    }
+
+    // N21: đã lưu / đổi cấu hình Công tắc người chết
+    @Async
+    public void sendDmsConfiguredNotice(String email, String fullName, int checkinDays, int graceDays, int reminderCount) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, "mail.dmsConfigured.body", checkinDays, graceDays, reminderCount));
+        paras.add(MailMessages.get(lang, "mail.ifNotYou"));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.openDms") + ": " + base + "/owner/dms");
+        }
+        sendKeyed(email, lang, Style.SUCCESS, "mail.dmsConfigured", paras);
+    }
+
+    // N22: admin tạm dừng / tiếp tục Công tắc người chết của Owner (reason chỉ có khi tạm dừng, có thể null)
+    @Async
+    public void sendDmsAdminActionNotice(String email, String fullName, boolean paused, String reason) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        String prefix = paused ? "mail.dmsPaused" : "mail.dmsResumed";
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, prefix + ".body"));
+        if (reason != null && !reason.isBlank()) {
+            paras.add(MailMessages.get(lang, "mail.reason", reason));
+        }
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.openDms") + ": " + base + "/owner/dms");
+        }
+        sendKeyed(email, lang, Style.NOTICE, prefix, paras);
+    }
+
+    // N26: người thụ hưởng đã đóng phần nhận tài sản
+    @Async
+    public void sendClaimCompletedNotice(String email, String fullName, String vaultName) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendKeyed(email, lang, Style.SUCCESS, "mail.claimDone", List.of(
+                MailMessages.get(lang, "mail.greeting", displayName(fullName, email)),
+                MailMessages.get(lang, "mail.claimDone.body", vaultName)));
+    }
+
+    // N4: admin khóa / mở khóa tài khoản (reason chỉ có khi khóa, có thể null)
+    @Async
+    public void sendAccountStatusNotice(String email, String fullName, boolean locked, String reason) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        String prefix = locked ? "mail.accountLocked" : "mail.accountUnlocked";
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, email)));
+        paras.add(MailMessages.get(lang, prefix + ".body"));
+        if (locked && reason != null && !reason.isBlank()) {
+            paras.add(MailMessages.get(lang, "mail.reason", reason));
+        }
+        if (locked) {
+            paras.add(MailMessages.get(lang, "mail.accountLocked.contact"));
+        } else {
+            String base = frontendBase();
+            if (base != null) {
+                paras.add(MailMessages.get(lang, "mail.signIn") + ": " + base + "/login");
+            }
+        }
+        sendKeyed(email, lang, locked ? Style.SECURITY : Style.SUCCESS, prefix, paras);
+    }
+
+    // N5: admin cấp / thu hồi vai trò
+    @Async
+    public void sendRoleChangedNotice(String email, String fullName, boolean granted, String roleCode) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        String prefix = granted ? "mail.roleGranted" : "mail.roleRevoked";
+        sendKeyed(email, lang, Style.SECURITY, prefix, List.of(
+                MailMessages.get(lang, "mail.greeting", displayName(fullName, email)),
+                MailMessages.get(lang, prefix + ".body", roleCode),
+                MailMessages.get(lang, "mail.ifNotYou")));
+    }
+
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
     @Async
     public void sendBeneficiaryInvitation(String email, String ownerName, String vaultName) {

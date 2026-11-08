@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.auditservice;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,9 +36,16 @@ public class AuditMailListener {
 
     private static final Pattern LOCKED_UNTIL = Pattern.compile("locked until (\\S+)");
     private static final Pattern NEXT_CHECKIN = Pattern.compile("nextCheckinDueAt=([^,\\s]+)");
+    private static final Pattern DMS_SETTINGS = Pattern.compile(
+            "checkinIntervalDays=(\\d+), gracePeriodDays=(\\d+), reminderCount=(\\d+)");
+    private static final Pattern OWNER_ID = Pattern.compile("ownerId=([0-9a-fA-F-]{36})");
+    private static final Pattern REASON = Pattern.compile("reason=(.+)$");
+    private static final Pattern STATUS_CHANGE = Pattern.compile("^STATUS (\\w+)->(\\w+)");
+    private static final Pattern VAULT_NAME = Pattern.compile("name=(.+)$");
 
     private final EmailSender emailSender;
     private final UserRepository userRepository;
+    private final VaultRepository vaultRepository;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -78,10 +87,97 @@ public class AuditMailListener {
                     actor(e).ifPresent(u -> emailSender.sendDmsCheckinConfirmation(u.getEmail(), u.getFullName(), next));
                 }
             }
+            // N14: két sắt bị xóa (detail "name=<tên>")
+            case VAULT_DELETED -> {
+                if (isSuccess(e)) {
+                    String name = first(VAULT_NAME, detail(e));
+                    actor(e).ifPresent(u -> emailSender.sendVaultDeletedNotice(u.getEmail(), u.getFullName(),
+                            name == null ? "" : name));
+                }
+            }
+            // N21: lưu cấu hình Công tắc người chết
+            case DMS_CONFIGURED -> {
+                String detail = detail(e);
+                Matcher m = detail == null ? null : DMS_SETTINGS.matcher(detail);
+                if (isSuccess(e) && m != null && m.find()) {
+                    int checkin = Integer.parseInt(m.group(1));
+                    int grace = Integer.parseInt(m.group(2));
+                    int reminders = Integer.parseInt(m.group(3));
+                    actor(e).ifPresent(u -> emailSender.sendDmsConfiguredNotice(
+                            u.getEmail(), u.getFullName(), checkin, grace, reminders));
+                }
+            }
+            // N22: admin tạm dừng / tiếp tục Công tắc người chết; actor là Admin, Owner nằm trong detail (ownerId=...)
+            case DMS_SUSPENDED, DMS_RESUMED -> {
+                boolean paused = e.action() == com.ltld.app.legacyvault.enums.AuditAction.DMS_SUSPENDED;
+                String detail = detail(e);
+                String reason = paused ? first(REASON, detail) : null;
+                user(first(OWNER_ID, detail)).ifPresent(u ->
+                        emailSender.sendDmsAdminActionNotice(u.getEmail(), u.getFullName(), paused, reason));
+            }
+            // N26: người thụ hưởng đã đóng phần nhận
+            case CLAIM_COMPLETED -> {
+                if (isSuccess(e) && e.vaultId() != null) {
+                    String vaultName = vaultRepository.findById(e.vaultId()).map(v -> v.getName()).orElse("");
+                    actor(e).ifPresent(u -> emailSender.sendClaimCompletedNotice(
+                            u.getEmail(), u.getFullName(), vaultName));
+                }
+            }
+            // N4 / N5: admin đổi trạng thái hoặc vai trò của một người dùng (entityType "User", entityId = người đó)
+            case RBAC_CHANGE -> {
+                if (isSuccess(e) && "User".equals(e.entityType()) && e.entityId() != null) {
+                    handleUserAdminChange(e);
+                }
+            }
             default -> {
                 // các hành động khác không gửi mail ở đây
             }
         }
+    }
+
+    private void handleUserAdminChange(AuditEvent e) {
+        String detail = detail(e);
+        if (detail == null) {
+            return;
+        }
+        Optional<User> target = userRepository.findById(e.entityId());
+        if (target.isEmpty()) {
+            return;
+        }
+        User u = target.get();
+        Matcher status = STATUS_CHANGE.matcher(detail);
+        if (status.find()) {
+            String from = status.group(1);
+            String to = status.group(2);
+            if ("LOCKED".equals(to)) {
+                emailSender.sendAccountStatusNotice(u.getEmail(), u.getFullName(), true, first(REASON, detail));
+            } else if ("LOCKED".equals(from) && "ACTIVE".equals(to)) {
+                emailSender.sendAccountStatusNotice(u.getEmail(), u.getFullName(), false, null);
+            }
+        } else if (detail.startsWith("GRANT ")) {
+            emailSender.sendRoleChangedNotice(u.getEmail(), u.getFullName(), true, detail.substring(6).trim());
+        } else if (detail.startsWith("REVOKE ")) {
+            emailSender.sendRoleChangedNotice(u.getEmail(), u.getFullName(), false, detail.substring(7).trim());
+        }
+    }
+
+    private Optional<User> user(String id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        try {
+            return userRepository.findById(UUID.fromString(id));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
+    }
+
+    static String first(Pattern pattern, String text) {
+        if (text == null) {
+            return null;
+        }
+        Matcher m = pattern.matcher(text);
+        return m.find() ? m.group(1).strip() : null;
     }
 
     private Optional<User> actor(AuditEvent e) {
