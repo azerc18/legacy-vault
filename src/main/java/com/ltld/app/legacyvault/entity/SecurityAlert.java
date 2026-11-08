@@ -60,6 +60,10 @@ public class SecurityAlert {
     @Column(name = "acknowledged_at")
     private Instant acknowledgedAt;
 
+    // B3: ghi chú của Admin khi xác nhận (tuỳ chọn)
+    @Column(name = "acknowledge_note", length = 500)
+    private String acknowledgeNote;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -28,7 +28,7 @@ export function saveSession(accessToken, email) {
 
 // Trang đích sau khi đăng nhập theo role: Admin > Legal Verifier > còn lại
 export const homeFor = (u) =>
-    u?.roles?.includes('ADMIN') ? '/admin/users'
+    u?.roles?.includes('ADMIN') ? '/admin'
         : u?.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home'
             : '/home';
 

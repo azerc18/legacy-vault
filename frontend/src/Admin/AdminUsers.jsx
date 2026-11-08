@@ -4,19 +4,10 @@ import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
-import { AdminLayout, ReasonDialog, Pager, isAdmin } from './adminUi.jsx';
+import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import UserDrawer from './UserDrawer.jsx';
 
-const STATUS_CLS = {
-    ACTIVE: 'bg-success-container text-on-success-container',
-    LOCKED: 'bg-error-container text-on-error-container',
-    PENDING: 'bg-surface-container text-outline',
-};
-const DMS_CLS = {
-    ACTIVE: 'bg-success-container text-on-success-container',
-    SUSPENDED: 'bg-warning-container text-on-warning-container',
-    TRIGGERED: 'bg-error-container text-on-error-container',
-};
 const STATUSES = ['ACTIVE', 'LOCKED', 'PENDING'];
 // Role admin được phép cấp/gỡ (khớp MANAGEABLE_ROLES của BE)
 const UNMANAGEABLE = ['OWNER', 'BENEFICIARY', 'EXECUTOR'];
@@ -33,6 +24,7 @@ export default function AdminUsers() {
     const [success, setSuccess] = useState('');
     const [busy, setBusy] = useState(false);
     const [dialog, setDialog] = useState(null); // { kind, user, roleCode? }
+    const [openUserId, setOpenUserId] = useState(null); // A3: ngăn kéo chi tiết
 
     const [roles, setRoles] = useState([]);
     useEffect(() => { adminApi.listRoles().then(setRoles).catch(() => {}); }, []);
@@ -108,26 +100,28 @@ export default function AdminUsers() {
             {data && rows.length === 0 && <EmptyState bordered icon="person_search" title={t('users.empty.title')} text={t('users.empty.text')} />}
 
             {rows.length > 0 && (
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-surface-container-low text-on-surface-variant">
+                <div className="lv-dossier overflow-x-auto">
+                    <table className="lv-ledger is-stack">
+                        <thead>
                         <tr>
-                            <th className="p-4">{t('users.cols.user')}</th>
-                            <th className="p-4">{t('users.cols.status')}</th>
-                            <th className="p-4">{t('users.cols.roles')}</th>
-                            <th className="p-4">{t('users.cols.lastLogin')}</th>
-                            <th className="p-4 text-right">{t('users.cols.actions')}</th>
+                            <th>{t('users.cols.user')}</th>
+                            <th>{t('users.cols.status')}</th>
+                            <th>{t('users.cols.roles')}</th>
+                            <th>{t('users.cols.lastLogin')}</th>
+                            <th className="text-right">{t('users.cols.actions')}</th>
                         </tr>
                         </thead>
                         <tbody>
                         {rows.map((u) => (
-                            <UserRow key={u.id} u={u} isMe={u.id === me?.id} manageable={manageable} labelOf={labelOf} onAction={setDialog} />
+                            <UserRow key={u.id} u={u} isMe={u.id === me?.id} manageable={manageable} labelOf={labelOf} onAction={setDialog} onOpen={setOpenUserId} />
                         ))}
                         </tbody>
                     </table>
                 </div>
             )}
             <Pager page={page} totalPages={data?.totalPages} onChange={setPage} />
+
+            <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} onChanged={replaceRow} />
 
             <ReasonDialog
                 open={!!dialog}
@@ -140,7 +134,7 @@ export default function AdminUsers() {
     );
 }
 
-function UserRow({ u, isMe, manageable, labelOf, onAction }) {
+function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
     const { t } = useTranslation('admin');
     const allRoles = u.roles || [];
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
@@ -158,30 +152,30 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
         });
 
     return (
-        <tr className="border-t border-outline-variant/20 align-top">
-            <td className="p-4">
-                <p className="font-semibold">{u.fullName || '—'}{isMe && <span className="ml-1 text-xs text-outline">({t('users.you')})</span>}</p>
+        <tr className="is-row">
+            <td data-label={t('users.cols.user')}>
+                <button type="button" onClick={() => onOpen(u.id)} className="font-semibold text-left hover:text-secondary hover:underline" title={t('drawer.open')}>
+                    {u.fullName || '—'}{isMe && <span className="ml-1 text-xs text-outline">({t('users.you')})</span>}
+                </button>
                 <p className="text-on-surface-variant">{u.email}</p>
                 <p className="text-xs text-outline">{t('users.joined', { date: formatDate(u.createdAt) })}</p>
             </td>
-            <td className="p-4">
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${STATUS_CLS[u.status] || ''}`}>
-                    {t(`users.status.${u.status}`, { defaultValue: u.status })}
-                </span>
+            <td data-label={t('users.cols.status')}>
+                <Stamp tone={toneOf(u.status)}>{t(`users.status.${u.status}`, { defaultValue: u.status })}</Stamp>
             </td>
-            <td className="p-4">
+            <td data-label={t('users.cols.roles')}>
                 <div className="flex flex-wrap gap-1">
                     {roles.length === 0 && <span className="text-xs text-outline">—</span>}
                     {roles.map((r) => (
                         <span key={r}
-                              className="text-xs font-semibold px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container whitespace-nowrap">
+                              className="text-[11px] font-semibold px-2 py-0.5 rounded border border-outline-variant bg-surface-container-low whitespace-nowrap">
                             {labelOf(r)}
                         </span>
                     ))}
                 </div>
             </td>
-            <td className="p-4 whitespace-nowrap">{formatDate(u.lastLoginAt, true)}</td>
-            <td className="p-4">
+            <td data-label={t('users.cols.lastLogin')} className="whitespace-nowrap">{formatDate(u.lastLoginAt, true)}</td>
+            <td data-label={t('users.cols.actions')}>
                 <div className="flex flex-col items-end gap-1.5">
                     {/* Cấp / gỡ role (chỉ với tài khoản ACTIVE): gom vào 1 menu để cột không dài ra khi có nhiều role tự tạo */}
                     {u.status === 'ACTIVE' && roleOptions.length > 0 && (
@@ -207,9 +201,9 @@ function UserRow({ u, isMe, manageable, labelOf, onAction }) {
                     )}
                     {/* DMS của Owner: hiện đúng nút theo trạng thái */}
                     {isOwner && u.dmsStatus && (
-                        <span className={`mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${DMS_CLS[u.dmsStatus] || ''}`}>
+                        <span className="mt-1"><Stamp tone={u.dmsStatus === 'ACTIVE' ? 'info' : toneOf(u.dmsStatus)} flat>
                             {t(`users.dms.${u.dmsStatus}`, { defaultValue: u.dmsStatus })}
-                        </span>
+                        </Stamp></span>
                     )}
                     {isOwner && u.dmsStatus === 'ACTIVE' && (
                         <button onClick={() => onAction({ kind: 'suspend', user: u })} className={link}>{t('users.actions.suspend')}</button>

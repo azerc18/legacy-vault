@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
-import { AdminLayout, Pager } from './adminUi.jsx';
+import { AdminLayout, Pager, Stamp, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 
 // <input type="datetime-local"> -> ISO string cho BE
@@ -15,11 +15,6 @@ const groupActions = (actions) => {
     const groups = {};
     [...actions].sort().forEach((a) => { (groups[a.split('_')[0]] ??= []).push(a); });
     return Object.entries(groups).sort(([x], [y]) => x.localeCompare(y));
-};
-
-const RESULT_CLS = {
-    SUCCESS: 'bg-success-container text-on-success-container',
-    FAILURE: 'bg-error-container text-on-error-container',
 };
 
 export default function AdminAuditLogs() {
@@ -40,6 +35,15 @@ export default function AdminAuditLogs() {
     const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const [expanded, setExpanded] = useState(null);
+    const [exporting, setExporting] = useState(false);
+
+    // B4: xuất đúng bộ lọc đang áp dụng
+    const exportCsv = async () => {
+        setExporting(true); setError('');
+        try { await adminApi.exportAuditLogs({ ...query, from: toIso(query.from), to: toIso(query.to) }); }
+        catch (e) { setError(getErrorMessage(e, t('exportError'))); }
+        finally { setExporting(false); }
+    };
 
     useEffect(() => { adminApi.listAuditActions().then(setActions).catch(() => {}); }, []);
 
@@ -61,7 +65,13 @@ export default function AdminAuditLogs() {
     const rows = data?.content ?? [];
 
     return (
-        <AdminLayout title={t('audit.title')} subtitle={t('audit.subtitle')}>
+        <AdminLayout title={t('audit.title')} subtitle={t('audit.subtitle')}
+                     actions={(
+                         <button onClick={exportCsv} disabled={exporting}
+                                 className="h-10 px-4 rounded-xl border border-outline-variant text-sm font-semibold inline-flex items-center gap-2 hover:bg-surface-container-low disabled:opacity-60">
+                             <Icon name="download" className="text-[18px]" /> {exporting ? t('wait') : t('exportCsv')}
+                         </button>
+                     )}>
             <form onSubmit={search} className="grid gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-[200px_1fr_160px_190px_190px_auto]">
                 <select value={filters.action} onChange={set('action')} className={inputClass}>
                     <option value="">{t('audit.allActions')}</option>
@@ -92,33 +102,33 @@ export default function AdminAuditLogs() {
             )}
 
             {rows.length > 0 && (
-                <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-surface-container-low text-on-surface-variant">
+                <div className="lv-dossier overflow-x-auto">
+                    <table className="lv-ledger is-stack">
+                        <thead>
                         <tr>
-                            <th className="p-4">{t('audit.cols.time')}</th>
-                            <th className="p-4">{t('audit.cols.action')}</th>
-                            <th className="p-4">{t('audit.cols.result')}</th>
-                            <th className="p-4">{t('audit.cols.actor')}</th>
-                            <th className="p-4">IP</th>
-                            <th className="p-4">{t('audit.cols.detail')}</th>
+                            <th>{t('audit.cols.time')}</th>
+                            <th>{t('audit.cols.action')}</th>
+                            <th>{t('audit.cols.result')}</th>
+                            <th>{t('audit.cols.actor')}</th>
+                            <th>IP</th>
+                            <th>{t('audit.cols.detail')}</th>
                         </tr>
                         </thead>
                         <tbody>
                         {rows.map((l) => (
                             <React.Fragment key={l.id}>
-                                <tr className="border-t border-outline-variant/20 align-top cursor-pointer hover:bg-surface-container-low"
+                                <tr className="is-row cursor-pointer"
                                     onClick={() => setExpanded(expanded === l.id ? null : l.id)}>
-                                    <td className="p-4 whitespace-nowrap">{formatDate(l.createdAt, true)}</td>
-                                    <td className="p-4 font-mono text-xs font-semibold">{l.action}</td>
-                                    <td className="p-4">
+                                    <td data-label={t('audit.cols.time')} className="whitespace-nowrap">{formatDate(l.createdAt, true)}</td>
+                                    <td data-label={t('audit.cols.action')} className="lv-mono text-xs font-semibold">{l.action}</td>
+                                    <td data-label={t('audit.cols.result')}>
                                         {l.result && (
-                                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RESULT_CLS[l.result] || ''}`}>{t(`audit.result.${l.result}`, { defaultValue: l.result })}</span>
+                                            <Stamp tone={toneOf(l.result)}>{t(`audit.result.${l.result}`, { defaultValue: l.result })}</Stamp>
                                         )}
                                     </td>
-                                    <td className="p-4">{l.actorEmail || <span className="text-outline">{t('audit.system')}</span>}</td>
-                                    <td className="p-4 font-mono text-xs">{l.ipAddress || '—'}</td>
-                                    <td className="p-4 text-on-surface-variant max-w-xs truncate">{l.detail || '—'}</td>
+                                    <td data-label={t('audit.cols.actor')}>{l.actorEmail || <span className="text-outline">{t('audit.system')}</span>}</td>
+                                    <td data-label="IP" className="lv-mono text-xs">{l.ipAddress || '—'}</td>
+                                    <td data-label={t('audit.cols.detail')} className="text-on-surface-variant max-w-xs truncate">{l.detail || '—'}</td>
                                 </tr>
                                 {expanded === l.id && (
                                     <tr className="bg-surface-container-low">

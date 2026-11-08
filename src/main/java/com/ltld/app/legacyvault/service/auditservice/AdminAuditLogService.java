@@ -11,4 +11,7 @@ public interface AdminAuditLogService {
                                        Instant from, Instant to, int page, int size);
 
     List<String> listActions();
+
+    // B4: toàn bộ bản ghi khớp bộ lọc (tối đa MAX_EXPORT_ROWS) để xuất CSV
+    List<AdminAuditLogResponse> export(String action, String actorEmail, String ip, Instant from, Instant to);
 }
