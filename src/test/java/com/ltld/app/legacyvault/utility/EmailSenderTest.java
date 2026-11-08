@@ -1,5 +1,8 @@
 package com.ltld.app.legacyvault.utility;
 
+import com.ltld.app.legacyvault.enums.AppLanguage;
+import com.ltld.app.legacyvault.service.userservice.UserLanguageResolver;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,7 +12,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -28,6 +30,7 @@ import static org.mockito.Mockito.verify;
 class EmailSenderTest {
 
     @Mock private JavaMailSender javaMailSender;
+    @Mock private UserLanguageResolver languageResolver;
     private static final UUID VAULT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
     @InjectMocks private EmailSender emailSender;
 
@@ -35,6 +38,7 @@ class EmailSenderTest {
 
     @BeforeEach
     void setUp() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
         originalZone = TimeZone.getDefault();
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "http://localhost:3000/");
@@ -45,10 +49,8 @@ class EmailSenderTest {
         TimeZone.setDefault(originalZone);
     }
 
-    private SimpleMailMessage sentMessage() {
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        return captor.getValue();
+    private SentMail sentMessage() {
+        return SentMail.captureOne(javaMailSender);
     }
 
     @Test
@@ -56,7 +58,7 @@ class EmailSenderTest {
         emailSender.sendVaultUnlockedNotification("an@example.com", "An", "Bình", "Hồ sơ A",
                 LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         String text = message.getText();
         assertTrue(message.getTo()[0].equals("an@example.com"));
         assertTrue(text.contains("The vault \"Hồ sơ A\" of Bình"));
@@ -75,7 +77,7 @@ class EmailSenderTest {
 
     @Test
     void unlockedNotification_propagatesSendFailure() {
-        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(MimeMessage.class));
 
         assertThrows(MailSendException.class, () -> emailSender.sendVaultUnlockedNotification(
                 "an@example.com", "An", "Bình", "Hồ sơ A", LocalDateTime.of(2026, 12, 31, 10, 30), true, VAULT_ID));

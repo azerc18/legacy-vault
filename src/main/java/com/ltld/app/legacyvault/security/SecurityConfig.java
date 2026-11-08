@@ -69,6 +69,8 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Trang Hồ sơ: thiết bị đang đăng nhập, nằm dưới /api/auth để nhận cookie refresh_token nhưng vẫn cần JWT
+                        .requestMatchers("/api/auth/sessions", "/api/auth/sessions/**").authenticated()
                         .requestMatchers("/error", "/api/auth/**").permitAll()
                         // VNPay và link trong email không có JWT; xác thực bằng chữ ký / token riêng tại controller.
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay-ipn", "/api/payments/vnpay-return").permitAll()

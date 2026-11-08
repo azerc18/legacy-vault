@@ -83,5 +83,7 @@ public enum AuditAction {
     HANDOVER_SNAPSHOT_CREATED,
     ASSET_VERIFICATION_EXPIRED, ASSET_VERIFICATION_REMINDED,
     // #10: Admin mở khóa xác minh danh tính của người thụ hưởng
-    IDENTITY_UNLOCKED_BY_ADMIN
+    IDENTITY_UNLOCKED_BY_ADMIN,
+    // Trang Hồ sơ: người dùng tự đăng xuất một / mọi thiết bị khác
+    SESSION_REVOKED
 }

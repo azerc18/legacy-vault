@@ -46,6 +46,7 @@ import AdminBeneficiaryLocks from './Admin/AdminBeneficiaryLocks.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
+import IdleLogout from './Common/IdleLogout.jsx'; // Hồ sơ > Tuỳ chọn: tự đăng xuất khi rảnh
 import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -62,6 +63,7 @@ function App() {
     return (
         <AnimateUIProvider>
             <BrowserRouter>
+                <IdleLogout />
                 <Routes>
                 {/* Công khai */}
                 <Route path="/" element={<Dashboard />} />
