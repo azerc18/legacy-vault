@@ -10,7 +10,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
+import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -34,6 +34,7 @@ class EmailSenderDmsReminderTest {
 
     @BeforeEach
     void setUp() {
+        SentMail.prepare(javaMailSender, emailSender);
         // Máy chủ chạy UTC như container Docker.
         originalZone = TimeZone.getDefault();
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
@@ -44,10 +45,8 @@ class EmailSenderDmsReminderTest {
         TimeZone.setDefault(originalZone);
     }
 
-    private SimpleMailMessage sentMessage() {
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        return captor.getValue();
+    private SentMail sentMessage() {
+        return SentMail.capture(javaMailSender);
     }
 
     @Test
@@ -56,7 +55,7 @@ class EmailSenderDmsReminderTest {
         emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         String text = message.getText();
         assertThat(message.getTo()).containsExactly("owner@example.com");
         assertThat(message.getSubject()).contains("(1/3)");
@@ -69,7 +68,7 @@ class EmailSenderDmsReminderTest {
     @Test
     @DisplayName("M1: lỗi gửi được ném ra để người gọi trả lại lần nhắc")
     void checkinReminder_propagatesSendFailure() {
-        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(MimeMessage.class));
 
         assertThatThrownBy(() -> emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3))

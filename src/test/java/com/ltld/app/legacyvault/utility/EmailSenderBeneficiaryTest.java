@@ -1,13 +1,13 @@
 package com.ltld.app.legacyvault.utility;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,13 +20,16 @@ class EmailSenderBeneficiaryTest {
     @Mock private JavaMailSender javaMailSender;
     @InjectMocks private EmailSender emailSender;
 
-    private SimpleMailMessage sentMessage() {
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        return captor.getValue();
+    @BeforeEach
+    void prepareMail() {
+        SentMail.prepare(javaMailSender, emailSender);
     }
 
-    private static void assertNoOtpFooter(SimpleMailMessage message) {
+    private SentMail sentMessage() {
+        return SentMail.capture(javaMailSender);
+    }
+
+    private static void assertNoOtpFooter(SentMail message) {
         assertThat(message.getText()).doesNotContain("The code is valid for");
         assertThat(message.getText()).doesNotContain("not share this code");
     }
@@ -36,7 +39,7 @@ class EmailSenderBeneficiaryTest {
     void otpEmail_keepsOtpFooter() {
         emailSender.sendEmail("user@example.com", "123456");
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("user@example.com");
         assertThat(message.getText()).contains("123456");
         assertThat(message.getText()).contains("The code is valid for 5 minutes.");
@@ -48,7 +51,7 @@ class EmailSenderBeneficiaryTest {
     void passwordResetEmail_keepsOtpFooter() {
         emailSender.sendPasswordResetEmail("user@example.com", "654321");
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("user@example.com");
         assertThat(message.getText()).contains("654321");
         assertThat(message.getText()).contains("Please do not share this code");
@@ -59,7 +62,7 @@ class EmailSenderBeneficiaryTest {
     void beneficiaryInvitation_hasNoOtpFooter() {
         emailSender.sendBeneficiaryInvitation("ben@example.com", "Owner", "My Vault");
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("ben@example.com");
         assertThat(message.getSubject()).isEqualTo("Invitation to become a beneficiary - LegacyVault");
         assertThat(message.getText()).contains("Owner").contains("\"My Vault\"");
@@ -71,7 +74,7 @@ class EmailSenderBeneficiaryTest {
     void beneficiaryAssignedNotice_hasNoOtpFooter() {
         emailSender.sendBeneficiaryAssignedNotice("ben@example.com", "Owner", "My Vault");
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("ben@example.com");
         assertThat(message.getSubject()).isEqualTo("You have been named a beneficiary - LegacyVault");
         assertNoOtpFooter(message);
@@ -82,7 +85,7 @@ class EmailSenderBeneficiaryTest {
     void beneficiaryAssignmentConfirmation_hasNoOtpFooter() {
         emailSender.sendBeneficiaryAssignmentConfirmation("owner@example.com", "My Vault", "ben@example.com", true);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("owner@example.com");
         assertThat(message.getSubject()).isEqualTo("Beneficiary assignment confirmed - LegacyVault");
         assertThat(message.getText()).contains("ben@example.com").contains("a sign-up invitation has been sent");
