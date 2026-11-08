@@ -323,7 +323,7 @@ export default function ProfilePage() {
 
                 {profile && (
                     <div className="grid lg:grid-cols-3 gap-6 items-start">
-                        <div className="min-w-0 space-y-6 lg:sticky lg:top-6">
+                        <div className="min-w-0 space-y-6">
                             <div id="profile-summary" className="scroll-mt-6">
                                 <SummaryCard profile={profile} onChanged={handleSaved} />
                             </div>
