@@ -160,6 +160,21 @@ public class BeneficiaryControllerTest {
         verify(beneficiaryService).sendIdentityOtp(any(), eq(userId));
     }
 
+    // #19: body mới chỉ cần vaultId (DTO SendIdentityOtpRequest); body cũ có verificationMethod vẫn chạy
+    @Test
+    void sendIdentityOtp_vaultIdOnlyBody_returns200() throws Exception {
+        UUID userId = UUID.randomUUID();
+        Principal principal = () -> userId.toString();
+
+        mockMvc.perform(post("/api/beneficiaries/verifications/otp")
+                        .principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"vaultId\":\"" + UUID.randomUUID() + "\"}"))
+                .andExpect(status().isOk());
+
+        verify(beneficiaryService).sendIdentityOtp(any(), eq(userId));
+    }
+
     @Test
     void sendIdentityOtp_missingVaultId_returns400() throws Exception {
         Principal principal = () -> UUID.randomUUID().toString();

@@ -81,5 +81,7 @@ public enum AuditAction {
     // PR 2: xác nhận chéo Executor, bản chụp bàn giao, hết hạn / nhắc xác thực lại
     EXECUTOR_TASK_CONFIRMED, EXECUTOR_TASK_DISPUTED,
     HANDOVER_SNAPSHOT_CREATED,
-    ASSET_VERIFICATION_EXPIRED, ASSET_VERIFICATION_REMINDED
+    ASSET_VERIFICATION_EXPIRED, ASSET_VERIFICATION_REMINDED,
+    // #10: Admin mở khóa xác minh danh tính của người thụ hưởng
+    IDENTITY_UNLOCKED_BY_ADMIN
 }

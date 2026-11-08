@@ -132,6 +132,7 @@ public class AuditDescriptionBuilder {
             case IDENTITY_VERIFIED -> "The beneficiary verified their identity.";
             case IDENTITY_VERIFY_FAILED -> "The beneficiary failed identity verification.";
             case IDENTITY_LOCKED -> "Identity verification locked after too many failed attempts.";
+            case IDENTITY_UNLOCKED_BY_ADMIN -> "An admin unlocked the beneficiary's identity verification.";
             // FR-03 / FR-06 / FR-07: nhật ký cấp Owner; detail chứa ownerId và id nội bộ nên không nối
             case DMS_CONFIGURED -> "Saved the Dead Man's Switch configuration.";
             case DMS_CHECKIN -> "Checked in to confirm still active.";

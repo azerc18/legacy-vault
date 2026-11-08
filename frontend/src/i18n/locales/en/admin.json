@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "plans": "Plans", "notifications": "Failed emails" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -285,5 +285,26 @@
     "lockUser": "Lock this user",
     "lockReason": "Locked from alert {{rule}}",
     "ackDialog": { "title": "Acknowledge this alert?", "message": "Note what you did (e.g. called the user, locked the account). The note is saved with the alert and in the audit log." }
+  },
+
+  "beneficiaryLocks": {
+    "title": "Locked beneficiaries",
+    "subtitle": "Beneficiaries who enter a wrong identity code 5 times are locked for 24 hours. Unlock early once you have confirmed the person through another channel.",
+    "loadError": "Could not load locked beneficiaries.",
+    "emptyTitle": "Nobody is locked",
+    "emptyText": "Beneficiaries who fail 5 times appear here for 24 hours.",
+    "ledger": "Currently locked",
+    "total": "{{count}} people",
+    "cols": {
+      "beneficiary": "Beneficiary",
+      "vault": "Vault",
+      "lockedAt": "Locked at",
+      "lockedUntil": "Unlocks at"
+    },
+    "unlock": "Unlock",
+    "confirmTitle": "Unlock identity verification?",
+    "confirmText": "{{email}} can try again right away for vault \"{{vault}}\" (5 fresh attempts). This is recorded in the audit log.",
+    "unlocked": "Unlocked {{email}}.",
+    "unlockError": "Could not unlock."
   }
 }

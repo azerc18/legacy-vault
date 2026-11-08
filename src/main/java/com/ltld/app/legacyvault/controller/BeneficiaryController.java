@@ -75,7 +75,7 @@ public class BeneficiaryController {
     @PostMapping("/verifications/otp")
     public ResponseEntity<ApiResponse<Void>> sendIdentityOtp(
             Principal principal,
-            @Valid @RequestBody BeneficiaryClaimRequest request) {
+            @Valid @RequestBody SendIdentityOtpRequest request) {
 
         beneficiaryService.sendIdentityOtp(request, currentUserId(principal));
         return ResponseEntity.ok(ApiResponse.success("An OTP has been sent to your email."));
