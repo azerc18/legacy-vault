@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.adminoverviewservice;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -12,7 +13,8 @@ public final class CsvWriter {
     private final StringBuilder sb = new StringBuilder("﻿");
 
     public CsvWriter row(Object... cells) {
-        return row(List.of(cells));
+        // Arrays.asList chấp nhận phần tử null (List.of thì ném NullPointerException)
+        return row(Arrays.asList(cells));
     }
 
     public CsvWriter row(List<?> cells) {
