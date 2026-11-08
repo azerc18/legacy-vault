@@ -103,4 +103,135 @@ class EmailSenderLanguageTest {
 
         assertThat(SentMail.captureOne(javaMailSender).getHtml()).doesNotContain("<b>Owner</b>").contains("&lt;b&gt;");
     }
+
+    @Test
+    void welcome_vietnameseAndEnglish() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+        emailSender.sendWelcomeEmail("an@example.com", "An");
+        SentMail vi = SentMail.captureOne(javaMailSender);
+        assertThat(vi.getSubject()).isEqualTo("Chào mừng đến với LegacyVault");
+        assertThat(vi.getText()).contains("Xin chào An,", "https://legacyvault.test/login");
+    }
+
+    @Test
+    void welcome_english_fallsBackToEmailWhenNoName() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        emailSender.sendWelcomeEmail("an@example.com", null);
+        SentMail en = SentMail.captureOne(javaMailSender);
+        assertThat(en.getSubject()).isEqualTo("Welcome to LegacyVault");
+        assertThat(en.getText()).contains("Hello an@example.com,");
+    }
+
+    @Test
+    void passwordChanged_warnsAndLinksToReset() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        emailSender.sendPasswordChangedNotice("an@example.com", "An");
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Your password was changed - LegacyVault");
+        assertThat(mail.getText()).contains("If this was not you", "https://legacyvault.test/forgot-password");
+    }
+
+    @Test
+    void accountLocked_mentionsMinutes() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+        emailSender.sendAccountLockedNotice("an@example.com", "An", 15);
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Tài khoản tạm thời bị khóa - LegacyVault");
+        assertThat(mail.getText()).contains("khóa 15 phút");
+    }
+
+    @Test
+    void dmsCheckinConfirmation_showsNextDeadlineInVietnamTime() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            emailSender.sendDmsCheckinConfirmation("an@example.com", "An", LocalDateTime.of(2026, 12, 1, 10, 30));
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getText()).contains("01/12/2026 17:30 (GMT+7)", "/owner/dms");
+    }
+
+    @Test
+    void englishAndVietnamesePropertiesHaveTheSameKeys() {
+        java.util.ResourceBundle.Control control = java.util.ResourceBundle.Control.getNoFallbackControl(
+                java.util.ResourceBundle.Control.FORMAT_PROPERTIES);
+        java.util.ResourceBundle en = java.util.ResourceBundle.getBundle("mail/mail", AppLanguage.EN.toLocale(), control);
+        java.util.ResourceBundle vi = java.util.ResourceBundle.getBundle("mail/mail", AppLanguage.VI.toLocale(), control);
+
+        assertThat(en.keySet()).containsExactlyInAnyOrderElementsOf(vi.keySet());
+    }
+
+    @Test
+    void dmsReminder_vietnameseKeepsLinkAndCounts() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        java.util.TimeZone original = java.util.TimeZone.getDefault();
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"));
+        try {
+            emailSender.sendDmsCheckinReminder("an@example.com",
+                    LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 2, 3, "tok");
+        } finally {
+            java.util.TimeZone.setDefault(original);
+        }
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Nhắc check-in Công tắc người chết (2/3) - LegacyVault");
+        assertThat(mail.getText()).contains("Hạn check-in: 01/11/2026 09:00 (giờ Việt Nam)",
+                "https://legacyvault.test/dms/checkin?token=tok", "thứ 2 trên 3");
+    }
+
+    @Test
+    void executorAssigned_vietnameseUsesVietnameseRole() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendExecutorAssignedNotice("ex@example.com", "Owner A", "owner@example.com",
+                com.ltld.app.legacyvault.enums.ExecutorType.BACKUP);
+
+        assertThat(SentMail.captureOne(javaMailSender).getText())
+                .contains("Owner A (owner@example.com) đã chỉ định bạn làm Người thực thi dự phòng (BACKUP)",
+                        "Công tắc người chết của Owner A");
+    }
+
+    @Test
+    void vaultDeleted_vietnamese() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendVaultDeletedNotice("an@example.com", "An", "Hồ sơ A");
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("Két sắt của bạn đã bị xóa - LegacyVault");
+        assertThat(mail.getText()).contains("Két sắt \"Hồ sơ A\" đã bị xóa");
+    }
+
+    @Test
+    void accountLockedByAdmin_showsReasonOnlyWhenLocking() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+
+        emailSender.sendAccountStatusNotice("an@example.com", "An", true, "spam");
+
+        assertThat(SentMail.captureOne(javaMailSender).getText()).contains("Reason: spam", "locked your LegacyVault account");
+    }
+
+    @Test
+    void roleGranted_namesTheRole() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
+
+        emailSender.sendRoleChangedNotice("an@example.com", "An", true, "VERIFIER");
+
+        SentMail mail = SentMail.captureOne(javaMailSender);
+        assertThat(mail.getSubject()).isEqualTo("A role was added to your account - LegacyVault");
+        assertThat(mail.getText()).contains("the role VERIFIER");
+    }
+
+    @Test
+    void dmsPaused_includesReason() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendDmsAdminActionNotice("an@example.com", "An", true, "bảo trì");
+
+        assertThat(SentMail.captureOne(javaMailSender).getText()).contains("Lý do: bảo trì", "tạm dừng");
+    }
 }
