@@ -13,6 +13,8 @@ import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } fro
 import { tEnum } from '../i18n/format.js';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 import EmptyState from "../Common/EmptyState.jsx";
+import VerificationBadge from '../Common/VerificationBadge.jsx';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -164,8 +166,9 @@ function VaultList({ vaults, progress }) {
                             {v.assets?.length > 0 && (
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {v.assets.map((a) => (
-                                        <span key={a.assetId} className="text-xs px-3 py-1.5 rounded-full bg-surface-container text-on-surface-variant">
+                                        <span key={a.assetId} className="text-xs pl-3 pr-1.5 py-1 rounded-full bg-surface-container text-on-surface-variant inline-flex items-center gap-2">
                                             {a.assetName} · {tEnum('assetType', a.assetType)}
+                                            <VerificationBadge status={a.verificationStatus || 'SELF_DECLARED'} method={a.verificationMethod} />
                                         </span>
                                     ))}
                                 </div>
@@ -464,22 +467,59 @@ function AccountTasksSection({ assignmentId, progress }) {
     );
 }
 
+// C.6: màu khung trạng thái xác nhận chéo
+const CONFIRM_CLS = {
+    PENDING: 'bg-warning-container text-on-warning-container',
+    CONFIRMED: 'bg-success-container text-on-success-container',
+    DISPUTED: 'bg-error-container text-on-error-container',
+    autoConfirmed: 'bg-success-container text-on-success-container',
+};
+
 function AccountTaskRow({ assignmentId, task, onSaved }) {
-    const { t } = useTranslation('executor');
+    const { t } = useTranslation(['executor', 'verification']);
     const [status, setStatus] = useState(task.status);
     const [note, setNote] = useState(task.note || '');
+    const [evidenceRef, setEvidenceRef] = useState(task.evidenceRef || '');
+    const [file, setFile] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
-    const dirty = status !== task.status || note !== (task.note || '');
+
+    // Người thụ hưởng đã xác nhận (hoặc quá hạn phản đối): khóa hẳn, BE cũng chặn
+    const locked = task.confirmationStatus === 'CONFIRMED' || task.autoConfirmed;
+    // Đã báo DONE thì phải chuyển về "Đang làm" và lưu trước khi đổi bằng chứng (BE yêu cầu)
+    const evidenceLocked = locked || task.status === 'DONE';
+    const confirmKey = task.autoConfirmed ? 'autoConfirmed' : task.confirmationStatus;
+    const dirty = status !== task.status || note !== (task.note || '')
+        || evidenceRef.trim() !== (task.evidenceRef || '') || !!file;
 
     const save = async () => {
-        setBusy(true); setError('');
+        setError('');
+        if (file && file.size > MAX_SIZE) return setError(t('verification:executor.fileTooBig'));
+        const hasEvidence = !!evidenceRef.trim() || !!task.evidenceRef || task.hasEvidenceDocument || !!file;
+        if (status === 'DONE' && !hasEvidence) return setError(t('verification:executor.needEvidence'));
+        setBusy(true);
         try {
-            onSaved(await executorApi.updateTask(assignmentId, task.id, { status, note }));
+            // Tải tệp trước; lỗi thì dừng, chưa đổi trạng thái
+            if (file) {
+                onSaved(await executorApi.uploadTaskEvidence(assignmentId, task.id, file));
+                setFile(null);
+            }
+            const body = { status, note };
+            if (evidenceRef.trim()) body.evidenceRef = evidenceRef.trim();
+            onSaved(await executorApi.updateTask(assignmentId, task.id, body));
         } catch (e) {
             setError(getErrorMessage(e, t('case.tasks.saveError')));
         } finally {
             setBusy(false);
+        }
+    };
+
+    const download = async () => {
+        setError('');
+        try {
+            await executorApi.downloadTaskEvidence(assignmentId, task.id, task.evidenceFileName);
+        } catch (e) {
+            setError(await getBlobErrorMessage(e, t('verification:executor.downloadError')));
         }
     };
 
@@ -495,15 +535,51 @@ function AccountTaskRow({ assignmentId, task, onSaved }) {
                         </a>
                     )}
                 </div>
-                <select value={status} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} w-auto`}>
+                <select value={status} disabled={locked} onChange={(e) => setStatus(e.target.value)} className={`${inputClass} w-auto`}>
                     {TASK_STATUSES.map((v) => <option key={v} value={v}>{t(`taskStatus.${v}`)}</option>)}
                 </select>
             </div>
-            <textarea rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)}
+
+            <AutoHeight>
+                {confirmKey && (
+                    <div className="pt-3">
+                        <p className={`text-sm px-3 py-2 rounded-lg ${CONFIRM_CLS[confirmKey] || ''}`}>
+                            {t(`verification:confirm.${confirmKey}`, { date: formatDate(task.confirmDeadlineAt), reason: task.disputeReason })}
+                        </p>
+                    </div>
+                )}
+            </AutoHeight>
+            {locked && <p className="mt-2 text-xs text-outline">{t('verification:executor.locked')}</p>}
+
+            <div className="mt-3 space-y-3">
+                <label className="block">
+                    <span className="text-sm font-semibold text-on-surface-variant">{t('verification:executor.refLabel')}</span>
+                    <input value={evidenceRef} maxLength={200} disabled={evidenceLocked} onChange={(e) => setEvidenceRef(e.target.value)}
+                           placeholder={t('verification:executor.refPlaceholder')} className={`${inputClass} mt-1`} />
+                </label>
+                <div>
+                    <p className="text-sm font-semibold text-on-surface-variant">{t('verification:executor.fileLabel')}</p>
+                    {task.hasEvidenceDocument && (
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+                            <span className="font-medium">{t('verification:executor.fileCurrent', { name: task.evidenceFileName })}</span>
+                            {task.evidenceSha256 && <span className="text-xs text-outline font-mono">{t('verification:executor.sha', { hash: task.evidenceSha256.slice(0, 16) })}</span>}
+                            <button type="button" onClick={download} className="text-primary font-semibold inline-flex items-center gap-1">
+                                <Icon name="download" className="text-[16px]" /> {t('verification:executor.download')}
+                            </button>
+                        </div>
+                    )}
+                    <div className="mt-1">
+                        <FilePicker file={file} onChange={setFile} accept={FILE_TYPES} disabled={evidenceLocked} hint={t('verification:executor.fileHint')} />
+                    </div>
+                    {task.status === 'DONE' && !locked && <p className="mt-1 text-xs text-outline">{t('verification:executor.editHint')}</p>}
+                </div>
+            </div>
+
+            <textarea rows={2} maxLength={1000} value={note} disabled={locked} onChange={(e) => setNote(e.target.value)}
                       placeholder={t('case.tasks.notePlaceholder')} className={`${inputClass} mt-3`} />
             <Alert>{error}</Alert>
             <div className="flex justify-end mt-2">
-                <button type="button" onClick={save} disabled={!dirty || busy} className={btnPrimary}>
+                <button type="button" onClick={save} disabled={!dirty || busy || locked} className={btnPrimary}>
                     <Icon name="save" className="text-[18px]" /> {busy ? t('saving') : t('case.tasks.save')}
                 </button>
             </div>

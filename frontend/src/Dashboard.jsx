@@ -4,6 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
 import BrandMark from './Common/BrandMark.jsx';
+import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
+import { Tilt, TiltContent } from '@animate-ui/react/primitives/effects/tilt';
+import { Magnetic } from '@animate-ui/react/primitives/effects/magnetic';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
 const NAV = [
@@ -169,8 +173,7 @@ export default function Dashboard() {
             </header>
 
             {/* 1. HERO */}
-            <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center"
-                     style={{ backgroundImage: 'radial-gradient(900px 420px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
+            <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center">
                 <img src="/key-photo.jpg" alt="" aria-hidden="true"
                      className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
                      style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
@@ -181,17 +184,22 @@ export default function Dashboard() {
                         ))}
                     </h1>
                     <p className="lv-hero-rv mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
-                    <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-                        <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
-                            <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
-                        </Link>
+                    <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center items-center">
+                        <Magnetic strength={0.18} range={90}>
+                            <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
+                                <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
+                            </Link>
+                        </Magnetic>
                         <a href="#how" className="h-12 px-7 rounded-full border border-white/40 text-white font-bold flex items-center justify-center hover:bg-white/10">
                             {t('hero.how')}
                         </a>
                     </div>
+                    <div className="mt-12 flex justify-center">
+                        <InteractiveVaultLock variant="hero" to="/register" />
+                    </div>
                 </div>
                 {/* Trust badges */}
-                <div className="lv-hero-badges relative mt-48 md:mt-64 flex flex-wrap justify-center gap-3">
+                <div className="lv-hero-badges relative mt-20 md:mt-28 flex flex-wrap justify-center gap-3">
                     {BADGES.map((b) => (
                         <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-white/10 border border-white/15 text-sm text-white/85 backdrop-blur">
                             <Icon name={b.icon} className="text-[18px] text-[#b9c9ff]" /> {t(`badges.${b.key}`)}
@@ -251,11 +259,15 @@ export default function Dashboard() {
             <Section id="security" mode="dark" eyebrow={t('security.eyebrow')} title={t('security.title')}>
                 <div className="lv-stagger grid md:grid-cols-3 gap-5">
                     {SECURITY.map((s) => (
-                        <div key={s.key} className="rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
-                            <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
-                            <h3 className="font-title-lg text-title-lg mt-4 text-white">{t(`security.items.${s.key}.title`)}</h3>
-                            <p className="mt-2 text-white/70">{t(`security.items.${s.key}.text`)}</p>
-                        </div>
+                        <Tilt key={s.key} maxTilt={4.5} perspective={1000}>
+                            <TiltContent className="h-full">
+                                <div className="h-full rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
+                                    <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
+                                    <h3 className="font-title-lg text-title-lg mt-4 text-white">{t(`security.items.${s.key}.title`)}</h3>
+                                    <p className="mt-2 text-white/70">{t(`security.items.${s.key}.text`)}</p>
+                                </div>
+                            </TiltContent>
+                        </Tilt>
                     ))}
                 </div>
             </Section>
@@ -276,13 +288,17 @@ export default function Dashboard() {
             <Section id="roles" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
                 <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {ROLES.map((r) => (
-                        <div key={r.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-                            <div className="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
-                                <Icon name={r.icon} />
-                            </div>
-                            <h3 className="font-title-lg text-title-lg mt-4">{t(`common:roles.${r.key}`)}</h3>
-                            <p className="mt-2 text-on-surface-variant">{t(`rolesSection.items.${r.key}`)}</p>
-                        </div>
+                        <Tilt key={r.key} maxTilt={4.5} perspective={1000}>
+                            <TiltContent className="h-full">
+                                <div className="h-full bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
+                                    <div className="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+                                        <Icon name={r.icon} />
+                                    </div>
+                                    <h3 className="font-title-lg text-title-lg mt-4">{t(`common:roles.${r.key}`)}</h3>
+                                    <p className="mt-2 text-on-surface-variant">{t(`rolesSection.items.${r.key}`)}</p>
+                                </div>
+                            </TiltContent>
+                        </Tilt>
                     ))}
                 </div>
             </Section>
@@ -300,7 +316,9 @@ export default function Dashboard() {
                                 {t(`faq.items.${k}.q`)}
                                 <Icon name={openFaq === i ? 'remove' : 'add'} className="text-outline" />
                             </button>
-                            {openFaq === i && <p className="pb-5 text-on-surface-variant">{t(`faq.items.${k}.a`)}</p>}
+                            <AutoHeight>
+                                {openFaq === i && <p className="pb-5 text-on-surface-variant">{t(`faq.items.${k}.a`)}</p>}
+                            </AutoHeight>
                         </div>
                     ))}
                 </div>
@@ -308,8 +326,7 @@ export default function Dashboard() {
 
             {/* 8. CLOSING CTA */}
             <section data-mode="dark" className="relative z-10 px-5 py-24">
-                <div className="lv-reveal max-w-6xl mx-auto rounded-3xl border border-white/15 text-white px-8 py-16 text-center"
-                     style={{ backgroundImage: 'radial-gradient(700px 260px at 50% 0%, rgba(80,105,230,.35), transparent 70%)' }}>
+                <div className="lv-reveal max-w-6xl mx-auto rounded-3xl border border-white/15 bg-white/5 backdrop-blur-sm text-white px-8 py-16 text-center">
                     <h2 className="font-headline-md text-headline-md">{t('closing.title')}</h2>
                     <p className="mt-3 opacity-80">{t('closing.text')}</p>
                     <Link to="/register" className="inline-flex mt-8 h-12 px-7 rounded-full bg-white text-brand font-bold items-center gap-2">
@@ -328,27 +345,27 @@ export default function Dashboard() {
                         </div>
                         <div className="flex-[2_1_520px] flex flex-wrap gap-9">
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
-                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.product')}</div>
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/75">{t('footerNav.product')}</div>
                             <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.features')}</a>
                             <a href="#how" className="text-white/70 hover:text-white">{t('footerNav.how')}</a>
                             <a href="#security" className="text-white/70 hover:text-white">{t('footerNav.security')}</a>
                             <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
-                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.forWho')}</div>
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/75">{t('footerNav.forWho')}</div>
                             <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.owner')}</Link>
                             <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.beneficiary')}</Link>
                             <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.executor')}</Link>
                             <a href="#roles" className="text-white/70 hover:text-white">{t('footerNav.verifier')}</a>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
-                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.account')}</div>
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/75">{t('footerNav.account')}</div>
                             <Link to="/login" className="text-white/70 hover:text-white">{t('footerNav.signIn')}</Link>
                             <Link to="/register" className="text-white/70 hover:text-white">{t('footerNav.signUp')}</Link>
                             <Link to="/forgot-password" className="text-white/70 hover:text-white">{t('footerNav.forgot')}</Link>
                         </div>
                         <div className="flex flex-col gap-3.5 min-w-[150px]">
-                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/50">{t('footerNav.project')}</div>
+                            <div className="text-[13px] font-semibold tracking-[0.08em] text-white/75">{t('footerNav.project')}</div>
                             <span className="text-white/70">SWP391, FPT University</span>
                             <a href="https://github.com/azerc18/legacy-vault" target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">GitHub</a>
                             <a href="#faq" className="text-white/70 hover:text-white">{t('footerNav.contact')}</a>
@@ -359,7 +376,7 @@ export default function Dashboard() {
                          style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em' }}>
                         LEGACYVAULT
                     </div>
-                    <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/50">
+                    <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/70">
                         <span>{t('footerNav.legal1')}</span>
                         <span>{t('footerNav.legal2')}</span>
                     </div>

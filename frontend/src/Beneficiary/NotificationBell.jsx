@@ -9,6 +9,7 @@ const TYPE_ICON = {
     VAULT_UNLOCKED: 'lock_open', EXECUTOR_ACTIVATED: 'badge', VERIFIER_REPLY: 'forum', VERIFICATION_DECIDED: 'gavel',
     ASSET_REASSIGNED: 'swap_horiz',
     LEGACY_MESSAGE_DELIVERED: 'mark_email_unread',
+    EXECUTOR_TASK_DISPUTED: 'report', ASSET_REVERIFY_NEEDED: 'update',
 };
 const fmt = (v, lng) => (v
     ? new Date(v).toLocaleString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' })
@@ -28,10 +29,26 @@ const SOURCES = {
         markRead: (id) => executorApi.markRead(id),
         target: async (n) => {
             if (n.referenceType === 'Vault') return `/beneficiary/vaults/${n.referenceId}`; // người vừa là Beneficiary
+            if (n.referenceType === 'ExecutorTask') {
+                // Thông báo phản đối: tìm assignment ACTIVE đang chứa task này
+                const active = (await executorApi.listMine().catch(() => [])).filter((a) => a.status === 'ACTIVE');
+                for (const a of active) {
+                    const tasks = await executorApi.getTasks(a.assignmentId).catch(() => []);
+                    if (tasks.some((x) => x.id === n.referenceId)) return `/executor/cases/${a.assignmentId}`;
+                }
+                return '/executor/home';
+            }
             if (n.referenceType !== 'LegalVerificationRequest') return null;
             const assignmentId = await executorApi.findAssignmentOfRequest(n.referenceId).catch(() => null);
             return assignmentId ? `/executor/cases/${assignmentId}` : '/executor/home';
         },
+    },
+    // Owner: dùng chung API /notifications/me; thông báo chỉ mang assetId (không có vaultId) nên về danh sách vault
+    owner: {
+        list: () => executorApi.listNotifications(),
+        count: () => executorApi.unreadCount(),
+        markRead: (id) => executorApi.markRead(id),
+        target: async () => '/owner/vaults',
     },
 };
 

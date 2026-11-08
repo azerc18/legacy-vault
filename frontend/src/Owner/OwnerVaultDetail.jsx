@@ -11,13 +11,15 @@ import {
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import LegacyMessageSection from './LegacyMessageSection.jsx';
+import VerificationBadge from '../Common/VerificationBadge.jsx';
+import VerifyAssetDialog from './VerifyAssetDialog.jsx';
 import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 import { AllocationFields, allocationBody, allocationFromAsset, allocationSummary, emptyAllocation, validateAllocation } from './AllocationFields.jsx';
 
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 
 export default function OwnerVaultDetail() {
-    const { t } = useTranslation(['vault', 'enums', 'common']);
+    const { t } = useTranslation(['vault', 'enums', 'common', 'verification']);
     const { vaultId } = useParams();
     const location = useLocation();
     const user = getUser();
@@ -145,6 +147,7 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
     const [form, setForm] = useState(null);         // null | { id?, assetType, assetName, secret, notes }
     const [deleting, setDeleting] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [verifying, setVerifying] = useState(null);   // tài sản đang mở hộp thoại xác thực
 
     const getAssetLabel = (type) => {
         const fallback = ASSET_TYPES.find((a) => a.value === type)?.label || type;
@@ -208,11 +211,21 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold truncate">{a.assetName}</p>
                                 <p className="text-xs text-outline">{getAssetLabel(a.assetType)} · {t('detail.assets.updatedOn', { date: formatDate(a.updatedAt) })}</p>
+                                <div className="mt-1">
+                                    <VerificationBadge status={a.verificationStatus || 'SELF_DECLARED'} method={a.verificationMethod} />
+                                </div>
                                 {beneficiaries.length >= 2 && (
                                     <p className="text-xs text-on-surface-variant">{allocationSummary(a, beneficiaries, t)}</p>
                                 )}
                             </div>
                             <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.view')}</button>
+                            {editable && (
+                                <button onClick={() => setVerifying(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">
+                                    {['VERIFIED', 'VERIFIED_SANDBOX'].includes(a.verificationStatus)
+                                        ? t('verification:button.details')
+                                        : a.verificationStatus === 'EXPIRED' ? t('verification:button.reverify') : t('verification:button.verify')}
+                                </button>
+                            )}
                             {editable && (
                                 <>
                                     <button onClick={() => edit(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.edit')}</button>
@@ -230,6 +243,15 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
             )}
 
             {viewing && <AssetViewModal asset={viewing} schemas={schemas} onClose={() => setViewing(null)} />}
+            {verifying && (
+                <VerifyAssetDialog
+                    vaultId={vaultId}
+                    asset={verifying}
+                    schemas={schemas}
+                    onClose={() => { setVerifying(null); load(); }}
+                    onChanged={load}
+                />
+            )}
             {form && (
                 <AssetFormModal
                     vaultId={vaultId}
@@ -257,7 +279,7 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 function Modal({ children, onClose }) {
     return (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
         </div>

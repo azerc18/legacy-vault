@@ -105,6 +105,15 @@ export const executorApi = {
     getTasks: (assignmentId) => http.get(`${BASE}/${assignmentId}/tasks`).then((r) => unwrap(r) ?? []),
     // F5: { status: TODO | DOING | DONE, note } -> task đã cập nhật
     updateTask: (assignmentId, taskId, body) => http.patch(`${BASE}/${assignmentId}/tasks/${taskId}`, body).then(unwrap),
+    // C.4: tải / thay tệp bằng chứng của task (PDF, JPG, PNG, tối đa 10MB, lưu mã hóa) -> task đã cập nhật
+    uploadTaskEvidence: (assignmentId, taskId, file) => {
+        const form = new FormData();
+        form.append('file', file);
+        return http.post(`${BASE}/${assignmentId}/tasks/${taskId}/evidence`, form).then(unwrap);
+    },
+    // C.4: tải lại tệp bằng chứng đã giải mã
+    downloadTaskEvidence: (assignmentId, taskId, fileName) =>
+        downloadBlob(`${BASE}/${assignmentId}/tasks/${taskId}/evidence/download`, fileName || 'evidence'),
     // FR-11: tệp đính kèm (đã giải mã) của một tin nhắn, trả về Blob để mở trong tab mới
     getAttachmentBlob: (assignmentId, requestId, messageId) =>
         http.get(`${BASE}/${assignmentId}/verification-requests/${requestId}/messages/${messageId}/attachment`,

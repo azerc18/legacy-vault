@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { CountingNumber } from '@animate-ui/react/primitives/texts/counting-number';
+import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
@@ -108,25 +110,27 @@ export default function AdminDashboard() {
 
             {s && (
                 <>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <StatCard icon="group" label={t('overview.cards.users')} value={sum(s.usersByStatus).toLocaleString()} to="/admin/users">
-                            <StatusSplit counts={s.usersByStatus} order={USER_ORDER} label={(k) => t(`users.status.${k}`)} />
-                        </StatCard>
-                        <StatCard icon="inventory_2" label={t('overview.cards.vaults')} value={sum(s.vaultsByStatus).toLocaleString()} to="/admin/vaults">
-                            <StatusSplit counts={s.vaultsByStatus} order={VAULT_ORDER} label={(k) => t(`vaults.status.${k}`)} />
-                        </StatCard>
-                        <StatCard icon="notifications_active" tone={s.openHighAlerts > 0 ? 'danger' : s.openAlerts > 0 ? 'warn' : 'ok'}
-                                  label={t('overview.cards.alerts')} value={s.openAlerts}
-                                  foot={t('overview.cards.alertsFoot', { count: s.openHighAlerts })} to="/admin/alerts" />
-                        <StatCard icon="timer" tone={s.executorRescueNeeded > 0 ? 'danger' : s.dmsPendingConfirmation > 0 ? 'warn' : 'ok'}
-                                  label={t('overview.cards.dms')} value={s.dmsPendingConfirmation + s.executorRescueNeeded}
-                                  foot={t('overview.cards.dmsFoot', { pending: s.dmsPendingConfirmation, rescue: s.executorRescueNeeded, triggered: s.dmsTriggered })}
-                                  to="/admin/users" />
-                        <StatCard icon="payments" tone="ok" label={t('overview.cards.revenue')} value={formatVnd(s.revenueThisMonthVnd)}
-                                  foot={t('overview.cards.revenueFoot', { count: s.successfulPaymentsThisMonth })} to="/admin/payments" />
-                        <StatCard icon="workspace_premium" label={t('overview.cards.vip')} value={s.vipUsers}
-                                  foot={t('overview.cards.vipFoot')} to="/admin/payments" />
-                    </div>
+                    <ReducedMotionConfig remount>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            <StatCard icon="group" label={t('overview.cards.users')} value={<CountingNumber number={sum(s.usersByStatus)} thousandSeparator="," />} to="/admin/users">
+                                <StatusSplit counts={s.usersByStatus} order={USER_ORDER} label={(k) => t(`users.status.${k}`)} />
+                            </StatCard>
+                            <StatCard icon="inventory_2" label={t('overview.cards.vaults')} value={<CountingNumber number={sum(s.vaultsByStatus)} thousandSeparator="," />} to="/admin/vaults">
+                                <StatusSplit counts={s.vaultsByStatus} order={VAULT_ORDER} label={(k) => t(`vaults.status.${k}`)} />
+                            </StatCard>
+                            <StatCard icon="notifications_active" tone={s.openHighAlerts > 0 ? 'danger' : s.openAlerts > 0 ? 'warn' : 'ok'}
+                                      label={t('overview.cards.alerts')} value={<CountingNumber number={s.openAlerts ?? 0} />}
+                                      foot={t('overview.cards.alertsFoot', { count: s.openHighAlerts })} to="/admin/alerts" />
+                            <StatCard icon="timer" tone={s.executorRescueNeeded > 0 ? 'danger' : s.dmsPendingConfirmation > 0 ? 'warn' : 'ok'}
+                                      label={t('overview.cards.dms')} value={<CountingNumber number={(s.dmsPendingConfirmation ?? 0) + (s.executorRescueNeeded ?? 0)} />}
+                                      foot={t('overview.cards.dmsFoot', { pending: s.dmsPendingConfirmation, rescue: s.executorRescueNeeded, triggered: s.dmsTriggered })}
+                                      to="/admin/users" />
+                            <StatCard icon="payments" tone="ok" label={t('overview.cards.revenue')} value={formatVnd(s.revenueThisMonthVnd)}
+                                      foot={t('overview.cards.revenueFoot', { count: s.successfulPaymentsThisMonth })} to="/admin/payments" />
+                            <StatCard icon="workspace_premium" label={t('overview.cards.vip')} value={<CountingNumber number={s.vipUsers ?? 0} />}
+                                      foot={t('overview.cards.vipFoot')} to="/admin/payments" />
+                        </div>
+                    </ReducedMotionConfig>
 
                     {charts && (
                         <div className="mt-4 grid gap-4 lg:grid-cols-2">
