@@ -1,5 +1,8 @@
 package com.ltld.app.legacyvault.utility;
 
+import com.ltld.app.legacyvault.enums.AppLanguage;
+import com.ltld.app.legacyvault.service.userservice.UserLanguageResolver;
+import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,7 +13,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -28,12 +30,14 @@ import static org.mockito.Mockito.verify;
 class EmailSenderDmsReminderTest {
 
     @Mock private JavaMailSender javaMailSender;
+    @Mock private UserLanguageResolver languageResolver;
     @InjectMocks private EmailSender emailSender;
 
     private TimeZone originalZone;
 
     @BeforeEach
     void setUp() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.EN);
         // Máy chủ chạy UTC như container Docker.
         originalZone = TimeZone.getDefault();
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
@@ -44,10 +48,8 @@ class EmailSenderDmsReminderTest {
         TimeZone.setDefault(originalZone);
     }
 
-    private SimpleMailMessage sentMessage() {
-        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(javaMailSender).send(captor.capture());
-        return captor.getValue();
+    private SentMail sentMessage() {
+        return SentMail.captureOne(javaMailSender);
     }
 
     @Test
@@ -56,7 +58,7 @@ class EmailSenderDmsReminderTest {
         emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3);
 
-        SimpleMailMessage message = sentMessage();
+        SentMail message = sentMessage();
         String text = message.getText();
         assertThat(message.getTo()).containsExactly("owner@example.com");
         assertThat(message.getSubject()).contains("(1/3)");
@@ -69,7 +71,7 @@ class EmailSenderDmsReminderTest {
     @Test
     @DisplayName("M1: lỗi gửi được ném ra để người gọi trả lại lần nhắc")
     void checkinReminder_propagatesSendFailure() {
-        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(SimpleMailMessage.class));
+        doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(MimeMessage.class));
 
         assertThatThrownBy(() -> emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3))

@@ -1,10 +1,16 @@
 package com.ltld.app.legacyvault.utility;
 
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.ExecutorType;
+import com.ltld.app.legacyvault.service.userservice.UserLanguageResolver;
+import com.ltld.app.legacyvault.utility.MailHtml.Style;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.MailPreparationException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -20,35 +27,34 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EmailSender {
     private final JavaMailSender javaMailSender;
+    private final UserLanguageResolver languageResolver;
     private final int OTP_EXPIRE_SECONDS = 300;
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     @Value("${app.frontend.base-url:}")
     private String frontendBaseUrl;
+    /** Địa chỉ người gửi hiển thị, ví dụ "LegacyVault <no-reply@legacyvault.codes>". Trống thì dùng tài khoản SMTP. */
+    @Value("${app.mail.from:}")
+    private String mailFrom;
 
     @Async
     public void sendEmail(String email, String otp) {
-        send(email,
-                "OTP verification code - LegacyVault",
-                "Your OTP code is: " + otp);
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendCode(email, lang, Style.CODE, "mail.otp", otp, List.of(), MailMessages.get(lang, "mail.codeFooter", OTP_EXPIRE_SECONDS / 60));
     }
 
     @Async
     public void sendAssetVerificationOtpEmail(String email, String otp, int validMinutes) {
-        send(email,
-                "Verify your email asset - LegacyVault",
-                "A LegacyVault user listed this email address as a digital asset and asked to verify that they own it."
-                        + "\nYour verification code is: " + otp
-                        + "\nThe code is valid for " + validMinutes + " minutes and can be used once."
-                        + "\nIf you did not add this email to LegacyVault, you can ignore this message.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendCode(email, lang, Style.CODE, "mail.assetOtp", otp, List.of(), MailMessages.get(lang, "mail.assetOtp.footer", validMinutes));
     }
 
     @Async
     public void sendPasswordResetEmail(String email, String otp) {
-        send(email,
-                "Reset your password - LegacyVault",
-                "Your password reset code is: " + otp
-                        + "\nIf you did not request this, ignore this email and consider changing your password.");
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendCode(email, lang, Style.SECURITY, "mail.reset", otp,
+                List.of(MailMessages.get(lang, "mail.reset.warn")),
+                MailMessages.get(lang, "mail.codeFooter", OTP_EXPIRE_SECONDS / 60));
     }
 
     // FR-02: mời người thụ hưởng chưa có tài khoản (hoặc chưa xác minh email) đăng ký
@@ -128,37 +134,28 @@ public class EmailSender {
      */
     public void sendVaultUnlockedNotification(String email, String fullName, String ownerName, String vaultName,
                                               LocalDateTime claimDeadlineAt, boolean accountActive, UUID vaultId) {
+        AppLanguage lang = languageResolver.forEmail(email);
         String deadline = formatDeadline(claimDeadlineAt);
-
-        StringBuilder body = new StringBuilder()
-                .append("Hello ").append(fullName == null ? "" : fullName).append(",\n\n")
-                .append("The vault \"").append(vaultName).append("\" of ").append(ownerName)
-                .append(" has been unlocked and handed over to you on LegacyVault.\n\n");
-
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.unlocked.greeting", fullName == null ? "" : fullName));
+        paras.add(MailMessages.get(lang, "mail.unlocked.intro", ownerName, vaultName));
         if (!accountActive) {
-            body.append("Your account has not been activated yet. ")
-                    .append("Please complete registration and verify your email first, then sign in to claim the assets.\n");
+            paras.add(MailMessages.get(lang, "mail.unlocked.inactive"));
             String registerLink = registerLink();
             if (registerLink != null) {
-                body.append("Register at: ").append(registerLink).append("\n");
+                paras.add(MailMessages.get(lang, "mail.register") + ": " + registerLink);
             }
-            body.append("\n");
         }
-
         String link = vaultLink(vaultId);
         if (link != null) {
-            body.append("Open the vault: ").append(link).append("\n\n");
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
         }
-
-        body.append("How to claim the assets:\n")
-                .append("1. Sign in to LegacyVault with your beneficiary account.\n")
-                .append("2. Open the handed-over vault and verify your identity (email OTP or eKYC).\n")
-                .append("3. View or download the assets, then confirm you have received the handover.\n\n")
-                .append("Claim deadline: ").append(deadline).append(" (GMT+7).\n")
-                .append("After this deadline the vault will be archived and you will no longer be able to access the asset contents.\n\n")
-                .append("Please do not share this email with anyone.");
-
-        sendWithoutOtpFooter(email, "Digital assets handed over to you - LegacyVault", body.toString());
+        paras.add(MailMessages.get(lang, "mail.unlocked.stepsTitle") + "\n" + MailMessages.get(lang, "mail.unlocked.steps"));
+        paras.add(MailMessages.get(lang, "mail.unlocked.deadline", deadline) + "\n"
+                + MailMessages.get(lang, "mail.unlocked.deadlineNote"));
+        deliver(email, lang, Style.LEGACY, MailMessages.get(lang, "mail.unlocked.subject"),
+                MailMessages.get(lang, "mail.unlocked.title"), paras, null,
+                MailMessages.get(lang, "mail.unlocked.noShare"));
     }
 
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi việc nhận tài sản
@@ -411,22 +408,76 @@ public class EmailSender {
         return ownerName == null || ownerName.isBlank() ? ownerEmail : ownerName + " (" + ownerEmail + ")";
     }
 
-    private void send(String to, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body
-                + "\nThe code is valid for " + (OTP_EXPIRE_SECONDS / 60) + " minutes."
-                + "\nPlease do not share this code with anyone.");
-        javaMailSender.send(message);
+    /** Mail có mã OTP: chữ lấy từ mail_xx.properties theo khóa prefix.subject/.title/.body. */
+    private void sendCode(String to, AppLanguage lang, Style style, String prefix, String code,
+                          List<String> extraParagraphs, String footerNote) {
+        List<String> paras = new ArrayList<>();
+        if (MailMessages.has(lang, prefix + ".body")) {
+            paras.add(MailMessages.get(lang, prefix + ".body"));
+        }
+        paras.addAll(extraParagraphs);
+        deliver(to, lang, style, MailMessages.get(lang, prefix + ".subject"),
+                MailMessages.get(lang, prefix + ".title"), paras, code, footerNote);
     }
 
-    // Gửi email thường, không gắn câu về thời hạn OTP như send()
+    /**
+     * Mail thường chưa có bản dịch: giữ nguyên chữ do hàm gọi dựng (tiếng Anh), chỉ khoác giao diện HTML.
+     * Đoạn cách nhau bằng dòng trống; tiêu đề lấy từ chủ đề bỏ đuôi " - LegacyVault".
+     */
     private void sendWithoutOtpFooter(String to, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
-        javaMailSender.send(message);
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        for (String p : body.split("\n\\s*\n")) {
+            if (!p.isBlank()) {
+                paras.add(p.strip());
+            }
+        }
+        deliver(to, lang, styleFor(subject), subject, titleOf(subject), paras, null, null);
+    }
+
+    private static String titleOf(String subject) {
+        String suffix = " - LegacyVault";
+        return subject.endsWith(suffix) ? subject.substring(0, subject.length() - suffix.length()) : subject;
+    }
+
+    /** Chọn nhóm giao diện theo chủ đề cho các mail chưa có bản dịch riêng. */
+    private static Style styleFor(String subject) {
+        String s = subject.toLowerCase();
+        if (s.startsWith("urgent") || s.contains("reminder") || s.contains("expiring")) {
+            return Style.URGENT;
+        }
+        if (s.contains("invitation")) {
+            return Style.INVITE;
+        }
+        if (s.contains("legacy message")) {
+            return Style.LEGACY;
+        }
+        if (s.contains("verification")) {
+            return Style.CASE;
+        }
+        if (s.contains("postponed") || s.contains("confirmed")) {
+            return Style.SUCCESS;
+        }
+        return Style.NOTICE;
+    }
+
+    private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
+                         List<String> paragraphs, String code, String footerNote) {
+        String brand = MailMessages.get(lang, "mail.brand");
+        String html = MailHtml.render(style, title, paragraphs, code, footerNote, brand);
+        String text = MailHtml.renderText(title, paragraphs, code, footerNote);
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            if (mailFrom != null && !mailFrom.isBlank()) {
+                helper.setFrom(mailFrom);
+            }
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(text, html);
+            javaMailSender.send(message);
+        } catch (MessagingException e) {
+            throw new MailPreparationException(e);
+        }
     }
 }
