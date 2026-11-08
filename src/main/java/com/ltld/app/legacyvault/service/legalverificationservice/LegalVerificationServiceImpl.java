@@ -52,6 +52,7 @@ import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -75,11 +76,14 @@ import java.util.stream.Collectors;
 public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     private static final String UNKNOWN_CONTENT_TYPE = "application/octet-stream";
-    private static final int CLAIM_TIMEOUT_DAYS = 60; // BR-04
     private static final int SIGN_OTP_EXPIRE_MINUTES = 5;
     private static final int MAX_SIGN_ATTEMPTS = 5;
     private static final long SIGN_OTP_RESEND_COOLDOWN_SECONDS = 60;
     private static final int MAX_HISTORY_PAGE_SIZE = 100;
+
+    // BR-04 (#5): lấy từ cấu hình app.claim.timeout-days; giá trị mặc định giữ cho unit test không có Spring
+    @Value("${app.claim.timeout-days:60}")
+    private int claimTimeoutDays = 60;
     private static final LocalDateTime HISTORY_MIN_TIME = LocalDateTime.of(1970, 1, 1, 0, 0);
     private static final LocalDateTime HISTORY_MAX_TIME = LocalDateTime.of(9999, 1, 1, 0, 0);
 
@@ -441,7 +445,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             Vault vault = link.getVault();
             vault.setStatus(VaultStatus.UNLOCKED);
             vault.setUnlockedAt(now);
-            vault.setClaimDeadlineAt(now.plusDays(CLAIM_TIMEOUT_DAYS));
+            vault.setClaimDeadlineAt(now.plusDays(claimTimeoutDays));
 
             // N5 / M4: Vault hợp lệ luôn có ID
             auditLogService.log(AuditAction.VAULT_UNLOCK, AuditResult.SUCCESS,

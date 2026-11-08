@@ -55,7 +55,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private static final String NOT_FOUND_MSG = "Claim request not found.";
     // Trùng với BeneficiaryNotificationListener.ENTITY_VAULT
     private static final String REF_VAULT = "Vault";
-    private static final int CLAIM_TIMEOUT_DAYS = 60;
 
     // FR-17: các tham số dễ chỉnh. SRS không quy định con số cụ thể.
     private static final int OTP_TTL_MINUTES = 5;
@@ -108,12 +107,18 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final ApplicationEventPublisher eventPublisher;   // N2-notify
     private final HandoverSnapshotService handoverSnapshotService;   // PR 2: bản chụp bàn giao
 
+    // BR-04 (#5): lấy từ cấu hình app.claim.timeout-days; giá trị mặc định giữ cho unit test không có Spring
+    @Value("${app.claim.timeout-days:60}")
+    private int claimTimeoutDays = 60;
+
+    // #5: Vault.claimDeadlineAt (đặt lúc Verifier ký mở khóa) là nguồn chuẩn; claim chỉ chép lại khi được tạo.
+    // Fallback chỉ dùng cho dữ liệu cũ thiếu hạn trên vault.
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
             return vault.getClaimDeadlineAt();
         }
         LocalDateTime base = vault.getUnlockedAt() != null ? vault.getUnlockedAt() : LocalDateTime.now();
-        return base.plusDays(CLAIM_TIMEOUT_DAYS);
+        return base.plusDays(claimTimeoutDays);
     }
 
     @Override
@@ -187,7 +192,11 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     public BeneficiaryClaimResponse initializeClaim(BeneficiaryClaimRequest request, UUID currentUserId) {
 
         // 1. Kiểm tra Vault và Phân quyền (Ngăn lộ Vault ID)
-        Vault vault = vaultRepository.findById(request.getVaultId())
+        // #5: khóa dòng vault NGAY câu đầu tiên của transaction. 2 request song song cùng thấy "chưa có claim"
+        // thì cả 2 insert và unique (vault_id, beneficiary_id) ném lỗi 500. Khóa trước mọi lần đọc thường
+        // để request thứ 2 chờ, rồi đọc thấy claim request thứ nhất đã commit (MySQL REPEATABLE READ lấy
+        // snapshot ở lần đọc thường đầu tiên, nên khóa sau khi đã đọc claim là quá muộn).
+        Vault vault = vaultRepository.findByIdForUpdate(request.getVaultId())
                 .orElseThrow(() -> new BeneficiaryException(NOT_FOUND_MSG, HttpStatus.NOT_FOUND));
 
         User beneficiary = requireBeneficiary(vault.getId(), currentUserId).getUser();
@@ -211,13 +220,17 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 throw new BeneficiaryException("These assets have already been claimed.", HttpStatus.CONFLICT);
             }
         } else {
-            claim = BeneficiaryClaim.builder()
+            // #5: kiểm hạn TRƯỚC khi lưu, không dựa vào rollback để xóa claim vừa tạo
+            LocalDateTime deadline = resolveDeadline(vault);
+            if (LocalDateTime.now().isAfter(deadline)) {
+                throw new BeneficiaryException("The claim period has ended.", HttpStatus.GONE);
+            }
+            claim = claimRepository.save(BeneficiaryClaim.builder()
                     .vault(vault)
                     .beneficiary(beneficiary)
                     .status(ClaimStatus.PENDING)
-                    .claimDeadlineAt(resolveDeadline(vault))
-                    .build();
-            claim = claimRepository.save(claim);
+                    .claimDeadlineAt(deadline)
+                    .build());
         }
 
         if (claim.getStatus() == ClaimStatus.EXPIRED || LocalDateTime.now().isAfter(claim.getClaimDeadlineAt())) {
