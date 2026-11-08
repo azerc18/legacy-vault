@@ -621,6 +621,36 @@ public class AuthServiceImplTest {
     }
 
     @Test
+    void loginWithGoogle_newEmail_storesRequestedLanguage_andNeverChangesExistingAccount() {
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.empty());
+        when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
+        when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            if (u.getId() == null) u.setId(UUID.randomUUID());
+            return u;
+        });
+        stubGoogleTokens();
+
+        authService.loginWithGoogle(new GoogleLoginRequest("google-id-token", "en"), IP, USER_AGENT);
+
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues().get(0).getPreferredLanguage()).isEqualTo(AppLanguage.EN);
+
+        // Tài khoản đã có: ngôn ngữ trong request không ghi đè lựa chọn của người dùng
+        user.setStatus(UserStatus.ACTIVE);
+        user.setPreferredLanguage(AppLanguage.VI);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+
+        authService.loginWithGoogle(new GoogleLoginRequest("google-id-token", "en"), IP, USER_AGENT);
+
+        assertThat(user.getPreferredLanguage()).isEqualTo(AppLanguage.VI);
+    }
+
+    @Test
     void loginWithGoogle_pendingAccount_activates_andReplacesPassword() {
         user.setStatus(UserStatus.PENDING);
         when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);

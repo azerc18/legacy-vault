@@ -17,6 +17,8 @@ const inputCls =
 
 export default function Register() {
     const { t, i18n } = useTranslation('auth');
+    // Ngôn ngữ giao diện đang xem (vi | en): BE lưu làm ngôn ngữ email/hóa đơn mặc định của tài khoản mới
+    const uiLanguage = (i18n.resolvedLanguage || i18n.language || 'vi').slice(0, 2) === 'en' ? 'en' : 'vi';
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
@@ -46,7 +48,7 @@ export default function Register() {
         const googleEmail = emailFromCredential(credential);
         setError(''); setLoading(true);
         try {
-            const res = await authApi.loginGoogle(credential);
+            const res = await authApi.loginGoogle(credential, uiLanguage);
             if (res.mfaRequired) {
                 // Email này đã có tài khoản bật 2FA -> sang trang Đăng nhập nhập mã
                 navigate('/login', { state: { email: googleEmail, mfaToken: res.mfaToken } });
@@ -81,13 +83,12 @@ export default function Register() {
         setError('');
         setLoading(true);
         try {
-            // language: ngôn ngữ đang chọn ở giao diện -> BE lưu làm ngôn ngữ email/hóa đơn mặc định
             await authApi.register({
                 fullName,
                 email: email.trim(),
                 password,
                 passwordConfirm,
-                language: (i18n.resolvedLanguage || i18n.language || 'vi').slice(0, 2) === 'en' ? 'en' : 'vi',
+                language: uiLanguage,
             });
             // BE đã tự gửi OTP -> sang trang xác thực
             navigate('/verify-email', { state: { email: email.trim() } });

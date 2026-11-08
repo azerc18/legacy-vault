@@ -161,7 +161,7 @@ public class AuthServiceImpl implements AuthService{
 
         User user = userRepository.findByEmailForUpdate(email).orElse(null);
         if (user == null) {
-            user = registerFromGoogle(google);
+            user = registerFromGoogle(google, request.language());
         } else {
             if (user.getStatus() == UserStatus.LOCKED) {
                 auditLogService.failure(AuditAction.LOGIN_FAILED, user.getId(), email, "account locked (google)");
@@ -198,7 +198,7 @@ public class AuthServiceImpl implements AuthService{
 
     // Lần đầu đăng nhập Google: tạo tài khoản ACTIVE (Google đã xác minh email), cùng role mặc định như đăng ký thường.
     // Mật khẩu là chuỗi ngẫu nhiên không ai biết; muốn đăng nhập bằng mật khẩu thì dùng "Quên mật khẩu".
-    private User registerFromGoogle(GoogleTokenVerifier.GoogleProfile google) {
+    private User registerFromGoogle(GoogleTokenVerifier.GoogleProfile google, String language) {
         Role defaultRole = roleRepository.findByCode("OWNER")
                 .orElseThrow(() -> new RuntimeException("Default role not found in database."));
         Role beneficiaryRole = roleRepository.findByCode("BENEFICIARY")
@@ -209,6 +209,7 @@ public class AuthServiceImpl implements AuthService{
                 .fullName(displayName(google))
                 .passwordHash(passwordEncoder.encode(randomSecret()))
                 .status(UserStatus.ACTIVE)
+                .preferredLanguage(AppLanguage.fromTag(language))
                 .roles(new HashSet<>(Set.of(defaultRole, beneficiaryRole)))
                 .build());
 
