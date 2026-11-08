@@ -1,0 +1,21 @@
+{
+  "aboutTerm": "About: {{term}}",
+  "terms": {
+    "dms": {
+      "title": "Dead Man's Switch",
+      "text": "A safety switch: if you stop checking in, the system reminds you first, then alerts your executor so the handover can begin. Check in again and everything stops."
+    },
+    "crossConfirm": {
+      "title": "Cross-confirmers",
+      "text": "Trusted people who are asked \"are they okay?\" before the handover starts, so a missed check-in does not trigger it by mistake."
+    },
+    "executor": {
+      "title": "Executor",
+      "text": "Someone you trust to handle the paperwork after you pass away, such as closing or transferring digital accounts."
+    },
+    "kOfN": {
+      "title": "K of N people",
+      "text": "At least K of the N recipients must agree before the asset is opened. For example 2 of 3: any 2 of the 3 people are enough."
+    }
+  }
+}
