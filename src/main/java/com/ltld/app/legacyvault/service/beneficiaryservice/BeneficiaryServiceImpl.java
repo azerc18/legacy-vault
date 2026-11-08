@@ -1,17 +1,16 @@
 package com.ltld.app.legacyvault.service.beneficiaryservice;
 
+import com.ltld.app.legacyvault.dto.assetverificationdto.AssetVerificationSummary;
 import com.ltld.app.legacyvault.dto.beneficiarydto.*;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AssetStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
-import com.ltld.app.legacyvault.enums.AllocationMode;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
-import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -23,6 +22,8 @@ import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotService;
+import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotView;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldSpec;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
@@ -104,6 +105,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     private final DigitalSignatureRepository digitalSignatureRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final ApplicationEventPublisher eventPublisher;   // N2-notify
+    private final HandoverSnapshotService handoverSnapshotService;   // PR 2: bản chụp bàn giao
 
     private LocalDateTime resolveDeadline(Vault vault) {
         if (vault.getClaimDeadlineAt() != null) {
@@ -1128,6 +1130,18 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         assertViewSession(vault.getId(), currentUserId);
         VaultBeneficiary me = requireBeneficiary(vault.getId(), currentUserId);
 
+        // PR 2: trạng thái xác thực LÚC BÀN GIAO lấy từ bản chụp (tạo bù nếu Vault mở khóa trước khi có tính năng).
+        // Lỗi bản chụp không được làm hỏng dossier: khi đó PDF bỏ phần huy hiệu.
+        HandoverSnapshotView snapshot = null;
+        try {
+            snapshot = handoverSnapshotService.ensureSnapshot(vault.getId()).orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("PR2: handover snapshot for vault {} unavailable, dossier without badges: {}",
+                    vault.getId(), e.getMessage());
+        }
+        final Map<UUID, AssetVerificationSummary> verification =
+                snapshot == null ? Map.of() : snapshot.verification();
+
         // 2. Chỉ tài sản người này đang giữ (người chính, hoặc nhận thay do người chính từ chối)
         // Q47 (b): cùng quy tắc với getInheritedAssets / getClaimProgress:
         // ẩn tài sản đã phân bổ cho người khác; tài sản chưa có dòng phân bổ nào thì ai cũng thấy.
@@ -1145,6 +1159,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                         .thenComparing(DigitalAsset::getId))
                 .map(a -> {
                     AssetAllocation al = mine.get(a.getId());   // null = chưa phân bổ riêng
+                    AssetVerificationSummary vs = verification.get(a.getId());
                     return new InheritanceDossierData.AssetLine(
                             a.getAssetName(),
                             a.getAssetType(),
@@ -1153,7 +1168,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                             al != null ? al.getSharePercent() : null,
                             al != null ? al.getNote() : null,
                             al != null && !al.getBeneficiary().getId().equals(me.getId()),
-                            dossierFields(a));
+                            dossierFields(a),
+                            vs == null ? null : new InheritanceDossierData.Verification(
+                                    vs.status(), vs.method(), vs.provider(), vs.verifiedAt()));
                 })
                 .toList();
         // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
@@ -1182,7 +1199,9 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 new InheritanceDossierData.Person(owner.getFullName(), owner.getEmail()),
                 new InheritanceDossierData.Person(me.getFullName(), me.getEmail()),
                 executorUser == null ? null : new InheritanceDossierData.Person(executorUser.getFullName(), executorUser.getEmail()),
-                signature, assets, documents, LocalDateTime.now());
+                signature, assets, documents, LocalDateTime.now(),
+                snapshot == null ? null : snapshot.hash(),
+                snapshot == null ? null : snapshot.createdAt());
     }
 
     // FR-17 3b: khóa tạm theo (vault, beneficiary). Có phiên FAILED tạo trong LOCK_HOURS gần nhất thì không tạo

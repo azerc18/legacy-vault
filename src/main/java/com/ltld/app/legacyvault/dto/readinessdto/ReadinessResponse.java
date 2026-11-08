@@ -18,5 +18,8 @@ public class ReadinessResponse {
     private int completedItems;
     private int totalItems;
     private List<ReadinessItemResponse> items;
+    // PR 2: số tài sản đã hết hạn xác thực (cần xác thực lại) và số tài sản sắp hết hạn trong 14 ngày
+    private int assetsNeedReverification;
+    private int assetsExpiringSoon;
 }
 

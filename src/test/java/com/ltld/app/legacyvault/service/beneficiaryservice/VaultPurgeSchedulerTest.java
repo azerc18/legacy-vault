@@ -5,15 +5,7 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VaultStatus;
-import com.ltld.app.legacyvault.repository.AssetAccessRecordRepository;
-import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
-import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
-import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
-import com.ltld.app.legacyvault.repository.IdentityVerificationRepository;
-import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
-import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
-import com.ltld.app.legacyvault.repository.VaultRepository;
-import com.ltld.app.legacyvault.repository.VerificationRequestVaultRepository;
+import com.ltld.app.legacyvault.repository.*;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,6 +50,7 @@ class VaultPurgeSchedulerTest {
     @Mock private AuditLogService auditLogService;
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private AssetAllocationRepository assetAllocationRepository;
+    @Mock private ExecutorEvidenceFileRepository executorEvidenceFileRepository;
 
     private VaultPurgeScheduler scheduler;
 
@@ -70,6 +63,7 @@ class VaultPurgeSchedulerTest {
         scheduler = new VaultPurgeScheduler(vaultRepository, accessRecordRepository,
                 identityVerificationRepository, requestVaultRepository, legalDocumentRepository,
                 digitalAssetRepository, claimRepository, vaultBeneficiaryRepository, assetAllocationRepository,
+                executorEvidenceFileRepository,
                 fileStorageService, auditLogService, transactionManager);
     }
 

@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class OwnerReadinessServiceImplTest {
     @Mock private LegalDocumentRepository legalDocumentRepository;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private DmsConfigRepository dmsConfigRepository;
+    @Mock private AssetVerificationService assetVerificationService;
 
     @InjectMocks
     private OwnerReadinessServiceImpl readinessService;

@@ -4,10 +4,7 @@ import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritanceDossierData;
 import com.ltld.app.legacyvault.dto.beneficiarydto.InheritanceDossierData.AssetLine;
-import com.ltld.app.legacyvault.enums.AllocationMode;
-import com.ltld.app.legacyvault.enums.AssetType;
-import com.ltld.app.legacyvault.enums.DocumentType;
-import com.ltld.app.legacyvault.enums.TransferMechanism;
+import com.ltld.app.legacyvault.enums.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +29,7 @@ import java.util.Set;
 public class InheritanceDossierPdfService {
 
     private static final DateTimeFormatter DT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter D = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final Color PRIMARY = new Color(0x00, 0x23, 0x6B);
     private static final Color MUTED = new Color(0x5F, 0x63, 0x68);
     private static final Color HEAD_BG = new Color(0xE8, 0xED, 0xF7);
@@ -58,6 +56,33 @@ public class InheritanceDossierPdfService {
             DocumentType.OWNERSHIP_PAPER, "Giấy tờ sở hữu",
             DocumentType.IDENTITY_CARD, "Giấy tờ tuỳ thân",
             DocumentType.OTHER, "Khác");
+    // Huy hiệu xác thực: không hứa quá điều đã chứng minh; "Mô phỏng" phải ghi rõ
+    private static final Map<AssetVerificationStatus, String> VERIFICATION_STATUS = Map.of(
+            AssetVerificationStatus.SELF_DECLARED, "Chủ tài sản tự khai, chưa được kiểm chứng",
+            AssetVerificationStatus.PENDING, "Đang chờ xác thực",
+            AssetVerificationStatus.VERIFIED, "Đã xác thực",
+            AssetVerificationStatus.VERIFIED_SANDBOX, "Mô phỏng (chưa phải xác thực thật)",
+            AssetVerificationStatus.FAILED, "Xác thực không thành công",
+            AssetVerificationStatus.EXPIRED, "Đã hết hạn xác thực");
+    private static final Map<AssetVerificationMethod, String> VERIFICATION_METHOD = Map.ofEntries(
+            Map.entry(AssetVerificationMethod.OTP_EMAIL, "mã OTP gửi qua email"),
+            Map.entry(AssetVerificationMethod.GOOGLE_LOGIN, "đăng nhập Google"),
+            Map.entry(AssetVerificationMethod.PAYPAL_LOGIN, "đăng nhập PayPal"),
+            Map.entry(AssetVerificationMethod.SMS_CODE_MOCK, "mã SMS"),
+            Map.entry(AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, "tra cứu tên chủ tài khoản"),
+            Map.entry(AssetVerificationMethod.BANK_FORMAT_CHECK, "kiểm tra định dạng số tài khoản"),
+            Map.entry(AssetVerificationMethod.STATEMENT_UPLOAD, "tệp sao kê"),
+            Map.entry(AssetVerificationMethod.MICRO_DEPOSIT_MOCK, "giao dịch thử"),
+            Map.entry(AssetVerificationMethod.EXCHANGE_EMAIL_CODE, "mã gửi tới email đăng ký sàn"),
+            Map.entry(AssetVerificationMethod.API_READONLY_MOCK, "khoá API chỉ đọc"),
+            Map.entry(AssetVerificationMethod.ADDRESS_CHECKSUM, "kiểm tra địa chỉ ví"),
+            Map.entry(AssetVerificationMethod.BIP39_CHECK, "kiểm tra cụm từ khôi phục"),
+            Map.entry(AssetVerificationMethod.PUBLIC_BALANCE, "đối chiếu số dư công khai"),
+            Map.entry(AssetVerificationMethod.WALLET_SIGNATURE, "chữ ký ví"),
+            Map.entry(AssetVerificationMethod.BIO_CHALLENGE_MOCK, "mã thử thách trên hồ sơ"),
+            Map.entry(AssetVerificationMethod.SCREENSHOT_UPLOAD, "ảnh chụp màn hình"),
+            Map.entry(AssetVerificationMethod.FILE_HASH, "mã băm tệp"),
+            Map.entry(AssetVerificationMethod.SECOND_PERSON_CONFIRM, "người thứ hai xác nhận"));
     private static final Map<String, String> FIELD_LABEL = Map.ofEntries(
             // Ngân hàng / sàn
             Map.entry("institutionName", "Ngân hàng / sàn"),
@@ -157,6 +182,16 @@ public class InheritanceDossierPdfService {
             doc.add(note("Chưa có chữ ký xác nhận của Người xác minh pháp lý cho kho di sản này."));
         }
 
+        if (d.handoverSnapshotHash() != null) {
+            PdfPTable snap = table(new float[]{30, 70});
+            row(snap, "Bản chụp lúc bàn giao", fmt(d.handoverSnapshotAt()));
+            PdfPCell sk = cell("Mã băm bản chụp", bold, 9); sk.setBackgroundColor(HEAD_BG);
+            snap.addCell(sk);
+            snap.addCell(cell(d.handoverSnapshotHash(), regular, 7.5f));
+            snap.setSpacingBefore(8);
+            doc.add(snap);
+        }
+
         // ---------- Phần 2 ----------
         doc.add(heading("2. Danh mục tài sản dành cho bạn"));
         if (d.assets().isEmpty()) {
@@ -174,6 +209,8 @@ public class InheritanceDossierPdfService {
                             .append(displayValue(k, v)));
                 }
                 if (a.viaFallback()) name.append("\n(nhận thay người thụ hưởng chính)");
+                String badge = verificationText(a.verification());
+                if (badge != null) name.append("\n").append(badge);
                 if (a.note() != null && !a.note().isBlank()) name.append("\nGhi chú: ").append(a.note());
                 t.addCell(cell(name.toString(), regular, 9));
                 t.addCell(cell(ASSET_TYPE.getOrDefault(a.type(), String.valueOf(a.type())), regular, 9));
@@ -186,6 +223,11 @@ public class InheritanceDossierPdfService {
                 t.addCell(cell(percent(a.sharePercent()), regular, 9));
             }
             doc.add(t);
+            if (d.assets().stream().anyMatch(x -> x.verification() != null)) {
+                doc.add(note("Trạng thái xác thực được chụp tại thời điểm mở khoá kho di sản, không phải trạng thái hiện tại. "
+                        + "\"Đã xác thực\" nghĩa là chủ tài sản đã chứng minh quyền kiểm soát tài sản bằng cách ghi trong ngoặc "
+                        + "vào thời điểm đó; không bảo đảm số dư hay giá trị tài sản. Mục \"Mô phỏng\" chưa phải xác thực thật."));
+            }
         }
 
         Paragraph docsTitle = new Paragraph("Tài liệu pháp lý đi kèm trong kho di sản", font(bold, 10, PRIMARY));
@@ -228,6 +270,22 @@ public class InheritanceDossierPdfService {
     }
 
     // ---------- helpers ----------
+
+    private static String verificationText(InheritanceDossierData.Verification v) {
+        if (v == null) return null;
+        StringBuilder sb = new StringBuilder("Xác thực lúc bàn giao: ")
+                .append(VERIFICATION_STATUS.getOrDefault(v.status(), String.valueOf(v.status())));
+        boolean verifiedLike = v.status() == AssetVerificationStatus.VERIFIED
+                || v.status() == AssetVerificationStatus.VERIFIED_SANDBOX
+                || v.status() == AssetVerificationStatus.EXPIRED;
+        if (verifiedLike && v.method() != null) {
+            sb.append(" (").append(VERIFICATION_METHOD.getOrDefault(v.method(), v.method().name())).append(")");
+        }
+        if (verifiedLike && v.verifiedAt() != null) {
+            sb.append(", ngày ").append(v.verifiedAt().format(D));
+        }
+        return sb.toString();
+    }
 
     private static BaseFont loadFont(String path) throws IOException {
         try (InputStream in = new ClassPathResource(path).getInputStream()) {

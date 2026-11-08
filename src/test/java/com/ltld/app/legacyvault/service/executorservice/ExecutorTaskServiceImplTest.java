@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -71,6 +72,7 @@ class ExecutorTaskServiceImplTest {
     @Mock private AuditLogService auditLogService;
     // Mock: TransactionTemplate gọi thẳng callback, đủ cho unit test
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private ExecutorTaskServiceImpl service;
 
     private final UUID assignmentId = UUID.randomUUID();
@@ -226,7 +228,7 @@ class ExecutorTaskServiceImplTest {
     void update_toDone_setsCompletedAtTrimsNoteAndAudits() {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
@@ -246,7 +248,7 @@ class ExecutorTaskServiceImplTest {
         t.setCompletedAt(LocalDateTime.now().minusDays(1));
         t.setNote("cũ");
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DOING, "   "), LOGIN);
@@ -260,7 +262,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         t.getVault().setOwner(User.builder().id(UUID.randomUUID()).build());
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -272,7 +274,7 @@ class ExecutorTaskServiceImplTest {
     void update_unknownTask_throws404() {
         UUID taskId = UUID.randomUUID();
         stubGuardAllows();
-        when(executorTaskRepository.findById(taskId)).thenReturn(Optional.empty());
+        when(executorTaskRepository.findByIdForUpdate(taskId)).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, taskId, request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -284,7 +286,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         vault.setStatus(VaultStatus.ARCHIVED_LOCKED);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -306,7 +308,7 @@ class ExecutorTaskServiceImplTest {
     void update_noteTooLong_throws400() {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.update(assignmentId, t.getId(),
                 request(ExecutorTaskStatus.DOING, "a".repeat(1001)), LOGIN));
@@ -320,7 +322,7 @@ class ExecutorTaskServiceImplTest {
     void update_toDone_withoutEvidence_throws400AndKeepsStatus() {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, "xong", null), LOGIN));
@@ -335,7 +337,7 @@ class ExecutorTaskServiceImplTest {
     void update_toDone_blankEvidenceRef_throws400() {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null, "   "), LOGIN));
@@ -349,7 +351,7 @@ class ExecutorTaskServiceImplTest {
     void update_toDone_withEvidenceRef_savesTrimmedRefAndAuditsEvidence() {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
@@ -369,7 +371,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         t.setEvidenceRef("REF-CU");
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
@@ -386,7 +388,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         t.setEvidenceDocumentId(UUID.randomUUID());
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
@@ -400,7 +402,7 @@ class ExecutorTaskServiceImplTest {
     void update_toDoing_doesNotRequireEvidence() {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),

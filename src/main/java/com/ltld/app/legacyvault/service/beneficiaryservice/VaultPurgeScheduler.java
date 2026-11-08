@@ -19,6 +19,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -47,6 +48,7 @@ public class VaultPurgeScheduler {
     private final AuditLogService auditLogService;
     private final TransactionTemplate requiresNewTx;
     private final AssetAllocationRepository assetAllocationRepository;
+    private final ExecutorEvidenceFileRepository executorEvidenceFileRepository;
 
     public VaultPurgeScheduler(VaultRepository vaultRepository,
                                AssetAccessRecordRepository accessRecordRepository,
@@ -57,6 +59,7 @@ public class VaultPurgeScheduler {
                                BeneficiaryClaimRepository claimRepository,
                                VaultBeneficiaryRepository vaultBeneficiaryRepository,
                                AssetAllocationRepository assetAllocationRepository,
+                               ExecutorEvidenceFileRepository executorEvidenceFileRepository,
                                FileStorageService fileStorageService,
                                AuditLogService auditLogService,
                                PlatformTransactionManager transactionManager) {
@@ -69,6 +72,7 @@ public class VaultPurgeScheduler {
         this.claimRepository = claimRepository;
         this.vaultBeneficiaryRepository = vaultBeneficiaryRepository;
         this.assetAllocationRepository = assetAllocationRepository;
+        this.executorEvidenceFileRepository = executorEvidenceFileRepository;
         this.fileStorageService = fileStorageService;
         this.auditLogService = auditLogService;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
@@ -112,11 +116,12 @@ public class VaultPurgeScheduler {
             status.setRollbackOnly();
             return null;
         }
-        // Phải lấy đường dẫn TRƯỚC khi xóa dòng legal_documents
-        List<String> filePaths = legalDocumentRepository.findByVaultId(vaultId).stream()
+        // Phải lấy đường dẫn TRƯỚC khi xóa dòng legal_documents / tài sản (evidence tự xóa theo FK)
+        List<String> filePaths = new ArrayList<>(legalDocumentRepository.findByVaultId(vaultId).stream()
                 .map(LegalDocument::getFileUrlEncrypted)
                 .filter(Objects::nonNull)
-                .toList();
+                .toList());
+        filePaths.addAll(executorEvidenceFileRepository.findFileUrlsByVaultId(vaultId));
 
         // Con trước, cha sau (theo FK)
         accessRecordRepository.deleteByVaultId(vaultId);

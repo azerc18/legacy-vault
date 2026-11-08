@@ -18,7 +18,10 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Table(name = "asset_verifications",
-        indexes = @Index(name = "idx_asset_verification_asset", columnList = "asset_id"))
+        indexes = {
+                @Index(name = "idx_asset_verification_asset", columnList = "asset_id"),
+                @Index(name = "idx_asset_verification_status_expires", columnList = "status, expires_at")
+        })
 public class AssetVerification {
 
     @Id
@@ -57,6 +60,10 @@ public class AssetVerification {
 
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
+
+    // PR 2: đã gửi nhắc "sắp hết hạn" lúc nào (null = chưa nhắc)
+    @Column(name = "reminded_at")
+    private LocalDateTime remindedAt;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
