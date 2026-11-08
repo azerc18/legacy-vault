@@ -2,9 +2,11 @@ package com.ltld.app.legacyvault.service.accountservice;
 
 import com.ltld.app.legacyvault.dto.accountdto.DeleteAccountRequest;
 import com.ltld.app.legacyvault.entity.Role;
+import com.ltld.app.legacyvault.entity.Subscription;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.repository.*;
@@ -21,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -44,6 +47,7 @@ class AccountDeletionServiceImplTest {
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private MfaBackupCodeRepository mfaBackupCodeRepository;
+    @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private MfaService mfaService;
     @Mock private TokenService tokenService;
     @Mock private PasswordEncoder passwordEncoder;
@@ -63,6 +67,7 @@ class AccountDeletionServiceImplTest {
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("NEW-HASH");
         lenient().when(executorAssignmentRepository.findLiveByExecutorUserId(any())).thenReturn(List.of());
         lenient().when(dmsConfigRepository.findByOwnerId(any())).thenReturn(Optional.empty());
+        lenient().when(subscriptionRepository.findByUserIdAndStatus(any(), any())).thenReturn(List.of());
     }
 
     private static Role role(String code) {
@@ -158,5 +163,44 @@ class AccountDeletionServiceImplTest {
         assertThat(res.getBlockers()).containsExactly("VAULTS_OWNED");
         assertThat(res.getVaultCount()).isEqualTo(2);
         assertThat(res.isMfaRequired()).isTrue();
+    }
+
+    @Test
+    void wrongPassword_countsAttempt_andLocksAfterFive() {
+        user.setFailedLoginAttempts(AccountDeletionServiceImpl.MAX_FAILED_ATTEMPTS - 1);
+        assertRejected(req("bad", "a@example.com", null), HttpStatus.BAD_REQUEST);
+        assertThat(user.getLockedUntil()).isAfter(Instant.now());
+    }
+
+    @Test
+    void lockedAccount_isRejectedBeforeCheckingPassword() {
+        user.setLockedUntil(Instant.now().plusSeconds(600));
+        assertRejected(req("pw", "a@example.com", null), HttpStatus.TOO_MANY_REQUESTS);
+        verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void blockedAccount_doesNotConsume2faCode() {
+        user.setMfaEnabled(true);
+        when(vaultRepository.existsByOwnerId(user.getId())).thenReturn(true);
+        assertRejected(req("pw", "a@example.com", "123456"), HttpStatus.CONFLICT);
+        verify(mfaService, never()).verifyCode(any(), any());
+    }
+
+    @Test
+    void beneficiaryOfOpenVault_isBlocked() {
+        when(vaultBeneficiaryRepository.existsLiveLinkForUser(user.getId())).thenReturn(true);
+        assertRejected(req("pw", "a@example.com", null), HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void success_cancelsActiveSubscriptions() {
+        Subscription sub = new Subscription();
+        sub.setStatus(SubscriptionStatus.ACTIVE);
+        when(subscriptionRepository.findByUserIdAndStatus(user.getId(), SubscriptionStatus.ACTIVE)).thenReturn(List.of(sub));
+
+        service.delete(user.getId(), req("pw", "a@example.com", null));
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.CANCELLED);
+        verify(subscriptionRepository).save(sub);
     }
 }

@@ -248,7 +248,7 @@
       "signIn": "You will be signed out everywhere and cannot sign in again.",
       "anonymize": "Your name, email, phone number, photo and 2FA are removed from the account.",
       "keep": "Payment history and system logs are kept in anonymized form as required.",
-      "noRefund": "Any remaining VIP time is not refunded."
+      "noRefund": "Any active VIP plan is cancelled right away and not refunded."
     },
     "exportFirst": "Tip: download \"My data\" above first if you want to keep a copy.",
     "password": "Current password",

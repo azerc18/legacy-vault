@@ -26,5 +26,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     @EntityGraph(attributePaths = {"user", "plan"})
     List<Subscription> findByStatusAndReminderSentFalseAndExpiresAtBetween(
             SubscriptionStatus status, LocalDateTime from, LocalDateTime to);
+
+    // Xoá tài khoản: huỷ mọi gói còn hiệu lực để không gia hạn / thu tiền tiếp
+    List<Subscription> findByUserIdAndStatus(UUID userId, SubscriptionStatus status);
 }
 

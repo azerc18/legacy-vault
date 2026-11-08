@@ -9,14 +9,19 @@ import { sessionApi } from '../api/sessionApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, btnOutline } from '../Owner/ownerUi.jsx';
 
-const SENSITIVE = /secret|password|passphrase|seed|private.?key|pin|otp|token|cvv|mfa/i;
+// So theo từng từ của tên khoá (camelCase / snake_case / kebab) để "pin" không bắt nhầm "shipping", "mapping"
+const SENSITIVE_WORD = /^(secrets?|passwords?|passphrases?|passcodes?|seeds?|pins?|otps?|tokens?|cvv|cvc|mfa)$/;
+function isSensitiveKey(key) {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    return words.some((w, i) => SENSITIVE_WORD.test(w) || w === 'privatekey' || (w === 'private' && words[i + 1] === 'key'));
+}
 
 // Bỏ mọi khoá có tên nhạy cảm ở mọi tầng (vd. publicFields của tài sản do người dùng tự đặt tên)
 function scrub(value) {
     if (Array.isArray(value)) return value.map(scrub);
     if (value && typeof value === 'object') {
         return Object.fromEntries(Object.entries(value)
-            .filter(([k]) => !SENSITIVE.test(k))
+            .filter(([k]) => !isSensitiveKey(k))
             .map(([k, v]) => [k, scrub(v)]));
     }
     return value;

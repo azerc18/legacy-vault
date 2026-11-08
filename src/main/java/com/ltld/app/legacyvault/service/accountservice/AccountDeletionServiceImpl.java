@@ -8,12 +8,15 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.RevokedReason;
+import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.MfaBackupCodeRepository;
+import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -31,6 +34,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -47,6 +51,10 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
     static final String DELETED_NAME = "Deleted user";
     static final String DELETED_EMAIL_DOMAIN = "@deleted.invalid";   // .invalid không bao giờ nhận được mail (RFC 2606)
     private static final Set<String> STAFF_ROLES = Set.of("ADMIN", "LEGAL_VERIFIER");
+    private static final Set<VaultStatus> OPEN_VAULT_STATUSES = Set.of(VaultStatus.ACTIVE, VaultStatus.UNLOCKED);
+    // Giống đăng nhập: sai mật khẩu / mã 2FA 5 lần thì khoá tạm 15 phút
+    static final int MAX_FAILED_ATTEMPTS = 5;
+    static final Duration LOCK_DURATION = Duration.ofMinutes(15);
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
@@ -55,6 +63,7 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
     private final MfaBackupCodeRepository mfaBackupCodeRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final MfaService mfaService;
     private final TokenService tokenService;
     private final PasswordEncoder passwordEncoder;
@@ -81,8 +90,17 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserProfileException(ErrorCode.NOT_FOUND, "Account not found"));
 
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
+            fail(user, "temporarily locked");
+            throw new UserProfileException("Too many failed attempts. Please try again later.",
+                    HttpStatus.TOO_MANY_REQUESTS);
+        }
+        if (user.getLockedUntil() != null) {   // khoá cũ đã hết hạn: đếm lại từ đầu như đăng nhập
+            user.setLockedUntil(null);
+            user.setFailedLoginAttempts(0);
+        }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            fail(user, "wrong password");
+            badSecret(user, "wrong password");
             throw new UserProfileException("Current password is incorrect", HttpStatus.BAD_REQUEST);
         }
         if (request.getConfirmEmail() == null
@@ -90,15 +108,16 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
             fail(user, "email mismatch");
             throw new UserProfileException("The email you typed does not match your account", HttpStatus.BAD_REQUEST);
         }
-        if (user.isMfaEnabled() && !mfaService.verifyCode(user, request.getCode())) {
-            fail(user, "invalid 2fa code");
-            throw new UserProfileException("The two-step verification code is incorrect", HttpStatus.BAD_REQUEST);
-        }
+        // Kiểm blockers trước 2FA để mã dự phòng không bị dùng mất khi tài khoản còn bị chặn
         List<String> blockers = blockers(user);
         if (!blockers.isEmpty()) {
             fail(user, "blocked " + blockers);
             throw new UserProfileException("Your account cannot be deleted yet: " + String.join(", ", blockers),
                     HttpStatus.CONFLICT);
+        }
+        if (user.isMfaEnabled() && !mfaService.verifyCode(user, request.getCode())) {
+            badSecret(user, "invalid 2fa code");
+            throw new UserProfileException("The two-step verification code is incorrect", HttpStatus.BAD_REQUEST);
         }
 
         String oldAvatar = user.getAvatarPath();
@@ -116,6 +135,8 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         user.setMfaLastUsedStep(null);
         user.setMfaChallengeHash(null);
         user.setMfaChallengeExpiresAt(null);
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         user.setStatus(UserStatus.DELETED);
         user.setDeletedAt(now);
         userRepository.save(user);
@@ -130,6 +151,12 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
                     c.setStatus(DmsStatus.SUSPENDED);
                     dmsConfigRepository.save(c);
                 });
+
+        // Gói còn hiệu lực bị huỷ (không hoàn tiền) để không nhắc / gia hạn / thu tiền tiếp
+        subscriptionRepository.findByUserIdAndStatus(userId, SubscriptionStatus.ACTIVE).forEach(sub -> {
+            sub.setStatus(SubscriptionStatus.CANCELLED);
+            subscriptionRepository.save(sub);
+        });
 
         if (oldAvatar != null) {
             afterCommit(() -> fileStorageService.deleteFile(oldAvatar));
@@ -150,10 +177,23 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         if (!executorAssignmentRepository.findLiveByExecutorUserId(id).isEmpty()) {
             out.add("EXECUTOR");
         }
-        if (vaultBeneficiaryRepository.existsLiveLinkForUser(id) || vaultRepository.existsByBeneficiaryId(id)) {
+        if (vaultBeneficiaryRepository.existsLiveLinkForUser(id)
+                || vaultRepository.existsByBeneficiaryIdAndStatusIn(id, OPEN_VAULT_STATUSES)) {
             out.add("BENEFICIARY");
         }
         return out;
+    }
+
+    // Sai mật khẩu / mã 2FA: đếm chung bộ đếm với đăng nhập, đủ 5 lần thì khoá tạm
+    private void badSecret(User user, String detail) {
+        int attempts = user.getFailedLoginAttempts() + 1;
+        user.setFailedLoginAttempts(attempts);
+        if (attempts >= MAX_FAILED_ATTEMPTS) {
+            user.setLockedUntil(Instant.now().plus(LOCK_DURATION));
+            user.setFailedLoginAttempts(0);
+        }
+        userRepository.save(user);
+        fail(user, detail + ", attempt " + attempts);
     }
 
     private void fail(User user, String detail) {

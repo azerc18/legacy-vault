@@ -142,4 +142,16 @@ class AccountDeletionIntegrationTest extends MySqlTestContainer {
 
         assertThat(accountDeletionService.check(u.getId()).getBlockers()).isEmpty();
     }
+
+    @Test
+    void beneficiaryOfFinishedVault_doesNotBlock() {
+        User u = user("heir");
+        User other = user("owner3");
+        Vault claimed = vaultRepository.save(Vault.builder().owner(other).name("Done").status(VaultStatus.CLAIMED)
+                .beneficiary(u).build());                                    // cả kiểu cũ (vaults.beneficiary_id)
+        vaultBeneficiaryRepository.save(VaultBeneficiary.builder().vault(claimed).user(u).email(u.getEmail())
+                .status(BeneficiaryInviteStatus.ACCEPTED).build());          // lẫn kiểu N:M, két đã nhận xong
+
+        assertThat(accountDeletionService.check(u.getId()).getBlockers()).isEmpty();
+    }
 }

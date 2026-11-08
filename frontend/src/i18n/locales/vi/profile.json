@@ -248,7 +248,7 @@
       "signIn": "Bạn sẽ bị đăng xuất khỏi mọi thiết bị và không đăng nhập lại được.",
       "anonymize": "Tên, email, số điện thoại, ảnh đại diện và 2FA bị xoá khỏi tài khoản.",
       "keep": "Lịch sử thanh toán và nhật ký hệ thống được giữ lại ở dạng ẩn danh theo quy định.",
-      "noRefund": "Gói VIP còn hạn sẽ không được hoàn tiền."
+      "noRefund": "Gói VIP còn hạn sẽ bị huỷ ngay và không được hoàn tiền."
     },
     "exportFirst": "Mẹo: tải \"Dữ liệu của tôi\" ở trên trước khi xoá nếu bạn muốn giữ một bản sao.",
     "password": "Mật khẩu hiện tại",
