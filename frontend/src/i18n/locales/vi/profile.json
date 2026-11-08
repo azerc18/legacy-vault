@@ -82,5 +82,102 @@
     "saved": "Tôi đã lưu",
     "fileHeader": "Mã dự phòng LegacyVault ({{email}})\nMỗi mã chỉ dùng được 1 lần.",
     "failed": "Đã có lỗi xảy ra."
+  },
+  "completeness": {
+    "title": "Mức độ hoàn thiện",
+    "hint": "Đã xong {{done}}/{{total}} mục. Hoàn tất các mục còn lại để tài khoản an toàn hơn.",
+    "allDone": "Tài khoản của bạn đã hoàn thiện và được bảo vệ tốt.",
+    "fix": "Làm ngay",
+    "estateScore": "Điểm sẵn sàng thừa kế",
+    "items": {
+      "verified": "Đã xác minh email",
+      "avatar": "Thêm ảnh đại diện",
+      "phone": "Thêm số điện thoại",
+      "mfa": "Bật xác thực 2 lớp"
+    }
+  },
+  "legacy": {
+    "title": "Di sản của tôi",
+    "vaults": "Két di sản",
+    "assets": "Tài sản số",
+    "dms": "Dead Man's Switch",
+    "dmsOff": "Chưa bật",
+    "plan": "Gói đang dùng",
+    "planFree": "Miễn phí",
+    "dmsStatus": {
+      "ACTIVE": "Đang bật",
+      "PENDING_CONFIRMATION": "Chờ xác nhận",
+      "TRIGGERED": "Đã kích hoạt",
+      "SUSPENDED": "Tạm dừng"
+    },
+    "dmsWarning": "DMS đã kích hoạt",
+    "peopleTitle_one": "Những người trong di sản của tôi ({{count}})",
+    "peopleTitle_other": "Những người trong di sản của tôi ({{count}})",
+    "empty": "Chưa có ai. Tạo két di sản và thêm người thụ hưởng để bắt đầu.",
+    "createVault": "Tạo két",
+    "roleBeneficiary_one": "Người thụ hưởng ({{count}} két)",
+    "roleBeneficiary_other": "Người thụ hưởng ({{count}} két)",
+    "roleConfirmer": "Người xác nhận DMS",
+    "executor": {
+      "PRIMARY": "Người thi hành chính",
+      "BACKUP": "Người thi hành dự phòng"
+    },
+    "beneficiaryStatus": {
+      "PENDING_REGISTRATION": "Chờ đăng ký",
+      "INVITED": "Đã mời",
+      "VERIFIED": "Đã xác minh",
+      "ACCEPTED": "Đã nhận",
+      "DECLINED": "Từ chối",
+      "WAIVED": "Đã nhường"
+    },
+    "executorStatus": {
+      "INACTIVE": "Đã chỉ định",
+      "ACTIVE": "Đang thi hành"
+    },
+    "confirmerStatus": {
+      "ACTIVE": "Sẵn sàng",
+      "CONFIRMED_ALIVE": "Đã xác nhận",
+      "CONFIRMED_UNREACHABLE": "Báo mất liên lạc"
+    },
+    "manageExecutors": "Quản lý người thi hành",
+    "manageDms": "Cài đặt DMS",
+    "viewActivity": "Nhật ký hoạt động"
+  },
+  "prefs": {
+    "title": "Tuỳ chọn cá nhân",
+    "description": "Áp dụng cho trình duyệt này.",
+    "theme": "Giao diện",
+    "themeLight": "Sáng",
+    "themeDark": "Tối",
+    "themeSystem": "Hệ thống",
+    "uiLanguage": "Ngôn ngữ giao diện",
+    "uiLanguageHint": "Ngôn ngữ email đổi ở mục Thông tin cá nhân.",
+    "idle": "Tự đăng xuất khi không dùng",
+    "idleHint": "Hữu ích khi dùng máy chung.",
+    "idleOff": "Không bao giờ",
+    "idleMinutes_one": "Sau {{count}} phút",
+    "idleMinutes_other": "Sau {{count}} phút",
+    "idleSignedOut": "Bạn đã được đăng xuất vì không hoạt động trong một thời gian."
+  },
+  "sessions": {
+    "title": "Thiết bị đang đăng nhập",
+    "description": "Các trình duyệt và thiết bị đang giữ phiên đăng nhập vào tài khoản của bạn.",
+    "thisDevice": "Thiết bị này",
+    "unknownDevice": "Thiết bị không xác định",
+    "lastActive": "Hoạt động {{time}}",
+    "signOut": "Đăng xuất",
+    "working": "Đang xử lý...",
+    "signOutOthers": "Đăng xuất mọi thiết bị khác",
+    "confirmTitle": "Đăng xuất mọi thiết bị khác?",
+    "confirmMessage_one": "{{count}} thiết bị khác sẽ phải đăng nhập lại. Thiết bị này vẫn giữ đăng nhập.",
+    "confirmMessage_other": "{{count}} thiết bị khác sẽ phải đăng nhập lại. Thiết bị này vẫn giữ đăng nhập.",
+    "note": "Thiết bị bị đăng xuất sẽ thoát hẳn trong tối đa 15 phút.",
+    "revoked": "Đã đăng xuất thiết bị.",
+    "revokedOthers_one": "Đã đăng xuất {{count}} thiết bị.",
+    "revokedOthers_other": "Đã đăng xuất {{count}} thiết bị.",
+    "errors": {
+      "load": "Không tải được danh sách thiết bị.",
+      "failed": "Không thực hiện được. Vui lòng thử lại."
+    }
   }
 }

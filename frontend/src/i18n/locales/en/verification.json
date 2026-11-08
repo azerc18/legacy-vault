@@ -1,0 +1,112 @@
+{
+  "badge": {
+    "SELF_DECLARED": { "label": "Self-declared", "hint": "Declared by the owner, not verified" },
+    "PENDING": { "label": "Verification pending", "hint": "Verification started but not completed" },
+    "VERIFIED": { "label": "Verified", "hint": "Verified" },
+    "VERIFIED_SANDBOX": { "label": "Simulated", "hint": "Simulated verification, not a real one" },
+    "FAILED": { "label": "Verification failed", "hint": "The last verification attempt failed" },
+    "EXPIRED": { "label": "Re-verify needed", "hint": "Verification has expired" }
+  },
+  "methods": {
+    "FILE_HASH": { "label": "File fingerprint (SHA-256)", "desc": "Upload the original to the vault; the system stores the file's SHA-256 fingerprint.", "fileIntro": "Upload the original document (PDF, DOC/DOCX, PNG or JPG, up to 10 MB). The system stores its SHA-256 fingerprint so a later change to the file can be detected. This does not prove the document is genuine." },
+    "SECOND_PERSON_CONFIRM": { "label": "Second-person confirmation", "desc": "Send a confirmation code to a witness or co-owner." },
+    "OTP_EMAIL": { "label": "Email OTP code", "desc": "Receive a code at the asset's email and enter it." },
+    "GOOGLE_LOGIN": { "label": "Google sign-in", "desc": "Sign in with the Google account you declared." },
+    "SMS_CODE_MOCK": { "label": "SMS code (simulated)", "desc": "Enter the simulated SMS code sent to the declared phone." },
+    "PAYPAL_LOGIN": { "label": "PayPal (simulated)", "desc": "Confirm the PayPal account with a challenge code." },
+    "BANK_NAME_LOOKUP_MOCK": { "label": "Bank account name lookup (simulated)", "desc": "Match the declared bank account holder name." },
+    "BANK_FORMAT_CHECK": { "label": "Account number format check", "desc": "Verify that the bank account number matches valid format rules." },
+    "STATEMENT_UPLOAD": { "label": "Bank statement upload", "desc": "Upload a bank statement to the vault for verification.", "fileIntro": "Upload a bank statement (PDF, DOC/DOCX, PNG or JPG, up to 10 MB) to store in the vault's documents." },
+    "MICRO_DEPOSIT_MOCK": { "label": "Micro-deposit code (simulated)", "desc": "Enter the simulated micro-deposit code sent to the bank account." },
+    "EXCHANGE_EMAIL_CODE": { "label": "Exchange email code", "desc": "Enter the verification code sent to the exchange account email." },
+    "API_READONLY_MOCK": { "label": "Read-only API key (simulated)", "desc": "Verify read-only connection to the exchange account." },
+    "ADDRESS_CHECKSUM": { "label": "Wallet address check", "desc": "Check the format and checksum of the wallet address." },
+    "BIP39_CHECK": { "label": "Recovery phrase check", "desc": "Check that the stored recovery phrase is a valid BIP-39 phrase." },
+    "PUBLIC_BALANCE": { "label": "Public balance lookup", "desc": "Look up the public balance of the address on the blockchain." },
+    "WALLET_SIGNATURE": { "label": "Wallet signature", "desc": "Sign a message with the wallet to prove you hold the key." },
+    "BIO_CHALLENGE_MOCK": { "label": "Bio challenge (simulated)", "desc": "Put a challenge code in the account's bio." },
+    "SCREENSHOT_UPLOAD": { "label": "Profile screenshot", "desc": "Upload a screenshot of the account profile page to the vault." }
+  },
+  "button": { "verify": "Verify", "reverify": "Re-verify", "details": "Verification status" },
+  "dialog": {
+    "title": "Verify asset",
+    "loading": "Loading...",
+    "noMethods": "This asset type does not support verification yet.",
+    "chooseHint": "Choose a verification method:",
+    "resume": "Continue the pending verification",
+    "alreadyVerified": "This asset is verified until {{date}}. If you change key details, it goes back to self-declared and needs verifying again.",
+    "codeSent": "A code was sent to {{target}}.",
+    "codeEnter": "Enter the code you received.",
+    "codeLabel": "Verification code",
+    "codePlaceholder": "Enter code",
+    "sandboxNotice": "Simulation mode: the result is labelled \"Simulated\" and is not a real verification.",
+    "sandboxCode": "Your simulated code: {{code}}",
+    "challengeLabel": "Message to sign",
+    "copy": "Copy",
+    "signatureLabel": "Signature",
+    "signaturePlaceholder": "Paste the signature (0x...)",
+    "bioIntro": "Put this code in the account's bio, then paste it into the box below:",
+    "bioLabel": "Bio text or code",
+    "bioPlaceholder": "LV-XXXXXX",
+    "fileIntro": "Upload a screenshot of the profile page (PNG or JPG, up to 10 MB). It is saved to the vault's documents.",
+    "autoIntro": "Nothing else to enter. Press Check and the system does the rest.",
+    "googleIntro": "Sign in with the exact Google account declared for this asset.",
+    "submit": "Complete verification",
+    "check": "Check",
+    "working": "Working...",
+    "back": "Choose another method",
+    "close": "Close",
+    "retry": "Try again",
+    "result": {
+      "verified": "Verified successfully.",
+      "sandbox": "Verified in simulation mode.",
+      "failed": "Verification was not successful.",
+      "expires": "Valid until {{date}}."
+    },
+    "errors": {
+      "load": "Could not load the verification status.",
+      "start": "Could not start verification.",
+      "confirm": "Could not complete verification.",
+      "fileTooBig": "File must be 10 MB or smaller."
+    }
+  },
+  "executor": {
+    "refLabel": "Reference code",
+    "refPlaceholder": "Request or case number from the provider",
+    "fileLabel": "Evidence file",
+    "fileHint": "PDF, JPG, PNG, up to 10 MB. The file is encrypted at rest.",
+    "fileCurrent": "Current file: {{name}}",
+    "sha": "SHA-256: {{hash}}...",
+    "download": "Download",
+    "needEvidence": "Enter a reference code or attach an evidence file before choosing \"Done\".",
+    "fileTooBig": "File must be 10 MB or smaller.",
+    "downloadError": "Could not download the evidence file.",
+    "locked": "This task was confirmed and can no longer be changed.",
+    "editHint": "Switch back to \"In progress\" and save before changing the evidence."
+  },
+  "confirm": {
+    "PENDING": "Waiting for the beneficiary to confirm (dispute deadline: {{date}}).",
+    "CONFIRMED": "The beneficiary confirmed the result.",
+    "DISPUTED": "The beneficiary disputed it: {{reason}}. A new reference code or file is needed to complete it again.",
+    "autoConfirmed": "The dispute window has passed; the result is treated as accepted."
+  },
+  "beneficiary": {
+    "evidenceRef": "Reference code: {{ref}}",
+    "evidenceFile": "Evidence file: {{name}}",
+    "sha": "SHA-256: {{hash}}...",
+    "confirmBtn": "Confirm",
+    "disputeBtn": "Dispute",
+    "reasonLabel": "Reason for disputing",
+    "reasonPlaceholder": "Explain why you disagree (5 to 500 characters)",
+    "reasonInvalid": "The reason must be 5 to 500 characters.",
+    "submitDispute": "Send dispute",
+    "cancel": "Cancel",
+    "confirmError": "Could not confirm.",
+    "disputeError": "Could not send the dispute."
+  },
+  "readiness": {
+    "reverify": "{{n}} assets need re-verification",
+    "expiringSoon": "{{n}} assets expire soon (within 14 days)",
+    "action": "Verify now"
+  }
+}

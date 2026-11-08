@@ -6,25 +6,33 @@ const unwrap = (res) => res.data?.data;
 
 // Báo ProtectionBanner tải lại sau khi Owner đổi vault / người thụ hưởng / Executor / DMS
 export const PROTECTION_CHANGED = 'lv:owner-protection-changed';
-const changed = (result) => { window.dispatchEvent(new Event(PROTECTION_CHANGED)); return result; };
+const changed = (result) => {
+    window.dispatchEvent(new Event(PROTECTION_CHANGED));
+    return result;
+};
 
 // Lấy tên file từ Content-Disposition rồi cho trình duyệt tải về
 async function saveBlob(url, fallbackName) {
     try {
-        const res = await http.get(url, { responseType: 'blob' });
+        const res = await http.get(url, {responseType: 'blob'});
         const cd = res.headers['content-disposition'] || '';
         const star = cd.match(/filename\*=UTF-8''([^;]+)/i);
         const plain = cd.match(/filename="?([^";]+)"?/i);
         const name = star ? decodeURIComponent(star[1]) : plain ? plain[1] : fallbackName;
         const href = URL.createObjectURL(res.data);
         const a = document.createElement('a');
-        a.href = href; a.download = name; a.click();
+        a.href = href;
+        a.download = name;
+        a.click();
         URL.revokeObjectURL(href);
     } catch (err) {
         // Lỗi trả về dạng Blob JSON -> đọc lại để lấy message của BE
         const blob = err.response?.data;
         if (blob instanceof Blob) {
-            try { err.response.data = JSON.parse(await blob.text()); } catch { /* giữ nguyên */ }
+            try {
+                err.response.data = JSON.parse(await blob.text());
+            } catch { /* giữ nguyên */
+            }
         }
         throw err;
     }
@@ -42,11 +50,11 @@ export const ownerApi = {
 
     // N1: beneficiaries bắt buộc, 1–10 dòng [{ email, fullName?, relationship? }]
     // name ≤100 (bắt buộc), description ≤500, assets ≤50: [{ assetType, assetName ≤200, secret ≤5000, notes ≤2000 }]
-    createVault: ({ name, description, assets, beneficiaries }) =>
-        http.post('/vaults', { name, description, assets, beneficiaries }).then(unwrap).then(changed),
+    createVault: ({name, description, assets, beneficiaries}) =>
+        http.post('/vaults', {name, description, assets, beneficiaries}).then(unwrap).then(changed),
 
     // Bị chặn khi DMS đã kích hoạt hoặc đang có hồ sơ xác minh
-    updateVault: (vaultId, { name, description }) => http.put(`/vaults/${vaultId}`, { name, description }).then(unwrap),
+    updateVault: (vaultId, {name, description}) => http.put(`/vaults/${vaultId}`, {name, description}).then(unwrap),
 
     // Chỉ xoá được khi vault ACTIVE
     deleteVault: (vaultId) => http.delete(`/vaults/${vaultId}`).then(changed),
@@ -58,6 +66,18 @@ export const ownerApi = {
     getAsset: (vaultId, assetId) => http.get(`/vaults/${vaultId}/assets/${assetId}`).then(unwrap),
     // N3: schema các loại tài sản -> [{ assetType, label, mechanism, fields: [{ key, label, type, required, sensitive, pattern, options }] }]
     getAssetTypes: () => http.get('/asset-types').then((r) => unwrap(r) ?? []),
+    // C.5: xác thực tài sản. Mỗi hàm trả { assetId, status, method, provider, verifiedAt, expiresAt, availableMethods, message, clientData }
+    getAssetVerification: (vaultId, assetId) =>
+        http.get(`/vaults/${vaultId}/assets/${assetId}/verification`).then(unwrap),
+    startAssetVerification: (vaultId, assetId, method) =>
+        http.post(`/vaults/${vaultId}/assets/${assetId}/verification/start`, {method}).then(unwrap),
+    // payload tùy cách: { code } | { signature, nonce } | { challengeCode } | { documentId } | { idToken } | {}
+    // Báo thẻ điểm sẵn sàng tải lại (số tài sản cần xác thực lại có thể đổi)
+    confirmAssetVerification: (vaultId, assetId, method, payload = {}) =>
+        http.post(`/vaults/${vaultId}/assets/${assetId}/verification/confirm`, {
+            method,
+            payload
+        }).then(unwrap).then(changed),
     // { assetType, assetName, fields (theo schema) | secret (kiểu cũ), notes }
     addAsset: (vaultId, asset) => http.post(`/vaults/${vaultId}/assets`, asset).then(unwrap),
     // Cập nhật: secret null/rỗng = giữ nguyên; notes null = giữ nguyên, "" = xoá ghi chú
@@ -65,16 +85,19 @@ export const ownerApi = {
     deleteAsset: (vaultId, assetId) => http.delete(`/vaults/${vaultId}/assets/${assetId}`),
 
     // N2-owner: thêm 1 người thụ hưởng -> { id, email, fullName, relationship, status }
-    addBeneficiary: (vaultId, { email, fullName, relationship }) =>
-        http.post(`/vaults/${vaultId}/beneficiaries`, { email, fullName, relationship }).then(unwrap).then(changed),
+    addBeneficiary: (vaultId, {email, fullName, relationship}) =>
+        http.post(`/vaults/${vaultId}/beneficiaries`, {email, fullName, relationship}).then(unwrap).then(changed),
 
     // N2-owner: xoá 1 người thụ hưởng theo id (BE chặn LAST_BENEFICIARY, BENEFICIARY_IN_USE)
     removeBeneficiaryById: (vaultId, beneficiaryId) =>
         http.delete(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`).then(changed),
 
     // Owner sửa tên / mối quan hệ của 1 người thụ hưởng (email không sửa) -> { id, email, fullName, relationship, status }
-    updateBeneficiary: (vaultId, beneficiaryId, { fullName, relationship }) =>
-        http.patch(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`, { fullName, relationship }).then(unwrap).then(changed),
+    updateBeneficiary: (vaultId, beneficiaryId, {fullName, relationship}) =>
+        http.patch(`/vaults/${vaultId}/beneficiaries/${beneficiaryId}`, {
+            fullName,
+            relationship
+        }).then(unwrap).then(changed),
 
     // FR-04 & X5: upload tài liệu pháp lý (PDF, DOC/DOCX, JPG/PNG, tối đa 10MB)
     // type: WILL | OWNERSHIP_PAPER | IDENTITY_CARD | OTHER
@@ -106,27 +129,27 @@ export const ownerApi = {
 
     // Nhật ký hoạt động: trả Page { content[], totalPages, totalElements, number, size }
     // startDate/endDate: ISO date-time (vd 2026-10-01T00:00:00Z); không gửi startDate thì xem toàn bộ lịch sử
-    getActivityLogs: (vaultId, { startDate, endDate, page = 0, size = 20 } = {}) => {
-        const params = { page, size };
+    getActivityLogs: (vaultId, {startDate, endDate, page = 0, size = 20} = {}) => {
+        const params = {page, size};
         if (startDate) params.startDate = startDate;
         if (endDate) params.endDate = endDate;
-        return http.get(`/vaults/${vaultId}/activity-logs`, { params }).then(unwrap);
+        return http.get(`/vaults/${vaultId}/activity-logs`, {params}).then(unwrap);
     },
 
     // Nhật ký cấp Owner (sự kiện DMS / Executor, không gắn vault). Cùng định dạng Page như nhật ký vault
-    getOwnerActivityLogs: ({ startDate, endDate, page = 0, size = 20 } = {}) => {
-        const params = { page, size };
+    getOwnerActivityLogs: ({startDate, endDate, page = 0, size = 20} = {}) => {
+        const params = {page, size};
         if (startDate) params.startDate = startDate;
         if (endDate) params.endDate = endDate;
-        return http.get('/owner/activity-logs', { params }).then(unwrap);
+        return http.get('/owner/activity-logs', {params}).then(unwrap);
     },
 
     // F6: Nhật ký minh bạch "Ai đã xem di sản của bạn" (Executor / Beneficiary / Admin / Khẩn cấp)
-    getEstateAccessLogs: ({ startDate, endDate, page = 0, size = 20 } = {}) => {
-        const params = { page, size };
+    getEstateAccessLogs: ({startDate, endDate, page = 0, size = 20} = {}) => {
+        const params = {page, size};
         if (startDate) params.startDate = startDate;
         if (endDate) params.endDate = endDate;
-        return http.get('/owner/activity-logs/access', { params }).then(unwrap);
+        return http.get('/owner/activity-logs/access', {params}).then(unwrap);
     },
 
     /* ---------- Dead Man's Switch (FR-03 & X2) ---------- */
@@ -136,13 +159,13 @@ export const ownerApi = {
     saveDms: (config) => http.put('/dms', config).then(unwrap).then(changed),
     checkIn: () => http.post('/dms/check-in').then(unwrap),
     // Lịch sử check-in, mới nhất trước: Page { content[{ checkinType, channel, occurredAt }], totalPages, totalElements, number, size }
-    getDmsCheckins: ({ page = 0, size = 20 } = {}) =>
-        http.get('/dms/check-ins', { params: { page, size } }).then(unwrap),
+    getDmsCheckins: ({page = 0, size = 20} = {}) =>
+        http.get('/dms/check-ins', {params: {page, size}}).then(unwrap),
 
     // X2: Trusted Social Confirmers (tối đa 2 người)
     listDmsConfirmers: () => http.get('/dms/confirmers').then((r) => unwrap(r) ?? []),
-    addDmsConfirmer: ({ name, email, relationship }) =>
-        http.post('/dms/confirmers', { name, email, relationship }).then(unwrap).then(changed),
+    addDmsConfirmer: ({name, email, relationship}) =>
+        http.post('/dms/confirmers', {name, email, relationship}).then(unwrap).then(changed),
     removeDmsConfirmer: (confirmerId) =>
         http.delete(`/dms/confirmers/${confirmerId}`).then(unwrap).then(changed),
 
@@ -151,7 +174,7 @@ export const ownerApi = {
     listExecutors: () => http.get('/owner/executors').then(unwrap),
     // type: PRIMARY | BACKUP
     assignExecutor: (type, email, confirmReplace = false) =>
-        http.put(`/owner/executors/${type}`, { email, confirmReplace }).then(unwrap).then(changed),
+        http.put(`/owner/executors/${type}`, {email, confirmReplace}).then(unwrap).then(changed),
     revokeExecutor: (type) => http.delete(`/owner/executors/${type}`).then(unwrap).then(changed),
 
     /* ---------- Estate Readiness Score (F1) ---------- */

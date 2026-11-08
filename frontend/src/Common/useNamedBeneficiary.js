@@ -12,7 +12,7 @@ export function resetNamedBeneficiaryCache() {
 export default function useNamedBeneficiary(enabled = true) {
     const [named, setNamed] = useState(null); // null = đang kiểm tra
     useEffect(() => {
-        if (!enabled) { setNamed(false); return; }
+        if (!enabled) return undefined;
         cache ??= beneficiaryApi.listVaults()
             .then((list) => list.length > 0)
             .catch(() => false); // 403 (không có role) hoặc lỗi mạng -> coi như chưa được chỉ định
@@ -20,5 +20,5 @@ export default function useNamedBeneficiary(enabled = true) {
         cache.then((v) => { if (alive) setNamed(v); });
         return () => { alive = false; };
     }, [enabled]);
-    return named;
+    return enabled ? named : false;
 }

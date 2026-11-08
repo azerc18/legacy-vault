@@ -1,5 +1,6 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AnimateUIProvider } from '@animate-ui/react/provider';
 import Dashboard from './Dashboard.jsx';
 import UserHome from './UserHome.jsx';
 import Login from './LogInLogOut/Login.jsx';
@@ -44,6 +45,8 @@ import AdminNotifications from './Admin/AdminNotifications.jsx';
 import AdminBeneficiaryLocks from './Admin/AdminBeneficiaryLocks.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
+import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
+import IdleLogout from './Common/IdleLogout.jsx'; // Hồ sơ > Tuỳ chọn: tự đăng xuất khi rảnh
 import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -58,8 +61,10 @@ const ADMIN = ['ADMIN'];
 function App() {
     useTranslation();
     return (
-        <BrowserRouter>
-            <Routes>
+        <AnimateUIProvider>
+            <BrowserRouter>
+                <IdleLogout />
+                <Routes>
                 {/* Công khai */}
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/login" element={<Login />} />
@@ -119,9 +124,11 @@ function App() {
 
                 <Route path="*" element={<NotFound />} />
             </Routes>
+            <InteractiveVaultLock variant="sentinel" />
             <AssistantWidget />
             <PlanLimitUpgradeDialog />
         </BrowserRouter>
+        </AnimateUIProvider>
     );
 }
 

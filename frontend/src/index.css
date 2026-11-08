@@ -1,7 +1,8 @@
-/* ===== Bảng màu (dùng trong tailwind.config ở index.html) =====
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap');
+
+/* ===== Bảng màu gốc (dùng trong tailwind.config ở index.html) =====
    Giá trị là "R G B" để Tailwind ghép được độ trong suốt: bg-primary/40.
    brand = nền thương hiệu luôn tối (sidebar, banner); primary đổi sang màu sáng khi nền tối. */
-/* .lv-landing: trang chủ luôn dùng bảng màu sáng (nền đổi sáng/tối theo phần cuộn), kể cả khi cả app đang ở chế độ tối */
 :root,
 .lv-landing {
   --c-primary: 11 16 32;
@@ -44,6 +45,7 @@
   --c-on-primary-container: 223 229 255;
   --c-on-tertiary-container: 137 245 231;
 }
+
 html.dark {
   --c-primary: 223 229 255;
   --c-on-primary: 11 16 32;
@@ -86,118 +88,271 @@ html.dark {
   --c-on-tertiary-container: 137 245 231;
 }
 
-html, body {
+:root {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --cursor-x: 50vw;
+  --cursor-y: 30vh;
+  --lock-accent-rgb: 61 90 224;
+  --lock-secondary-rgb: 143 164 255;
+}
+
+html,
+body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: var(--font-sans);
 }
 
-/* Nền trang: xanh lạnh có vệt sáng nhẹ ở góc phải trên (theo bản thiết kế UI mới) */
-body {
-  background-color: rgb(var(--c-background));
-  background-image: radial-gradient(1100px 520px at 88% -8%, rgba(160, 175, 235, 0.55), transparent 62%);
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: rgb(var(--c-secondary) / 0.22);
   color: rgb(var(--c-on-surface));
-  background-attachment: fixed;
-  -webkit-font-smoothing: antialiased;
 }
-html.dark body { background-image: radial-gradient(1100px 520px at 88% -8%, rgba(61, 90, 224, 0.22), transparent 62%); }
 
-/* Nút chính (nền navy) bo tròn dạng viên thuốc, giống bản thiết kế */
-.lv-pill { border-radius: 999px; }
-
-/* Thẻ nổi nhẹ hơn */
-.lv-rise { animation: lv-rise .5s ease both; }
-@keyframes lv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .lv-rise { animation: none; } }
+.lv-pill {
+  border-radius: 999px;
+}
 
 /* Trang auth: trên màn rộng, logo đã nằm ở panel trái nên ẩn khối logo trùng bên phải */
 @media (min-width: 1024px) {
-  .lv-auth-logo { display: none; }
+  .lv-auth-logo {
+    display: none;
+  }
 }
 
 /* Thanh bên (AppHeader). Desktop: cố định bên trái 248px. Điện thoại: thanh ngang phía trên. */
-.lv-side { display: flex; flex-direction: column; gap: 8px; padding: 20px 16px; }
-.lv-side-top { padding: 4px 8px 12px; }
-.lv-side-nav { display: flex; flex-direction: column; gap: 4px; }
-.lv-side-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
-.lv-side-bottom .material-symbols-outlined { color: inherit; }
-/* Dropdown thông báo nằm trong sidebar tối nhưng nền sáng: trả lại màu icon của chính nó */
-.lv-side-bottom .lv-pop .material-symbols-outlined.text-secondary { color: rgb(var(--c-secondary)); }
+.lv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 16px;
+}
+.lv-side-top {
+  padding: 4px 8px 12px;
+}
+.lv-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lv-side-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+}
+.lv-side-bottom .material-symbols-outlined {
+  color: inherit;
+}
+.lv-side-bottom .lv-pop .material-symbols-outlined.text-secondary {
+  color: rgb(var(--c-secondary));
+}
 @media (min-width: 1024px) {
-  .lv-side { position: fixed; z-index: 30; top: 0; left: 0; bottom: 0; width: 248px; overflow-y: auto; }
-  body.lv-has-side #root { padding-left: 248px; transition: padding-left .2s ease; }
-  .lv-side { transition: width .2s ease; }
-  /* Thu gọn: thanh hẹp chỉ còn icon */
-  body.lv-side-collapsed .lv-side { width: 76px; padding-left: 12px; padding-right: 12px; }
-  body.lv-side-collapsed.lv-has-side #root { padding-left: 76px; }
-  body.lv-side-collapsed .lv-label { display: none; }
-  body.lv-side-collapsed .lv-side-top { padding-left: 0; padding-right: 0; flex-direction: column; justify-content: center; gap: 10px; }
-  body.lv-side-collapsed .lv-side-nav a { position: relative; justify-content: center; padding-left: 0; padding-right: 0; }
-  body.lv-side-collapsed .lv-badge { position: absolute; top: 4px; right: 8px; margin: 0; }
-  body.lv-side-collapsed .lv-side-bottom { align-items: center; }
+  .lv-side {
+    position: fixed;
+    z-index: 30;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 248px;
+    overflow-y: auto;
+    transition: width 0.2s ease;
+  }
+  body.lv-has-side #root {
+    padding-left: 248px;
+    transition: padding-left 0.2s ease;
+  }
+  body.lv-side-collapsed .lv-side {
+    width: 76px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  body.lv-side-collapsed.lv-has-side #root {
+    padding-left: 76px;
+  }
+  body.lv-side-collapsed .lv-label {
+    display: none;
+  }
+  body.lv-side-collapsed .lv-side-top {
+    padding-left: 0;
+    padding-right: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+  }
+  body.lv-side-collapsed .lv-side-nav a {
+    position: relative;
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  body.lv-side-collapsed .lv-badge {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    margin: 0;
+  }
+  body.lv-side-collapsed .lv-side-bottom {
+    align-items: center;
+  }
   body.lv-side-collapsed .lv-side-tools,
-  body.lv-side-collapsed .lv-side-user { flex-direction: column; }
-  body.lv-side-collapsed .lv-side-user { gap: 8px; }
-  /* EN/VI xếp dọc cho vừa thanh hẹp */
-  body.lv-side-collapsed .lv-lang { flex-direction: column; height: auto; width: 44px; }
-  body.lv-side-collapsed .lv-lang button { height: 34px; width: 100%; padding: 0; }
+  body.lv-side-collapsed .lv-side-user {
+    flex-direction: column;
+  }
+  body.lv-side-collapsed .lv-side-user {
+    gap: 8px;
+  }
+  body.lv-side-collapsed .lv-lang {
+    flex-direction: column;
+    height: auto;
+    width: 44px;
+  }
+  body.lv-side-collapsed .lv-lang button {
+    height: 34px;
+    width: 100%;
+    padding: 0;
+  }
 }
 @media (max-width: 1023px) {
-  .lv-side { position: sticky; top: 0; z-index: 30; gap: 6px; padding: 10px 14px; flex-direction: row; flex-wrap: wrap; align-items: center; }
-  .lv-side-top { padding: 0; }
-  .lv-side-nav { flex-direction: row; overflow-x: auto; order: 3; width: 100%; }
-  .lv-side-bottom { margin-top: 0; margin-left: auto; flex-direction: row; align-items: center; padding-top: 0; }
-  .lv-side-bottom > div:last-child { border-top: 0; padding-top: 0; }
+  .lv-side {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    gap: 6px;
+    padding: 10px 14px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .lv-side-top {
+    padding: 0;
+  }
+  .lv-side-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    order: 3;
+    width: 100%;
+  }
+  .lv-side-bottom {
+    margin-top: 0;
+    margin-left: auto;
+    flex-direction: row;
+    align-items: center;
+    padding-top: 0;
+  }
+  .lv-side-bottom > div:last-child {
+    border-top: 0;
+    padding-top: 0;
+  }
 }
 
-/* ===== Hiệu ứng trang chủ ===== */
-.lv-bg { background-color: rgb(var(--c-background)); transition: background-color .7s ease; }
-.lv-bg[data-mode="dark"] { background-color: #0b1020; }
+/* ===== Hiệu ứng trang chủ (Landing Page) ===== */
+.lv-bg {
+  background-color: rgb(var(--c-background));
+  transition: background-color 0.7s ease;
+}
+.lv-bg[data-mode="dark"] {
+  background-color: #0b1020;
+}
 
-/* Hero: từng chữ hiện dần (mờ -> rõ), ánh sáng chạy qua chữ */
-.lv-word { animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both; }
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
+}
+
+.lv-word {
+  animation: lv-word 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 .lv-shine {
-  background-image: linear-gradient(100deg,#ffffff 0%,#b9c9ff 28%,#7f9dff 50%,#b9c9ff 72%,#ffffff 100%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: lv-word .8s cubic-bezier(.2,.7,.2,1) both, lv-shine 6s linear infinite;
+  color: #ffffff;
+  animation: lv-word 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-@keyframes lv-word { from { opacity: 0; filter: blur(14px); transform: translateY(18px); } to { opacity: 1; filter: blur(0); transform: none; } }
-@keyframes lv-shine { to { background-position: -200% 0; } }
+@keyframes lv-word {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+  }
+}
 
-/* Cuộn tới thì hiện dần / dựng thẳng (chỉ chạy trên trình duyệt hỗ trợ scroll-driven animation) */
 @supports (animation-timeline: view()) {
-  .lv-tilt { animation: lv-tilt linear both; animation-timeline: view(); animation-range: entry 0% cover 45%; transform-origin: 50% 100%; }
+  .lv-tilt {
+    animation: lv-tilt linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 45%;
+    transform-origin: 50% 100%;
+  }
 }
-@keyframes lv-tilt { from { transform: perspective(1200px) rotateX(24deg) scale(.9); opacity: .6; } to { transform: perspective(1200px) rotateX(0) scale(1); opacity: 1; } }
+@keyframes lv-tilt {
+  from {
+    transform: perspective(1200px) rotateX(24deg) scale(0.9);
+    opacity: 0.6;
+  }
+  to {
+    transform: perspective(1200px) rotateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+table th {
+  letter-spacing: 0.04em;
+}
+
+html.lv-snap {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 64px;
+}
+html.lv-snap .lv-landing section[data-mode] {
+  scroll-snap-align: start;
+}
+html.lv-snap .lv-landing footer[data-mode] {
+  scroll-snap-align: end;
+}
 @media (prefers-reduced-motion: reduce) {
-  .lv-word, .lv-shine, .lv-tilt { animation: none !important; }
-  .lv-shine { background-position: 0 0; }
+  html.lv-snap {
+    scroll-snap-type: none;
+  }
 }
 
-/* Thẻ nổi nhẹ như bản thiết kế; bảng và danh sách trong thẻ thoáng hơn */
-.bg-surface-container-lowest.rounded-2xl,
-.bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(11,16,32,.05), 0 12px 30px -18px rgba(11,16,32,.25); }
-html.dark .bg-surface-container-lowest.rounded-2xl,
-html.dark .bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -18px rgba(0,0,0,.7); }
-table th { letter-spacing: .04em; }
+.lv-rv {
+  opacity: 0;
+  transform: translateY(28px) scale(0.985);
+  transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s);
+  will-change: opacity, transform;
+}
+.lv-rv.lv-in {
+  opacity: 1;
+  transform: none;
+}
 
-/* Landing: hiện dần khi cuộn tới (lớp lv-rv do Dashboard.jsx gắn, lv-in khi vào khung nhìn) */
-.lv-rv { opacity: 0; transform: translateY(28px) scale(.985);
-  transition: opacity .9s cubic-bezier(.2,.7,.2,1) var(--d,0s), transform .9s cubic-bezier(.2,.7,.2,1) var(--d,0s);
-  will-change: opacity, transform; }
-.lv-rv.lv-in { opacity: 1; transform: none; }
-
-/* Chữ LEGACYVAULT cuối trang: nền mờ + dải sáng chạy chậm qua các chữ (chỉ để bớt tĩnh) */
 .lv-wordmark {
-  background-image:
-    linear-gradient(100deg, transparent 0%, transparent 42%, rgba(150,175,255,.55) 50%, transparent 58%, transparent 100%),
-    linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,0));
-  background-size: 300% 100%, 100% 100%;
-  background-position: 100% 0, 0 0;
-  background-repeat: no-repeat;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: lv-sweep 9s ease-in-out infinite;
+  color: rgba(255, 255, 255, 0.24);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
 }
-@keyframes lv-sweep { 0% { background-position: 100% 0, 0 0; } 33.333%, 100% { background-position: 0% 0, 0 0; } } /* chạy 3s, nghỉ 6s (vòng 9s) */
-@media (prefers-reduced-motion: reduce) { .lv-wordmark { animation: none; } }

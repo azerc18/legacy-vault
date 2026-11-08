@@ -94,4 +94,9 @@ export const beneficiaryApi = {
     // -> [{ id, platform, accountHandle, wish, status, note, updatedAt, completedAt }]
     listExecutorTasks: (vaultId) =>
         http.get(`/beneficiaries/vaults/${vaultId}/executor-tasks`).then((r) => r.data?.data ?? []),
+    // C.6: xác nhận hoặc phản đối kết quả Executor đã báo DONE -> task đã cập nhật
+    confirmExecutorTask: (vaultId, taskId) =>
+        http.post(`/beneficiaries/vaults/${vaultId}/executor-tasks/${taskId}/confirm`).then(unwrap),
+    disputeExecutorTask: (vaultId, taskId, reason) =>
+        http.post(`/beneficiaries/vaults/${vaultId}/executor-tasks/${taskId}/dispute`, { reason }).then(unwrap),
 };
