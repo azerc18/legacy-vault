@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
-    getDocumentBlob, getRejectionReasons,
+    getDocumentBlob, getRejectionReasons, analyzeDocumentOcr,
 } from '../api/verifierApi.js';
 import { getErrorCode, getErrorMessage } from '../api/http.js';
 import {
@@ -14,6 +14,7 @@ import VerifierHeader from './VerifierHeader.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
+import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
@@ -40,6 +41,8 @@ export default function VerificationRequestDetail() {
     const [busy, setBusy] = useState(false);
     const [viewing, setViewing] = useState(false);
     const [checking, setChecking] = useState(false);
+    const [ocrLoading, setOcrLoading] = useState(false);
+    const [ocrResult, setOcrResult] = useState(null);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
     const [rejectReasons, setRejectReasons] = useState([]);   // [{ code, label }] từ BE
@@ -144,6 +147,20 @@ export default function VerificationRequestDetail() {
         try { setDocCheck(await verifyDocument(req.id)); await load(); }
         catch (e) { setError(getErrorMessage(e, t('detail.err.check'))); }
         finally { setBusy(false); setChecking(false); }
+    };
+
+    const handleOcrDocument = async () => {
+        if (ocrLoading) return;
+        setOcrLoading(true);
+        setError('');
+        try {
+            const res = await analyzeDocumentOcr(req.id);
+            setOcrResult(res);
+        } catch (e) {
+            setError(getErrorMessage(e, t('detail.err.ocr', 'Không thể phân tích giấy chứng tử bằng AI OCR.')));
+        } finally {
+            setOcrLoading(false);
+        }
     };
 
     // D1: mở giấy chứng tử trong tab mới
@@ -338,18 +355,51 @@ export default function VerificationRequestDetail() {
                                             <span className="material-symbols-outlined text-[20px]">visibility</span>
                                             {viewing ? t('detail.opening') : t('detail.viewDocument')}
                                         </button>
+                                        <button
+                                            type="button"
+                                            data-testid="verifier-ocr-btn"
+                                            onClick={handleOcrDocument}
+                                            disabled={busy || viewing || ocrLoading}
+                                            className="h-11 px-5 rounded-xl border border-primary/40 bg-primary/10 text-primary font-semibold hover:bg-primary/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                            <span className={`material-symbols-outlined text-[20px] ${ocrLoading ? 'animate-spin' : ''}`}>
+                                                {ocrLoading ? 'progress_activity' : 'auto_awesome'}
+                                            </span>
+                                            {ocrLoading
+                                                ? t('detail.ocrScanning')
+                                                : t('detail.ocrDocument')}
+                                        </button>
                                     </div>
                                 )}
                                 {!isPending && (
-                                    <button
-                                        onClick={handleViewDocument}
-                                        disabled={busy || viewing}
-                                        className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
-                                    >
-                                        <span className="material-symbols-outlined text-[20px]">visibility</span>
-                                        {viewing ? t('detail.opening') : t('detail.viewDocument')}
-                                    </button>
+                                    <div className="flex flex-wrap gap-3">
+                                        <button
+                                            onClick={handleViewDocument}
+                                            disabled={busy || viewing}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className="material-symbols-outlined text-[20px]">visibility</span>
+                                            {viewing ? t('detail.opening') : t('detail.viewDocument')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-testid="verifier-ocr-btn"
+                                            onClick={handleOcrDocument}
+                                            disabled={busy || viewing || ocrLoading}
+                                            className="h-11 px-5 rounded-xl border border-primary/40 bg-primary/10 text-primary font-semibold hover:bg-primary/20 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                                        >
+                                            <span className={`material-symbols-outlined text-[20px] ${ocrLoading ? 'animate-spin' : ''}`}>
+                                                {ocrLoading ? 'progress_activity' : 'auto_awesome'}
+                                            </span>
+                                            {ocrLoading
+                                                ? t('detail.ocrScanning')
+                                                : t('detail.ocrDocument')}
+                                        </button>
+                                    </div>
                                 )}
+                                <p className="text-xs text-on-surface-variant">
+                                    {t('detail.ocrPrivacyHint')}
+                                </p>
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">{t('detail.noCertificate')}</p>
@@ -358,6 +408,15 @@ export default function VerificationRequestDetail() {
                             <div className={`mt-5 p-3 rounded-lg text-sm ${checkResult.valid ? 'bg-success-container text-on-success-container' : 'bg-error-container text-on-error-container'}`}>
                                 <b>{checkResult.valid ? t('detail.valid') : t('detail.invalid')}</b>{checkResult.message ? ` — ${checkResult.message}` : ''}
                             </div>
+                        )}
+                        {ocrResult && (
+                            <OcrAnalysisCard
+                                data={ocrResult}
+                                role="verifier"
+                                onSuggestRejectReason={(code) => {
+                                    if (code) setRejectChoice(code);
+                                }}
+                            />
                         )}
                         {isPending && req.hasDeathCertificate && (
                             <div className="mt-6 p-4 rounded-xl bg-surface-container-low border border-outline-variant/40">

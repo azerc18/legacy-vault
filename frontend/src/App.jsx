@@ -37,6 +37,10 @@ import ProfilePage from './Profile/ProfilePage.jsx';
 import AdminRoles from './Admin/AdminRoles.jsx';
 import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
+import AdminDashboard from './Admin/AdminDashboard.jsx';
+import AdminPayments from './Admin/AdminPayments.jsx';
+import AdminPlans from './Admin/AdminPlans.jsx';
+import AdminNotifications from './Admin/AdminNotifications.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import { useTranslation } from 'react-i18next';
@@ -97,7 +101,7 @@ function App() {
                 <Route path="/verifier/history" element={guard(VERIFIER, <VerificationHistory />)} />
 
                 {/* System Admin */}
-                <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
+                <Route path="/admin" element={guard(ADMIN, <AdminDashboard />)} />
                 <Route path="/admin/users" element={guard(ADMIN, <AdminUsers />)} />
                 <Route path="/admin/vaults" element={guard(ADMIN, <AdminVaults />)} />
 
@@ -105,6 +109,9 @@ function App() {
 
                 <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
                 <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
+                <Route path="/admin/payments" element={guard(ADMIN, <AdminPayments />)} />
+                <Route path="/admin/plans" element={guard(ADMIN, <AdminPlans />)} />
+                <Route path="/admin/notifications" element={guard(ADMIN, <AdminNotifications />)} />
 
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
 

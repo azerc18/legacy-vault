@@ -1,23 +1,28 @@
 // Layout + hộp thoại dùng chung cho các trang Admin
 import React, {useEffect, useState} from 'react';
-import {Navigate} from 'react-router-dom';
+import {Link, Navigate} from 'react-router-dom';
 import {useTranslation} from 'react-i18next';
 import {getUser} from '../auth/auth.js';
 import {btnPrimary, btnOutline, btnDanger} from '../Owner/ownerUi.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 import {adminApi} from '../api/adminApi.js';
+import './admin.css';
 
 const NAV = [
+    {to: '/admin', key: 'overview', icon: 'dashboard', end: true},
     {to: '/admin/users', key: 'users', icon: 'group'},
     {to: '/admin/roles', key: 'roles', icon: 'shield_person'},
     {to: '/admin/vaults', key: 'vaults', icon: 'inventory_2'},
     {to: '/admin/audit-logs', key: 'auditLogs', icon: 'history'},
     {to: '/admin/alerts', key: 'alerts', icon: 'notifications_active'},
+    {to: '/admin/payments', key: 'payments', icon: 'receipt_long'},
+    {to: '/admin/plans', key: 'plans', icon: 'sell'},
+    {to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe'},
 ];
 
 export const isAdmin = (user) => (user?.roles || []).includes('ADMIN');
 
-export function AdminLayout({title, subtitle, children}) {
+export function AdminLayout({title, subtitle, actions, children}) {
     const {t} = useTranslation('admin');
     const user = getUser();
 
@@ -37,10 +42,13 @@ export function AdminLayout({title, subtitle, children}) {
     }));
 
     return (
-        <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader workspace={t('workspace')} home="/admin/users" nav={nav}/>
+        <div className="lv-admin bg-background font-body-md text-on-surface antialiased min-h-screen">
+            <AppHeader workspace={t('workspace')} home="/admin" nav={nav}/>
             <main className={`${PAGE_WIDTH} py-10`}>
-                <PageTitle title={title} subtitle={subtitle}/>
+                <div className="lv-adm-head mb-8">
+                    <p className="lv-adm-kicker mb-2">{t('kicker')}</p>
+                    <PageTitle title={title} subtitle={subtitle} right={actions} className=""/>
+                </div>
                 {children}
             </main>
         </div>
@@ -120,4 +128,79 @@ export function Pager({page, totalPages, onChange}) {
             </button>
         </div>
     );
+}
+
+/* ---------- Thành phần "hồ sơ công chứng" dùng chung ---------- */
+
+// Con dấu trạng thái. tone: ok | warn | danger | info | muted
+export function Stamp({tone = 'muted', icon, flat, children, title}) {
+    return (
+        <span title={title} className={`lv-stamp is-${tone}${flat ? ' is-flat' : ''}`}>
+            {icon && <span className="material-symbols-outlined" style={{fontSize: 14}}>{icon}</span>}
+            {children}
+        </span>
+    );
+}
+
+// Màu con dấu theo trạng thái nghiệp vụ (dùng chung cho mọi trang admin)
+export const STATUS_TONE = {
+    // user
+    ACTIVE: 'ok', LOCKED: 'danger', PENDING: 'warn',
+    // vault
+    UNLOCKED: 'info', CLAIMED: 'ok', ARCHIVED_LOCKED: 'muted',
+    // DMS
+    SUSPENDED: 'warn', TRIGGERED: 'danger', PENDING_CONFIRMATION: 'warn',
+    // thanh toán
+    SUCCESS: 'ok', FAILED: 'danger',
+    // audit
+    FAILURE: 'danger',
+    // cảnh báo
+    HIGH: 'danger', MEDIUM: 'warn', OPEN: 'danger', ACKNOWLEDGED: 'muted',
+    // thông báo
+    SENT: 'ok', QUEUED: 'info', READ: 'muted',
+};
+export const toneOf = (status) => STATUS_TONE[status] || 'muted';
+
+// Tờ hồ sơ: khung giấy có tiêu đề + mã hồ sơ (tab) + nút bên phải
+export function Dossier({title, tab, right, className = '', bodyClass = 'p-5', children}) {
+    return (
+        <section className={`lv-dossier ${className}`}>
+            {(title || tab || right) && (
+                <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-6 pb-3 border-b border-dashed border-outline-variant">
+                    <div className="flex items-center gap-3 min-w-0">
+                        {title && <h2 className="lv-dossier-title truncate">{title}</h2>}
+                        {tab && <span className="lv-dossier-tab">{tab}</span>}
+                    </div>
+                    {right}
+                </header>
+            )}
+            <div className={bodyClass}>{children}</div>
+        </section>
+    );
+}
+
+// Thẻ số liệu cho trang tổng quan
+export function StatCard({icon, tone, label, value, foot, to, children}) {
+    const body = (
+        <div className="lv-stat">
+            <span className={`lv-stat-seal${tone ? ` is-${tone}` : ''}`}>
+                <span className="material-symbols-outlined" style={{fontSize: 22}}>{icon}</span>
+            </span>
+            <div className="min-w-0 flex-1">
+                <p className="lv-stat-label">{label}</p>
+                <p className="lv-stat-value mt-1">{value}</p>
+                {foot && <p className="lv-stat-foot">{foot}</p>}
+                {children}
+            </div>
+        </div>
+    );
+    return to
+        ? <Link to={to} className="lv-dossier block hover:border-secondary transition-colors">{body}</Link>
+        : <div className="lv-dossier">{body}</div>;
+}
+
+// 199000 -> "199.000 ₫"
+export function formatVnd(n) {
+    if (typeof n !== 'number') return '—';
+    return `${n.toLocaleString('vi-VN')} ₫`;
 }
