@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.integration;
 
+import com.ltld.app.legacyvault.dto.beneficiarydto.SendIdentityOtpRequest;
 import com.ltld.app.legacyvault.dto.beneficiarydto.VerifyIdentityRequest;
 import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.*;
@@ -10,6 +11,7 @@ import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,10 +20,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 // #10 / #19: lượt nhập sai OTP của FR-17 phải được lưu thật vào DB (noRollbackFor), và câu SUM lượt thử
 // của các phiên PENDING khác chỉ tính đúng phiên cùng vault + beneficiary trong 24h.
@@ -133,6 +141,38 @@ class IdentityVerificationAttemptsIntegrationTest extends MySqlTestContainer {
 
         assertThat(verificationRepository.sumAttemptsOfOtherPendingSessions(
                 vault.getId(), beneficiary.getId(), current.getId(), LocalDateTime.now().minusHours(24))).isZero();
+    }
+
+    // #19: bấm "gửi lại" 2 lần cùng lúc -> chỉ 1 mã được gửi, request kia nhận 429
+    @RepeatedTest(5)
+    void concurrentResend_onlyOneOtpIsSent() throws Exception {
+        IdentityVerification session = saveSession(vault, beneficiary, VerificationStatus.PENDING, 0);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<HttpStatus>> futures = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            futures.add(pool.submit(() -> {
+                start.await();
+                SendIdentityOtpRequest request = new SendIdentityOtpRequest();
+                request.setVaultId(vault.getId());
+                try {
+                    beneficiaryService.sendIdentityOtp(request, beneficiary.getId());
+                    return HttpStatus.OK;
+                } catch (BeneficiaryException e) {
+                    return e.getStatus();
+                }
+            }));
+        }
+        start.countDown();
+        List<HttpStatus> results = new ArrayList<>();
+        for (Future<HttpStatus> f : futures) {
+            results.add(f.get(30, TimeUnit.SECONDS));
+        }
+        pool.shutdown();
+
+        assertThat(results).containsExactlyInAnyOrder(HttpStatus.OK, HttpStatus.TOO_MANY_REQUESTS);
+        verify(emailSender, times(1)).sendEmail(eq("ben@example.com"), anyString());
+        assertThat(verificationRepository.findById(session.getId()).orElseThrow().getOtpCode()).isNotNull();
     }
 
     private IdentityVerification pendingOtpSession() {

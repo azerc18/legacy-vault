@@ -31,7 +31,7 @@ public interface BeneficiaryService {
      * Lỗi: 404 (không phải beneficiary), 400/409/410 (vault hoặc claim không hợp lệ,
      * hoặc chưa có phiên PENDING), 423 (đã bị khóa), 429 (gửi lại quá sớm).
      */
-    void sendIdentityOtp(BeneficiaryClaimRequest request, UUID currentUserId);
+    void sendIdentityOtp(SendIdentityOtpRequest request, UUID currentUserId);
 
     /**
      * FR-17: Xác thực danh tính bằng OTP hoặc mock eKYC.

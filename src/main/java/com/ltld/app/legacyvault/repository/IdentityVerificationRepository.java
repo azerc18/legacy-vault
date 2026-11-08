@@ -43,6 +43,14 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
     @Query("UPDATE IdentityVerification v SET v.attemptCount = COALESCE(v.attemptCount, 0) + 1 WHERE v.id = :id")
     void incrementAttemptCount(@Param("id") UUID id);
 
+    // #19: giữ chỗ gửi OTP nguyên tử. Chỉ cập nhật khi chưa gửi lần nào hoặc lần gửi trước đã cách đủ khoảng chờ;
+    // trả 0 nghĩa là request song song khác vừa giữ chỗ. UPDATE đọc giá trị đã commit mới nhất và khóa dòng.
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE IdentityVerification v SET v.otpSentAt = :now " +
+            "WHERE v.id = :id AND (v.otpSentAt IS NULL OR v.otpSentAt <= :resendBefore)")
+    int claimOtpSendSlot(@Param("id") UUID id, @Param("now") LocalDateTime now,
+                         @Param("resendBefore") LocalDateTime resendBefore);
+
     // FR-17: đọc lại giá trị đếm sau khi tăng
     @Query("SELECT COALESCE(v.attemptCount, 0) FROM IdentityVerification v WHERE v.id = :id")
     int findAttemptCountById(@Param("id") UUID id);

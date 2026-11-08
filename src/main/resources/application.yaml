@@ -69,6 +69,8 @@ app:
   security:
     crypto:
       master-key: ${CRYPTO_MASTER_KEY}
+    # #19: khóa HMAC băm OTP (Base64, >= 32 byte). Để trống: suy ra từ CRYPTO_MASTER_KEY
+    otp-hmac-key: ${OTP_HMAC_KEY:}
   vnpay:
     # Lấy từ cổng merchant VNPay; để trống khi chưa tích hợp. KHÔNG commit giá trị thật.
     tmn-code: ${VNPAY_TMN_CODE:}

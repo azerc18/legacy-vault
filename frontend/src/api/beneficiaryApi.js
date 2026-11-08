@@ -44,7 +44,7 @@ export const beneficiaryApi = {
 
     // FR-17: gửi OTP (chỉ dùng cho method OTP, cách nhau tối thiểu 60s)
     sendOtp: (vaultId) =>
-        http.post('/beneficiaries/verifications/otp', { vaultId, verificationMethod: 'OTP' }),
+        http.post('/beneficiaries/verifications/otp', { vaultId }),
 
     // FR-17: xác thực -> mở phiên xem 30 phút
     verify: (vaultId, verificationMethod, { otp, kycIdNumber } = {}) =>
