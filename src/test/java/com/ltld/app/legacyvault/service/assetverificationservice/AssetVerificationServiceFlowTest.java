@@ -43,6 +43,8 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -459,5 +461,15 @@ class AssetVerificationServiceFlowTest {
                 .isInstanceOf(VaultException.class)
                 .extracting("status").isEqualTo(HttpStatus.CONFLICT);
         verify(verificationRepository, never()).save(any());
+    }
+
+    @Test
+    void allowStart_blocksSixthCallWithinMinute() {
+        UUID assetId = UUID.randomUUID();
+        for (int i = 0; i < AssetVerificationServiceImpl.MAX_STARTS_PER_MINUTE; i++) {
+            assertTrue(service.allowStart(assetId));
+        }
+        assertFalse(service.allowStart(assetId));
+        assertTrue(service.allowStart(UUID.randomUUID())); // tài sản khác không bị ảnh hưởng
     }
 }

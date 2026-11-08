@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.AssetVerificationStatus;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
+import com.ltld.app.legacyvault.exception.TooManyAttemptsException;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.AssetVerificationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
@@ -29,13 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,6 +47,11 @@ public class AssetVerificationServiceImpl implements AssetVerificationService {
 
     /** Xác thực thành công có hiệu lực 6 tháng, sau đó thành EXPIRED. */
     static final int VALIDITY_DAYS = 180;
+    /** Giới hạn số lần start mỗi tài sản mỗi phút (chống spam mail OTP). */
+    static final int MAX_STARTS_PER_MINUTE = 5;
+    private static final int MAX_IN_MEMORY_KEYS = 500;
+
+    private final Map<UUID, Deque<Long>> startBuckets = new ConcurrentHashMap<>();
 
     private static final AssetVerificationSummary SELF_DECLARED_SUMMARY =
             new AssetVerificationSummary(AssetVerificationStatus.SELF_DECLARED, null, null, null, null);
@@ -88,6 +89,7 @@ public class AssetVerificationServiceImpl implements AssetVerificationService {
         }
         List<UUID> ids = assets.stream().map(DigitalAsset::getId).toList();
         Map<UUID, AssetVerification> latest = verificationRepository.findLatestByAssetIds(ids).stream()
+                // Nếu 2 dòng trùng createdAt thì lấy dòng bất kỳ (hiếm, chấp nhận được)
                 .collect(Collectors.toMap(v -> v.getAsset().getId(), Function.identity(), (a, b) -> a));
         LocalDateTime now = LocalDateTime.now();
         Map<UUID, AssetVerificationSummary> result = new LinkedHashMap<>();
@@ -122,6 +124,10 @@ public class AssetVerificationServiceImpl implements AssetVerificationService {
         AssetVerification latest = verificationRepository.findFirstByAssetIdOrderByCreatedAtDesc(assetId).orElse(null);
         ensureNotAlreadyVerified(asset, latest, now);
         AssetVerifier verifier = findVerifier(asset, method);
+
+        if (!allowStart(assetId)) {
+            throw new TooManyAttemptsException("Too many verification requests, please try again in a minute");
+        }
 
         AssetVerifier.StartResult result = verifier.start(asset, method, ownerId);
         VerificationProvider provider = providerOf(result.provider());
@@ -207,6 +213,35 @@ public class AssetVerificationServiceImpl implements AssetVerificationService {
     // =========================================================
     // Helpers
     // =========================================================
+
+    boolean allowStart(UUID assetId) {
+        long now = System.currentTimeMillis();
+        long windowStart = now - 60_000L;
+        if (startBuckets.size() >= MAX_IN_MEMORY_KEYS) {
+            pruneStaleBuckets(windowStart);
+        }
+        Deque<Long> timestamps = startBuckets.computeIfAbsent(assetId, k -> new ArrayDeque<>());
+        synchronized (timestamps) {
+            while (!timestamps.isEmpty() && timestamps.peekFirst() < windowStart) {
+                timestamps.pollFirst();
+            }
+            if (timestamps.size() >= MAX_STARTS_PER_MINUTE) {
+                return false;
+            }
+            timestamps.addLast(now);
+            return true;
+        }
+    }
+
+    private void pruneStaleBuckets(long windowStart) {
+        startBuckets.entrySet().removeIf(e -> {
+            Deque<Long> timestamps = e.getValue();
+            synchronized (timestamps) {
+                Long last = timestamps.peekLast();
+                return last == null || last < windowStart;
+            }
+        });
+    }
 
     private static boolean isVerified(AssetVerificationStatus status) {
         return status == AssetVerificationStatus.VERIFIED || status == AssetVerificationStatus.VERIFIED_SANDBOX;
