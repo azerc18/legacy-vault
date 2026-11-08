@@ -130,11 +130,103 @@ export default function Dashboard() {
         };
     }, []);
 
-    // Tự khớp trang: dùng scroll-snap gốc của trình duyệt (êm, không giành quyền cuộn)
+    // Tự khớp trang: vuốt qua ~30% phần kế bên rồi dừng thì tự trượt cho vừa khít phần đó
     useEffect(() => {
-        const el = document.documentElement;
-        el.classList.add('lv-snap');
-        return () => el.classList.remove('lv-snap');
+        const root = rootRef.current;
+        if (!root || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+        const THRESHOLD = 0.3;
+        let timer = null;
+        let lastY = window.scrollY;
+        let dir = 1;
+        let touching = false;
+        let pressed = false;   // đang giữ chuột (kéo thanh cuộn): chưa được tự khớp, nếu không sẽ giành quyền với tay
+        let snapping = false;
+        let raf = 0;
+
+        const snap = () => {
+            if (touching || pressed) return;
+            const vh = window.innerHeight;
+            const head = root.querySelector('header');
+            const off = head ? head.offsetHeight : 0;
+            const y = window.scrollY + off; // mép trên vùng nhìn thấy (dưới navbar)
+            const view = vh - off;
+            const tops = Array.from(root.querySelectorAll('[data-mode]'))
+                .filter((el) => el.tagName !== 'DIV')
+                .map((el) => ({ top: el.getBoundingClientRect().top + window.scrollY, h: el.offsetHeight }));
+            let target = null;
+            if (dir > 0) {
+                const next = tops.find((s) => s.top > y + 8);
+                if (next && next.top - y < view * (1 - THRESHOLD)) target = next.top;
+            } else {
+                const cur = [...tops].reverse().find((s) => s.top < y - 8);
+                if (cur) {
+                    const curBottom = cur.top + cur.h;
+                    // phần trên đang hiện >=30% khung nhìn thì lùi về vừa khít phần đó
+                    if (y - curBottom < 0 && curBottom - y >= view * THRESHOLD) target = Math.max(cur.top, curBottom - view);
+                }
+            }
+            if (target === null) return;
+            glide(Math.max(0, target - off));
+        };
+
+        // Tự trượt bằng rAF (êm hơn smooth mặc định); người dùng chạm/cuộn là dừng ngay
+        const cancel = () => { if (raf) cancelAnimationFrame(raf); raf = 0; snapping = false; };
+        const glide = (to) => {
+            cancel();
+            const from = window.scrollY;
+            const dist = to - from;
+            if (Math.abs(dist) < 2) return;
+            const dur = Math.min(760, 380 + Math.abs(dist) * 0.35);
+            const t0 = performance.now();
+            snapping = true;
+            const step = (now) => {
+                const k = Math.min(1, (now - t0) / dur);
+                const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // easeInOutCubic: vào ra đều tay, không giật
+                window.scrollTo(0, from + dist * e);
+                if (k < 1) raf = requestAnimationFrame(step);
+                else { raf = 0; snapping = false; lastY = window.scrollY; }
+            };
+            raf = requestAnimationFrame(step);
+        };
+
+        const onScroll = () => {
+            const y = window.scrollY;
+            if (snapping) { lastY = y; return; }
+            if (Math.abs(y - lastY) > 1) dir = y > lastY ? 1 : -1;
+            lastY = y;
+            clearTimeout(timer);
+            timer = setTimeout(snap, 130);
+        };
+        const down = () => { touching = true; cancel(); };
+        const onMouseDown = () => { pressed = true; clearTimeout(timer); cancel(); };
+        const onMouseUp = () => { if (!pressed) return; pressed = false; clearTimeout(timer); timer = setTimeout(snap, 100); };
+        const up = () => { touching = false; clearTimeout(timer); timer = setTimeout(snap, 100); };
+
+        const release = () => { pressed = false; cancel(); };
+        window.addEventListener('wheel', release, { passive: true });
+        window.addEventListener('keydown', release);
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('pointerup', onMouseUp);
+        window.addEventListener('pointercancel', onMouseUp);
+        window.addEventListener('blur', onMouseUp);
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('touchstart', down, { passive: true });
+        window.addEventListener('touchend', up, { passive: true });
+        return () => {
+            clearTimeout(timer);
+            cancel();
+            window.removeEventListener('wheel', release);
+            window.removeEventListener('keydown', release);
+            window.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('pointerup', onMouseUp);
+            window.removeEventListener('pointercancel', onMouseUp);
+            window.removeEventListener('blur', onMouseUp);
+            window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('touchstart', down);
+            window.removeEventListener('touchend', up);
+        };
     }, []);
 
     // Đã đăng nhập -> vào thẳng trang chủ người dùng

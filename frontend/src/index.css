@@ -182,12 +182,6 @@ html.dark .bg-surface-container-lowest.rounded-2xl,
 html.dark .bg-surface-container-lowest.rounded-3xl { box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -18px rgba(0,0,0,.7); }
 table th { letter-spacing: .04em; }
 
-/* Landing: tự khớp từng phần khi cuộn (bật bằng class lv-snap trên <html>) */
-html.lv-snap { scroll-snap-type: y proximity; scroll-padding-top: 64px; }
-html.lv-snap .lv-landing section[data-mode] { scroll-snap-align: start; }
-html.lv-snap .lv-landing footer[data-mode] { scroll-snap-align: end; }
-@media (prefers-reduced-motion: reduce) { html.lv-snap { scroll-snap-type: none; } }
-
 /* Landing: hiện dần khi cuộn tới (lớp lv-rv do Dashboard.jsx gắn, lv-in khi vào khung nhìn) */
 .lv-rv { opacity: 0; transform: translateY(28px) scale(.985);
   transition: opacity .9s cubic-bezier(.2,.7,.2,1) var(--d,0s), transform .9s cubic-bezier(.2,.7,.2,1) var(--d,0s);
