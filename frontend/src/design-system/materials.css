@@ -1,0 +1,269 @@
+/* =====================================================================
+   LEGACYVAULT DESIGN SYSTEM — 5-TIER LIQUID GLASS MATERIALS
+   Phân tầng vật liệu theo đúng Apple Liquid Glass Guidelines:
+   1. glass-clear      — Floating controls, compact pills
+   2. glass-regular    — Page header (.lv-page-hero), segmented controls
+   3. glass-frosted    — Popovers, dropdowns (.lv-pop), contextual panels
+   4. surface-standard — Dashboard cards (.lv-dossier, .bg-surface-container-lowest), tables, forms
+   5. surface-secure   — Secret/credential dialogs, 2FA, recovery modals
+   ===================================================================== */
+
+/* ---------- 1. GLASS CLEAR (Floating Controls & Pills) ---------- */
+.lv-glass-clear {
+  background-color: var(--lv-glass-clear-bg);
+  border: 1px solid var(--lv-glass-border);
+  box-shadow: inset 0 1px 0 var(--lv-glass-highlight);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lv-glass-clear {
+    backdrop-filter: blur(var(--lv-glass-blur-sm)) saturate(var(--lv-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--lv-glass-blur-sm)) saturate(var(--lv-glass-saturation));
+  }
+}
+
+/* ---------- 2. GLASS REGULAR (Page Header Banner & Primary Floating Panels) ---------- */
+.lv-glass-regular,
+.lv-page-hero {
+  --gx: 50%;
+  --gy: 50%;
+  --g-prox: 0;
+  position: relative;
+  z-index: 10;
+  border-radius: var(--lv-radius-panel);
+  padding: 1.5rem 1.75rem;
+  color: #ffffff;
+  background-color: var(--lv-glass-regular-bg);
+  background-image:
+    radial-gradient(
+      420px circle at var(--gx) var(--gy),
+      rgba(143, 164, 255, calc(0.08 + var(--g-prox, 0) * 0.12)),
+      transparent 70%
+    ),
+    radial-gradient(640px 240px at 88% 0%, rgba(61, 90, 224, 0.28), transparent 70%),
+    linear-gradient(135deg, rgba(11, 16, 32, 0.90) 0%, rgba(22, 33, 72, 0.84) 100%);
+  border: 1px solid rgba(143, 164, 255, calc(0.24 + var(--g-prox, 0) * 0.22));
+  box-shadow:
+    var(--lv-shadow-floating),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.16 + var(--g-prox, 0) * 0.12));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+html.dark .lv-glass-regular,
+html.dark .lv-page-hero {
+  background-color: var(--lv-glass-regular-bg);
+  background-image:
+    radial-gradient(
+      420px circle at var(--gx) var(--gy),
+      rgba(143, 164, 255, calc(0.10 + var(--g-prox, 0) * 0.14)),
+      transparent 70%
+    ),
+    radial-gradient(640px 240px at 88% -10%, rgba(79, 108, 240, 0.30), transparent 70%),
+    linear-gradient(135deg, rgba(24, 36, 78, 0.82) 0%, rgba(15, 23, 50, 0.78) 100%);
+  border: 1px solid rgba(185, 201, 255, calc(0.18 + var(--g-prox, 0) * 0.22));
+  box-shadow:
+    var(--lv-shadow-floating),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.14 + var(--g-prox, 0) * 0.12));
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lv-glass-regular,
+  .lv-page-hero {
+    backdrop-filter: blur(var(--lv-glass-blur)) saturate(var(--lv-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--lv-glass-blur)) saturate(var(--lv-glass-saturation));
+  }
+}
+
+/* Typography & Controls inside .lv-page-hero */
+.lv-page-hero h1 {
+  color: #ffffff;
+}
+.lv-page-hero-sub {
+  color: rgba(219, 226, 255, 0.84);
+}
+.lv-page-hero-kicker {
+  font: 700 11px/1.2 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b9c9ff;
+}
+.lv-page-hero-back {
+  color: #b9c9ff;
+}
+.lv-page-hero-back:hover {
+  color: #ffffff;
+}
+.lv-page-hero .bg-primary {
+  background-color: #3d5ae0;
+  color: #ffffff;
+  border: 1px solid rgba(185, 201, 255, 0.38);
+  box-shadow: 0 4px 14px rgba(61, 90, 224, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.lv-page-hero .bg-primary:hover {
+  background-color: #4b68eb;
+}
+.lv-page-hero button.border-outline-variant,
+.lv-page-hero a.border-outline-variant {
+  background-color: rgba(255, 255, 255, 0.10);
+  border-color: rgba(185, 201, 255, 0.30);
+  color: #ffffff;
+}
+.lv-page-hero button.border-outline-variant:hover,
+.lv-page-hero a.border-outline-variant:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+}
+.lv-page-hero select {
+  background-color: rgba(11, 16, 32, 0.65);
+  border-color: rgba(185, 201, 255, 0.32);
+  color: #ffffff;
+}
+.lv-page-hero select option {
+  background-color: #111832;
+  color: #ffffff;
+}
+
+/* ---------- 3. GLASS FROSTED (Popovers, Menus, Notification Panels) ---------- */
+.lv-glass-frosted,
+.lv-pop {
+  background-color: var(--lv-glass-frosted-bg);
+  border: 1px solid var(--lv-glass-border);
+  box-shadow:
+    var(--lv-shadow-floating),
+    inset 0 1px 0 var(--lv-glass-highlight);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lv-glass-frosted,
+  .lv-pop {
+    backdrop-filter: blur(var(--lv-glass-blur-lg)) saturate(var(--lv-glass-saturation));
+    -webkit-backdrop-filter: blur(var(--lv-glass-blur-lg)) saturate(var(--lv-glass-saturation));
+  }
+}
+
+/* ---------- 4. SURFACE STANDARD (Dashboard Cards, Dossiers, Tables, Forms) ----------
+   Semi-solid Apple Liquid Glass: ưu tiên độ rõ nét của dữ liệu, viền sáng 1px tinh tế,
+   và hiệu ứng ánh sáng specular phản hồi nhẹ nhàng theo tọa độ con trỏ chuột. */
+.lv-surface-standard,
+.lv-dossier,
+.lv-glass,
+main .bg-surface-container-lowest.rounded-2xl,
+main .bg-surface-container-lowest.rounded-3xl {
+  --gx: 50%;
+  --gy: 50%;
+  --g-prox: 0;
+  position: relative;
+  background-color: rgba(255, 255, 255, calc(0.64 - var(--g-prox, 0) * 0.14));
+  background-image:
+    radial-gradient(
+      360px circle at var(--gx) var(--gy),
+      rgba(255, 255, 255, calc(0.48 * var(--g-prox, 0))),
+      rgba(61, 90, 224, calc(0.10 * var(--g-prox, 0))) 48%,
+      transparent 72%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.46) 0%,
+      rgba(255, 255, 255, 0.10) 55%,
+      rgba(185, 201, 255, 0.14) 100%
+    );
+  border: 1px solid rgba(143, 164, 255, calc(0.38 + var(--g-prox, 0) * 0.45));
+  box-shadow:
+    var(--lv-shadow-surface),
+    0 12px 32px -12px rgba(61, 90, 224, calc(0.06 + var(--g-prox, 0) * 0.14)),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.78 + var(--g-prox, 0) * 0.20)),
+    inset 0 0 0 1px rgba(255, 255, 255, calc(0.30 + var(--g-prox, 0) * 0.32));
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.18s ease,
+    box-shadow 0.2s ease,
+    background-color 0.18s ease;
+}
+
+html.dark .lv-surface-standard,
+html.dark .lv-dossier,
+html.dark .lv-glass,
+html.dark main .bg-surface-container-lowest.rounded-2xl,
+html.dark main .bg-surface-container-lowest.rounded-3xl {
+  background-color: rgba(17, 25, 48, calc(0.64 - var(--g-prox, 0) * 0.14));
+  background-image:
+    radial-gradient(
+      360px circle at var(--gx) var(--gy),
+      rgba(143, 164, 255, calc(0.18 * var(--g-prox, 0))),
+      rgba(255, 255, 255, calc(0.05 * var(--g-prox, 0))) 48%,
+      transparent 72%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.015) 55%,
+      rgba(143, 164, 255, 0.05) 100%
+    );
+  border: 1px solid rgba(143, 164, 255, calc(0.20 + var(--g-prox, 0) * 0.36));
+  box-shadow:
+    var(--lv-shadow-surface),
+    0 14px 36px -12px rgba(61, 90, 224, calc(0.12 + var(--g-prox, 0) * 0.22)),
+    inset 0 1px 0 rgba(255, 255, 255, calc(0.12 + var(--g-prox, 0) * 0.16)),
+    inset 0 0 0 1px rgba(185, 201, 255, calc(0.05 + var(--g-prox, 0) * 0.12));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lv-surface-standard,
+  .lv-dossier,
+  .lv-glass,
+  main .bg-surface-container-lowest.rounded-2xl,
+  main .bg-surface-container-lowest.rounded-3xl {
+    backdrop-filter: blur(14px) saturate(145%);
+    -webkit-backdrop-filter: blur(14px) saturate(145%);
+  }
+}
+
+/* ---------- 5. SURFACE SECURE (Modals, Secret Viewing, 2FA, Destructive Confirmations) ----------
+   Độ tương phản cao, gần như đặc hoàn toàn để không làm nhiễu thông tin nhạy cảm */
+.lv-surface-secure,
+main .lv-surface-secure.bg-surface-container-lowest.rounded-2xl,
+div.fixed.inset-0 > div.bg-surface-container-lowest {
+  background-color: var(--lv-surface-secure-bg);
+  background-image: none;
+  border: 1px solid var(--lv-glass-border-strong);
+  box-shadow:
+    var(--lv-shadow-modal),
+    inset 0 1px 0 var(--lv-glass-highlight);
+}
+html.dark .lv-surface-secure,
+html.dark main .lv-surface-secure.bg-surface-container-lowest.rounded-2xl,
+html.dark div.fixed.inset-0 > div.bg-surface-container-lowest {
+  background-color: var(--lv-surface-secure-bg);
+  background-image: none;
+  border: 1px solid var(--lv-glass-border-strong);
+  box-shadow:
+    var(--lv-shadow-modal),
+    inset 0 1px 0 var(--lv-glass-highlight);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lv-surface-secure,
+  main .lv-surface-secure.bg-surface-container-lowest.rounded-2xl,
+  div.fixed.inset-0 > div.bg-surface-container-lowest {
+    backdrop-filter: blur(var(--lv-glass-blur-lg));
+    -webkit-backdrop-filter: blur(var(--lv-glass-blur-lg));
+  }
+}
+
+/* ---------- Fallback khi trình duyệt hoặc người dùng bật prefers-reduced-transparency ---------- */
+@media (prefers-reduced-transparency: reduce) {
+  .lv-glass-clear,
+  .lv-glass-regular,
+  .lv-page-hero,
+  .lv-glass-frosted,
+  .lv-pop,
+  .lv-surface-standard,
+  .lv-dossier,
+  .lv-glass,
+  main .bg-surface-container-lowest.rounded-2xl,
+  main .bg-surface-container-lowest.rounded-3xl,
+  .lv-surface-secure {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .lv-surface-standard,
+  .lv-dossier,
+  main .bg-surface-container-lowest.rounded-2xl,
+  main .bg-surface-container-lowest.rounded-3xl {
+    background-color: rgb(var(--c-surface-container-lowest));
+  }
+}

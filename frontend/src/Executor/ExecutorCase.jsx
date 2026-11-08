@@ -14,6 +14,7 @@ import { tEnum } from '../i18n/format.js';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 import EmptyState from "../Common/EmptyState.jsx";
 import VerificationBadge from '../Common/VerificationBadge.jsx';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 
 const FILE_TYPES = '.pdf,.png,.jpg,.jpeg';
 const MAX_SIZE = 10 * 1024 * 1024;
@@ -539,11 +540,15 @@ function AccountTaskRow({ assignmentId, task, onSaved }) {
                 </select>
             </div>
 
-            {confirmKey && (
-                <p className={`mt-3 text-sm px-3 py-2 rounded-lg ${CONFIRM_CLS[confirmKey] || ''}`}>
-                    {t(`verification:confirm.${confirmKey}`, { date: formatDate(task.confirmDeadlineAt), reason: task.disputeReason })}
-                </p>
-            )}
+            <AutoHeight>
+                {confirmKey && (
+                    <div className="pt-3">
+                        <p className={`text-sm px-3 py-2 rounded-lg ${CONFIRM_CLS[confirmKey] || ''}`}>
+                            {t(`verification:confirm.${confirmKey}`, { date: formatDate(task.confirmDeadlineAt), reason: task.disputeReason })}
+                        </p>
+                    </div>
+                )}
+            </AutoHeight>
             {locked && <p className="mt-2 text-xs text-outline">{t('verification:executor.locked')}</p>}
 
             <div className="mt-3 space-y-3">

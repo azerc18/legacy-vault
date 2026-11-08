@@ -73,9 +73,9 @@ export default function ProtectionBanner() {
 
     return (
         <div role="alert"
-             className={`mb-8 rounded-2xl border p-5 ${critical
-                 ? 'bg-error-container/60 border-error/30 text-on-error-container'
-                 : 'bg-warning-container/70 border-warning/30 text-on-warning-container'}`}>
+             className={`mb-8 rounded-2xl border p-5 backdrop-blur-md shadow-lg ${critical
+                 ? 'bg-error-container/65 border-error/40 text-on-error-container'
+                 : 'bg-warning-container/70 border-warning/40 text-on-warning-container'}`}>
             <div className="flex flex-wrap items-start gap-4">
                 <Icon name={critical ? 'gpp_bad' : 'gpp_maybe'} className="text-[28px] shrink-0" />
                 <div className="flex-1 min-w-[220px]">

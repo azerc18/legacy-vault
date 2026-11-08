@@ -46,10 +46,7 @@ export function AdminLayout({title, subtitle, actions, children}) {
         <div className="lv-admin bg-background font-body-md text-on-surface antialiased min-h-screen">
             <AppHeader workspace={t('workspace')} home="/admin" nav={nav}/>
             <main className={`${PAGE_WIDTH} py-10`}>
-                <div className="lv-adm-head mb-8">
-                    <p className="lv-adm-kicker mb-2">{t('kicker')}</p>
-                    <PageTitle title={title} subtitle={subtitle} right={actions} className=""/>
-                </div>
+                <PageTitle kicker={t('kicker')} title={title} subtitle={subtitle} right={actions} className="mb-8"/>
                 {children}
             </main>
         </div>
@@ -167,7 +164,7 @@ export function Dossier({title, tab, right, className = '', bodyClass = 'p-5', c
     return (
         <section className={`lv-dossier ${className}`}>
             {(title || tab || right) && (
-                <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-6 pb-3 border-b border-dashed border-outline-variant">
+                <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5 pb-3.5 border-b border-outline-variant/60">
                     <div className="flex items-center gap-3 min-w-0">
                         {title && <h2 className="lv-dossier-title truncate">{title}</h2>}
                         {tab && <span className="lv-dossier-tab">{tab}</span>}

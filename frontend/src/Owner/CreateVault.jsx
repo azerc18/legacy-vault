@@ -271,7 +271,7 @@ export default function CreateVault() {
 
                 {partial && (
                     <div className="p-4 rounded-xl bg-warning-container text-on-warning-container flex flex-wrap items-center justify-between gap-3" role="alert">
-                        <span className="text-sm">{t('create.errors.assetsPartial', {count: partial.failed})}</span>
+                        <span className="text-sm">{t('create.assetsPartial', {count: partial.failed})}</span>
                         <button type="button" onClick={() => navigate(`/owner/vaults/${partial.vaultId}`, {state: {created: true}})} className={btnPrimary}>
                             {t('create.openVault')}
                         </button>

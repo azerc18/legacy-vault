@@ -71,7 +71,7 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
+            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>

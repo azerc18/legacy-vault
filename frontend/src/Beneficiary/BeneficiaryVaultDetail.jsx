@@ -6,6 +6,7 @@ import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
 import ClaimProgress from '../Common/ClaimProgress.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import {
     BeneficiaryLayout, Icon, StatusBadge, Alert, formatDate,
     ASSET_ICON, useEnumLabels, inputClass, btnPrimary, btnOutline,
@@ -22,7 +23,7 @@ export default function BeneficiaryVaultDetail() {
     const { vaultId } = useParams();
     const { t } = useTranslation('beneficiary');
     const tRef = useRef(t);          // callback/effect đọc t qua ref để đổi ngôn ngữ không kích hoạt tải lại
-    tRef.current = t;
+    useEffect(() => { tRef.current = t; }, [t]);
     const user = getUser();
 
     const [vault, setVault] = useState(null);       // BeneficiaryVaultSummaryResponse
@@ -245,7 +246,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
     };
 
     return (
-        <section className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 max-w-lg">
+        <section className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 max-w-lg">
             <div className="flex items-center gap-3">
                 <Icon name="verified_user" className="text-secondary text-[28px]" />
                 <h2 className="font-title-lg text-title-lg">{t('verify.title')}</h2>
@@ -436,7 +437,7 @@ function AssetDetailModal({ detail, onClose }) {
 
     return (
         <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>
                         <p className="text-xs text-outline">{label.assetType(detail.assetType)}</p>
@@ -599,23 +600,25 @@ function ExecutorTasksCard({ vaultId }) {
                                 </div>
                             )}
 
-                            {disputing?.id === task.id && (
-                                <div className="w-full">
-                                    <label className="block">
-                                        <span className="text-sm font-semibold text-on-surface-variant">{t('verification:beneficiary.reasonLabel')}</span>
-                                        <textarea rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)}
-                                                  placeholder={t('verification:beneficiary.reasonPlaceholder')} className={`${inputClass} mt-1 h-auto py-2`} />
-                                    </label>
-                                    <div className="flex justify-end gap-2 mt-2">
-                                        <button type="button" disabled={busyId === task.id} onClick={() => { setDisputing(null); setError(''); }} className={btnOutline}>
-                                            {t('verification:beneficiary.cancel')}
-                                        </button>
-                                        <button type="button" disabled={busyId === task.id} onClick={dispute} className={btnPrimary}>
-                                            {t('verification:beneficiary.submitDispute')}
-                                        </button>
+                            <AutoHeight className="w-full">
+                                {disputing?.id === task.id && (
+                                    <div className="w-full pt-1">
+                                        <label className="block">
+                                            <span className="text-sm font-semibold text-on-surface-variant">{t('verification:beneficiary.reasonLabel')}</span>
+                                            <textarea rows={3} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)}
+                                                      placeholder={t('verification:beneficiary.reasonPlaceholder')} className={`${inputClass} mt-1 h-auto py-2`} />
+                                        </label>
+                                        <div className="flex justify-end gap-2 mt-2">
+                                            <button type="button" disabled={busyId === task.id} onClick={() => { setDisputing(null); setError(''); }} className={btnOutline}>
+                                                {t('verification:beneficiary.cancel')}
+                                            </button>
+                                            <button type="button" disabled={busyId === task.id} onClick={dispute} className={btnPrimary}>
+                                                {t('verification:beneficiary.submitDispute')}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </AutoHeight>
                         </li>
                     );
                 })}
@@ -785,7 +788,6 @@ function RespondClaim({ vaultId, myStatus, onAccepted, onDeclined, onError }) {
 /* ---------- N2-notify: tiến độ phần của mình ---------- */
 function ProgressPanel({ progress }) {
     const { t } = useTranslation('beneficiary');
-    const label = useEnumLabels();
     if (!progress) return null;
     return (
         <section className="mb-10 bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
