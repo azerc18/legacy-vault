@@ -15,4 +15,7 @@ public class UpdateExecutorTaskRequest {
 
     @Size(max = 1000, message = "Ghi chú tối đa 1000 ký tự.")
     private String note;
+
+    @Size(max = 200, message = "Mã tham chiếu tối đa 200 ký tự.")
+    private String evidenceRef;
 }

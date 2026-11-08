@@ -1,17 +1,13 @@
 package com.ltld.app.legacyvault.service.readinessservice;
 
+import com.ltld.app.legacyvault.dto.assetverificationdto.AssetVerificationSummary;
 import com.ltld.app.legacyvault.dto.readinessdto.ReadinessItemResponse;
 import com.ltld.app.legacyvault.dto.readinessdto.ReadinessResponse;
 import com.ltld.app.legacyvault.entity.DigitalAsset;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Vault;
-import com.ltld.app.legacyvault.enums.AssetStatus;
-import com.ltld.app.legacyvault.enums.DmsStatus;
-import com.ltld.app.legacyvault.enums.DocumentType;
-import com.ltld.app.legacyvault.enums.ExecutorStatus;
-import com.ltld.app.legacyvault.enums.ExecutorType;
-import com.ltld.app.legacyvault.enums.TransferMechanism;
+import com.ltld.app.legacyvault.enums.*;
 import com.ltld.app.legacyvault.repository.AssetAllocationRepository;
 import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
@@ -19,8 +15,10 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
 import com.ltld.app.legacyvault.utility.TransferMechanisms;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,6 +46,9 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
     static final int EXCELLENT_MIN = 85;
     static final int GOOD_MIN = 65;
     static final int FAIR_MIN = 40;
+    // Cùng giá trị với AssetVerificationExpiryScheduler để thẻ Readiness khớp với thông báo nhắc
+    @Value("${app.verification.reminder-days:14}")
+    private int reverifySoonDays = 14;
 
     private final VaultRepository vaultRepository;
     private final DigitalAssetRepository digitalAssetRepository;
@@ -56,6 +57,7 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
     private final LegalDocumentRepository legalDocumentRepository;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
+    private final AssetVerificationService assetVerificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -184,6 +186,29 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 .sum();
         int completedCount = (int) items.stream().filter(ReadinessItemResponse::isDone).count();
 
+        // PR 2: tài sản cần xác thực lại (không ảnh hưởng điểm số)
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime soonCutoff = now.plusDays(reverifySoonDays);
+        List<DigitalAsset> liveAssets = activeAssets.stream()
+                .filter(a -> a.getVault().getStatus() == VaultStatus.ACTIVE)
+                .toList();
+        int needReverification = 0;
+        int expiringSoon = 0;
+        if (!liveAssets.isEmpty()) {
+            for (AssetVerificationSummary s : assetVerificationService.summarize(liveAssets).values()) {
+                if (s == null) {
+                    continue;
+                }
+                if (s.status() == AssetVerificationStatus.EXPIRED) {
+                    needReverification++;
+                } else if ((s.status() == AssetVerificationStatus.VERIFIED
+                        || s.status() == AssetVerificationStatus.VERIFIED_SANDBOX)
+                        && s.expiresAt() != null && s.expiresAt().isBefore(soonCutoff)) {
+                    expiringSoon++;
+                }
+            }
+        }
+
         return ReadinessResponse.builder()
                 .score(score)
                 .maxScore(items.stream().mapToInt(ReadinessItemResponse::getPoints).sum())
@@ -191,6 +216,8 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
                 .completedItems(completedCount)
                 .totalItems(items.size())
                 .items(items)
+                .assetsNeedReverification(needReverification)
+                .assetsExpiringSoon(expiringSoon)
                 .build();
     }
 

@@ -60,6 +60,7 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
@@ -146,6 +147,8 @@ public class BeneficiaryServiceImplTest {
     private DigitalSignatureRepository digitalSignatureRepository;   // getDossierData
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;   // getDossierData
+    @Mock
+    private HandoverSnapshotService handoverSnapshotService;
 
     private BeneficiaryClaimRequest request;
     private Vault unlockedVault;

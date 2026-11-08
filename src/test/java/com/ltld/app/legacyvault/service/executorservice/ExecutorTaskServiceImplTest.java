@@ -34,6 +34,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -71,6 +72,7 @@ class ExecutorTaskServiceImplTest {
     @Mock private AuditLogService auditLogService;
     // Mock: TransactionTemplate gọi thẳng callback, đủ cho unit test
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private ApplicationEventPublisher eventPublisher;
     @InjectMocks private ExecutorTaskServiceImpl service;
 
     private final UUID assignmentId = UUID.randomUUID();
@@ -103,6 +105,12 @@ class ExecutorTaskServiceImplTest {
         UpdateExecutorTaskRequest r = new UpdateExecutorTaskRequest();
         r.setStatus(status);
         r.setNote(note);
+        return r;
+    }
+
+    private static UpdateExecutorTaskRequest request(ExecutorTaskStatus status, String note, String evidenceRef) {
+        UpdateExecutorTaskRequest r = request(status, note);
+        r.setEvidenceRef(evidenceRef);
         return r;
     }
 
@@ -220,11 +228,11 @@ class ExecutorTaskServiceImplTest {
     void update_toDone_setsCompletedAtTrimsNoteAndAudits() {
         ExecutorTask t = task(ExecutorTaskStatus.DOING);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
-                request(ExecutorTaskStatus.DONE, "  Đã gửi yêu cầu #123  "), LOGIN);
+                request(ExecutorTaskStatus.DONE, "  Đã gửi yêu cầu #123  ", "REF-123"), LOGIN);
 
         assertEquals(ExecutorTaskStatus.DONE, r.getStatus());
         assertEquals("Đã gửi yêu cầu #123", r.getNote());
@@ -240,7 +248,7 @@ class ExecutorTaskServiceImplTest {
         t.setCompletedAt(LocalDateTime.now().minusDays(1));
         t.setNote("cũ");
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
         when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
 
         service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DOING, "   "), LOGIN);
@@ -254,7 +262,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         t.getVault().setOwner(User.builder().id(UUID.randomUUID()).build());
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -266,7 +274,7 @@ class ExecutorTaskServiceImplTest {
     void update_unknownTask_throws404() {
         UUID taskId = UUID.randomUUID();
         stubGuardAllows();
-        when(executorTaskRepository.findById(taskId)).thenReturn(Optional.empty());
+        when(executorTaskRepository.findByIdForUpdate(taskId)).thenReturn(Optional.empty());
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, taskId, request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -278,7 +286,7 @@ class ExecutorTaskServiceImplTest {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         vault.setStatus(VaultStatus.ARCHIVED_LOCKED);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null), LOGIN));
@@ -300,12 +308,108 @@ class ExecutorTaskServiceImplTest {
     void update_noteTooLong_throws400() {
         ExecutorTask t = task(ExecutorTaskStatus.TODO);
         stubGuardAllows();
-        when(executorTaskRepository.findById(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.update(assignmentId, t.getId(),
                 request(ExecutorTaskStatus.DOING, "a".repeat(1001)), LOGIN));
         assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
         verify(executorTaskRepository, never()).saveAndFlush(any());
+    }
+
+    // ---------- update: bằng chứng bắt buộc để DONE ----------
+
+    @Test
+    void update_toDone_withoutEvidence_throws400AndKeepsStatus() {
+        ExecutorTask t = task(ExecutorTaskStatus.DOING);
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, "xong", null), LOGIN));
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
+        assertEquals(ExecutorTaskStatus.DOING, t.getStatus());
+        assertNull(t.getCompletedAt());
+        verify(executorTaskRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void update_toDone_blankEvidenceRef_throws400() {
+        ExecutorTask t = task(ExecutorTaskStatus.DOING);
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.update(assignmentId, t.getId(), request(ExecutorTaskStatus.DONE, null, "   "), LOGIN));
+
+        assertEquals(ErrorCode.VALIDATION_FAILED, ex.getErrorCode());
+        assertNull(t.getEvidenceRef());
+        verify(executorTaskRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void update_toDone_withEvidenceRef_savesTrimmedRefAndAuditsEvidence() {
+        ExecutorTask t = task(ExecutorTaskStatus.DOING);
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
+
+        ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
+                request(ExecutorTaskStatus.DONE, null, "  FB-REQ-998  "), LOGIN);
+
+        assertEquals(ExecutorTaskStatus.DONE, r.getStatus());
+        assertEquals("FB-REQ-998", t.getEvidenceRef());
+        assertEquals("FB-REQ-998", r.getEvidenceRef());
+        assertThat(r.isHasEvidenceDocument()).isFalse();
+        verify(auditLogService).log(eq(AuditAction.EXECUTOR_EVIDENCE_ADDED), eq(AuditResult.SUCCESS),
+                eq(executor.getId()), eq(LOGIN), eq(vault.getId()), eq("ExecutorTask"), eq(t.getId().toString()),
+                eq("evidenceRef"));
+    }
+
+    @Test
+    void update_toDone_taskAlreadyHasEvidenceRef_doesNotNeedItAgain() {
+        ExecutorTask t = task(ExecutorTaskStatus.DOING);
+        t.setEvidenceRef("REF-CU");
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
+
+        ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
+                request(ExecutorTaskStatus.DONE, null), LOGIN);
+
+        assertEquals(ExecutorTaskStatus.DONE, r.getStatus());
+        assertEquals("REF-CU", r.getEvidenceRef());
+        verify(auditLogService, never()).log(eq(AuditAction.EXECUTOR_EVIDENCE_ADDED), any(), any(), any(), any(),
+                any(), any(), any());
+    }
+
+    @Test
+    void update_toDone_taskHasEvidenceDocument_isAccepted() {
+        ExecutorTask t = task(ExecutorTaskStatus.DOING);
+        t.setEvidenceDocumentId(UUID.randomUUID());
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
+
+        ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
+                request(ExecutorTaskStatus.DONE, null), LOGIN);
+
+        assertEquals(ExecutorTaskStatus.DONE, r.getStatus());
+        assertThat(r.isHasEvidenceDocument()).isTrue();
+    }
+
+    @Test
+    void update_toDoing_doesNotRequireEvidence() {
+        ExecutorTask t = task(ExecutorTaskStatus.TODO);
+        stubGuardAllows();
+        when(executorTaskRepository.findByIdForUpdate(t.getId())).thenReturn(Optional.of(t));
+        when(executorTaskRepository.saveAndFlush(t)).thenReturn(t);
+
+        ExecutorTaskResponse r = service.update(assignmentId, t.getId(),
+                request(ExecutorTaskStatus.DOING, "đang xử lý"), LOGIN);
+
+        assertEquals(ExecutorTaskStatus.DOING, r.getStatus());
+        assertNull(r.getEvidenceRef());
     }
 
     // ---------- listForBeneficiary ----------

@@ -1,18 +1,21 @@
 package com.ltld.app.legacyvault.controller.executor;
 
 import com.ltld.app.legacyvault.controller.ExecutorTaskController;
+import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorTaskResponse;
 import com.ltld.app.legacyvault.enums.ExecutorTaskStatus;
 import com.ltld.app.legacyvault.enums.ExecutorTaskWish;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.security.SecurityConfig;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorEvidenceService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorTaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -27,8 +30,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,10 +42,14 @@ class ExecutorTaskControllerSecurityTest {
     private static final String LIST_URL = "/api/executor-assignments/{aid}/tasks";
     private static final String UPDATE_URL = LIST_URL + "/{tid}";
     private static final String BENEFICIARY_URL = "/api/beneficiaries/vaults/{vid}/executor-tasks";
+    private static final String CONFIRM_URL = BENEFICIARY_URL + "/{tid}/confirm";
+    private static final String DISPUTE_URL = BENEFICIARY_URL + "/{tid}/dispute";
+    private static final String EVIDENCE_URL = UPDATE_URL + "/evidence";
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private ExecutorTaskService executorTaskService;
     @MockitoBean private JwtDecoder jwtDecoder;
+    @MockitoBean private ExecutorEvidenceService executorEvidenceService;
 
     private final UUID userId = UUID.randomUUID();
     private final UUID aid = UUID.randomUUID();
@@ -149,5 +155,77 @@ class ExecutorTaskControllerSecurityTest {
                 .thenThrow(new BusinessException(ErrorCode.NOT_FOUND, "Không tìm thấy Vault."));
 
         mockMvc.perform(get(BENEFICIARY_URL, vid).with(beneficiaryToken())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void confirm_withoutBeneficiaryRole_returns403() throws Exception {
+        mockMvc.perform(post(CONFIRM_URL, vid, tid).with(token())).andExpect(status().isForbidden());
+        verifyNoInteractions(executorTaskService);
+    }
+
+    @Test
+    void confirm_valid_returns200() throws Exception {
+        when(executorTaskService.confirmByBeneficiary(vid, tid, userId)).thenReturn(row(ExecutorTaskStatus.DONE));
+
+        mockMvc.perform(post(CONFIRM_URL, vid, tid).with(beneficiaryToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("DONE"));
+    }
+
+    @Test
+    void dispute_withoutBeneficiaryRole_returns403() throws Exception {
+        mockMvc.perform(post(DISPUTE_URL, vid, tid).with(token())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Ma tham chieu sai\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(executorTaskService);
+    }
+
+    @Test
+    void dispute_reasonTooShort_returns400() throws Exception {
+        mockMvc.perform(post(DISPUTE_URL, vid, tid).with(beneficiaryToken())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"sai\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(executorTaskService);
+    }
+
+    @Test
+    void dispute_valid_returns200() throws Exception {
+        when(executorTaskService.disputeByBeneficiary(eq(vid), eq(tid), any(), eq(userId)))
+                .thenReturn(row(ExecutorTaskStatus.DOING));
+
+        mockMvc.perform(post(DISPUTE_URL, vid, tid).with(beneficiaryToken())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Ma tham chieu sai\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("DOING"));
+    }
+
+    @Test
+    void evidenceUpload_noToken_returns401() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "a.pdf", "application/pdf", "%PDF-1.4".getBytes());
+        mockMvc.perform(multipart(EVIDENCE_URL, aid, tid).file(file)).andExpect(status().isUnauthorized());
+        verifyNoInteractions(executorEvidenceService);
+    }
+
+    @Test
+    void evidenceUpload_valid_returns200() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "a.pdf", "application/pdf", "%PDF-1.4".getBytes());
+        when(executorEvidenceService.upload(eq(aid), eq(tid), any(), eq(userId.toString())))
+                .thenReturn(row(ExecutorTaskStatus.DOING));
+
+        mockMvc.perform(multipart(EVIDENCE_URL, aid, tid).file(file).with(token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("DOING"));
+    }
+
+    @Test
+    void evidenceDownload_valid_returnsFileWithNoStore() throws Exception {
+        when(executorEvidenceService.download(aid, tid, userId.toString())).thenReturn(
+                DocumentDownloadResponse.builder().fileName("a.pdf").contentType("application/pdf")
+                        .content("%PDF-1.4".getBytes()).build());
+
+        mockMvc.perform(get(EVIDENCE_URL + "/download", aid, tid).with(token()))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")));
     }
 }
