@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import InfoTip from '../Common/InfoTip.jsx';
 import { inputClass } from './ownerUi.jsx';
 
 // N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
@@ -197,12 +198,15 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
             )}
 
             {value.mode === 'JOINT_CONSENSUS' && (
-                <select value={value.threshold} onChange={(e) => set({ threshold: e.target.value })} disabled={n < 2} className={inputClass}>
-                    <option value="">{tt('thresholdPlaceholder')}</option>
-                    {Array.from({ length: Math.max(0, n - 1) }, (_, i) => i + 2).map((k) => (
-                        <option key={k} value={k}>{tt('thresholdOption', { k, n })}</option>
-                    ))}
-                </select>
+                <div className="flex items-center gap-2">
+                    <select value={value.threshold} onChange={(e) => set({ threshold: e.target.value })} disabled={n < 2} className={inputClass}>
+                        <option value="">{tt('thresholdPlaceholder')}</option>
+                        {Array.from({ length: Math.max(0, n - 1) }, (_, i) => i + 2).map((k) => (
+                            <option key={k} value={k}>{tt('thresholdOption', { k, n })}</option>
+                        ))}
+                    </select>
+                    <InfoTip term="kOfN" />
+                </div>
             )}
 
             {value.mode !== 'ALL' && (

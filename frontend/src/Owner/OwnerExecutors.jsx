@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import InfoTip from '../Common/InfoTip.jsx';
 import { Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi, needsReplaceConfirm } from '../api/ownerApi.js';
@@ -96,7 +97,7 @@ function ExecutorCard({ position, assignment, onChanged }) {
         <Card>
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)}</h2>
+                    <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)} <InfoTip term="executor" /></h2>
                     <p className="text-sm text-on-surface-variant mt-1">{t(`executors.positions.${position.type}.text`)}</p>
                 </div>
                 {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}

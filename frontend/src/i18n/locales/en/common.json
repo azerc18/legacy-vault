@@ -5,6 +5,7 @@
   "notifications": { "title": "Notifications", "empty": "No notifications yet." },
   "language": { "label": "Language", "en": "EN", "vi": "VI" },
   "theme": { "toLight": "Switch to light mode", "toDark": "Switch to dark mode" },
+  "toast": { "close": "Close" },
   "claim": {
     "progress": "Claim progress",
     "accepted": "{{accepted}}/{{required}} people accepted",
