@@ -141,7 +141,7 @@
     "cols": { "user": "Người dùng", "status": "Trạng thái", "roles": "Vai trò", "lastLogin": "Đăng nhập gần nhất", "actions": "Thao tác" },
     "you": "bạn",
     "joined": "Tham gia {{date}}",
-    "status": { "ACTIVE": "Hoạt động", "LOCKED": "Đã khoá", "PENDING": "Chờ xác minh" },
+    "status": { "ACTIVE": "Hoạt động", "LOCKED": "Đã khoá", "PENDING": "Chờ xác minh", "DELETED": "Đã xoá" },
     "dms": { "ACTIVE": "DMS đang chạy", "SUSPENDED": "DMS tạm dừng", "TRIGGERED": "DMS đã kích hoạt" },
     "actions": {
       "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",

@@ -17,6 +17,9 @@ import CompletenessCard from './CompletenessCard.jsx';
 import LegacyOverviewCard from './LegacyOverviewCard.jsx';
 import SessionsCard from './SessionsCard.jsx';
 import PreferencesCard from './PreferencesCard.jsx';
+import LifeEventsCard from './LifeEventsCard.jsx';
+import DataExportCard from './DataExportCard.jsx';
+import DeleteAccountCard from './DeleteAccountCard.jsx';
 
 const STATUS_STYLE = {
     ACTIVE: 'bg-success-container text-on-success-container',
@@ -331,6 +334,7 @@ export default function ProfilePage() {
                         </div>
                         <div className="min-w-0 lg:col-span-2 space-y-6">
                             {profile.roles?.includes('OWNER') && <LegacyOverviewCard />}
+                            {profile.roles?.includes('OWNER') && <LifeEventsCard />}
                             <div id="profile-info" className="scroll-mt-6">
                                 <ProfileForm profile={profile} onSaved={handleSaved} />
                             </div>
@@ -342,6 +346,8 @@ export default function ProfilePage() {
                             <div id="profile-sessions" className="scroll-mt-6">
                                 <SessionsCard />
                             </div>
+                            <DataExportCard profile={profile} />
+                            <DeleteAccountCard profile={profile} />
                         </div>
                     </div>
                 )}

@@ -85,5 +85,7 @@ public enum AuditAction {
     // #10: Admin mở khóa xác minh danh tính của người thụ hưởng
     IDENTITY_UNLOCKED_BY_ADMIN,
     // Trang Hồ sơ: người dùng tự đăng xuất một / mọi thiết bị khác
-    SESSION_REVOKED
+    SESSION_REVOKED,
+    // Trang Hồ sơ: người dùng tự xoá tài khoản (thành công / bị chặn / sai xác nhận)
+    ACCOUNT_DELETED, ACCOUNT_DELETE_FAILED
 }

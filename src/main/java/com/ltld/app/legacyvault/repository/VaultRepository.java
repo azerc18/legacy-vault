@@ -139,6 +139,9 @@ public interface VaultRepository extends JpaRepository<Vault, UUID> {
     // T1 (m6): đếm vault của Owner để kiểm tra giới hạn gói, không nạp entity
     long countByOwnerId(UUID ownerId);
 
+    // Xoá tài khoản: user còn là người thụ hưởng kiểu cũ (cột vaults.beneficiary_id) của két chưa hoàn tất nào không
+    boolean existsByBeneficiaryIdAndStatusIn(UUID beneficiaryId, Collection<VaultStatus> statuses);
+
     // Admin tìm kiếm và lọc Vault theo trạng thái
     Page<Vault> findByStatus(VaultStatus status, Pageable pageable);
 

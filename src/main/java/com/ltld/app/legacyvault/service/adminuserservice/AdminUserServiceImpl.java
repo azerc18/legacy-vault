@@ -114,7 +114,7 @@ public class AdminUserServiceImpl implements AdminUserService{
     @Transactional
     public AdminUserResponse updateStatus(UUID adminId, UUID userId, UpdateUserStatusRequest req) {
         UserStatus target = parseStatus(req.getStatus());
-        if (target == UserStatus.PENDING) {
+        if (target == UserStatus.PENDING || target == UserStatus.DELETED) {
             throw new AdminException("Only changing between ACTIVE and LOCKED", HttpStatus.BAD_REQUEST);
         }
         if (adminId.equals(userId)) {
@@ -123,6 +123,9 @@ public class AdminUserServiceImpl implements AdminUserService{
         User user = lockUser(userId);
         if (user.getStatus() == UserStatus.PENDING) {
             throw new AdminException("Account is not email verified", HttpStatus.CONFLICT);
+        }
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new AdminException("Account was deleted by its owner", HttpStatus.CONFLICT);
         }
         if (user.getStatus() == target) {
             return toResponse(user);              // idempotent

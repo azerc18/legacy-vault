@@ -179,5 +179,88 @@
       "load": "Could not load your devices.",
       "failed": "Something went wrong. Please try again."
     }
+  },
+  "lifeEvents": {
+    "title": "Has life changed?",
+    "description": "After a big change, review your legacy so your family receives what you intend. Pick what just happened to see what to do.",
+    "lastReview": "Last review: {{date}}.",
+    "neverReviewed": "You have not reviewed your legacy yet.",
+    "overdue": "Review at least every 6 months.",
+    "events": {
+      "marriage": "Got married",
+      "newChild": "New child",
+      "separation": "Divorce / separation",
+      "bereavement": "Loss of a loved one",
+      "newAsset": "New asset",
+      "contactChanged": "New phone / email"
+    },
+    "suggested": "Suggested next steps",
+    "tasks": {
+      "addSpouse": "Add your spouse as a beneficiary",
+      "updateWill": "Update the will in your vault",
+      "addConfirmer": "Choose DMS confirmers",
+      "addChild": "Add your child as a beneficiary or backup",
+      "futureMessage": "Write a scheduled message for your child",
+      "backupExecutor": "Assign a backup executor",
+      "reviewBeneficiaries": "Review beneficiaries and shares",
+      "reviewExecutors": "Review your executors",
+      "reviewConfirmers": "Review DMS confirmers",
+      "replaceBeneficiary": "Replace a beneficiary who has passed",
+      "replaceExecutor": "Replace an executor who has passed",
+      "addAsset": "Add the new asset to a vault",
+      "allocateAsset": "Choose who receives the new asset",
+      "uploadPapers": "Upload ownership papers",
+      "updatePhone": "Update your phone number",
+      "checkReminders": "Check your check-in reminder channel"
+    },
+    "markReviewed": "I've reviewed everything",
+    "saving": "Saving...",
+    "reviewed": "Review recorded. Your Dead Man's Switch cycle was refreshed too.",
+    "needDms": "Turn on the Dead Man's Switch to record a review.",
+    "openDms": "Turn it on",
+    "errors": {
+      "review": "Could not record the review."
+    }
+  },
+  "export": {
+    "title": "My data",
+    "description": "Download a copy of your account data (JSON): profile, vaults, assets, beneficiaries, executors, DMS, plan and payment history.",
+    "noSecrets": "Contains no passwords, secret keys or encrypted asset contents.",
+    "button": "Download data",
+    "preparing": "Preparing...",
+    "failed": "Could not download your data."
+  },
+  "deleteAccount": {
+    "title": "Delete account",
+    "description": "Permanently delete your LegacyVault account. This cannot be undone.",
+    "start": "I want to delete my account",
+    "blockedTitle": "Your account cannot be deleted yet because:",
+    "blockers": {
+      "VAULTS_OWNED_one": "You still have {{count}} vault. Delete it first (unlocked or handed-over vaults cannot be deleted).",
+      "VAULTS_OWNED_other": "You still have {{count}} vaults. Delete them first (unlocked or handed-over vaults cannot be deleted).",
+      "EXECUTOR": "You are an executor for a vault owner. Ask them to revoke this role.",
+      "BENEFICIARY": "You are a beneficiary of a vault. Decline it or ask the owner to remove you.",
+      "STAFF_ROLE": "Admin / Legal Verifier accounts cannot delete themselves. Please contact an administrator."
+    },
+    "goFix": "Resolve",
+    "close": "Close",
+    "consequences": {
+      "signIn": "You will be signed out everywhere and cannot sign in again.",
+      "anonymize": "Your name, email, phone number, photo and 2FA are removed from the account.",
+      "keep": "Payment history and system logs are kept in anonymized form as required.",
+      "noRefund": "Any active VIP plan is cancelled right away and not refunded."
+    },
+    "exportFirst": "Tip: download \"My data\" above first if you want to keep a copy.",
+    "password": "Current password",
+    "passwordHint": "Signed up with Google and have no password? Use \"Forgot password\" on the sign-in page to set one first.",
+    "code": "Two-step verification code or backup code",
+    "typeEmail": "Type your email to confirm:",
+    "confirm": "Delete account permanently",
+    "deleting": "Deleting...",
+    "done": "Your account has been deleted. Thank you for using LegacyVault.",
+    "errors": {
+      "check": "Could not check whether your account can be deleted.",
+      "failed": "Could not delete your account."
+    }
   }
 }

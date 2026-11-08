@@ -76,6 +76,10 @@ public class User {
     @Column(name = "avatar_updated_at")
     private Instant avatarUpdatedAt;
 
+    // Thời điểm người dùng tự xoá tài khoản (status = DELETED)
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Builder.Default
     @Column(name = "mfa_enabled", nullable = false)
     private boolean mfaEnabled = false;
