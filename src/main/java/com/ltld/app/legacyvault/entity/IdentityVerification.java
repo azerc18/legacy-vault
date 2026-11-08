@@ -12,7 +12,10 @@ import java.util.UUID;
 
 @Entity
 @DynamicUpdate
-@Table(name = "identity_verifications")
+@Table(name = "identity_verifications",
+        // #19: khớp migration V20261108_2000 (index ghép cho các truy vấn FR-17)
+        indexes = @Index(name = "idx_identity_verification_lookup",
+                columnList = "vault_id, beneficiary_id, status, created_at"))
 @Getter
 @Setter
 @NoArgsConstructor
