@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,8 +102,8 @@ class CryptoWalletAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("PUBLIC_BALANCE: tra số dư thành công trả REAL; khi mạng lỗi tự chuyển sang SANDBOX trung thực")
-    void publicBalance_realAndSandboxFallback() {
+    @DisplayName("PUBLIC_BALANCE: tra số dư thành công trả REAL; khi mạng lỗi báo thất bại, không tự tạo số dư")
+    void publicBalance_realAndNoFabricatedFallback() {
         DigitalAsset asset = cryptoAsset("Ethereum", TEST_ETH_ADDRESS, null);
         verifier.setBalanceLookup((net, addr) ->
                 new CryptoWalletAssetVerifier.BalanceLookupResult("1.5 ETH", "publicnode"));
@@ -116,11 +117,22 @@ class CryptoWalletAssetVerifierTest {
         verifier.setBalanceLookup((net, addr) -> {
             throw new IOException("Network unreachable");
         });
-        AssetVerifier.VerifyResult sandboxResult = verifier.confirm(
+        AssetVerifier.VerifyResult offlineResult = verifier.confirm(
                 asset, AssetVerificationMethod.PUBLIC_BALANCE, Map.of(), ownerId, null);
-        assertThat(sandboxResult.success()).isTrue();
-        assertThat(sandboxResult.provider()).isEqualTo(VerificationProvider.SANDBOX);
-        assertThat(sandboxResult.evidence()).containsEntry("mode", "SANDBOX");
+        assertThat(offlineResult.success()).isFalse();
+        assertThat(offlineResult.evidence()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("BIP39_CHECK: không nhận seed phrase gửi trong payload, chỉ kiểm seed đã lưu")
+    void bip39_ignoresSeedPhraseInPayload() {
+        DigitalAsset asset = cryptoAsset("Ethereum", TEST_ETH_ADDRESS, null);
+
+        AssetVerifier.VerifyResult result = verifier.confirm(asset, AssetVerificationMethod.BIP39_CHECK,
+                Map.of("seedPhrase", VALID_BIP39_12, "mnemonic", VALID_BIP39_12), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        verifyNoInteractions(cryptoService);
     }
 
     @Test

@@ -7,6 +7,8 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,8 @@ class SocialMediaAssetVerifierTest {
 
     @Mock private OtpGenerator otpGenerator;
     @Mock private LegalDocumentRepository legalDocumentRepository;
+    @Mock private FileStorageService fileStorageService;
+    @Mock private CryptoService cryptoService;
 
     private SocialMediaAssetVerifier verifier;
     private UUID ownerId;
@@ -38,7 +42,8 @@ class SocialMediaAssetVerifierTest {
 
     @BeforeEach
     void setUp() {
-        verifier = new SocialMediaAssetVerifier(otpGenerator, new OtpHasher(), legalDocumentRepository);
+        verifier = new SocialMediaAssetVerifier(otpGenerator, new OtpHasher(), legalDocumentRepository,
+                fileStorageService, cryptoService);
         ownerId = UUID.randomUUID();
         vaultId = UUID.randomUUID();
         assetId = UUID.randomUUID();
@@ -80,8 +85,8 @@ class SocialMediaAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("SCREENSHOT_UPLOAD: xác thực qua documentId trong kho tài liệu mã hóa của vault trả REAL")
-    void screenshotUpload_withVaultDocumentId_success() {
+    @DisplayName("SCREENSHOT_UPLOAD: ghi nhận ảnh trong kho tài liệu của vault, server tự băm nội dung tệp, trả SANDBOX")
+    void screenshotUpload_withVaultDocumentId_success() throws Exception {
         DigitalAsset asset = socialAsset("Instagram", "@longvan");
         UUID docId = UUID.randomUUID();
         LegalDocument doc = LegalDocument.builder()
@@ -91,6 +96,10 @@ class SocialMediaAssetVerifierTest {
                 .fileUrlEncrypted("enc://bucket/ig.png")
                 .build();
         when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.of(doc));
+        byte[] cipher = new byte[]{9, 9};
+        byte[] plain = "png-bytes".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(fileStorageService.readFile("enc://bucket/ig.png")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
 
         AssetVerifier.VerifyResult result = verifier.confirm(
                 asset,
@@ -101,11 +110,36 @@ class SocialMediaAssetVerifierTest {
         );
 
         assertThat(result.success()).isTrue();
-        assertThat(result.provider()).isEqualTo(VerificationProvider.REAL);
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
         assertThat(result.evidence())
                 .containsEntry("documentId", docId.toString())
                 .containsEntry("fileName", "instagram_profile.png")
-                .containsKey("sha256");
+                .containsEntry("sha256", java.util.HexFormat.of().formatHex(
+                        java.security.MessageDigest.getInstance("SHA-256").digest(plain)));
+    }
+
+    @Test
+    @DisplayName("SCREENSHOT_UPLOAD: chỉ gửi chuỗi sha256 (không có tài liệu thật) thì thất bại")
+    void screenshotUpload_rawHashOnly_fails() {
+        DigitalAsset asset = socialAsset("TikTok", "@longvan");
+
+        AssetVerifier.VerifyResult result = verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("sha256", "a".repeat(64)), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("SCREENSHOT_UPLOAD: tài liệu ở vault khác thì thất bại")
+    void screenshotUpload_documentFromOtherVault_fails() {
+        DigitalAsset asset = socialAsset("Instagram", "@longvan");
+        UUID docId = UUID.randomUUID();
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.empty());
+
+        AssetVerifier.VerifyResult result = verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("documentId", docId.toString()), ownerId, null);
+
+        assertThat(result.success()).isFalse();
     }
 
     @Test
@@ -117,6 +151,6 @@ class SocialMediaAssetVerifierTest {
                 asset, AssetVerificationMethod.SCREENSHOT_UPLOAD, Map.of(), ownerId, null);
 
         assertThat(result.success()).isFalse();
-        assertThat(result.provider()).isEqualTo(VerificationProvider.REAL);
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
     }
 }

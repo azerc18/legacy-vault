@@ -68,7 +68,7 @@ class EmailAssetVerifierTest {
         assertThat(start.provider()).isEqualTo(VerificationProvider.REAL);
         assertThat(start.challengeHash()).hasSize(64);
         assertThat(start.clientData()).containsEntry("email", "owner.vault@gmail.com");
-        verify(emailSender).sendEmail("owner.vault@gmail.com", "482910");
+        verify(emailSender).sendAssetVerificationOtpEmail("owner.vault@gmail.com", "482910", 5);
 
         AssetVerifier.VerifyResult confirm = verifier.confirm(
                 asset, AssetVerificationMethod.OTP_EMAIL, Map.of("code", "482910"), ownerId, start.challengeHash());

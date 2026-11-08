@@ -34,6 +34,16 @@ public class EmailSender {
     }
 
     @Async
+    public void sendAssetVerificationOtpEmail(String email, String otp, int validMinutes) {
+        send(email,
+                "Verify your email asset - LegacyVault",
+                "A LegacyVault user listed this email address as a digital asset and asked to verify that they own it."
+                        + "\nYour verification code is: " + otp
+                        + "\nThe code is valid for " + validMinutes + " minutes and can be used once."
+                        + "\nIf you did not add this email to LegacyVault, you can ignore this message.");
+    }
+
+    @Async
     public void sendPasswordResetEmail(String email, String otp) {
         send(email,
                 "Reset your password - LegacyVault",

@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,7 +39,6 @@ import java.util.regex.Pattern;
 public class EWalletAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 5;
-    private static final int MAX_CACHE_SIZE = 1000;
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(2500))
             .build();
@@ -54,7 +52,6 @@ public class EWalletAssetVerifier implements AssetVerifier {
     private final String paypalClientId;
     private PayPalEmailLookup payPalEmailLookup;
 
-    private final Map<UUID, String> lastChallengeByAsset = new ConcurrentHashMap<>();
 
     @FunctionalInterface
     public interface PayPalEmailLookup {
@@ -102,10 +99,11 @@ public class EWalletAssetVerifier implements AssetVerifier {
     @Override
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId) {
-        String cachedHash = asset.getId() != null ? lastChallengeByAsset.get(asset.getId()) : null;
-        return confirm(asset, method, payload, ownerId, cachedHash);
+        // Mã thử thách lưu ở DB; service truyền vào qua hàm 5 tham số. Gọi hàm này thì các cách cần mã sẽ trả thất bại.
+        return confirm(asset, method, payload, ownerId, null);
     }
 
+    // Ghi đè hàm default 5 tham số của AssetVerifier (thêm ở #199). Không đặt @Override để vẫn biên dịch được trước khi #199 merge.
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId, String challengeHash) {
         Map<String, String> fields = FlatJson.decode(asset.getPublicFieldsJson());
@@ -133,16 +131,8 @@ public class EWalletAssetVerifier implements AssetVerifier {
         String otp = otpGenerator.generate();
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
         String challengeHash = otpHasher.hash(saltId, otp);
-        if (asset.getId() != null) {
-            if (lastChallengeByAsset.size() >= MAX_CACHE_SIZE) {
-                lastChallengeByAsset.clear();
-            }
-            lastChallengeByAsset.put(asset.getId(), challengeHash);
-        }
 
-        log.info("[SANDBOX SMS] E-Wallet {} ({} - {}) verification code: {}",
-                platform, maskedPhone, carrier, otp);
-
+        // Mã mô phỏng chỉ trả về trong clientData.sandboxCode, không ghi log
         Map<String, String> clientData = new LinkedHashMap<>();
         clientData.put("platform", platform);
         clientData.put("maskedPhone", maskedPhone);
@@ -174,12 +164,7 @@ public class EWalletAssetVerifier implements AssetVerifier {
         }
 
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
-        boolean matched = otpHasher.matches(saltId, code, challengeHash)
-                || CryptoVerificationUtils.constantTimeEquals(CryptoVerificationUtils.sha256Hex(code), challengeHash);
-
-        if (asset.getId() != null) {
-            lastChallengeByAsset.remove(asset.getId());
-        }
+        boolean matched = otpHasher.matches(saltId, code, challengeHash);
 
         if (!matched) {
             return new VerifyResult(false, VerificationProvider.SANDBOX,
@@ -206,12 +191,6 @@ public class EWalletAssetVerifier implements AssetVerifier {
         String otp = otpGenerator.generate();
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
         String challengeHash = otpHasher.hash(saltId, otp);
-        if (asset.getId() != null) {
-            if (lastChallengeByAsset.size() >= MAX_CACHE_SIZE) {
-                lastChallengeByAsset.clear();
-            }
-            lastChallengeByAsset.put(asset.getId(), challengeHash);
-        }
 
         Map<String, String> clientData = new LinkedHashMap<>();
         clientData.put("platform", "PayPal");
@@ -233,10 +212,6 @@ public class EWalletAssetVerifier implements AssetVerifier {
                                             Map<String, String> payload, String challengeHash) {
         requirePayPalCompatible(platform, rawEmail);
         String expectedEmail = rawEmail.trim().toLowerCase(Locale.ROOT);
-
-        if (asset.getId() != null) {
-            lastChallengeByAsset.remove(asset.getId());
-        }
 
         // Trường hợp 1: Client gửi accessToken từ PayPal OAuth Sandbox
         String accessToken = firstNonBlank(payload, "accessToken", "paypalAccessToken");
@@ -275,8 +250,7 @@ public class EWalletAssetVerifier implements AssetVerifier {
         }
 
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
-        boolean matched = otpHasher.matches(saltId, code, challengeHash)
-                || CryptoVerificationUtils.constantTimeEquals(CryptoVerificationUtils.sha256Hex(code), challengeHash);
+        boolean matched = otpHasher.matches(saltId, code, challengeHash);
         if (!matched) {
             return new VerifyResult(false, VerificationProvider.SANDBOX,
                     "Invalid PayPal sandbox verification code", Map.of());

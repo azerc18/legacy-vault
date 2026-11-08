@@ -7,43 +7,48 @@ import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * C.3.6: Xác thực tài sản SOCIAL_MEDIA (Facebook, Instagram, TikTok, X, LinkedIn, YouTube):
  * - BIO_CHALLENGE_MOCK (SANDBOX): tạo mã thử thách dạng LV-XXXXXX để Owner dán vào tiểu sử (bio) và kiểm tra (mô phỏng).
- * - SCREENSHOT_UPLOAD (REAL): ghi nhận bằng chứng ảnh chụp trang cá nhân qua kho tài liệu mã hóa hoặc mã băm SHA-256 của tệp.
+ * - SCREENSHOT_UPLOAD (SANDBOX): ghi nhận ảnh chụp trang cá nhân đã tải lên kho tài liệu của vault.
+ *   Ảnh do Owner tự nộp nên chỉ là bằng chứng tự khai, KHÔNG tính là xác thực thật. Server tự băm SHA-256 nội dung tệp
+ *   (không nhận hash do client gửi) để sau này đối chiếu tệp có bị thay không.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SocialMediaAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 15;
-    private static final int MAX_CACHE_SIZE = 1000;
     private static final Pattern BIO_CODE_PATTERN = Pattern.compile("(LV-\\d{6})", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SHA256_HEX_PATTERN = Pattern.compile("^[0-9a-fA-F]{64}$");
 
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
     private final LegalDocumentRepository legalDocumentRepository;
-
-    private final Map<UUID, String> lastChallengeByAsset = new ConcurrentHashMap<>();
+    private final FileStorageService fileStorageService;
+    private final CryptoService cryptoService;
 
     @Override
     public AssetType type() {
@@ -64,8 +69,9 @@ public class SocialMediaAssetVerifier implements AssetVerifier {
         return switch (method) {
             case BIO_CHALLENGE_MOCK -> startBioChallenge(asset, platform, handle);
             case SCREENSHOT_UPLOAD -> new StartResult(
-                    VerificationProvider.REAL,
-                    "Upload a screenshot of your " + platform + " profile (" + handle + ") and confirm",
+                    VerificationProvider.SANDBOX,
+                    "Upload a screenshot of your " + platform + " profile (" + handle
+                            + ") to the vault documents, then confirm with its documentId",
                     null,
                     Map.of("platform", platform, "usernameOrHandle", handle),
                     LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES)
@@ -78,10 +84,11 @@ public class SocialMediaAssetVerifier implements AssetVerifier {
     @Override
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId) {
-        String cachedHash = asset.getId() != null ? lastChallengeByAsset.get(asset.getId()) : null;
-        return confirm(asset, method, payload, ownerId, cachedHash);
+        // Không có challengeHash (lưu ở DB, service truyền vào qua hàm 5 tham số) thì các cách cần mã sẽ trả thất bại
+        return confirm(asset, method, payload, ownerId, null);
     }
 
+    // Ghi đè hàm default 5 tham số của AssetVerifier (thêm ở #199). Không đặt @Override để vẫn biên dịch được trước khi #199 merge.
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId, String challengeHash) {
         Map<String, String> fields = FlatJson.decode(asset.getPublicFieldsJson());
@@ -105,13 +112,6 @@ public class SocialMediaAssetVerifier implements AssetVerifier {
         String challengeCode = "LV-" + otpGenerator.generate();
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
         String challengeHash = otpHasher.hash(saltId, challengeCode);
-        if (asset.getId() != null) {
-            if (lastChallengeByAsset.size() >= MAX_CACHE_SIZE) {
-                lastChallengeByAsset.clear();
-            }
-            lastChallengeByAsset.put(asset.getId(), challengeHash);
-        }
-
         Map<String, String> clientData = new LinkedHashMap<>();
         clientData.put("platform", platform);
         clientData.put("usernameOrHandle", handle);
@@ -141,12 +141,7 @@ public class SocialMediaAssetVerifier implements AssetVerifier {
 
         String token = extractBioChallengeCode(rawInput);
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
-        boolean matched = otpHasher.matches(saltId, token, challengeHash)
-                || CryptoVerificationUtils.constantTimeEquals(CryptoVerificationUtils.sha256Hex(token), challengeHash);
-
-        if (asset.getId() != null) {
-            lastChallengeByAsset.remove(asset.getId());
-        }
+        boolean matched = otpHasher.matches(saltId, token, challengeHash);
 
         if (!matched) {
             return new VerifyResult(false, VerificationProvider.SANDBOX,
@@ -180,67 +175,65 @@ public class SocialMediaAssetVerifier implements AssetVerifier {
 
     private VerifyResult confirmScreenshotUpload(DigitalAsset asset, String platform, String handle,
                                                  Map<String, String> payload) {
-        String docIdStr = firstNonBlank(payload, "documentId", "evidenceDocumentId");
-        String rawHash = firstNonBlank(payload, "sha256", "fileHash", "hash");
-        String fileName = firstNonBlank(payload, "fileName");
+        UUID vaultId = asset.getVault() != null ? asset.getVault().getId() : null;
+        if (vaultId == null) {
+            return new VerifyResult(false, VerificationProvider.SANDBOX,
+                    "Asset is not attached to a vault", Map.of());
+        }
 
-        LegalDocument linkedDoc = null;
+        LegalDocument doc;
+        String docIdStr = firstNonBlank(payload, "documentId", "evidenceDocumentId");
         if (docIdStr != null) {
             UUID docId;
             try {
                 docId = UUID.fromString(docIdStr);
             } catch (IllegalArgumentException e) {
-                return new VerifyResult(false, VerificationProvider.REAL,
+                return new VerifyResult(false, VerificationProvider.SANDBOX,
                         "Invalid documentId UUID format", Map.of());
             }
-            Optional<LegalDocument> found = (asset.getVault() != null && asset.getVault().getId() != null)
-                    ? legalDocumentRepository.findByIdAndVaultId(docId, asset.getVault().getId())
-                    : legalDocumentRepository.findById(docId);
+            // Chỉ nhận tài liệu nằm trong đúng vault của tài sản
+            Optional<LegalDocument> found = legalDocumentRepository.findByIdAndVaultId(docId, vaultId);
             if (found.isEmpty()) {
-                return new VerifyResult(false, VerificationProvider.REAL,
-                        "Screenshot document not found in vault", Map.of());
+                return new VerifyResult(false, VerificationProvider.SANDBOX,
+                        "Screenshot document not found in this vault", Map.of());
             }
-            linkedDoc = found.get();
+            doc = found.get();
         } else if (asset.getLinkedDocumentGroupId() != null) {
-            linkedDoc = legalDocumentRepository
+            doc = legalDocumentRepository
                     .findFirstByDocumentGroupIdOrderByVersionDesc(asset.getLinkedDocumentGroupId())
+                    .filter(d -> d.getVault() != null && vaultId.equals(d.getVault().getId()))
                     .orElse(null);
-        }
-
-        String verifiedHash = null;
-        if (rawHash != null) {
-            if (!SHA256_HEX_PATTERN.matcher(rawHash).matches()) {
-                return new VerifyResult(false, VerificationProvider.REAL,
-                        "Screenshot SHA-256 hash must be a 64-character hex string", Map.of());
+            if (doc == null) {
+                return new VerifyResult(false, VerificationProvider.SANDBOX,
+                        "Linked screenshot document not found in this vault", Map.of());
             }
-            verifiedHash = rawHash.toLowerCase(Locale.ROOT);
-        } else if (linkedDoc != null) {
-            verifiedHash = CryptoVerificationUtils.sha256Hex(
-                    linkedDoc.getId() + ":" + linkedDoc.getFileName() + ":" + linkedDoc.getFileUrlEncrypted());
-        } else if (asset.getAttachmentUrl() != null && !asset.getAttachmentUrl().isBlank()) {
-            verifiedHash = CryptoVerificationUtils.sha256Hex(asset.getAttachmentUrl().trim());
+        } else {
+            return new VerifyResult(false, VerificationProvider.SANDBOX,
+                    "Upload the profile screenshot to the vault documents and send its documentId", Map.of());
         }
 
-        if (verifiedHash == null) {
-            return new VerifyResult(false, VerificationProvider.REAL,
-                    "Screenshot documentId or 64-character SHA-256 fileHash is required", Map.of());
+        String fileSha256;
+        try {
+            byte[] plain = cryptoService.decryptBytes(fileStorageService.readFile(doc.getFileUrlEncrypted()));
+            fileSha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(plain));
+        } catch (Exception e) {
+            log.warn("Could not read screenshot document {} for asset {}: {}", doc.getId(), asset.getId(), e.getMessage());
+            return new VerifyResult(false, VerificationProvider.SANDBOX,
+                    "Could not read the screenshot document, please try again later", Map.of());
         }
 
         Map<String, String> evidence = new LinkedHashMap<>();
         evidence.put("platform", platform);
         evidence.put("usernameOrHandle", handle);
-        evidence.put("sha256", verifiedHash);
-        if (linkedDoc != null) {
-            evidence.put("documentId", linkedDoc.getId().toString());
-            if (linkedDoc.getFileName() != null) {
-                evidence.put("fileName", linkedDoc.getFileName());
-            }
-        } else if (fileName != null) {
-            evidence.put("fileName", fileName);
+        evidence.put("documentId", doc.getId().toString());
+        evidence.put("sha256", fileSha256);
+        if (doc.getFileName() != null) {
+            evidence.put("fileName", doc.getFileName());
         }
+        evidence.put("mode", "SANDBOX");
 
-        return new VerifyResult(true, VerificationProvider.REAL,
-                "Social media profile screenshot evidence recorded (SHA-256 verified)", evidence);
+        return new VerifyResult(true, VerificationProvider.SANDBOX,
+                "Profile screenshot recorded as self-submitted evidence (Sandbox)", evidence);
     }
 
     private static String requireHandle(String raw) {

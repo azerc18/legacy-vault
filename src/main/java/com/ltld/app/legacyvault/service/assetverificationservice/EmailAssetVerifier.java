@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -35,7 +34,6 @@ import java.util.regex.Pattern;
 public class EmailAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 5;
-    private static final int MAX_CACHE_SIZE = 1000;
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final OtpGenerator otpGenerator;
@@ -43,8 +41,6 @@ public class EmailAssetVerifier implements AssetVerifier {
     private final EmailSender emailSender;
     private final GoogleTokenVerifier googleTokenVerifier;
 
-    // Lưu tạm challengeHash gần nhất theo assetId để tương thích cả khi gọi confirm 4 tham số (PR 0)
-    private final Map<UUID, String> lastChallengeByAsset = new ConcurrentHashMap<>();
 
     @Override
     public AssetType type() {
@@ -73,10 +69,11 @@ public class EmailAssetVerifier implements AssetVerifier {
     @Override
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId) {
-        String cachedHash = asset.getId() != null ? lastChallengeByAsset.get(asset.getId()) : null;
-        return confirm(asset, method, payload, ownerId, cachedHash);
+        // Mã thử thách lưu ở DB; service truyền vào qua hàm 5 tham số. Gọi hàm này thì các cách cần mã sẽ trả thất bại.
+        return confirm(asset, method, payload, ownerId, null);
     }
 
+    // Ghi đè hàm default 5 tham số của AssetVerifier (thêm ở #199). Không đặt @Override để vẫn biên dịch được trước khi #199 merge.
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId, String challengeHash) {
         Map<String, String> fields = FlatJson.decode(asset.getPublicFieldsJson());
@@ -96,14 +93,8 @@ public class EmailAssetVerifier implements AssetVerifier {
         String otp = otpGenerator.generate();
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
         String challengeHash = otpHasher.hash(saltId, otp);
-        if (asset.getId() != null) {
-            if (lastChallengeByAsset.size() >= MAX_CACHE_SIZE) {
-                lastChallengeByAsset.clear();
-            }
-            lastChallengeByAsset.put(asset.getId(), challengeHash);
-        }
 
-        emailSender.sendEmail(email, otp);
+        emailSender.sendAssetVerificationOtpEmail(email, otp, CHALLENGE_TTL_MINUTES);
 
         String masked = maskEmail(email);
         Map<String, String> clientData = new LinkedHashMap<>();
@@ -132,12 +123,7 @@ public class EmailAssetVerifier implements AssetVerifier {
         }
 
         UUID saltId = asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
-        boolean matched = otpHasher.matches(saltId, code, challengeHash)
-                || CryptoVerificationUtils.constantTimeEquals(CryptoVerificationUtils.sha256Hex(code), challengeHash);
-
-        if (asset.getId() != null) {
-            lastChallengeByAsset.remove(asset.getId());
-        }
+        boolean matched = otpHasher.matches(saltId, code, challengeHash);
 
         if (!matched) {
             return new VerifyResult(false, VerificationProvider.REAL,

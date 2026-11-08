@@ -28,15 +28,16 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * C.3.5: Xác thực tài sản CRYPTO_WALLET:
  * - ADDRESS_CHECKSUM (REAL): kiểm tra checksum địa chỉ (EIP-55 Keccak-256 cho Ethereum/BNB, Base58Check & Bech32/Bech32m cho Bitcoin, Base58 32-byte cho Solana).
- * - BIP39_CHECK (REAL): kiểm tra 12/24 từ theo wordlist BIP-39 2048 từ tiếng Anh + SHA-256 entropy checksum.
- * - PUBLIC_BALANCE (REAL / fallback SANDBOX khi mạng bị chặn): tra cứu số dư công khai trên blockchain.
+ * - BIP39_CHECK (REAL): kiểm seed phrase ĐÃ LƯU (mã hóa) trong tài sản theo wordlist BIP-39 2048 từ + SHA-256 checksum.
+ *   Không nhận seed phrase gửi lên từ request.
+ * - PUBLIC_BALANCE (REAL): tra cứu số dư công khai trên blockchain; không tra được thì báo thất bại, không tự tạo số.
+ * Lưu ý: ADDRESS_CHECKSUM, BIP39_CHECK, PUBLIC_BALANCE chỉ chứng minh dữ liệu HỢP LỆ; chỉ WALLET_SIGNATURE chứng minh SỞ HỮU.
  * - WALLET_SIGNATURE (REAL): tạo thông điệp thử thách và khôi phục địa chỉ từ chữ ký MetaMask personal_sign (EIP-191 + secp256k1 ecRecover).
  */
 @Slf4j
@@ -44,7 +45,6 @@ import java.util.regex.Pattern;
 public class CryptoWalletAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 10;
-    private static final int MAX_CACHE_SIZE = 1000;
     private static final Duration CONNECT_TIMEOUT = Duration.ofMillis(2000);
     private static final Duration READ_TIMEOUT = Duration.ofMillis(3000);
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
@@ -60,8 +60,6 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
     private final OtpGenerator otpGenerator;
     private PublicBalanceLookup balanceLookup;
 
-    private final Map<UUID, String> lastChallengeHashByAsset = new ConcurrentHashMap<>();
-    private final Map<UUID, String> lastChallengeMessageByAsset = new ConcurrentHashMap<>();
 
     @FunctionalInterface
     public interface PublicBalanceLookup {
@@ -129,10 +127,11 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
     @Override
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId) {
-        String cachedHash = asset.getId() != null ? lastChallengeHashByAsset.get(asset.getId()) : null;
-        return confirm(asset, method, payload, ownerId, cachedHash);
+        // Mã thử thách lưu ở DB; service truyền vào qua hàm 5 tham số. Gọi hàm này thì các cách cần mã sẽ trả thất bại.
+        return confirm(asset, method, payload, ownerId, null);
     }
 
+    // Ghi đè hàm default 5 tham số của AssetVerifier (thêm ở #199). Không đặt @Override để vẫn biên dịch được trước khi #199 merge.
     public VerifyResult confirm(DigitalAsset asset, AssetVerificationMethod method,
                                 Map<String, String> payload, UUID ownerId, String challengeHash) {
         Map<String, String> fields = FlatJson.decode(asset.getPublicFieldsJson());
@@ -142,7 +141,7 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
 
         return switch (method) {
             case ADDRESS_CHECKSUM -> confirmAddressChecksum(network, address);
-            case BIP39_CHECK -> confirmBip39Check(asset, safePayload);
+            case BIP39_CHECK -> confirmBip39Check(asset);
             case PUBLIC_BALANCE -> confirmPublicBalance(network, address);
             case WALLET_SIGNATURE -> confirmWalletSignature(asset, network, address, safePayload, challengeHash);
             default -> throw new VaultException("Unsupported verification method for CRYPTO_WALLET: " + method,
@@ -220,9 +219,10 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
     // 2. BIP39_CHECK
     // =========================================================
 
-    private VerifyResult confirmBip39Check(DigitalAsset asset, Map<String, String> payload) {
-        String phrase = firstNonBlank(payload, "seedPhrase", "mnemonic");
-        if (phrase == null && asset.getEncryptedSecret() != null && !asset.getEncryptedSecret().isBlank()) {
+    private VerifyResult confirmBip39Check(DigitalAsset asset) {
+        // Quy ước C.2: KHÔNG nhận seed phrase gửi lên từ request. Chỉ kiểm seed phrase Owner đã lưu (mã hóa) trong tài sản.
+        String phrase = null;
+        if (asset.getEncryptedSecret() != null && !asset.getEncryptedSecret().isBlank()) {
             try {
                 String decrypted = cryptoService.decrypt(asset.getEncryptedSecret());
                 Map<String, String> secretFields = FlatJson.decode(decrypted);
@@ -233,6 +233,10 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
             }
         }
 
+        if (phrase == null || phrase.isBlank()) {
+            return new VerifyResult(false, VerificationProvider.REAL,
+                    "No seed phrase is stored for this asset. Save it in the asset's secret fields first", Map.of());
+        }
         CryptoVerificationUtils.Bip39CheckResult check = CryptoVerificationUtils.verifyBip39Mnemonic(phrase);
         if (!check.valid()) {
             return new VerifyResult(false, VerificationProvider.REAL, check.errorMessage(), Map.of());
@@ -267,19 +271,13 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
                         "Public blockchain balance verified: " + lookupResult.balanceFormatted(), evidence);
             }
         } catch (Exception e) {
-            log.info("Public blockchain lookup unreachable for {} ({}), falling back to SANDBOX: {}",
+            log.info("Public blockchain lookup unreachable for {} ({}): {}",
                     network, address, e.getMessage());
         }
 
-        // Khi môi trường bị chặn mạng ra ngoài, trả SANDBOX trung thực (không giả mạo REAL)
-        String simulatedBalance = simulateBalance(network, address);
-        Map<String, String> evidence = new LinkedHashMap<>();
-        evidence.put("network", network);
-        evidence.put("walletAddress", address);
-        evidence.put("balance", simulatedBalance);
-        evidence.put("mode", "SANDBOX");
-        return new VerifyResult(true, VerificationProvider.SANDBOX,
-                "Public balance verified in Sandbox mode: " + simulatedBalance, evidence);
+        // Không tra được thì báo thất bại, KHÔNG tự tạo số dư (tránh dữ liệu bịa)
+        return new VerifyResult(false, VerificationProvider.REAL,
+                "Could not look up the public balance right now, please try again later", Map.of());
     }
 
     private BalanceLookupResult fetchPublicBalanceOverHttp(String network, String address)
@@ -375,17 +373,6 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
                 || CryptoVerificationUtils.isValidSolanaAddress(address);
     }
 
-    private static String simulateBalance(String network, String address) {
-        String hash = CryptoVerificationUtils.sha256Hex(address);
-        int bucket = Integer.parseInt(hash.substring(0, 4), 16) % 500 + 15;
-        BigDecimal amount = BigDecimal.valueOf(bucket).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP);
-        String normNet = network.toLowerCase(Locale.ROOT);
-        String unit = normNet.contains("bitcoin") ? "BTC"
-                : normNet.contains("bnb") ? "BNB"
-                : normNet.contains("solana") ? "SOL" : "ETH";
-        return amount.toPlainString() + " " + unit;
-    }
-
     // =========================================================
     // 4. WALLET_SIGNATURE (EIP-191 personal_sign + secp256k1 ecRecover)
     // =========================================================
@@ -400,14 +387,6 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
         String challengeMessage = buildChallengeMessage(address, nonce);
         String challengeHash = CryptoVerificationUtils.sha256Hex(challengeMessage);
 
-        if (asset.getId() != null) {
-            if (lastChallengeHashByAsset.size() >= MAX_CACHE_SIZE) {
-                lastChallengeHashByAsset.clear();
-                lastChallengeMessageByAsset.clear();
-            }
-            lastChallengeHashByAsset.put(asset.getId(), challengeHash);
-            lastChallengeMessageByAsset.put(asset.getId(), challengeMessage);
-        }
 
         Map<String, String> clientData = new LinkedHashMap<>();
         clientData.put("challengeMessage", challengeMessage);
@@ -448,14 +427,7 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
 
         String nonce = firstNonBlank(payload, "nonce");
         boolean challengeMatched = CryptoVerificationUtils.constantTimeEquals(
-                CryptoVerificationUtils.sha256Hex(message), challengeHash)
-                || (nonce != null && CryptoVerificationUtils.constantTimeEquals(
-                        CryptoVerificationUtils.sha256Hex(nonce), challengeHash));
-
-        if (asset.getId() != null) {
-            lastChallengeHashByAsset.remove(asset.getId());
-            lastChallengeMessageByAsset.remove(asset.getId());
-        }
+                CryptoVerificationUtils.sha256Hex(message), challengeHash);
 
         if (!challengeMatched) {
             return new VerifyResult(false, VerificationProvider.REAL,
@@ -492,9 +464,6 @@ public class CryptoWalletAssetVerifier implements AssetVerifier {
         String nonce = firstNonBlank(payload, "nonce");
         if (nonce != null) {
             return buildChallengeMessage(address, nonce);
-        }
-        if (asset.getId() != null) {
-            return lastChallengeMessageByAsset.get(asset.getId());
         }
         return null;
     }
