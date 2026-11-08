@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.userdto.UpdateProfileRequest;
 import com.ltld.app.legacyvault.dto.userdto.UserProfileResponse;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.exception.UserProfileException;
@@ -58,6 +59,9 @@ public class UserProfileServiceImpl implements UserProfileService {
         user.setFullName(request.getFullName().trim());
         String phone = request.getPhoneNumber();
         user.setPhoneNumber(phone == null || phone.isBlank() ? null : phone.trim());
+        if (request.getPreferredLanguage() != null) {
+            user.setPreferredLanguage(AppLanguage.fromTag(request.getPreferredLanguage()));
+        }
         userRepository.save(user);
 
         auditLogService.success(AuditAction.PROFILE_UPDATED, user.getId(), user.getEmail());
@@ -214,6 +218,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .hasAvatar(u.getAvatarPath() != null)
                 .avatarUpdatedAt(u.getAvatarUpdatedAt())
                 .mfaEnabled(u.isMfaEnabled())
+                .preferredLanguage((u.getPreferredLanguage() != null ? u.getPreferredLanguage() : AppLanguage.DEFAULT).tag())
                 .build();
     }
 }

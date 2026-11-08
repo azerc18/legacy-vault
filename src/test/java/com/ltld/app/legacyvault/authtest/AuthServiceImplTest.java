@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.enums.TokenType;
@@ -164,6 +165,26 @@ public class AuthServiceImplTest {
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         assertThat(captor.getValue().getEmail()).isEqualTo("test@example.com");
+    }
+
+    @Test
+    void register_savesRequestedLanguage_andDefaultsToVietnamese() {
+        when(userRepository.existsByEmail("test@example.com")).thenReturn(false);
+        when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed-password");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RegisterRequest english = validRegisterRequest();
+        english.setLanguage("en");
+        authService.register(english);
+        RegisterRequest unspecified = validRegisterRequest();
+        authService.register(unspecified);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues().get(0).getPreferredLanguage()).isEqualTo(AppLanguage.EN);
+        assertThat(captor.getAllValues().get(1).getPreferredLanguage()).isEqualTo(AppLanguage.VI);
     }
 
     @Test
@@ -597,6 +618,36 @@ public class AuthServiceImplTest {
         verify(verificationTokenService, never()).issueOtp(any(), any());
         assertThat(result.response().getAccessToken()).isEqualTo("access-token");
         assertThat(result.refreshToken()).isEqualTo("refresh-token");
+    }
+
+    @Test
+    void loginWithGoogle_newEmail_storesRequestedLanguage_andNeverChangesExistingAccount() {
+        when(googleTokenVerifier.verify("google-id-token")).thenReturn(GOOGLE_PROFILE);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.empty());
+        when(roleRepository.findByCode("OWNER")).thenReturn(Optional.of(ownerRole));
+        when(roleRepository.findByCode("BENEFICIARY")).thenReturn(Optional.of(beneficiaryRole));
+        when(passwordEncoder.encode(anyString())).thenReturn("random-hash");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            if (u.getId() == null) u.setId(UUID.randomUUID());
+            return u;
+        });
+        stubGoogleTokens();
+
+        authService.loginWithGoogle(new GoogleLoginRequest("google-id-token", "en"), IP, USER_AGENT);
+
+        ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
+        verify(userRepository, atLeastOnce()).save(saved.capture());
+        assertThat(saved.getAllValues().get(0).getPreferredLanguage()).isEqualTo(AppLanguage.EN);
+
+        // Tài khoản đã có: ngôn ngữ trong request không ghi đè lựa chọn của người dùng
+        user.setStatus(UserStatus.ACTIVE);
+        user.setPreferredLanguage(AppLanguage.VI);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+
+        authService.loginWithGoogle(new GoogleLoginRequest("google-id-token", "en"), IP, USER_AGENT);
+
+        assertThat(user.getPreferredLanguage()).isEqualTo(AppLanguage.VI);
     }
 
     @Test

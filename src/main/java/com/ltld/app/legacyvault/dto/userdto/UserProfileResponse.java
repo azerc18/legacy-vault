@@ -24,4 +24,6 @@ public class UserProfileResponse {
     // Thời điểm đổi ảnh gần nhất, FE dùng làm "version" để biết khi nào cần tải lại ảnh
     private Instant avatarUpdatedAt;
     private boolean mfaEnabled;
+    // Ngôn ngữ nhận email và nội dung hệ thống gửi: "vi" hoặc "en"
+    private String preferredLanguage;
 }

@@ -158,15 +158,20 @@ function ProfileForm({ profile, onSaved }) {
     const { t } = useTranslation('profile');
     const [fullName, setFullName] = useState(profile.fullName || '');
     const [phone, setPhone] = useState(profile.phoneNumber || '');
+    const [language, setLanguage] = useState(profile.preferredLanguage || 'vi');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    const dirty = fullName.trim() !== (profile.fullName || '') || phone.trim() !== (profile.phoneNumber || '');
+    const dirty =
+        fullName.trim() !== (profile.fullName || '') ||
+        phone.trim() !== (profile.phoneNumber || '') ||
+        language !== (profile.preferredLanguage || 'vi');
 
     const reset = () => {
         setFullName(profile.fullName || '');
         setPhone(profile.phoneNumber || '');
+        setLanguage(profile.preferredLanguage || 'vi');
         setError('');
     };
 
@@ -180,7 +185,7 @@ function ProfileForm({ profile, onSaved }) {
 
         setBusy(true);
         try {
-            const updated = await userApi.updateMe(name, phone.trim());
+            const updated = await userApi.updateMe(name, phone.trim(), language);
             onSaved(updated);
             setSuccess(t('info.saved'));
         } catch (err) {
@@ -205,6 +210,12 @@ function ProfileForm({ profile, onSaved }) {
                 </div>
                 <Field label={t('info.email')} hint={t('info.emailHint')}>
                     <input value={profile.email} disabled className={`${inputClass} opacity-60 cursor-not-allowed`} />
+                </Field>
+                <Field label={t('info.language')} hint={t('info.languageHint')}>
+                    <select value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass}>
+                        <option value="vi">{t('info.languageVi')}</option>
+                        <option value="en">{t('info.languageEn')}</option>
+                    </select>
                 </Field>
                 <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={reset} disabled={!dirty || busy} className={btnOutline}>

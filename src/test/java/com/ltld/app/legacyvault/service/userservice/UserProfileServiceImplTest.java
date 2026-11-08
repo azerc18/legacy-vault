@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.RevokedReason;
+import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.dto.userdto.AvatarFile;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
@@ -133,6 +134,38 @@ class UserProfileServiceImplTest {
         assertEquals("Tran Thi B", res.getFullName());
         verify(userRepository).save(u);
         verify(auditLogService).success(AuditAction.PROFILE_UPDATED, userId, "owner@example.com");
+    }
+
+    @Test
+    void updateMe_preferredLanguage_isSavedAndReturned() {
+        User u = user();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        UpdateProfileRequest req = updateRequest("Nguyen Van A", "0901234567");
+        req.setPreferredLanguage("en");
+
+        UserProfileResponse res = service.updateMe(userId, req);
+
+        assertEquals(AppLanguage.EN, u.getPreferredLanguage());
+        assertEquals("en", res.getPreferredLanguage());
+    }
+
+    @Test
+    void updateMe_withoutLanguage_keepsCurrentLanguage() {
+        User u = user();
+        u.setPreferredLanguage(AppLanguage.EN);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        UserProfileResponse res = service.updateMe(userId, updateRequest("Nguyen Van A", "0901234567"));
+
+        assertEquals(AppLanguage.EN, u.getPreferredLanguage());
+        assertEquals("en", res.getPreferredLanguage());
+    }
+
+    @Test
+    void getMe_defaultLanguageIsVietnamese() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
+
+        assertEquals("vi", service.getMe(userId).getPreferredLanguage());
     }
 
     @Test

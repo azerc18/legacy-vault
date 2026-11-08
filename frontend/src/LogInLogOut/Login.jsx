@@ -15,7 +15,8 @@ const inputCls =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
 
 export default function Login() {
-    const { t } = useTranslation('auth');
+    const { t, i18n } = useTranslation('auth');
+    const uiLanguage = (i18n.resolvedLanguage || i18n.language || 'vi').slice(0, 2) === 'en' ? 'en' : 'vi';
     const navigate = useNavigate();
     const location = useLocation();
     // Trang Đăng ký chuyển sang khi tài khoản Google đã bật 2FA: { email, mfaToken }
@@ -82,7 +83,7 @@ export default function Login() {
         const googleEmail = emailFromCredential(credential);
         setError(''); setNeedVerify(false); setEmail(googleEmail); setLoading(true);
         try {
-            const res = await authApi.loginGoogle(credential);
+            const res = await authApi.loginGoogle(credential, uiLanguage);
             if (res.mfaRequired) {
                 setMfaToken(res.mfaToken);
                 setCode(''); setUseBackup(false);
