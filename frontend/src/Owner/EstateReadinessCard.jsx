@@ -26,6 +26,7 @@ const GRADE_META = {
 
 export default function EstateReadinessCard() {
     const { t } = useTranslation('readiness');
+    const { t: tv } = useTranslation('verification');
     const [readiness, setReadiness] = useState(null);
     const [expanded, setExpanded] = useState(false);
 
@@ -115,7 +116,25 @@ export default function EstateReadinessCard() {
                     {expanded ? t('showFewer') : t('viewAll', { count: items.length })}
                 </button>
             </div>
-
+            {(readiness.assetsNeedReverification > 0 || readiness.assetsExpiringSoon > 0) && (
+                <div className="mt-5 pt-4 border-t border-white/15 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-start gap-2.5 text-sm text-white">
+                        <Icon name="update" className="text-[20px] text-[#ffd27a]" />
+                        <div>
+                            {readiness.assetsNeedReverification > 0 && (
+                                <p className="font-semibold">{tv('readiness.reverify', { n: readiness.assetsNeedReverification })}</p>
+                            )}
+                            {readiness.assetsExpiringSoon > 0 && (
+                                <p className="text-white/70">{tv('readiness.expiringSoon', { n: readiness.assetsExpiringSoon })}</p>
+                            )}
+                        </div>
+                    </div>
+                    <Link to="/owner/vaults" className="inline-flex items-center gap-1 text-xs font-semibold text-[#b9c9ff] hover:underline">
+                        {tv('readiness.action')}
+                        <Icon name="arrow_forward" className="text-[14px]" />
+                    </Link>
+                </div>
+            )}
             {visibleItems.length > 0 && (
                 <div className="mt-5 pt-4 border-t border-white/15 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {visibleItems.map((item) => (
