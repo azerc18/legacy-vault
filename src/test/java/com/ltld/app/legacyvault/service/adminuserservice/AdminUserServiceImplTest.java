@@ -257,7 +257,7 @@ class AdminUserServiceImplTest {
         @Test
         @DisplayName("status không hợp lệ -> 400, không query")
         void invalidStatus_returns400() {
-            assertAdminError(() -> service.listUsers(null, null, "DELETED", 0, 20), HttpStatus.BAD_REQUEST);
+            assertAdminError(() -> service.listUsers(null, null, "BANNED", 0, 20), HttpStatus.BAD_REQUEST);
             verifyNoInteractions(userRepository);
         }
 
@@ -362,6 +362,26 @@ class AdminUserServiceImplTest {
                     HttpStatus.CONFLICT);
             assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING);
             verifyNoRbacSideEffects();
+        }
+
+        @Test
+        @DisplayName("tài khoản đã tự xoá (DELETED) -> 409, không mở khoá lại được")
+        void userDeleted_returns409() {
+            user.setStatus(UserStatus.DELETED);
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            assertAdminError(() -> service.updateStatus(adminId, userId, req("ACTIVE", null)),
+                    HttpStatus.CONFLICT);
+            assertThat(user.getStatus()).isEqualTo(UserStatus.DELETED);
+            verifyNoRbacSideEffects();
+        }
+
+        @Test
+        @DisplayName("admin không đặt được trạng thái DELETED -> 400")
+        void targetDeleted_returns400() {
+            assertAdminError(() -> service.updateStatus(adminId, userId, req("DELETED", null)),
+                    HttpStatus.BAD_REQUEST);
+            verifyNoInteractions(userRepository);
         }
 
         @Test

@@ -179,5 +179,88 @@
       "load": "Không tải được danh sách thiết bị.",
       "failed": "Không thực hiện được. Vui lòng thử lại."
     }
+  },
+  "lifeEvents": {
+    "title": "Cuộc sống có thay đổi?",
+    "description": "Sau mỗi thay đổi lớn, hãy rà soát lại di sản để gia đình nhận đúng những gì bạn muốn. Chọn điều vừa xảy ra để xem việc nên làm.",
+    "lastReview": "Lần rà soát gần nhất: {{date}}.",
+    "neverReviewed": "Bạn chưa rà soát di sản lần nào.",
+    "overdue": "Nên rà soát ít nhất 6 tháng một lần.",
+    "events": {
+      "marriage": "Kết hôn",
+      "newChild": "Có con",
+      "separation": "Ly hôn / chia tay",
+      "bereavement": "Người thân qua đời",
+      "newAsset": "Có tài sản mới",
+      "contactChanged": "Đổi SĐT / email"
+    },
+    "suggested": "Việc nên làm",
+    "tasks": {
+      "addSpouse": "Thêm vợ / chồng làm người thụ hưởng",
+      "updateWill": "Cập nhật di chúc trong két",
+      "addConfirmer": "Chọn người xác nhận DMS",
+      "addChild": "Thêm con làm người thụ hưởng hoặc dự phòng",
+      "futureMessage": "Viết lời nhắn hẹn giờ cho con",
+      "backupExecutor": "Chỉ định người thi hành dự phòng",
+      "reviewBeneficiaries": "Rà lại người thụ hưởng và tỉ lệ phân bổ",
+      "reviewExecutors": "Rà lại người thi hành",
+      "reviewConfirmers": "Rà lại người xác nhận DMS",
+      "replaceBeneficiary": "Thay người thụ hưởng không còn",
+      "replaceExecutor": "Thay người thi hành không còn",
+      "addAsset": "Thêm tài sản mới vào két",
+      "allocateAsset": "Chọn người nhận cho tài sản mới",
+      "uploadPapers": "Tải lên giấy tờ sở hữu",
+      "updatePhone": "Cập nhật số điện thoại trong hồ sơ",
+      "checkReminders": "Kiểm tra kênh nhận nhắc check-in"
+    },
+    "markReviewed": "Tôi đã rà soát xong",
+    "saving": "Đang ghi nhận...",
+    "reviewed": "Đã ghi nhận lần rà soát. Chu kỳ Dead Man's Switch cũng được làm mới.",
+    "needDms": "Cần bật Dead Man's Switch để ghi nhận rà soát.",
+    "openDms": "Bật ngay",
+    "errors": {
+      "review": "Không ghi nhận được lần rà soát."
+    }
+  },
+  "export": {
+    "title": "Dữ liệu của tôi",
+    "description": "Tải một bản sao dữ liệu tài khoản (JSON): hồ sơ, két, tài sản, người thụ hưởng, người thi hành, DMS, gói và lịch sử thanh toán.",
+    "noSecrets": "Không chứa mật khẩu, khoá bí mật hay nội dung tài sản đã mã hoá.",
+    "button": "Tải dữ liệu",
+    "preparing": "Đang chuẩn bị...",
+    "failed": "Không tải được dữ liệu."
+  },
+  "deleteAccount": {
+    "title": "Xoá tài khoản",
+    "description": "Xoá vĩnh viễn tài khoản LegacyVault của bạn. Thao tác này không hoàn tác được.",
+    "start": "Tôi muốn xoá tài khoản",
+    "blockedTitle": "Chưa thể xoá tài khoản vì:",
+    "blockers": {
+      "VAULTS_OWNED_one": "Bạn còn {{count}} két di sản. Hãy xoá két trước (két đã mở khoá hoặc đã bàn giao thì không xoá được).",
+      "VAULTS_OWNED_other": "Bạn còn {{count}} két di sản. Hãy xoá các két trước (két đã mở khoá hoặc đã bàn giao thì không xoá được).",
+      "EXECUTOR": "Bạn đang là người thi hành cho một chủ két. Hãy nhờ chủ két thu hồi vai trò này.",
+      "BENEFICIARY": "Bạn đang là người thụ hưởng của một két. Hãy từ chối nhận hoặc nhờ chủ két gỡ bạn ra.",
+      "STAFF_ROLE": "Tài khoản Admin / Legal Verifier không tự xoá được. Hãy liên hệ quản trị viên."
+    },
+    "goFix": "Xử lý",
+    "close": "Đóng",
+    "consequences": {
+      "signIn": "Bạn sẽ bị đăng xuất khỏi mọi thiết bị và không đăng nhập lại được.",
+      "anonymize": "Tên, email, số điện thoại, ảnh đại diện và 2FA bị xoá khỏi tài khoản.",
+      "keep": "Lịch sử thanh toán và nhật ký hệ thống được giữ lại ở dạng ẩn danh theo quy định.",
+      "noRefund": "Gói VIP còn hạn sẽ không được hoàn tiền."
+    },
+    "exportFirst": "Mẹo: tải \"Dữ liệu của tôi\" ở trên trước khi xoá nếu bạn muốn giữ một bản sao.",
+    "password": "Mật khẩu hiện tại",
+    "passwordHint": "Đăng ký bằng Google và chưa có mật khẩu? Dùng \"Quên mật khẩu\" ở trang đăng nhập để đặt mật khẩu trước.",
+    "code": "Mã xác thực 2 lớp hoặc mã dự phòng",
+    "typeEmail": "Gõ lại email để xác nhận:",
+    "confirm": "Xoá vĩnh viễn tài khoản",
+    "deleting": "Đang xoá...",
+    "done": "Tài khoản của bạn đã được xoá. Cảm ơn bạn đã dùng LegacyVault.",
+    "errors": {
+      "check": "Không kiểm tra được điều kiện xoá tài khoản.",
+      "failed": "Không xoá được tài khoản."
+    }
   }
 }

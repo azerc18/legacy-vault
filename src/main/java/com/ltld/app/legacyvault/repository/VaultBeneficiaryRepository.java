@@ -54,7 +54,16 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
     List<VaultBeneficiary> findByUserIdAndVaultIdIn(@Param("userId") UUID userId,
                                                     @Param("vaultIds") Collection<UUID> vaultIds);
 
-    long countByVaultId(UUID vaultId);   // N2-owner: PUT cũ chỉ hợp lệ khi vault có ≤ 1 người
+    long countByVaultId(UUID vaultId);
+
+    // Xoá tài khoản: còn là người thụ hưởng (đã gắn tài khoản) ở két nào không, trừ dòng đã từ chối / nhường
+    @Query("""
+            SELECT COUNT(b) > 0 FROM VaultBeneficiary b
+            WHERE b.user.id = :userId
+              AND b.status NOT IN (com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.DECLINED,
+                                   com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.WAIVED)
+            """)
+    boolean existsLiveLinkForUser(@Param("userId") UUID userId);   // N2-owner: PUT cũ chỉ hợp lệ khi vault có ≤ 1 người
 
     // N2-exec: ghi lần nhắc nếu lần trước đã quá cutoff; trả 0 khi chưa đủ 24h (một câu UPDATE, không cần khóa)
     @Modifying(flushAutomatically = true, clearAutomatically = true)

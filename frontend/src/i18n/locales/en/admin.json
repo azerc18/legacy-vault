@@ -147,7 +147,7 @@
     "cols": { "user": "User", "status": "Status", "roles": "Roles", "lastLogin": "Last login", "actions": "Actions" },
     "you": "you",
     "joined": "Joined {{date}}",
-    "status": { "ACTIVE": "Active", "LOCKED": "Locked", "PENDING": "Pending" },
+    "status": { "ACTIVE": "Active", "LOCKED": "Locked", "PENDING": "Pending", "DELETED": "Deleted" },
     "dms": { "ACTIVE": "DMS active", "SUSPENDED": "DMS suspended", "TRIGGERED": "DMS triggered" },
     "actions": {
       "grant": "Make {{role}}", "revoke": "Remove {{role}}",

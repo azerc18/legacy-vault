@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
@@ -98,6 +99,23 @@ class FlywayMigrationIntegrationTest {
         for (ClaimStatus s : ClaimStatus.values()) {
             assertThat(claimType).contains("'" + s.name() + "'");
         }
+    }
+
+    // Xoá tài khoản: mọi UserStatus (kể cả DELETED) phải có trong enum users.status, và có cột deleted_at
+    @Test
+    void userStatus_columnAcceptsEveryJavaEnumValue_andHasDeletedAt() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'status'
+                """, String.class);
+        for (UserStatus s : UserStatus.values()) {
+            assertThat(col).contains("'" + s.name() + "'");
+        }
+        Integer deletedAt = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'deleted_at'
+                """, Integer.class);
+        assertThat(deletedAt).isEqualTo(1);
     }
 
     // X2: mọi DmsStatus (kể cả PENDING_CONFIRMATION) phải có trong enum dms_configs.status; validate không kiểm giá trị enum
