@@ -35,8 +35,7 @@ body {
 }
 
 /* Khung bao trang trong suốt, KHÔNG tạo stacking context hay Backdrop Root cô lập */
-#root div.bg-background:not(.lv-landing),
-#root .bg-background:not(.lv-landing):not(input):not(select):not(textarea),
+#root > div.min-h-screen.bg-background:not(.lv-landing),
 .lv-admin.bg-background {
   background-color: transparent !important;
 }

@@ -68,7 +68,7 @@ function MessageContent({ text, animate = false }) {
     );
 }
 
-export default function ChatPanel({ messages, setMessages, onClose, onReply, onThinking, costume = 'none', onCostumeChange }) {
+export default function ChatPanel({ messages, setMessages, onClose, onReply, onThinking, costume = 'none', onCostumeChange, dragHandlers }) {
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
@@ -119,12 +119,13 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
         <div className="lv-glass-thick w-[340px] max-w-[calc(100vw-2rem)] h-[460px] max-h-[calc(100vh-10rem)] flex flex-col
                         rounded-2xl overflow-hidden chibi-bubble">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-brand/85 backdrop-blur-md border-b border-white/15 text-white">
+            <div {...dragHandlers} title="Drag to move"
+                 className="lv-assistant-handle flex items-center justify-between px-4 py-3 bg-brand/85 backdrop-blur-md border-b border-white/15 text-white">
                 <div>
                     <p className="font-semibold leading-tight">Vaulty</p>
                     <p className="text-xs text-white/75">{picking ? 'Choose an outfit' : 'LegacyVault guide'}</p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" data-no-drag>
                     <button type="button" onClick={() => setPicking((p) => !p)}
                             aria-label={picking ? 'Back to chat' : 'Change outfit'} aria-pressed={picking}
                             className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-white/15">
