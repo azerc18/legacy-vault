@@ -172,7 +172,7 @@ textarea {
 /* Nhóm vai trò đang đóng: chỉ ẩn trên desktop, nơi có nút mở nhóm (điện thoại hiện mọi link trên một hàng cuộn ngang) */
 @media (min-width: 1024px) {
   .lv-nav-section-items--closed {
-    display: none;
+    display: none !important;   /* Tailwind CDN chèn <style> sau CSS của app, không có !important thì .flex thắng */
   }
 }
 .lv-side-bottom {
@@ -278,7 +278,7 @@ textarea {
   }
   .lv-nav-section,
   .lv-nav-section-items {
-    display: contents;
+    display: contents !important;   /* thắng .flex của Tailwind CDN để mọi link nằm trên một hàng cuộn ngang */
   }
   .lv-nav-section-header {
     display: none !important;
