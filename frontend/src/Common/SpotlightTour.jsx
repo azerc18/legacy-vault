@@ -679,7 +679,7 @@ export default function SpotlightTour() {
                         <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-br from-amber-400 to-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-400/30">
                             <span className="material-symbols-outlined text-[34px]">verified</span>
                         </div>
-                        <h3 className="text-xl font-bold mt-4 text-white">
+                        <h3 id="congrats-modal-title" className="text-xl font-bold mt-4 text-white">
                             {t('tour.congrats.title')}
                         </h3>
                         <p className="text-sm font-medium text-amber-300 mt-1">
