@@ -48,17 +48,25 @@ public class SubscriptionExpiryScheduler {
         for (Reminder reminder : batch.reminders()) {
             sendReminder(reminder);
         }
+        for (Reminder expired : batch.expired()) {
+            sendExpiredNotice(expired);
+        }
         return batch.expiredCount();
     }
 
     private Batch markExpiredAndSelectReminders(LocalDateTime now) {
         List<Subscription> expiredList = subscriptionRepository
                 .findByStatusAndExpiresAtBefore(SubscriptionStatus.ACTIVE, now);
+        List<Reminder> expiredNotices = new ArrayList<>();
         for (Subscription sub : expiredList) {
             sub.setStatus(SubscriptionStatus.EXPIRED);
             subscriptionRepository.save(sub);
             log.info("Marked subscription {} as EXPIRED for user {}",
                     sub.getId(), sub.getUser() != null ? sub.getUser().getId() : null);
+            if (sub.getUser() != null && sub.getUser().getEmail() != null) {
+                expiredNotices.add(new Reminder(sub.getId(), sub.getUser().getEmail(), sub.getUser().getFullName(),
+                        sub.getPlan() != null ? sub.getPlan().getName() : "VIP", sub.getExpiresAt()));
+            }
         }
 
         List<Reminder> reminders = new ArrayList<>();
@@ -79,7 +87,16 @@ public class SubscriptionExpiryScheduler {
                     sub.getPlan() != null ? sub.getPlan().getName() : "VIP",
                     sub.getExpiresAt()));
         }
-        return new Batch(expiredList.size(), reminders);
+        return new Batch(expiredList.size(), reminders, expiredNotices);
+    }
+
+    // N12: EXPIRED đã commit nên gửi lỗi không thử lại được; chỉ log, gói vẫn hết hạn đúng
+    private void sendExpiredNotice(Reminder notice) {
+        try {
+            emailSender.sendSubscriptionExpiredNotice(notice.email(), notice.fullName(), notice.planName());
+        } catch (RuntimeException ex) {
+            log.warn("N12: could not send expired notice for subscription {}: {}", notice.subscriptionId(), ex.getMessage());
+        }
     }
 
     private void sendReminder(Reminder reminder) {
@@ -104,7 +121,7 @@ public class SubscriptionExpiryScheduler {
         }
     }
 
-    private record Batch(int expiredCount, List<Reminder> reminders) {
+    private record Batch(int expiredCount, List<Reminder> reminders, List<Reminder> expired) {
     }
 
     private record Reminder(UUID subscriptionId, String email, String fullName, String planName, LocalDateTime expiresAt) {

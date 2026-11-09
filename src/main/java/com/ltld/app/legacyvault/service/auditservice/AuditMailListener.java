@@ -1,9 +1,15 @@
 package com.ltld.app.legacyvault.service.auditservice;
 
+import com.ltld.app.legacyvault.dto.paymentdto.PaymentReceiptData;
+import com.ltld.app.legacyvault.entity.Subscription;
+import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.repository.SubscriptionRepository;
+import com.ltld.app.legacyvault.service.paymentservice.PaymentReceiptPdfService;
+import com.ltld.app.legacyvault.service.paymentservice.PaymentReceiptService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +49,9 @@ public class AuditMailListener {
     private static final Pattern STATUS_CHANGE = Pattern.compile("^STATUS (\\w+)->(\\w+)");
     private static final Pattern VAULT_NAME = Pattern.compile("name=(.+)$");
 
+    private final PaymentReceiptService receiptService;
+    private final PaymentReceiptPdfService receiptPdfService;
+    private final SubscriptionRepository subscriptionRepository;
     private final EmailSender emailSender;
     private final UserRepository userRepository;
     private final VaultRepository vaultRepository;
@@ -115,6 +124,15 @@ public class AuditMailListener {
                 user(first(OWNER_ID, detail)).ifPresent(u ->
                         emailSender.sendDmsAdminActionNotice(u.getEmail(), u.getFullName(), paused, reason));
             }
+            // N9 + N11: entityId là giao dịch, chung cho mọi cổng thanh toán
+            case PAYMENT_SUCCEEDED -> {
+                if (isSuccess(e) && e.entityId() != null) {
+                    actor(e).ifPresent(u -> handlePaymentSucceeded(e, u));
+                }
+            }
+            // N10
+            case PAYMENT_FAILED -> actor(e).ifPresent(u ->
+                    emailSender.sendPaymentFailedNotice(u.getEmail(), u.getFullName()));
             // N26: người thụ hưởng đã đóng phần nhận
             case CLAIM_COMPLETED -> {
                 if (isSuccess(e) && e.vaultId() != null) {
@@ -133,6 +151,21 @@ public class AuditMailListener {
                 // các hành động khác không gửi mail ở đây
             }
         }
+    }
+
+    private void handlePaymentSucceeded(AuditEvent e, User u) {
+        PaymentReceiptData receipt = receiptService.getReceiptData(e.entityId(), e.actorId());
+        byte[] pdf = null;
+        try {
+            pdf = receiptPdfService.render(receipt);
+        } catch (RuntimeException ex) {
+            log.warn("N9: could not render receipt for payment {}: {}", e.entityId(), ex.getMessage());
+        }
+        emailSender.sendPaymentSucceededNotice(u.getEmail(), u.getFullName(), receipt.planName(), receipt.amountVnd(),
+                receipt.receiptNo(), pdf);
+        emailSender.sendVipActivatedNotice(u.getEmail(), u.getFullName(), receipt.planName(),
+                subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(e.actorId(), SubscriptionStatus.ACTIVE)
+                        .map(Subscription::getExpiresAt).orElse(null));
     }
 
     private void handleUserAdminChange(AuditEvent e) {
