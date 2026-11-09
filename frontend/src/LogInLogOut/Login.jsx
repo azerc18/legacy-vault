@@ -34,6 +34,11 @@ export default function Login() {
     // http.js chuyển về /login?expired=1 khi refresh token hết hạn
     const expired = new URLSearchParams(location.search).has('expired');
 
+    // Mở trang login khi đang ở demo mode -> tự động dọn sạch phiên demo để đăng nhập thật
+    if (localStorage.getItem('lv_demo_mode') === 'true') {
+        clearAuth();
+    }
+
     // Đã đăng nhập -> không cho vào lại trang login
     const current = getUser();
     if (current) {
@@ -202,7 +207,7 @@ export default function Login() {
                     <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
                     <div className="relative flex py-1 items-center">
                         <div className="flex-grow border-t border-outline-variant/30" />
-                        <span className="flex-shrink mx-3 text-[11px] font-bold text-outline uppercase tracking-wider">HOẶC DÙNG THỬ NHANH</span>
+                        <span className="flex-shrink mx-3 text-[11px] font-bold text-outline uppercase tracking-wider">{t('demo.orDemo', 'HOẶC DÙNG THỬ NHANH')}</span>
                         <div className="flex-grow border-t border-outline-variant/30" />
                     </div>
                     <Link
@@ -210,7 +215,7 @@ export default function Login() {
                         className="w-full h-12 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-bold hover:brightness-110 shadow-md shadow-amber-400/20 flex items-center justify-center gap-2 transition-all"
                     >
                         <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
-                        <span>Vào Thẳng Dashboard (Chế độ Dùng Thử)</span>
+                        <span>{t('demo.tryDemo', 'Vào Thẳng Dashboard (Chế độ Dùng Thử)')}</span>
                     </Link>
                     </div>
                 ) : (

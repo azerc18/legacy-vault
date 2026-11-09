@@ -48,6 +48,7 @@ import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
 import IdleLogout from './Common/IdleLogout.jsx'; // Hồ sơ > Tuỳ chọn: tự đăng xuất khi rảnh
 import SpotlightTour from './Common/SpotlightTour.jsx';
+import DemoBanner from './Common/DemoBanner.jsx';
 import DemoEntry from './Common/DemoEntry.jsx';
 import { useTranslation } from 'react-i18next';
 
@@ -65,6 +66,7 @@ function App() {
     return (
         <AnimateUIProvider>
             <BrowserRouter>
+                <DemoBanner />
                 <IdleLogout />
                 <Routes>
                 {/* Công khai */}

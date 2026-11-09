@@ -29,6 +29,11 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
+    // Mở trang register khi đang ở demo mode -> tự động dọn sạch phiên demo để tạo tài khoản thật
+    if (localStorage.getItem('lv_demo_mode') === 'true') {
+        clearAuth();
+    }
+
     // Đã đăng nhập -> về trang chủ theo role (giống Login)
     const current = getUser();
     if (current) return <Navigate to={homeFor(current)} replace />;

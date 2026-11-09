@@ -7,11 +7,13 @@
   },
   "signIn": "Sign in",
   "getStarted": "Get started",
+  "demoNav": "Try Demo",
   "hero": {
     "title": "Your digital life deserves a plan, too.",
     "titleLines": ["Your digital life", "deserves a plan, too."],
     "text": "Keep passwords, accounts and documents in one encrypted vault, and make sure they reach the right people when it matters.",
     "cta": "Create your vault",
+    "demoCta": "Quick Demo",
     "how": "How it works"
   },
   "badges": {

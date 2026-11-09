@@ -273,9 +273,9 @@ export default function Dashboard() {
                     </nav>
                     <div className="flex items-center gap-3">
                         <LanguageSwitch variant={light ? 'light' : 'dark'} />
-                        <Link to="/demo" className="h-9 px-3.5 rounded-full text-xs font-bold flex items-center gap-1.5 bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 hover:brightness-110 shadow">
+                        <Link to="/demo" className="h-9 px-3.5 rounded-full text-xs font-bold flex items-center gap-1.5 border border-amber-400/50 text-amber-300 hover:bg-amber-400/10 transition-colors">
                             <Icon name="rocket_launch" className="text-[15px]" />
-                            <span>Vào Dashboard</span>
+                            <span>{t('demoNav', 'Dùng thử')}</span>
                         </Link>
                         <Link to="/login" className={`hidden sm:block text-sm font-semibold ${light ? 'text-brand/80 hover:text-brand' : 'text-white/85 hover:text-white'}`}>{t('signIn')}</Link>
                         <Link to="/register" className={`h-10 px-5 rounded-full text-sm font-bold flex items-center ${light ? 'bg-brand text-white hover:bg-brand-container' : 'bg-white text-brand hover:bg-white/85'}`}>
@@ -299,10 +299,13 @@ export default function Dashboard() {
                     <p className="lv-hero-rv mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
                     <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center items-center">
                         <Magnetic strength={0.18} range={90}>
-                            <Link to="/demo" className="h-12 px-7 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-bold flex items-center justify-center gap-2 hover:brightness-110 shadow-lg shadow-amber-400/20">
-                                <Icon name="rocket_launch" className="text-[18px]" /> Vào Thẳng Dashboard
+                            <Link to="/register" className="h-12 px-7 rounded-full bg-white text-brand font-bold flex items-center justify-center gap-2 hover:bg-white/85">
+                                <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                             </Link>
                         </Magnetic>
+                        <Link to="/demo" className="h-12 px-6 rounded-full border border-amber-400/50 hover:border-amber-400 text-amber-300 hover:bg-amber-400/10 font-bold flex items-center justify-center gap-2 transition-all">
+                            <Icon name="rocket_launch" className="text-[18px] text-amber-400" /> {t('hero.demoCta', 'Dùng thử nhanh')}
+                        </Link>
                         <a href="#how" className="h-12 px-7 rounded-full border border-white/40 text-white font-bold flex items-center justify-center hover:bg-white/10">
                             {t('hero.how')}
                         </a>

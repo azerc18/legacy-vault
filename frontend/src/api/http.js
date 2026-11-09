@@ -68,11 +68,12 @@ function handleDemoMock(config) {
 
 // Gắn Bearer token vào mọi request
 http.interceptors.request.use((config) => {
-    if (localStorage.getItem('lv_demo_mode') === 'true') {
+    const isAuthCall = config.url?.startsWith('/auth/') || config.url?.includes('/auth/');
+    if (!isAuthCall && localStorage.getItem('lv_demo_mode') === 'true') {
         config.adapter = async (cfg) => handleDemoMock(cfg);
     }
     const token = getToken();
-    const isAuthCall = config.url?.startsWith('/auth/');
+
     if (token && !isAuthCall) config.headers.Authorization = `Bearer ${token}`;
     config.headers['Accept-Language'] = i18n.resolvedLanguage || 'en';   // ← thêm
     return config;
