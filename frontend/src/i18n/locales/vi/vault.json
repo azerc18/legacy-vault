@@ -233,7 +233,7 @@
     },
     "messages": {
       "title": "Lời nhắn di nguyện & Hẹn giờ ({{count}})",
-      "subtitle": "Gửi lại những lời dặn dò tâm huyết, video kỷ niệm hoặc bản ghi âm cho người thân. Có thể chọn mở ngay khi nhận két hoặc hẹn giờ mở vào một ngày kỷ niệm trong tương lai (Time-Capsule).",
+      "subtitle": "Gửi gắm lời dặn dò, tâm thư, video hoặc bản ghi âm kỷ niệm tới người thân. Bạn có thể chọn mở ngay khi người thân nhận két hoặc hẹn một ngày đặc biệt trong tương lai (Hộp thời gian).",
       "emptyTitle": "Chưa có lời nhắn di nguyện nào",
       "emptyEditable": "Soạn tâm thư, video kỷ niệm hoặc thư hẹn ngày mở ở bên dưới.",
       "emptyLocked": "Két sắt này không có lời nhắn di nguyện nào.",
@@ -249,15 +249,15 @@
       "titleLabel": "Tiêu đề *",
       "titlePlaceholder": "VD: Lời nhắn gửi con gái ngày lập gia đình",
       "recipientLabel": "Người nhận *",
-      "allFamilyOption": "Cả gia đình (Tất cả mọi người)",
+      "allFamilyOption": "Cả gia đình (Tất cả người thụ hưởng)",
       "specificBeneficiaryOption": "Một người thụ hưởng cụ thể",
       "chooseRecipientLabel": "Chọn người nhận *",
       "triggerLabel": "Thời điểm mở *",
-      "onClaimOption": "Khi nhận két (Ngay khi két mở khoá)",
-      "specificDateOption": "Hẹn ngày cụ thể (Time-Capsule)",
+      "onClaimOption": "Khi nhận két (Mở ngay khi bàn giao)",
+      "specificDateOption": "Hẹn ngày cụ thể (Hộp thời gian)",
       "scheduleDateLabel": "Ngày hẹn mở *",
       "contentLabel": "Nội dung lời nhắn *",
-      "contentPlaceholder": "Viết lời nhắn riêng tư hoặc tâm nguyện của bạn. Nội dung sẽ được mã hoá trước khi lưu.",
+      "contentPlaceholder": "Viết lời nhắn riêng tư hoặc tâm nguyện của bạn gửi tới người thân. Nội dung sẽ được mã hoá bảo mật trước khi lưu trữ.",
       "attachmentLabel": "Tệp đính kèm (Ảnh, Âm thanh, Video, PDF - tối đa 10MB)",
       "keepExistingFile": "Giữ tệp đính kèm hiện tại: {{name}}",
       "saveButton": "Lưu lời nhắn",
@@ -302,9 +302,9 @@
   },
   "assetFields": {
     "mechanisms": {
-      "LEGAL_CLAIM_DOSSIER": "Người thụ hưởng dùng hồ sơ khai nhận di sản để làm thủ tục pháp lý.",
-      "CRYPTOGRAPHIC_SPLIT_KEY": "Thông tin bí mật được chuyển giao độc quyền cho một người thụ hưởng.",
-      "EXECUTOR_DISPOSITION": "Người thi hành thực hiện theo đúng di nguyện bạn đã chọn."
+      "LEGAL_CLAIM_DOSSIER": "Tài sản này được bàn giao thông qua bộ Hồ sơ thừa kế pháp lý cho người thụ hưởng.",
+      "CRYPTOGRAPHIC_SPLIT_KEY": "Thông tin bí mật được chuyển giao riêng cho người thụ hưởng được chỉ định.",
+      "EXECUTOR_DISPOSITION": "Người thi hành sẽ bàn giao tài sản theo đúng di nguyện bạn đã chọn."
     },
     "options": {
       "MEMORIALIZE": "Chuyển sang chế độ tưởng niệm",
@@ -343,7 +343,7 @@
     },
     "sections": {
       "sealed": "Phần niêm phong",
-      "sealedHint": "Được mã hoá trước khi lưu. Chỉ mở cho người thụ hưởng khi két được bàn giao."
+      "sealedHint": "Được mã hoá bảo mật. Chỉ người thụ hưởng được chỉ định mới giải mã được khi két được bàn giao."
     },
     "examples": {
       "institutionName": "VD: Vietcombank",
@@ -367,7 +367,7 @@
     },
     "hints": {
       "accountNumber": "Từ 6 đến 19 chữ số, không có dấu cách.",
-      "estimatedValue": "Chỉ để người thụ hưởng hình dung, không cần chính xác.",
+      "estimatedValue": "Ước tính giá trị để người thân dễ hình dung (không bắt buộc chính xác tuyệt đối).",
       "walletAddress": "Chỉ gồm chữ và số, 20 đến 100 ký tự.",
       "seedPhrase": "Viết đúng thứ tự các từ.",
       "wish": "Người thi hành sẽ làm theo lựa chọn này.",

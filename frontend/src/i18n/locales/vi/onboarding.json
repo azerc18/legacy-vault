@@ -75,7 +75,7 @@
       "step6": {
         "title": "Ấn \"Tạo két sắt\" để hoàn thành",
         "instruction": "Kiểm tra lại toàn bộ thông tin và nhấn 'Tạo két sắt' để niêm phong an toàn khối tài sản di sản của bạn!",
-        "tip": "Sau khi tạo két thành công, bạn có thể thiết lập thêm Công tắc tử thần (DMS) hoặc mời thêm Người thực thi di chúc (Executor)."
+        "tip": "Sau khi tạo két thành công, bạn có thể thiết lập thêm Công tắc tử thần (DMS) hoặc mời thêm Người thi hành di chúc (Executor)."
       }
     }
   },
@@ -96,7 +96,7 @@
       },
       "step3": {
         "title": "Lịch sử truy cập & Kiểm toán",
-        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thực thi và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
+        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thi hành và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
         "tip": "Mọi thao tác đều được ghi nhận kèm mã định danh, địa chỉ và thời gian bất biến (Immutable Audit Log)."
       }
     },
@@ -119,20 +119,20 @@
       }
     },
     "owner_executors": {
-      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THỰC THI DI CHÚC",
+      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THI HÀNH DI CHÚC",
       "step1": {
-        "title": "Tổng quan Người thực thi (Executors)",
+        "title": "Tổng quan Người thi hành (Executors)",
         "instruction": "Chỉ định người đại diện pháp lý hỗ trợ thủ tục bàn giao tài sản và nộp hồ sơ giám định khi có sự kiện thừa kế.",
-        "tip": "Người thực thi đóng vai trò cầu nối pháp lý, hoàn toàn không được quyền giải mã tài sản của bạn."
+        "tip": "Người thi hành đóng vai trò cầu nối pháp lý, hoàn toàn không được quyền giải mã tài sản của bạn."
       },
       "step2": {
-        "title": "Người thực thi chính (Primary Executor)",
+        "title": "Người thi hành chính (Primary Executor)",
         "instruction": "Đại diện chính chịu trách nhiệm kiểm tra thực địa, nộp trích lục khai tử và làm việc với Giám định viên.",
         "tip": "Nên chọn luật sư, công chứng viên hoặc bạn thân có uy tín và am hiểu thủ tục."
       },
       "step3": {
-        "title": "Người thực thi dự phòng (Backup Executor)",
-        "instruction": "Kế nhiệm quyền đại diện nếu Người thực thi chính không thể liên lạc hoặc từ chối thực hiện nhiệm vụ.",
+        "title": "Người thi hành dự phòng (Backup Executor)",
+        "instruction": "Kế nhiệm quyền đại diện nếu Người thi hành chính không thể liên lạc hoặc từ chối thực hiện nhiệm vụ.",
         "tip": "Đảm bảo quy trình thừa kế không bao giờ bị đình trệ hay gián đoạn."
       }
     },
@@ -168,9 +168,9 @@
       }
     },
     "executor_home": {
-      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THỰC THI",
+      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THI HÀNH",
       "step1": {
-        "title": "Thống kê nhiệm vụ thực thi",
+        "title": "Thống kê nhiệm vụ thi hành",
         "instruction": "Theo dõi tổng số hồ sơ cần xử lý ngay, hồ sơ đang chờ thẩm định pháp lý và hồ sơ đã bàn giao thành công.",
         "tip": "Hồ sơ có hạn chót gấp sẽ được đánh dấu cảnh báo để bạn kịp thời xử lý."
       },
@@ -211,15 +211,15 @@
     {
       "key": "guardians",
       "tag": "TRỤ CỘT 2 · CHỈ ĐỊNH",
-      "title": "Người Thụ Hưởng & Người Thực Thi (Guardians & Heirs)",
+      "title": "Người Thụ Hưởng & Người Thi Hành (Guardians & Heirs)",
       "subtitle": "Thiết lập mạng lưới bàn giao an toàn và minh bạch",
       "description": "LegacyVault phân định rõ ràng giữa người nhận tài sản và người hỗ trợ làm thủ tục pháp lý. Bạn toàn quyền quyết định ai nhận tài sản gì, và ai là người được ủy quyền đại diện xử lý di nguyện.",
       "points": [
         "Người thụ hưởng (Beneficiary): Nhận tài sản và tài liệu theo di nguyện khi két mở khóa",
-        "Người thực thi (Executor): Kiểm tra thực địa, nộp hồ sơ pháp lý và bàn giao tài sản",
+        "Người thi hành (Executor): Kiểm tra thực địa, nộp hồ sơ pháp lý và bàn giao tài sản",
         "Cơ chế chuyển giao linh hoạt: Toàn bộ, chia tỷ lệ, độc quyền hoặc đồng thuận đa bên (Shamir)"
       ],
-      "tip": "Mẹo tân thủ: Nên chỉ định người thân làm Người thụ hưởng và bạn thân hoặc luật sư uy tín làm Người thực thi."
+      "tip": "Mẹo tân thủ: Nên chỉ định người thân làm Người thụ hưởng và bạn thân hoặc luật sư uy tín làm Người thi hành."
     },
     {
       "key": "dms",

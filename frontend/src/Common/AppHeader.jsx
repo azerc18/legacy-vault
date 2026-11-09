@@ -352,17 +352,19 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                         <Icon name="swap_horiz" className="text-[16px]" /><span className="lv-label">{t('header.userHome')}</span>
                     </Link>
                 )}
-                <div className="lv-side-tools flex items-center gap-2 relative" ref={guideMenuRef}>
+                <div className="relative mb-2 w-full" ref={guideMenuRef}>
                     <button
                         type="button"
                         onClick={() => setGuideMenuOpen((o) => !o)}
                         title={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
                         aria-label={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
                         aria-expanded={guideMenuOpen}
-                        className="lv-guide-btn h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                        className="lv-guide-btn w-full h-8 px-2.5 rounded-full inline-flex items-center justify-between gap-1.5 whitespace-nowrap text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
                     >
-                        <Icon name="school" className="text-[17px] text-amber-300" />
-                        <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
+                        <div className="flex items-center gap-1.5">
+                            <Icon name="school" className="text-[17px] text-amber-300" />
+                            <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
+                        </div>
                         <Icon name="expand_more" className="text-[14px] text-white/60" />
                     </button>
 
@@ -372,36 +374,53 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                             <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-bold tracking-wider uppercase text-amber-300">
                                 {tOnboarding('menuTitle')}
                             </div>
-                            {currentFeatureTour && (
+                            {currentFeatureTour ? (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setGuideMenuOpen(false);
+                                            startFeatureTour(currentFeatureTour.id);
+                                        }}
+                                        className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
+                                    >
+                                        <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
+                                        <div>
+                                            <div className="font-bold">{tOnboarding('replayCurrentTour')}</div>
+                                            <div className="text-[10px] text-white/60 font-normal">{tOnboarding(currentFeatureTour.badgeKey)}</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setGuideMenuOpen(false);
+                                            startSpotlightTour();
+                                        }}
+                                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white/80 hover:text-white"
+                                    >
+                                        <span className="material-symbols-outlined text-amber-300/80 text-[18px]">inventory_2</span>
+                                        <div>
+                                            <div className="font-semibold">{tOnboarding('startInteractiveTour')}</div>
+                                            <div className="text-[10px] text-white/50 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
+                                        </div>
+                                    </button>
+                                </>
+                            ) : (
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setGuideMenuOpen(false);
-                                        startFeatureTour(currentFeatureTour.id);
+                                        startSpotlightTour();
                                     }}
-                                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
+                                    className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
                                 >
-                                    <span className="material-symbols-outlined text-amber-400 text-[18px]">explore</span>
+                                    <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
                                     <div>
-                                        <div className="font-bold">{tOnboarding('replayCurrentTour')}</div>
-                                        <div className="text-[10px] text-white/60 font-normal">{tOnboarding(currentFeatureTour.badgeKey)}</div>
+                                        <div className="font-bold">{tOnboarding('startInteractiveTour')}</div>
+                                        <div className="text-[10px] text-white/60 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
                                     </div>
                                 </button>
                             )}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setGuideMenuOpen(false);
-                                    startSpotlightTour();
-                                }}
-                                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
-                            >
-                                <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
-                                <div>
-                                    <div className="font-bold">{tOnboarding('startInteractiveTour')}</div>
-                                    <div className="text-[10px] text-white/60 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
-                                </div>
-                            </button>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -431,10 +450,14 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                             </div>
                         </div>
                     )}
+                </div>
 
-                    <LanguageSwitch variant="dark" className="lv-lang" />
-                    <ThemeToggle variant="dark" />
-                    {extra}
+                <div className="lv-side-tools flex items-center justify-between gap-2 w-full">
+                    <LanguageSwitch variant="dark" className="lv-lang shrink-0" />
+                    <div className="flex items-center gap-2 shrink-0">
+                        <ThemeToggle variant="dark" />
+                        {extra}
+                    </div>
                 </div>
                 <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/15 min-w-0">
                     <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1 group">

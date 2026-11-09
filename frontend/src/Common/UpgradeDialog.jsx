@@ -35,11 +35,11 @@ export default function UpgradeDialog({ open, message, feature, onClose }) {
 
     return (
         <div
-            className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
+            className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div
-                className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md border border-outline-variant/30 shadow-xl"
+                className="lv-surface-secure bg-surface-container-lowest text-on-surface rounded-2xl sm:rounded-3xl p-6 w-full max-w-md border border-outline-variant/30 dark:border-white/15 shadow-2xl animate-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center gap-2 text-primary">

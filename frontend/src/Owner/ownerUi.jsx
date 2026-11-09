@@ -31,6 +31,17 @@ export const DOCUMENT_TYPES = [
     {value: 'OTHER', label: 'Other'},
 ];
 
+export const ASSET_ICON = {
+    BANK_ACCOUNT: 'account_balance',
+    CRYPTO_WALLET: 'currency_bitcoin',
+    SOCIAL_MEDIA: 'share',
+    DOCUMENT: 'description',
+    EXCHANGE_ACCOUNT: 'currency_exchange',
+    E_WALLET: 'account_balance_wallet',
+    EMAIL: 'mail',
+    OTHER: 'category',
+};
+
 export function Alert({type = 'error', children}) {
     if (!children) return null;
     const cls = {
@@ -70,11 +81,11 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     const {t} = useTranslation(['vault', 'common']);
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center px-4" onClick={onCancel}>
-            <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
+        <div className="fixed inset-0 z-40 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200" onClick={onCancel}>
+            <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200"
                  onClick={(e) => e.stopPropagation()}>
-                <h3 className="font-title-lg text-title-lg">{title}</h3>
-                <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
+                <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{title}</h3>
+                <p className="mt-2 text-sm text-on-surface-variant dark:text-white/70">{message}</p>
                 <div className="mt-6 flex justify-end gap-3">
                     <button onClick={onCancel} className={btnOutline}>{t('common:actions.cancel')}</button>
                     <button onClick={onConfirm} disabled={busy} className={danger ? btnDanger : btnPrimary}>

@@ -138,9 +138,9 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
     return (
         <motion.div
             initial={{ backgroundColor: 'rgba(0, 0, 0, 0)', backdropFilter: 'blur(0px)' }}
-            animate={{ backgroundColor: 'rgba(0, 0, 0, 0.42)', backdropFilter: 'blur(3px)' }}
+            animate={{ backgroundColor: 'rgba(0, 0, 0, 0.42)', backdropFilter: 'blur(8px)' }}
             transition={motionTransition.overlay}
-            className="fixed inset-0 z-40 flex items-center justify-center px-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
@@ -157,19 +157,19 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                     transform: 'perspective(500px) rotateX(0deg) scale(1)',
                 }}
                 transition={spring.dialog}
-                className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-outline-variant/30 shadow-xl"
+                className="bg-surface-container-lowest text-on-surface dark:bg-[#0e1629] dark:text-white rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-outline-variant/30 dark:border-white/15 shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex justify-between items-start gap-3">
+                <div className="flex justify-between items-start gap-3 pb-3 border-b border-outline-variant/20 dark:border-white/10">
                     <div className="min-w-0">
-                        <h3 className="font-title-lg text-title-lg">{t('dialog.title')}</h3>
+                        <h3 className="font-title-lg text-lg font-bold text-on-surface dark:text-white">{t('dialog.title')}</h3>
                         <p className="text-sm text-on-surface-variant truncate">{asset.assetName}</p>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
                         aria-label={t('dialog.close')}
-                        className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container-low transition-colors"
+                        className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors shrink-0"
                     >
                         <Icon name="close" className="text-outline" />
                     </button>
