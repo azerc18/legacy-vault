@@ -301,11 +301,10 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                                         className="text-[16px] opacity-75"
                                     />
                                 </button>
-                                {isSecOpen && (
-                                    <div className="lv-nav-section-items flex flex-col gap-0.5 mt-0.5">
-                                        {sec.items.map(renderNavLink)}
-                                    </div>
-                                )}
+                                {/* Luôn render link: dưới 1024px không có nút mở nhóm, nên chỉ ẩn bằng CSS trên desktop */}
+                                <div className={`lv-nav-section-items flex flex-col gap-0.5 mt-0.5${isSecOpen ? '' : ' lv-nav-section-items--closed'}`}>
+                                    {sec.items.map(renderNavLink)}
+                                </div>
                             </div>
                         );
                     })}

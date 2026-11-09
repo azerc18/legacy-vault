@@ -169,6 +169,12 @@ textarea {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
 }
+/* Nhóm vai trò đang đóng: chỉ ẩn trên desktop, nơi có nút mở nhóm (điện thoại hiện mọi link trên một hàng cuộn ngang) */
+@media (min-width: 1024px) {
+  .lv-nav-section-items--closed {
+    display: none;
+  }
+}
 .lv-side-bottom {
   margin-top: auto;
   display: flex;
