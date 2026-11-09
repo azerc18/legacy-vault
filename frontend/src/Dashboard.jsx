@@ -7,8 +7,13 @@ import BrandMark from './Common/BrandMark.jsx';
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
 import { DecodeLoop } from './Common/DecodeText.jsx';
 import CipherField from './Common/CipherField.jsx';
+import ProblemTimeline from './Common/ProblemTimeline.jsx';
+import CyberSteps from './Common/CyberSteps.jsx';
+import './Common/cyber.css';
+import { SecurityCard, VaultBox, RoleCard } from './Common/LandingCards.jsx';
+import { ACCENT } from './Common/landingAccents.js';
+import AppPreview from './Common/AppPreview.jsx';
 import { useReducedMotion } from 'motion/react';
-import { Tilt, TiltContent } from '@animate-ui/react/primitives/effects/tilt';
 import { Magnetic } from '@animate-ui/react/primitives/effects/magnetic';
 import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 
@@ -247,8 +252,10 @@ export default function Dashboard() {
     if (getUser()) return <Navigate to="/home" replace />;
 
     return (
-        <div ref={rootRef} className="lv-landing font-body-md text-on-surface antialiased min-h-screen relative">
+        <div ref={rootRef} className="lv-landing font-body-md text-white antialiased min-h-screen relative">
             <div aria-hidden="true" className="lv-bg fixed inset-0 z-0" data-mode={mode} />
+            {/* Mưa ký tự nền chung cho cả trang (1 canvas), đậm/nhạt theo phần đang xem */}
+            <CipherField mode={mode} />
             {/* NAVBAR */}
             <header className={`sticky top-0 z-20 backdrop-blur border-b transition-colors duration-500 ${light
                 ? 'bg-white/80 border-black/10 text-brand'
@@ -276,7 +283,6 @@ export default function Dashboard() {
 
             {/* 1. HERO */}
             <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center">
-                <CipherField />
                 <img src="/key-photo.jpg" alt="" aria-hidden="true"
                      className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
                      style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
@@ -311,7 +317,7 @@ export default function Dashboard() {
                 </div>
             </section>
 
-            {/* PREVIEW — khung trình duyệt nghiêng, cuộn tới thì dựng thẳng */}
+            {/* PREVIEW — khung trình duyệt nghiêng, cuộn tới thì dựng thẳng; bên trong là bản demo bấm thử được */}
             <section data-mode="dark" className="relative z-10 px-5 py-24 text-center text-white overflow-hidden">
                 <div className="lv-reveal max-w-2xl mx-auto mb-12">
                     <p className="font-label-sm uppercase tracking-wider mb-2 text-[#b9c9ff]">{t('preview.eyebrow')}</p>
@@ -322,105 +328,76 @@ export default function Dashboard() {
                     <div className="flex items-center gap-1.5 px-3 py-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-white/25" /><span className="w-2.5 h-2.5 rounded-full bg-white/25" /><span className="w-2.5 h-2.5 rounded-full bg-white/25" />
                     </div>
+                    {/* Giao diện Owner thật, bấm thử được (dữ liệu mẫu, không gọi API) */}
                     <div className="relative rounded-xl overflow-hidden">
-                        <img src="/dash-preview.jpg" alt="" className="w-full block" />
-                        <div aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/3" style={{ background: 'linear-gradient(180deg,transparent,#0b1020)' }} />
+                        <AppPreview />
                     </div>
                 </div>
+                <p className="lv-ap-hint"><Icon name="touch_app" className="text-[18px] text-[#b9c9ff]" /> {t('preview.hint')}</p>
             </section>
 
-            {/* 2. PROBLEM */}
-            <Section eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
-                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                    {PROBLEMS.map((p) => (
-                        <div key={p.key} className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-                            <Icon name={p.icon} className="text-error text-[28px]" />
-                            <p className="mt-4 font-label-sm text-error">{t(`problem.items.${p.key}.when`)}</p>
-                            <p className="mt-1 text-on-surface-variant">{t(`problem.items.${p.key}.text`)}</p>
-                        </div>
-                    ))}
-                </div>
+            {/* 2. PROBLEM — dòng thời gian 3D, dữ liệu "hỏng" dần theo thời gian */}
+            <Section mode="dark" eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
+                <ProblemTimeline items={PROBLEMS.map((p) => ({
+                    key: p.key, icon: p.icon,
+                    when: t(`problem.items.${p.key}.when`), text: t(`problem.items.${p.key}.text`),
+                }))} />
             </Section>
 
-            {/* 3. HOW IT WORKS */}
-            <Section id="how" eyebrow={t('how.eyebrow')} title={t('how.title')}>
-                <div className="lv-stagger grid md:grid-cols-4 gap-6">
-                    {STEPS.map((s, i) => (
-                        <div key={s.key} className="relative">
-                            <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center">
-                                <Icon name={s.icon} />
-                            </div>
-                            <p className="mt-4 text-sm text-outline font-semibold">{t('how.step', { n: i + 1 })}</p>
-                            <h3 className="font-title-lg text-title-lg mt-1">{t(`how.items.${s.key}.title`)}</h3>
-                            <p className="mt-2 text-on-surface-variant">{t(`how.items.${s.key}.text`)}</p>
-                        </div>
-                    ))}
-                </div>
+            {/* 3. HOW IT WORKS — phong cách cyber: bus mạch + gói dữ liệu kích sáng từng bước */}
+            <Section id="how" mode="dark" eyebrow={t('how.eyebrow')} title={t('how.title')}>
+                <CyberSteps items={STEPS.map((s, i) => ({
+                    key: s.key, icon: s.icon, stepLabel: t('how.step', { n: i + 1 }),
+                    title: t(`how.items.${s.key}.title`), text: t(`how.items.${s.key}.text`),
+                }))} />
             </Section>
 
-            {/* 4. SECURITY */}
+            {/* 4. SECURITY — mỗi lớp bảo vệ một màu, rê chuột có tia quét */}
             <Section id="security" mode="dark" eyebrow={t('security.eyebrow')} title={t('security.title')}>
                 <div className="lv-stagger grid md:grid-cols-3 gap-5">
                     {SECURITY.map((s) => (
-                        <Tilt key={s.key} maxTilt={4.5} perspective={1000}>
-                            <TiltContent className="h-full">
-                                <div className="h-full rounded-2xl p-7 border border-white/15 bg-white/5 backdrop-blur">
-                                    <Icon name={s.icon} className="text-[#b9c9ff] text-[32px]" />
-                                    <h3 className="font-title-lg text-title-lg mt-4 text-white">{t(`security.items.${s.key}.title`)}</h3>
-                                    <p className="mt-2 text-white/70">{t(`security.items.${s.key}.text`)}</p>
-                                </div>
-                            </TiltContent>
-                        </Tilt>
+                        <SecurityCard key={s.key} icon={s.icon} accent={ACCENT.security[s.key]}
+                                      title={t(`security.items.${s.key}.title`)} text={t(`security.items.${s.key}.text`)} />
                     ))}
                 </div>
             </Section>
 
-            {/* 5. WHAT YOU CAN STORE */}
-            <Section eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
-                <div className="lv-stagger grid grid-cols-2 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            {/* 5. WHAT YOU CAN STORE — hộp ký gửi: rê chuột/chạm để mở cửa ô, xem mô tả bên trong */}
+            <Section mode="dark" eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
+                <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
                     {ASSETS.map((a) => (
-                        <div key={a.key} className="flex items-center gap-3 p-4 rounded-xl border border-outline-variant/40">
-                            <Icon name={a.icon} className="text-primary" />
-                            <span className="font-semibold">{t(`assets.items.${a.key}`)}</span>
-                        </div>
+                        <VaultBox key={a.key} icon={a.icon} accent={ACCENT.assets[a.key]}
+                                  label={t(`assets.items.${a.key}`)} desc={t(`assets.desc.${a.key}`)} />
                     ))}
                 </div>
+                <p className="lv-box-hint">{t('assets.hint')}</p>
             </Section>
 
-            {/* 6. ROLES — tên vai trò dùng chung common:roles */}
-            <Section id="roles" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
+            {/* 6. ROLES — thẻ định danh có ánh kim; tên vai trò dùng chung common:roles */}
+            <Section id="roles" mode="dark" eyebrow={t('rolesSection.eyebrow')} title={t('rolesSection.title')}>
                 <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
                     {ROLES.map((r) => (
-                        <Tilt key={r.key} maxTilt={4.5} perspective={1000}>
-                            <TiltContent className="h-full">
-                                <div className="h-full bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30">
-                                    <div className="w-11 h-11 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
-                                        <Icon name={r.icon} />
-                                    </div>
-                                    <h3 className="font-title-lg text-title-lg mt-4">{t(`common:roles.${r.key}`)}</h3>
-                                    <p className="mt-2 text-on-surface-variant">{t(`rolesSection.items.${r.key}`)}</p>
-                                </div>
-                            </TiltContent>
-                        </Tilt>
+                        <RoleCard key={r.key} icon={r.icon} accent={ACCENT.roles[r.key]}
+                                  title={t(`common:roles.${r.key}`)} text={t(`rolesSection.items.${r.key}`)} />
                     ))}
                 </div>
             </Section>
 
             {/* 7. FAQ */}
-            <Section id="faq" eyebrow={t('faq.eyebrow')} title={t('faq.title')}>
-                <div className="lv-stagger max-w-2xl mx-auto divide-y divide-outline-variant/40 border-y border-outline-variant/40">
+            <Section id="faq" mode="dark" eyebrow={t('faq.eyebrow')} title={t('faq.title')}>
+                <div className="lv-stagger max-w-2xl mx-auto divide-y divide-white/10 border-y border-white/10">
                     {FAQS.map((k, i) => (
                         <div key={k}>
                             <button
                                 type="button"
                                 onClick={() => setOpenFaq(openFaq === i ? -1 : i)}
-                                className="w-full py-5 flex justify-between items-center text-left font-semibold"
+                                className="w-full py-5 flex justify-between items-center text-left font-semibold text-white hover:text-[#5ce1ff] transition-colors"
                             >
                                 {t(`faq.items.${k}.q`)}
-                                <Icon name={openFaq === i ? 'remove' : 'add'} className="text-outline" />
+                                <Icon name={openFaq === i ? 'remove' : 'add'} className="text-[#5ce1ff]/80" />
                             </button>
                             <AutoHeight>
-                                {openFaq === i && <p className="pb-5 text-on-surface-variant">{t(`faq.items.${k}.a`)}</p>}
+                                {openFaq === i && <p className="pb-5 text-white/70">{t(`faq.items.${k}.a`)}</p>}
                             </AutoHeight>
                         </div>
                     ))}

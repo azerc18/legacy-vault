@@ -93,7 +93,16 @@
       "legal": "Legal documents",
       "notes": "Private notes",
       "files": "Files & photos"
-    }
+    },
+    "desc": {
+      "passwords": "Logins for email, social and work accounts, handed only to the person you choose.",
+      "banks": "Account numbers and where your money is kept, so your family is not left guessing.",
+      "crypto": "Wallet addresses and recovery phrases that would otherwise be lost for good.",
+      "legal": "Wills, property deeds and insurance papers, together with what is needed to claim them.",
+      "notes": "Personal letters and instructions you want read at the right time.",
+      "files": "Photos and documents that matter, encrypted before they are saved."
+    },
+    "hint": "Hover or tap a box to open it"
   },
   "rolesSection": {
     "eyebrow": "Who is involved",
@@ -138,7 +147,39 @@
     "terms": "Terms of Service",
     "support": "Support"
   },
-  "preview": {"eyebrow": "Preview", "title": "Your whole digital legacy on one screen", "text": "See your readiness, what to do next and handover progress as soon as you sign in."},
+  "preview": {
+    "eyebrow": "Preview",
+    "title": "Your whole digital legacy on one screen",
+    "text": "See your readiness, what to do next and handover progress as soon as you sign in.",
+    "hint": "Interactive demo: switch pages on the left and try the buttons.",
+    "demo": {
+      "name": "An",
+      "vaults": [
+        {
+          "name": "Family vault",
+          "desc": "Bank accounts, insurance and the house papers.",
+          "beneficiary": "lan.nguyen@gmail.com",
+          "assets": 5,
+          "docs": 2
+        },
+        {
+          "name": "Crypto wallets",
+          "desc": "Ledger wallet and its recovery phrase.",
+          "beneficiary": "minh.tran@gmail.com",
+          "assets": 2,
+          "docs": 1
+        }
+      ],
+      "primary": {
+        "name": "Huy Pham",
+        "email": "huy.pham@gmail.com"
+      },
+      "backup": {
+        "name": "Minh Tran",
+        "email": "minh.tran@gmail.com"
+      }
+    }
+  },
   "footerNav": {
     "tagline": "Keep your digital legacy whole, and hand it to the right people at the right time.",
     "product": "PRODUCT",

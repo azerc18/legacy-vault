@@ -1,6 +1,6 @@
-// Nền hero trang chủ: "mưa ký tự" kiểu Matrix (chữ cái + số), thỉnh thoảng một cột rơi thành
-// từ khoá bảo mật (AES-256, VAULT, eKYC...). Vẽ bằng canvas, màu xanh thương hiệu, mờ dần ở giữa
-// để tiêu đề và nút vẫn nổi bật (xem mặt nạ trong cipherField.css).
+// Nền chung cho cả trang chủ: "mưa ký tự" kiểu Matrix (chữ cái + số), thỉnh thoảng một cột rơi thành
+// từ khoá bảo mật (AES256, VAULT, EKYC...). Chỉ MỘT canvas cố định sau toàn trang, nên chỉ một vòng vẽ.
+// Đổi màu/độ đậm theo phần đang xem (mode: dark | light) — xem cipherField.css.
 // Chỉ trang trí: aria-hidden, không nhận chuột; dừng khi tab ẩn; giảm chuyển động thì không vẽ.
 import React, { useEffect, useRef } from 'react';
 import { useReducedMotion } from 'motion/react';
@@ -12,10 +12,19 @@ const FONT_PX = 15;
 const COL_GAP = 20;          // khoảng cách giữa các cột (px)
 const FPS = 22;              // đủ mượt cho mưa ký tự, nhẹ máy
 const WORD_CHANCE = 0.12;    // tỉ lệ một giọt mới rơi thành từ khoá
+const FADE = 0.16;           // tốc độ phai vệt mỗi khung
 
-export default function CipherField() {
+// Bảng màu theo nền: nền tối dùng xanh sáng + vàng; nền sáng dùng xanh thương hiệu đậm
+const PALETTE = {
+    dark: { head: 'rgba(214, 224, 255, 0.9)', body: 'rgba(111, 134, 255, 0.55)', word: 'rgba(233, 214, 160, 0.95)' },
+    light: { head: 'rgba(40, 58, 150, 0.85)', body: 'rgba(70, 92, 200, 0.5)', word: 'rgba(150, 110, 20, 0.9)' },
+};
+
+export default function CipherField({ mode = 'dark' }) {
     const reduce = useReducedMotion();
     const ref = useRef(null);
+    const modeRef = useRef(mode);
+    useEffect(() => { modeRef.current = mode; }, [mode]);
 
     useEffect(() => {
         if (reduce) return undefined;
@@ -28,15 +37,12 @@ export default function CipherField() {
         let raf = 0;
         let last = 0;
 
-        const newDrop = (startAbove) => {
-            const word = Math.random() < WORD_CHANCE ? WORDS[Math.floor(Math.random() * WORDS.length)] : null;
-            return {
-                y: startAbove ? -Math.random() * h : Math.random() * h,   // vị trí (px) của đầu giọt
-                speed: FONT_PX * (0.45 + Math.random() * 0.75),           // px mỗi khung
-                word,
-                idx: 0,
-            };
-        };
+        const newDrop = (startAbove) => ({
+            y: startAbove ? -Math.random() * h : Math.random() * h,   // vị trí (px) của đầu giọt
+            speed: FONT_PX * (0.45 + Math.random() * 0.75),           // px mỗi khung
+            word: Math.random() < WORD_CHANCE ? WORDS[Math.floor(Math.random() * WORDS.length)] : null,
+            idx: 0,
+        });
 
         const resize = () => {
             const r = canvas.getBoundingClientRect();
@@ -45,17 +51,18 @@ export default function CipherField() {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             const cols = Math.ceil(w / COL_GAP);
             drops = Array.from({ length: cols }, (_, i) => drops[i] || newDrop(false));
-            ctx.fillStyle = '#0b1020';
-            ctx.fillRect(0, 0, w, h);
         };
         resize();
         const ro = new ResizeObserver(resize);
         ro.observe(canvas);
 
         const draw = () => {
-            // Phủ một lớp nền mờ để các ký tự cũ phai dần thành vệt
-            ctx.fillStyle = 'rgba(11, 16, 32, 0.16)';
+            // Xoá mờ dần (trong suốt) thay vì phủ màu nền -> dùng được trên cả nền tối lẫn nền sáng
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.fillStyle = `rgba(0, 0, 0, ${FADE})`;
             ctx.fillRect(0, 0, w, h);
+            ctx.globalCompositeOperation = 'source-over';
+            const c = PALETTE[modeRef.current] || PALETTE.dark;
             ctx.font = `600 ${FONT_PX}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
             ctx.textAlign = 'center';
             for (let i = 0; i < drops.length; i++) {
@@ -66,14 +73,13 @@ export default function CipherField() {
                     ch = d.word[d.idx % d.word.length];
                     d.idx++;
                     if (d.idx >= d.word.length) d.word = null;   // viết xong từ khoá thì quay lại ký tự ngẫu nhiên
-                    ctx.fillStyle = 'rgba(233, 214, 160, 0.95)';  // từ khoá ánh vàng
+                    ctx.fillStyle = c.word;
                 } else {
                     ch = randGlyph();
-                    ctx.fillStyle = 'rgba(214, 224, 255, 0.9)';   // đầu giọt sáng
+                    ctx.fillStyle = c.head;
                 }
                 ctx.fillText(ch, x, d.y);
-                // Ký tự ngay phía trên đầu giọt đổi màu xanh thương hiệu, tạo thân vệt
-                ctx.fillStyle = 'rgba(111, 134, 255, 0.55)';
+                ctx.fillStyle = c.body;                           // thân vệt ngay phía trên đầu giọt
                 ctx.fillText(randGlyph(), x, d.y - FONT_PX);
                 d.y += d.speed;
                 if (d.y - FONT_PX * 2 > h) drops[i] = newDrop(true);
@@ -86,7 +92,7 @@ export default function CipherField() {
             last = now;
             draw();
         };
-        const start = () => { last = 0; raf = requestAnimationFrame(tick); };
+        const start = () => { cancelAnimationFrame(raf); last = 0; raf = requestAnimationFrame(tick); };
         const stop = () => cancelAnimationFrame(raf);
         const onVis = () => (document.hidden ? stop() : start());
         document.addEventListener('visibilitychange', onVis);
@@ -95,5 +101,5 @@ export default function CipherField() {
     }, [reduce]);
 
     if (reduce) return null;
-    return <canvas ref={ref} aria-hidden="true" className="lv-cipher-rain" />;
+    return <canvas ref={ref} aria-hidden="true" data-mode={mode} className="lv-cipher-rain" />;
 }
