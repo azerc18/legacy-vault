@@ -25,9 +25,9 @@ export default function InfoTip({ term, className = '' }) {
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">help</span>
             </button>
             <span id={id} role="tooltip"
-                  className={`pointer-events-none absolute left-0 top-full mt-2 w-64 max-w-[80vw] rounded-lg bg-on-surface text-background text-xs font-normal leading-relaxed px-3 py-2 shadow-lg z-20 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${open ? 'opacity-100' : 'opacity-0'}`}>
-                {title && <strong className="block mb-0.5">{title}</strong>}
-                {text}
+                  className={`pointer-events-none absolute left-0 top-full mt-2 w-64 max-w-[80vw] rounded-xl lv-glass-frosted bg-surface-container-lowest/95 text-on-surface border border-outline-variant/50 text-xs font-normal leading-relaxed px-3.5 py-2.5 shadow-xl z-30 origin-top-left transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+                {title && <strong className="block mb-1 text-on-surface font-semibold">{title}</strong>}
+                <span className="text-on-surface-variant">{text}</span>
             </span>
         </span>
     );

@@ -8,7 +8,7 @@ import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './admi
 import EmptyState from "../Common/EmptyState.jsx";
 import UserDrawer from './UserDrawer.jsx';
 
-const STATUSES = ['ACTIVE', 'LOCKED', 'PENDING'];
+const STATUSES = ['ACTIVE', 'LOCKED', 'PENDING', 'DELETED'];
 // Role admin được phép cấp/gỡ (khớp MANAGEABLE_ROLES của BE)
 const UNMANAGEABLE = ['OWNER', 'BENEFICIARY', 'EXECUTOR'];
 const HIDDEN_ROLES = ['BENEFICIARY'];

@@ -8,19 +8,6 @@ import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 import {adminApi} from '../api/adminApi.js';
 import './admin.css';
 
-const NAV = [
-    {to: '/admin', key: 'overview', icon: 'dashboard', end: true},
-    {to: '/admin/users', key: 'users', icon: 'group'},
-    {to: '/admin/roles', key: 'roles', icon: 'shield_person'},
-    {to: '/admin/vaults', key: 'vaults', icon: 'inventory_2'},
-    {to: '/admin/audit-logs', key: 'auditLogs', icon: 'history'},
-    {to: '/admin/alerts', key: 'alerts', icon: 'notifications_active'},
-    {to: '/admin/payments', key: 'payments', icon: 'receipt_long'},
-    {to: '/admin/plans', key: 'plans', icon: 'sell'},
-    {to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe'},
-    {to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open'},
-];
-
 export const isAdmin = (user) => (user?.roles || []).includes('ADMIN');
 
 export function AdminLayout({title, subtitle, actions, children}) {
@@ -36,15 +23,9 @@ export function AdminLayout({title, subtitle, actions, children}) {
     if (!user) return <Navigate to="/login" replace/>;
     if (!isAdmin(user)) return <Navigate to="/home" replace/>;
 
-    const nav = NAV.map(({key, ...n}) => ({
-        ...n,
-        label: t(`nav.${key}`),
-        ...(n.to === '/admin/alerts' ? {badge: openAlerts} : {}),
-    }));
-
     return (
         <div className="lv-admin bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader workspace={t('workspace')} home="/admin" nav={nav}/>
+            <AppHeader alertBadge={openAlerts}/>
             <main className={`${PAGE_WIDTH} py-10`}>
                 <PageTitle kicker={t('kicker')} title={title} subtitle={subtitle} right={actions} className="mb-8"/>
                 {children}
@@ -71,8 +52,8 @@ export function ReasonDialog({
     const [reason, setReason] = useState('');
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
-            <div className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
+        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center px-4" onClick={onCancel}>
+            <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 {message && <p className="mt-2 text-sm text-on-surface-variant">{message}</p>}
@@ -80,14 +61,14 @@ export function ReasonDialog({
                     <textarea
                         rows={3} maxLength={255} value={reason} onChange={(e) => setReason(e.target.value)}
                         placeholder={t('dialog.reasonPlaceholder')}
-                        className="w-full mt-4 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"
+                        className="lv-glass-inline w-full mt-4 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"
                     />
                 )}
                 {askEmail && (
                     <input
                         type="email" autoFocus value={reason} onChange={(e) => setReason(e.target.value)}
                         placeholder={placeholder || 'name@example.com'} maxLength={255}
-                        className="w-full mt-4 h-11 px-4 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"
+                        className="lv-glass-inline w-full mt-4 h-11 px-4 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"
                     />
                 )}
                 <div className="mt-6 flex justify-end gap-3">
@@ -143,7 +124,7 @@ export function Stamp({tone = 'muted', icon, flat, children, title}) {
 // Màu con dấu theo trạng thái nghiệp vụ (dùng chung cho mọi trang admin)
 export const STATUS_TONE = {
     // user
-    ACTIVE: 'ok', LOCKED: 'danger', PENDING: 'warn',
+    ACTIVE: 'ok', LOCKED: 'danger', PENDING: 'warn', DELETED: 'muted',
     // vault
     UNLOCKED: 'info', CLAIMED: 'ok', ARCHIVED_LOCKED: 'muted',
     // DMS

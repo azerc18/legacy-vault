@@ -152,6 +152,7 @@
         "thresholdOption": "{{k}} of {{n}} people",
         "notePlaceholder": "Note about this allocation (optional)",
         "vipNote": "Percentage split, backup beneficiary and joint approval require a VIP plan.",
+        "proportionalUnavailable": "Percentage split is only available for assets that need a legal claim (bank accounts, exchange accounts, documents), so this asset type does not offer it.",
         "summary": {
           "ALL": "All beneficiaries",
           "EXCLUSIVE": "Only {{name}}",

@@ -1,42 +1,62 @@
 /* =====================================================================
    LEGACYVAULT DESIGN SYSTEM — AMBIENT MIDNIGHT CANVAS & WATERMARK LAYER
+   Kiến trúc chuẩn W3C Filter Effects Level 2 (Root Backdrop):
+   1. Nền canvas đặt trực tiếp trên `html`, `body` trong suốt (`transparent`).
+   2. `.lv-backdrop-vault` (Cú - Ổ Khóa) đặt `position: fixed; z-index: -1` để vẽ ở
+      Step 2 của Root Stacking Context (ngay trên nền `html` và dưới toàn bộ nội dung).
+   3. Không có phần tử trung gian nào (`body`, `#root`, `.lv-admin`, `main`) tạo
+      Backdrop Root cô lập.
+   => Mọi khối kính Liquid Glass (`backdrop-filter: blur(...)`) làm mờ thật sự phần
+      hình Cú - Ổ Khóa nằm phía sau tấm kính đó; vùng không có kính thì Cú rõ nét 100%.
    ===================================================================== */
+
+html {
+  background-color: rgb(var(--c-background));
+  background-image:
+    radial-gradient(46px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgb(var(--lock-accent-rgb, 61 90 224) / 0.14), transparent 72%),
+    radial-gradient(960px 520px at 88% -8%, rgb(156 173 238 / 0.42), transparent 62%),
+    radial-gradient(820px 480px at 12% 92%, rgb(61 90 224 / 0.10), transparent 64%);
+  background-attachment: fixed;
+}
+
+html.dark {
+  background-color: rgb(var(--c-background));
+  background-image:
+    radial-gradient(46px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgb(var(--lock-accent-rgb, 143 164 255) / 0.15), transparent 72%),
+    radial-gradient(980px 540px at 88% -8%, rgb(61 90 224 / 0.22), transparent 62%),
+    radial-gradient(860px 500px at 14% 90%, rgb(32 52 112 / 0.28), transparent 64%);
+}
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--lv-bg);
-  background-image:
-    radial-gradient(620px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgba(61, 90, 224, 0.08), transparent 68%),
-    radial-gradient(1100px 520px at 88% -8%, rgba(160, 175, 235, 0.48), transparent 62%);
-  color: var(--lv-fg);
-  background-attachment: fixed;
+  background: transparent !important;
+  color: rgb(var(--c-on-surface));
   -webkit-font-smoothing: antialiased;
 }
 
-html.dark body {
-  background-image:
-    radial-gradient(640px circle at var(--cursor-x, 50vw) var(--cursor-y, 30vh), rgba(143, 164, 255, 0.09), transparent 68%),
-    radial-gradient(1100px 520px at 88% -8%, rgba(61, 90, 224, 0.18), transparent 62%);
+/* Khung bao trang trong suốt, KHÔNG tạo stacking context hay Backdrop Root cô lập */
+#root > div.min-h-screen.bg-background:not(.lv-landing),
+.lv-admin.bg-background {
+  background-color: transparent !important;
 }
 
-/* Khung bao trang trong suốt để lộ nhẹ nhàng lớp chạm khắc nền và ánh sáng ambient */
-#root > div.min-h-screen.bg-background:not(.lv-landing) {
-  background-color: transparent;
-  position: relative;
-  z-index: 10;
-}
-
-/* Tầng biểu tượng Cú - Ổ Khóa xoay chìm tinh tế (Watermark) phía sau lớp kính */
+/* Tầng biểu tượng Cú - Ổ Khóa ở nền (z-index: -1 nằm ngay trên nền html và dưới mọi tấm kính) */
 .lv-backdrop-vault {
-  z-index: 1;
+  z-index: -1;
   color: rgb(var(--c-primary));
-  opacity: 0.24;
-  transition: padding-left 0.22s ease, opacity 0.3s ease;
+  transition: padding-left 0.22s ease, color 0.3s ease;
+}
+
+.lv-backdrop-vault .lv-owl-backdrop-svg {
+  opacity: 0.16;
 }
 
 html.dark .lv-backdrop-vault {
   color: #8fa4ff;
-  opacity: 0.28;
+}
+
+html.dark .lv-backdrop-vault .lv-owl-backdrop-svg {
+  opacity: 0.20;
 }
 
 @media (min-width: 1024px) {
@@ -47,9 +67,3 @@ html.dark .lv-backdrop-vault {
     padding-left: 76px;
   }
 }
-
-/* Thanh bên (Sidebar): giữ nguyên nền xanh Navy đặc sang trọng */
-.lv-side.bg-brand {
-  background-color: rgb(var(--c-brand));
-}
-

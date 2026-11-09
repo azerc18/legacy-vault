@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("DocumentAssetVerifier – C.3.7 xác thực tài sản DOCUMENT (FILE_HASH)")
+@DisplayName("DocumentAssetVerifier – C.3.7 xác thực tài sản DOCUMENT (FILE_HASH, SECOND_PERSON_CONFIRM, DOCUMENT_TIMESTAMP)")
 class DocumentAssetVerifierTest {
 
     @Mock private LegalDocumentRepository legalDocumentRepository;
@@ -80,12 +81,16 @@ class DocumentAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("methods(): FILE_HASH và SECOND_PERSON_CONFIRM, type() là DOCUMENT")
+    @DisplayName("methods(): FILE_HASH, SECOND_PERSON_CONFIRM và DOCUMENT_TIMESTAMP, type() là DOCUMENT")
     void methodsAndType() {
         assertThat(verifier.type()).isEqualTo(AssetType.DOCUMENT);
         assertThat(verifier.methods()).containsExactly(
-                AssetVerificationMethod.FILE_HASH, AssetVerificationMethod.SECOND_PERSON_CONFIRM);
+                AssetVerificationMethod.FILE_HASH,
+                AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                AssetVerificationMethod.DOCUMENT_TIMESTAMP);
     }
+
+    // ---------- FILE_HASH ----------
 
     @Test
     @DisplayName("FILE_HASH start: trả REAL, không có challengeHash")
@@ -167,6 +172,124 @@ class DocumentAssetVerifierTest {
                 Map.of("documentId", "not-a-uuid"), ownerId, null);
 
         assertThat(result.success()).isFalse();
+    }
+
+    // ---------- DOCUMENT_TIMESTAMP (Việc 46) ----------
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP start: trả SANDBOX, không có challengeHash")
+    void documentTimestamp_start() {
+        AssetVerifier.StartResult start = verifier.start(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(start.challengeHash()).isNull();
+        assertThat(start.clientData()).containsEntry("documentTitle", "Land title");
+        assertThat(start.challengeExpiresAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: server tự băm nội dung tệp trong vault, trả SANDBOX kèm timestampedAt và mode SIMULATED")
+    void documentTimestamp_withDocumentId_success() throws Exception {
+        UUID docId = UUID.randomUUID();
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.of(document(docId)));
+        byte[] cipher = {10, 20};
+        byte[] plain = "timestamp-pdf-bytes".getBytes(StandardCharsets.UTF_8);
+        when(fileStorageService.readFile("enc://bucket/land-title.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of("documentId", docId.toString()), ownerId, null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(result.evidence())
+                .containsEntry("documentId", docId.toString())
+                .containsEntry("sha256", sha256(plain))
+                .containsEntry("mode", "SIMULATED")
+                .containsKey("timestampedAt");
+        assertThat(Instant.parse(result.evidence().get("timestampedAt"))).isNotNull();
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: fallback nhóm tài liệu gắn với tài sản khi không truyền documentId")
+    void documentTimestamp_fallbackToLinkedDocumentGroup() throws Exception {
+        UUID groupId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        when(legalDocumentRepository.findFirstByDocumentGroupIdOrderByVersionDesc(groupId))
+                .thenReturn(Optional.of(document(docId)));
+        byte[] cipher = {30};
+        byte[] plain = "linked-v2-bytes".getBytes(StandardCharsets.UTF_8);
+        when(fileStorageService.readFile("enc://bucket/land-title.pdf")).thenReturn(cipher);
+        when(cryptoService.decryptBytes(cipher)).thenReturn(plain);
+
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(groupId),
+                AssetVerificationMethod.DOCUMENT_TIMESTAMP, Map.of(), ownerId, null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(result.evidence())
+                .containsEntry("sha256", sha256(plain))
+                .containsEntry("mode", "SIMULATED")
+                .containsKey("timestampedAt");
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: tài liệu ở vault khác thì thất bại (SANDBOX)")
+    void documentTimestamp_documentFromOtherVault_fails() {
+        UUID docId = UUID.randomUUID();
+        when(legalDocumentRepository.findByIdAndVaultId(docId, vaultId)).thenReturn(Optional.empty());
+
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of("documentId", docId.toString()), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: chỉ gửi chuỗi sha256 do client tự tính thì thất bại (SANDBOX)")
+    void documentTimestamp_clientHashOnly_fails() {
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of("sha256", "a".repeat(64)), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: documentId sai định dạng thì thất bại (SANDBOX), không ném lỗi")
+    void documentTimestamp_invalidUuid_fails() {
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of("documentId", "not-a-valid-uuid"), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: không có documentId và không có linkedDocumentGroupId thì thất bại (SANDBOX)")
+    void documentTimestamp_noDocIdNoLinkedGroup_fails() {
+        AssetVerifier.VerifyResult result = verifier.confirm(documentAsset(null), AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of(), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+    }
+
+    @Test
+    @DisplayName("DOCUMENT_TIMESTAMP confirm: asset chưa gắn vault thì thất bại (SANDBOX)")
+    void documentTimestamp_noVault_fails() {
+        DigitalAsset assetNoVault = DigitalAsset.builder()
+                .id(UUID.randomUUID())
+                .vault(null)
+                .assetType(AssetType.DOCUMENT)
+                .build();
+
+        AssetVerifier.VerifyResult result = verifier.confirm(assetNoVault, AssetVerificationMethod.DOCUMENT_TIMESTAMP,
+                Map.of("documentId", UUID.randomUUID().toString()), ownerId, null);
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
     }
 
     @Test

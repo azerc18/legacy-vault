@@ -27,6 +27,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ltld.app.legacyvault.dto.assetverificationdto.AssetVerificationSummary;
+import com.ltld.app.legacyvault.entity.DigitalAsset;
+import com.ltld.app.legacyvault.enums.AssetStatus;
+
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -47,6 +51,7 @@ import java.util.UUID;
  * để không phải sửa repository dùng chung.
  */
 @Service
+@lombok.RequiredArgsConstructor
 public class AdminInsightService {
 
     static final int RECENT_LOGS = 10;
@@ -58,6 +63,10 @@ public class AdminInsightService {
     // Các luật cảnh báo theo sự kiện lấy subject = id audit log
     private static final EnumSet<AuditAction> ALERT_EVENT_ACTIONS =
             EnumSet.of(AuditAction.ACCOUNT_LOCKED, AuditAction.TOKEN_REUSE_DETECTED, AuditAction.RBAC_CHANGE);
+
+    static final int MAX_ASSET_VERIFICATIONS = 100;
+
+    private final com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService assetVerificationService;
 
     @PersistenceContext
     private EntityManager em;
@@ -114,7 +123,33 @@ public class AdminInsightService {
                 .vaults(vaults)
                 .recentLogs(logs)
                 .alerts(relatedAlerts(userId))
+                .assetVerifications(assetVerifications(userId))
                 .build();
+    }
+
+    // B.4: trạng thái hiệu lực (đã tính dấu vân tay, hết hạn) lấy từ chính service xác thực
+    private List<AdminUserDetailResponse.AssetVerificationItem> assetVerifications(UUID userId) {
+        List<DigitalAsset> assets = em.createQuery("""
+                        SELECT a FROM DigitalAsset a JOIN FETCH a.vault v
+                        WHERE v.owner.id = :id AND a.status = :status
+                        ORDER BY a.createdAt DESC
+                        """, DigitalAsset.class)
+                .setParameter("id", userId).setParameter("status", AssetStatus.ACTIVE)
+                .setMaxResults(MAX_ASSET_VERIFICATIONS).getResultList();
+        Map<UUID, AssetVerificationSummary> summaries = assetVerificationService.summarize(assets);
+        return assets.stream().map(a -> {
+            AssetVerificationSummary s = summaries.get(a.getId());
+            return AdminUserDetailResponse.AssetVerificationItem.builder()
+                    .assetId(a.getId())
+                    .assetType(a.getAssetType() == null ? null : a.getAssetType().name())
+                    .vaultName(a.getVault().getName())
+                    .status(s == null ? null : s.status().name())
+                    .method(s == null || s.method() == null ? null : s.method().name())
+                    .provider(s == null || s.provider() == null ? null : s.provider().name())
+                    .verifiedAt(s == null ? null : s.verifiedAt())
+                    .expiresAt(s == null ? null : s.expiresAt())
+                    .build();
+        }).toList();
     }
 
     // Cảnh báo có subject = id người dùng (tải hàng loạt) hoặc = id một audit log sự kiện của người này

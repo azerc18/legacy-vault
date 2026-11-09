@@ -152,6 +152,7 @@
         "thresholdOption": "{{k}} trên {{n}} người",
         "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
         "vipNote": "Chia theo tỷ lệ %, người dự phòng và đồng thuận cần gói VIP.",
+        "proportionalUnavailable": "Chia theo tỷ lệ % chỉ dùng cho tài sản cần làm thủ tục pháp lý (tài khoản ngân hàng, tài khoản sàn, tài liệu), nên loại tài sản này không có lựa chọn đó.",
         "summary": {
           "ALL": "Tất cả người thụ hưởng",
           "EXCLUSIVE": "Chỉ {{name}}",

@@ -68,6 +68,7 @@ function App() {
             <BrowserRouter>
                 <DemoBanner />
                 <IdleLogout />
+                <InteractiveVaultLock variant="sentinel" />
                 <Routes>
                 {/* Công khai */}
                 <Route path="/" element={<Dashboard />} />
@@ -129,7 +130,6 @@ function App() {
 
                 <Route path="*" element={<NotFound />} />
             </Routes>
-            <InteractiveVaultLock variant="sentinel" />
             <AssistantWidget />
             <PlanLimitUpgradeDialog />
             <SpotlightTour />

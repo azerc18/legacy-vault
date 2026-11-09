@@ -9,12 +9,12 @@ import { getIdleMinutes, setIdleMinutes, IDLE_OPTIONS } from '../Common/idleTime
 
 function Segmented({ label, options, value, onChange }) {
     return (
-        <div role="radiogroup" aria-label={label} className="grid grid-flow-col auto-cols-fr p-1 rounded-xl bg-surface-container-low gap-1">
+        <div role="radiogroup" aria-label={label} className="grid grid-flow-col auto-cols-fr p-1 rounded-xl bg-surface-container-low/80 gap-1 border border-outline-variant/30">
             {options.map((o) => (
                 <button key={o.value} type="button" role="radio" aria-checked={value === o.value}
                         onClick={() => onChange(o.value)}
-                        className={`h-10 px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${value === o.value
-                            ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                        className={`h-10 px-3 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5 transition-all duration-200 ${value === o.value
+                            ? 'lv-glass-clear bg-surface-container-lowest text-on-surface shadow-sm'
                             : 'text-on-surface-variant hover:text-on-surface'}`}>
                     {o.icon && <Icon name={o.icon} className="text-[18px]" />}
                     <span>{o.label}</span>

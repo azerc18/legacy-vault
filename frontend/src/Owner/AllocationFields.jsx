@@ -6,6 +6,12 @@ import { inputClass } from './ownerUi.jsx';
 // N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
 export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL', 'JOINT_CONSENSUS'];
 
+// Chế độ hợp lệ cho loại tài sản đang chọn. BE chỉ cho chia % (PROPORTIONAL) với tài sản cần hồ sơ pháp lý
+// (transfer mechanism LEGAL_CLAIM_DOSSIER); các chế độ còn lại dùng được cho mọi loại. Loại không hợp lệ thì ẩn
+// hẳn khỏi danh sách; chỉ giữ lại khi chính nó đang được chọn (để select không trống, nút lưu sẽ báo lỗi).
+export const availableModes = (allowProportional, currentMode) =>
+    MODES.filter((m) => m !== 'PROPORTIONAL' || allowProportional || currentMode === 'PROPORTIONAL');
+
 const textareaCls = 'w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 const SHARE_RE = /^\d{1,3}(\.\d{1,2})?$/;                    // tối đa 2 chữ số thập phân (cột decimal(5,2))
 const cents = (s) => Math.round(parseFloat(s) * 100);         // so sánh bằng số nguyên để khỏi sai số số thực
@@ -140,11 +146,12 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
         <fieldset className="rounded-xl border border-outline-variant/50 p-4 space-y-3">
             <legend className="px-2 text-sm font-semibold">{tt('title')}</legend>
             <select value={value.mode} onChange={(e) => setMode(e.target.value)} className={inputClass}>
-                {MODES.map((m) => (
+                {availableModes(allowProportional, value.mode).map((m) => (
                     <option key={m} value={m} disabled={m === 'PROPORTIONAL' && !allowProportional}>{tt(`mode.${m}`)}</option>
                 ))}
             </select>
             <p className="text-xs text-on-surface-variant">{tt(`modeHint.${value.mode}`)}</p>
+            {!allowProportional && <p className="text-xs text-outline">{tt('proportionalUnavailable')}</p>}
 
             {value.mode === 'EXCLUSIVE' && (
                 <>

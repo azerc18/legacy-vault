@@ -92,12 +92,12 @@ function CaseCard({c, busy, onAcknowledge}) {
                 <div className="flex gap-2">
                     {step === 0 && (
                         <button onClick={onAcknowledge} disabled={busy}
-                                className={`${btn} bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60`}>
+                                className={`${btn} lv-btn-primary bg-primary text-on-primary hover:bg-primary-container disabled:opacity-60`}>
                             <Icon name="task_alt" className="text-[18px]"/> {busy ? t('saving') : t('acknowledge')}
                         </button>
                     )}
                     <Link to={`/executor/cases/${c.assignmentId}`}
-                          className={`${btn} ${step === 0 ? 'border border-outline-variant text-primary' : 'bg-primary text-on-primary hover:bg-primary-container'}`}>
+                          className={`${btn} ${step === 0 ? 'lv-btn-secondary border border-outline-variant text-primary' : 'lv-btn-primary bg-primary text-on-primary hover:bg-primary-container'}`}>
                         <Icon name="folder_open" className="text-[18px]"/> {t('home.openCase')}
                     </Link>
                 </div>

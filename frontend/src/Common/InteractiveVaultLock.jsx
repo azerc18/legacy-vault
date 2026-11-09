@@ -14,10 +14,6 @@ const PUBLIC_ROUTES = [
 ];
 
 const DIAL_TICKS_24 = Array.from({ length: 24 }, (_, i) => i * 15);
-const DIAL_TICKS_36 = Array.from({ length: 36 }, (_, i) => i * 10);
-const GEAR_TEETH_16 = Array.from({ length: 16 }, (_, i) => i * 22.5);
-const COMPASS_8 = Array.from({ length: 8 }, (_, i) => i * 45);
-const SEAL_12 = Array.from({ length: 12 }, (_, i) => i * 30);
 
 const ARCHETYPE_ORDER = ['AUTO', 'ADMIN', 'VIP', 'FREE', 'VERIFIER', 'EXECUTOR', 'BENEFICIARY'];
 
@@ -246,7 +242,7 @@ export default function InteractiveVaultLock({
                     document.documentElement.style.setProperty('--cursor-y', `${clientY}px`);
 
                     const glassNodes = document.querySelectorAll(
-                        '.lv-dossier, .lv-page-hero, .lv-glass, .bg-surface-container-lowest.rounded-2xl, .bg-surface-container-lowest.rounded-3xl'
+                        '.lv-side, .lv-dossier, .lv-page-hero, .lv-glass, .lv-glass-clear, .lv-glass-regular, .lv-glass-thick, .lv-glass-tinted, .lv-glass-secure, .lv-surface-standard, .lv-surface-secure, .bg-surface-container-lowest.rounded-2xl, .bg-surface-container-lowest.rounded-3xl'
                     );
                     for (let i = 0; i < glassNodes.length; i += 1) {
                         const node = glassNodes[i];
@@ -258,7 +254,7 @@ export default function InteractiveVaultLock({
                         const dxEdge = Math.max(r.left - clientX, 0, clientX - r.right);
                         const dyEdge = Math.max(r.top - clientY, 0, clientY - r.bottom);
                         const distToCard = Math.hypot(dxEdge, dyEdge);
-                        const prox = Math.max(0, Math.min(1, 1 - distToCard / 280));
+                        const prox = Math.max(0, Math.min(1, 1 - distToCard / 42));
 
                         node.style.setProperty('--gx', `${gx}px`);
                         node.style.setProperty('--gy', `${gy}px`);
@@ -284,13 +280,13 @@ export default function InteractiveVaultLock({
                 const rawAngle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
                 const normalizedAngle = ((Math.round(rawAngle) % 360) + 360) % 360;
 
-                const maxRadius = variant === 'hero' ? 420 : 520;
+                const maxRadius = variant === 'hero' ? 220 : 520;
                 const factor = Math.max(0, 1 - dist / maxRadius);
-                const clampDx = Math.max(-1, Math.min(1, dx / 260));
-                const clampDy = Math.max(-1, Math.min(1, dy / 260));
+                const clampDx = Math.max(-1, Math.min(1, dx / 240));
+                const clampDy = Math.max(-1, Math.min(1, dy / 240));
 
-                const tiltScale = variant === 'hero' ? 12 : variant === 'sentinel' ? 7 : 0;
-                const pullScale = variant === 'hero' ? 6 : variant === 'sentinel' ? 10 : 0;
+                const tiltScale = variant === 'hero' ? 12 : variant === 'sentinel' ? 10 : 0;
+                const pullScale = variant === 'hero' ? 6 : variant === 'sentinel' ? 12 : 0;
 
                 const tiltX = Number((-clampDy * factor * tiltScale).toFixed(2));
                 const tiltY = Number((clampDx * factor * tiltScale).toFixed(2));
@@ -398,108 +394,74 @@ export default function InteractiveVaultLock({
      * Toàn bộ dùng bảng màu đơn sắc Xanh Navy / Sapphire / Trắng Băng sang trọng, không pha màu lòe loẹt.
      */
     const renderOwlLockSvg = (sizeClass = 'w-32 h-32', isBackdrop = false) => {
-        // Bảng màu đơn sắc chuẩn thương hiệu: trên nền sáng vẽ nét Navy/Sapphire, trên nền tối/hero vẽ nét Trắng/Sapphire sáng
+        // Bảng màu đơn sắc đồng nhất: tránh pha màu xanh/xám chồng chéo gây vết cắt lạ trên hình Cú nền
         const primaryStroke = isBackdrop ? 'currentColor' : '#ffffff';
-        const accentStroke = isBackdrop ? 'rgb(var(--c-secondary))' : '#b9c9ff';
+        const ringRotation = isBackdrop ? 0 : effectiveDialRotation;
 
         return (
             <svg
-                className={`${sizeClass} select-none overflow-visible`}
+                className={`${sizeClass} select-none overflow-visible ${isBackdrop ? 'lv-owl-backdrop-svg' : ''}`}
                 viewBox="0 0 200 200"
                 aria-hidden="true"
             >
                 <defs>
                     <radialGradient id={`owlCoreGlow-${uid}`} cx="50%" cy="50%" r="55%">
-                        <stop offset="0%" stopColor="#5b78f6" stopOpacity={isBackdrop ? '0.22' : '0.38'} />
-                        <stop offset="65%" stopColor="#1e2d66" stopOpacity={isBackdrop ? '0.08' : '0.16'} />
+                        <stop offset="0%" stopColor="#5b78f6" stopOpacity={isBackdrop ? '0.18' : '0.38'} />
+                        <stop offset="65%" stopColor="#1e2d66" stopOpacity={isBackdrop ? '0.06' : '0.16'} />
                         <stop offset="100%" stopColor="#0b1020" stopOpacity="0" />
                     </radialGradient>
                 </defs>
 
                 {/* Lớp hào quang nền nhẹ đồng điệu tông Sapphire */}
-                <circle cx="100" cy="104" r="84" fill={`url(#owlCoreGlow-${uid})`} />
+                <circle cx="100" cy="104" r="90" fill={`url(#owlCoreGlow-${uid})`} />
 
-                {/* ==================== TẦNG 1: VÒNG SỐ CƠ KHÍ XOAY QUANH BIỂU TƯỢNG CÚ - Ổ KHÓA ==================== */}
+                {/* ==================== TẦNG 1: VÀNH LA BÀN NGOÀI CÙNG (TĨNH KHI LÀ BACKGROUND, KHÔNG CẮT QUA CÀNG KHÓA) ==================== */}
                 <g
                     style={{
-                        transform: `rotate(${effectiveDialRotation}deg)`,
+                        transform: isBackdrop ? 'none' : `rotate(${ringRotation}deg)`,
                         transformOrigin: '100px 104px',
-                        transition:
-                            status === 'idle'
-                                ? 'transform 140ms cubic-bezier(0.22, 1, 0.36, 1)'
-                                : 'transform 440ms cubic-bezier(0.16, 1, 0.3, 1)',
+                        transition: isBackdrop
+                            ? 'none'
+                            : status === 'idle'
+                              ? 'transform 140ms cubic-bezier(0.22, 1, 0.36, 1)'
+                              : 'transform 440ms cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
                 >
-                    {/* Vành la bàn cơ khí ngoài cùng */}
+                    {/* Vành tròn bao ngoài sạch sẽ, r=94 nằm hoàn toàn bên ngoài càng khóa và mũ/vương miện */}
                     <circle
                         cx="100"
                         cy="104"
-                        r="86"
+                        r="94"
                         fill="none"
-                        stroke={accentStroke}
-                        strokeWidth="1.4"
-                        strokeOpacity="0.45"
+                        stroke={primaryStroke}
+                        strokeWidth="1.5"
+                        strokeOpacity="0.38"
                     />
 
-                    {/* ADMIN: Khung Bát Giác Tối Cao xoay đồng tâm */}
-                    {activeArchetype === 'ADMIN' && (
-                        <polygon
-                            points="100,14 164,40 190,104 164,168 100,194 36,168 10,104 36,40"
-                            fill="none"
-                            stroke={primaryStroke}
-                            strokeWidth="1.5"
-                            strokeOpacity="0.32"
-                        />
-                    )}
+                    {/* Vành tròn mảnh thứ hai r=88 tạo viền kép sang trọng, không dùng nét đứt cắt ngang thân cú */}
+                    <circle
+                        cx="100"
+                        cy="104"
+                        r="88"
+                        fill="none"
+                        stroke={primaryStroke}
+                        strokeWidth="1"
+                        strokeOpacity="0.22"
+                    />
 
-                    {/* EXECUTOR: Vành Bánh Răng Hiệp Sĩ 16 Chốt */}
-                    {activeArchetype === 'EXECUTOR' &&
-                        GEAR_TEETH_16.map((deg) => (
-                            <rect
-                                key={deg}
-                                x="97"
-                                y="11"
-                                width="6"
-                                height="7"
-                                rx="1.5"
-                                fill={primaryStroke}
-                                fillOpacity="0.42"
-                                transform={`rotate(${deg} 100 104)`}
-                            />
-                        ))}
-
-                    {/* VERIFIER: 12 Ấn Chương Công Chứng */}
-                    {activeArchetype === 'VERIFIER' &&
-                        SEAL_12.map((deg) => (
-                            <circle
-                                key={deg}
-                                cx="100"
-                                cy="14"
-                                r="3"
-                                fill="none"
-                                stroke={primaryStroke}
-                                strokeWidth="1.5"
-                                strokeOpacity="0.5"
-                                transform={`rotate(${deg} 100 104)`}
-                            />
-                        ))}
-
-                    {/* Các vạch chia độ chuẩn xác trên vòng khóa */}
-                    {(activeArchetype === 'VIP' || activeArchetype === 'ADMIN'
-                        ? DIAL_TICKS_36
-                        : DIAL_TICKS_24
-                    ).map((deg) => {
+                    {/* Các vạch chia độ nằm gọn giữa r=88 và r=94, tuyệt đối không đâm vào càng khóa */}
+                    {DIAL_TICKS_24.map((deg) => {
                         const major = deg % 45 === 0;
                         return (
                             <line
                                 key={deg}
                                 x1="100"
-                                y1={major ? '18' : '21'}
+                                y1="6.5"
                                 x2="100"
-                                y2={major ? '27' : '25'}
+                                y2={major ? '11.5' : '9.5'}
                                 stroke={primaryStroke}
-                                strokeWidth={deg === 0 ? '3' : major ? '2' : '1.1'}
-                                strokeOpacity={deg === 0 ? '0.95' : major ? '0.68' : '0.32'}
+                                strokeWidth={major ? '1.6' : '1'}
+                                strokeOpacity={major ? '0.48' : '0.24'}
                                 strokeLinecap="round"
                                 transform={`rotate(${deg} 100 104)`}
                             />
@@ -507,51 +469,15 @@ export default function InteractiveVaultLock({
                     })}
                 </g>
 
-                {/* ==================== TẦNG 2: VÒNG ĐỒNG TÂM XOAY NGƯỢC CHIỀU ==================== */}
+                {/* ==================== TẦNG 2: CÀNG KHÓA (SHACKLE) & PHỤ KIỆN ĐẦU CÚ THEO PHÂN HẠNG ==================== */}
                 <g
                     style={{
-                        transform: `rotate(${-effectiveDialRotation * 0.65}deg)`,
-                        transformOrigin: '100px 104px',
-                        transition:
-                            status === 'idle'
-                                ? 'transform 160ms cubic-bezier(0.22, 1, 0.36, 1)'
-                                : 'transform 460ms cubic-bezier(0.16, 1, 0.3, 1)',
-                    }}
-                >
-                    <circle
-                        cx="100"
-                        cy="104"
-                        r="72"
-                        fill="none"
-                        stroke={primaryStroke}
-                        strokeWidth="1.3"
-                        strokeDasharray={
-                            activeArchetype === 'FREE' ? '6 6' : '14 6 3 6'
-                        }
-                        strokeOpacity="0.38"
-                    />
-                    {(activeArchetype === 'VIP' ||
-                        activeArchetype === 'ADMIN' ||
-                        activeArchetype === 'BENEFICIARY') &&
-                        COMPASS_8.map((deg) => (
-                            <polygon
-                                key={deg}
-                                points="100,29 102.5,34 100,37 97.5,34"
-                                fill={primaryStroke}
-                                fillOpacity="0.55"
-                                transform={`rotate(${deg} 100 104)`}
-                            />
-                        ))}
-                </g>
-
-                {/* ==================== TẦNG 3: CÀNG KHÓA (SHACKLE) & PHỤ KIỆN ĐẦU CÚ THEO PHÂN HẠNG ==================== */}
-                <g
-                    style={{
-                        transform: isShackleOpen
-                            ? 'translateY(-14px) rotate(12deg)'
-                            : status === 'route-spin'
-                              ? 'translateY(-5px) rotate(0deg)'
-                              : 'translateY(0px) rotate(0deg)',
+                        transform:
+                            !isBackdrop && isShackleOpen
+                                ? 'translateY(-14px) rotate(12deg)'
+                                : !isBackdrop && status === 'route-spin'
+                                  ? 'translateY(-5px) rotate(0deg)'
+                                  : 'translateY(0px) rotate(0deg)',
                         transformOrigin: '76px 68px',
                         transition: 'transform 320ms cubic-bezier(0.16, 1, 0.3, 1)',
                     }}
@@ -565,84 +491,36 @@ export default function InteractiveVaultLock({
                         strokeLinecap="round"
                     />
 
-                    {/* Viền rãnh cơ khí bên trong càng khóa cho ADMIN & EXECUTOR */}
-                    {(activeArchetype === 'ADMIN' || activeArchetype === 'EXECUTOR') && (
-                        <path
-                            d="M 83 65 V 52 C 83 41, 90 34, 100 34 C 110 34, 117 41, 117 52 V 65"
-                            fill="none"
-                            stroke={accentStroke}
-                            strokeWidth="2"
-                            strokeDasharray="4 3"
-                        />
-                    )}
-
                     {/* HẠNG VIP: Vương Miện Vua Cú (King Owl Crown) */}
                     {activeArchetype === 'VIP' && (
                         <g fill={primaryStroke}>
-                            <path d="M 82 28 L 85 15 L 93 23 L 100 12 L 107 23 L 115 15 L 118 28 Z" />
-                            <circle cx="85" cy="12.5" r="2" />
-                            <circle cx="100" cy="9" r="2.5" />
-                            <circle cx="115" cy="12.5" r="2" />
+                            <path d="M 84 22 L 86 12 L 94 18 L 100 9 L 106 18 L 114 12 L 116 22 Z" />
                         </g>
                     )}
 
-                    {/* HẠNG ADMIN: Ấn Đại Pháp Sư Tối Cao (Grandmaster Arch-Crest) */}
+                    {/* HẠNG ADMIN: Ấn Vương Quyền Tối Cao (Grandmaster Crest) */}
                     {activeArchetype === 'ADMIN' && (
                         <g fill={primaryStroke}>
-                            <polygon points="100,8 106,20 100,25 94,20" />
-                            <path
-                                d="M 70 42 L 60 28 L 74 34 Z"
-                                fillOpacity="0.85"
-                            />
-                            <path
-                                d="M 130 42 L 140 28 L 126 34 Z"
-                                fillOpacity="0.85"
-                            />
+                            <polygon points="100,9 105,18 100,22 95,18" />
                         </g>
                     )}
 
-                    {/* HẠNG VERIFIER: Mũ Học Giả / Thẩm Phán (Graduate Mortarboard & Tassel) */}
+                    {/* HẠNG VERIFIER: Mũ Học Giả / Thẩm Phán (Graduate Mortarboard) */}
                     {activeArchetype === 'VERIFIER' && (
                         <g fill={primaryStroke}>
-                            <polygon points="100,14 128,23 100,32 72,23" />
-                            <path
-                                d="M 122 25 V 39"
-                                stroke={primaryStroke}
-                                strokeWidth="2.4"
-                                strokeLinecap="round"
-                            />
-                            <circle cx="122" cy="41" r="2.8" />
+                            <polygon points="100,11 124,19 100,26 76,19" />
                         </g>
                     )}
 
-                    {/* HẠNG EXECUTOR: Mào Giáp Hiệp Sĩ Hộ Vệ (Knight Plume Crest) */}
+                    {/* HẠNG EXECUTOR: Mào Hiệp Sĩ Hộ Vệ (Knight Crest) */}
                     {activeArchetype === 'EXECUTOR' && (
                         <g fill={primaryStroke}>
-                            <path d="M 94 26 L 100 11 L 106 26 Z" />
-                            <path
-                                d="M 86 30 L 88 18 L 94 27 Z"
-                                fillOpacity="0.7"
-                            />
-                            <path
-                                d="M 114 30 L 112 18 L 106 27 Z"
-                                fillOpacity="0.7"
-                            />
+                            <path d="M 95 22 L 100 10 L 105 22 Z" />
                         </g>
-                    )}
-
-                    {/* HẠNG BENEFICIARY: Vòm Hào Quang Tinh Cầu (Astral Halo Dome) */}
-                    {activeArchetype === 'BENEFICIARY' && (
-                        <path
-                            d="M 66 62 A 36 36 0 0 1 134 62"
-                            fill="none"
-                            stroke={primaryStroke}
-                            strokeWidth="2.2"
-                            strokeDasharray="5 4"
-                        />
                     )}
                 </g>
 
-                {/* ==================== TẦNG 4: THÂN "CÚ - Ổ KHÓA" (CHUẨN ĐƯỜNG NÉT LOGO LEGACYVAULT) ==================== */}
+                {/* ==================== TẦNG 3: THÂN "CÚ - Ổ KHÓA" (CHUẨN ĐƯỜNG NÉT LOGO LEGACYVAULT) ==================== */}
                 <g fill={primaryStroke}>
                     {/* 1. Đôi mày & sừng cú vút cong chữ V đặc trưng của Logo */}
                     <path d="M 48 56 C 58 68, 79 70, 100 83 C 121 70, 142 68, 152 56 C 149 74, 135 83, 117 87 C 108 89, 103 94, 100 99 C 97 94, 92 89, 83 87 C 65 83, 51 74, 48 56 Z" />
@@ -659,16 +537,10 @@ export default function InteractiveVaultLock({
                     <path d="M 65 85 A 13.5 13.5 0 1 0 90 92 L 84 89 A 7.5 7.5 0 1 1 71 86 Z" />
                     <path d="M 110 92 A 13.5 13.5 0 1 0 135 85 L 129 86 A 7.5 7.5 0 1 1 116 89 Z" />
 
-                    {/* VIP & VERIFIER: Kính một mắt (Monocle) + dây xích đặc trưng của Cú Vaulty */}
+                    {/* VIP & VERIFIER: Kính một mắt (Monocle) đặc trưng của Cú Vaulty */}
                     {(activeArchetype === 'VIP' || activeArchetype === 'VERIFIER') && (
                         <g fill="none" stroke={primaryStroke}>
-                            <circle cx="122.5" cy="90" r="16.5" strokeWidth="2.6" />
-                            <path
-                                d="M 137 98 Q 149 112 142 128"
-                                strokeWidth="2"
-                                strokeDasharray="2.5 3.5"
-                                strokeLinecap="round"
-                            />
+                            <circle cx="122.5" cy="90" r="16.5" strokeWidth="2.4" />
                         </g>
                     )}
 
@@ -684,39 +556,6 @@ export default function InteractiveVaultLock({
                         d="M 140 80 C 149 80, 153 86, 153 96 C 153 132, 131 157, 100 174 C 95 165, 94 152, 99 139 C 105 124, 121 112, 136 101 C 142 96, 143 85, 140 80 Z M 139 112 C 126 121, 113 132, 107 146 C 105 151, 105 156, 106 160 C 125 149, 137 133, 139 112 Z"
                     />
                 </g>
-
-                {/* ==================== TẦNG 5: DẤU ẤN PHÂN HẠNG TRÊN NGỰC CÚ ==================== */}
-                {activeArchetype === 'ADMIN' && (
-                    /* ADMIN: Vòng ấn tối cao quanh tâm mỏ cú */
-                    <circle
-                        cx="100"
-                        cy="111"
-                        r="16"
-                        fill="none"
-                        stroke={primaryStroke}
-                        strokeWidth="1.6"
-                        strokeDasharray="4 3"
-                        strokeOpacity="0.65"
-                    />
-                )}
-                {activeArchetype === 'EXECUTOR' && (
-                    /* EXECUTOR: Khiên Hiệp Sĩ bảo vệ quanh thân cú */
-                    <polygon
-                        points="100,66 144,82 136,142 100,168 64,142 56,82"
-                        fill="none"
-                        stroke={primaryStroke}
-                        strokeWidth="1.6"
-                        strokeOpacity="0.4"
-                    />
-                )}
-                {activeArchetype === 'BENEFICIARY' && (
-                    /* BENEFICIARY: Ngôi sao la bàn dẫn đường ở tâm ngực */
-                    <polygon
-                        points="100,124 102.5,131 110,133.5 102.5,136 100,143 97.5,136 90,133.5 97.5,131"
-                        fill={primaryStroke}
-                        fillOpacity="0.85"
-                    />
-                )}
             </svg>
         );
     };
@@ -862,7 +701,7 @@ export default function InteractiveVaultLock({
                     }}
                 >
                     {renderOwlLockSvg(
-                        'w-[320px] h-[320px] md:w-[440px] md:h-[440px] lg:w-[500px] lg:h-[500px]',
+                        'w-[460px] h-[460px] md:w-[600px] md:h-[600px] lg:w-[700px] lg:h-[700px]',
                         true
                     )}
                 </div>

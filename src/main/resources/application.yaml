@@ -46,10 +46,29 @@ security:
 app:
   verification:
     bank:
-#      account-lengths:
-      # Khóa = tên ngân hàng viết thường, không dấu, không khoảng trắng.
-      # Nhóm điền từ nguồn chính thức, KHÔNG điền theo trí nhớ. Ví dụ định dạng:
-      # tennganhang: [10, 13]
+      # Độ dài số tài khoản hợp lệ theo ngân hàng, dùng cho cách xác thực BANK_FORMAT_CHECK (chỉ kiểm định dạng).
+      # Khóa = tên ngân hàng viết thường, không dấu, không khoảng trắng; có thể thêm tên gọi tắt thành khóa riêng.
+      # Mỗi dòng chỉ lấy từ trang CHÍNH THỨC của chính ngân hàng đó (đã đọc ngày 09/11/2026), KHÔNG điền theo trí nhớ
+      # và KHÔNG lấy từ bài của ngân hàng khác viết về ngân hàng này. Ngân hàng không có ở đây thì
+      # BANK_FORMAT_CHECK không dùng được cho ngân hàng đó (và bị ẩn hẳn nếu cả bảng trống). Muốn thêm: thêm một khóa
+      # kèm trích dẫn nguồn chính thức ngay dưới đây.
+      account-lengths:
+        # BIDV: thông báo "Thông báo dừng sử dụng tài khoản 14 số tại BIDV" (bidv.com.vn, đăng 01/06/2025, nhắc lại thông báo
+        # 10/07/2024): bắt buộc dùng "tài khoản rút gọn (tài khoản có độ dài từ 3-8 và 10 số)" thay cho tài khoản 14 số;
+        # từ 15/07/2025 giao dịch tới/đi tài khoản 14 số bị gián đoạn nên KHÔNG đưa 14 vào bảng.
+        # (Trang "Tài khoản Như ý" của BIDV ghi chung "từ 3 đến 10 chữ số" nhưng không nêu 9; giữ theo thông báo.)
+        bidv: [3, 4, 5, 6, 7, 8, 10]
+        # Techcombank: bài "Số tài khoản ngân hàng là gì?" (techcombank.com/thong-tin/blog/so-tai-khoan-ngan-hang, bản 05/11/2026):
+        # "thường có độ dài 14 ký tự"; chương trình số đẹp "tự chọn bộ số có độ dài từ 6 - 14 ký tự"
+        # (tất cả khách hàng 10 - 12 - 14 ký tự, khách hàng ưu tiên 6 - 9 ký tự).
+        techcombank: [6, 7, 8, 9, 10, 11, 12, 13, 14]
+        tcb: [6, 7, 8, 9, 10, 11, 12, 13, 14]
+        # MB: bài "Số tài khoản ngân hàng là gì?" (mbbank.com.vn/tin-tuc/tin-san-pham-dich-vu/so-tai-khoan-ngan-hang-la-gi,
+        # đăng 01/10/2022): "Đối với MB, số tài khoản ngân hàng sẽ có từ 9 - 13 số."
+        mbbank: [9, 10, 11, 12, 13]
+        mb: [9, 10, 11, 12, 13]
+        # CHƯA xác nhận được từ nguồn chính thức nên CHƯA điền (xem PR): Vietcombank, VietinBank (trang số đẹp chỉ nêu 4-12 ký tự),
+        # Agribank, ACB, Sacombank, VPBank, TPBank, HDBank, VIB, MSB, SeABank, SHB, OCB, LPBank, Eximbank.
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
   # Địa chỉ frontend (Vite, cổng 5173), dùng để tạo link trong email. BẮT BUỘC đặt FRONTEND_BASE_URL=https://... khi deploy, nếu không mail sẽ chứa link localhost.

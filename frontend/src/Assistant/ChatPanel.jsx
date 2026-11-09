@@ -116,13 +116,13 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
     const lastAssistant = messages.reduce((acc, m, i) => (m.role === 'assistant' ? i : acc), -1);
 
     return (
-        <div className="w-[340px] max-w-[calc(100vw-2rem)] h-[460px] max-h-[calc(100vh-10rem)] flex flex-col
-                        rounded-2xl border border-outline-variant bg-background shadow-2xl overflow-hidden chibi-bubble">
+        <div className="lv-glass-thick w-[340px] max-w-[calc(100vw-2rem)] h-[460px] max-h-[calc(100vh-10rem)] flex flex-col
+                        rounded-2xl overflow-hidden chibi-bubble">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-primary text-on-primary">
+            <div className="flex items-center justify-between px-4 py-3 bg-brand/85 backdrop-blur-md border-b border-white/15 text-white">
                 <div>
                     <p className="font-semibold leading-tight">Vaulty</p>
-                    <p className="text-xs opacity-80">{picking ? 'Choose an outfit' : 'LegacyVault guide'}</p>
+                    <p className="text-xs text-white/75">{picking ? 'Choose an outfit' : 'LegacyVault guide'}</p>
                 </div>
                 <div className="flex items-center gap-1">
                     <button type="button" onClick={() => setPicking((p) => !p)}
@@ -146,9 +146,9 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                             const on = c.id === costume;
                             return (
                                 <button key={c.id} type="button" onClick={() => onCostumeChange?.(c.id)} aria-pressed={on}
-                                        className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] leading-tight transition-colors ${
-                                            on ? 'border-primary ring-1 ring-primary text-primary font-semibold'
-                                                : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}>
+                                        className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] leading-tight transition-all ${
+                                            on ? 'lv-glass-tinted text-on-surface font-semibold'
+                                                : 'lv-glass-inline text-on-surface-variant hover:text-on-surface'}`}>
                                     <span className="text-2xl leading-none" aria-hidden="true">{c.emoji}</span>
                                     {c.label}
                                 </button>
@@ -163,7 +163,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                         if (m.role === 'user') {
                             return (
                                 <div key={i} className="flex justify-end">
-                                    <div className="max-w-[80%] px-3 py-2 rounded-2xl rounded-br-sm bg-primary text-on-primary text-sm whitespace-pre-line break-words">
+                                    <div className="max-w-[80%] px-3 py-2 rounded-2xl rounded-br-sm bg-primary text-on-primary text-sm whitespace-pre-line break-words shadow-sm">
                                         {m.content}
                                     </div>
                                 </div>
@@ -174,7 +174,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                         return (
                             <div key={i} className="relative flex items-end gap-2">
                                 <ChibiAvatar mini action={avatarAction} />
-                                <div className={`max-w-[80%] px-3 py-2 rounded-2xl rounded-bl-sm bg-surface-container-low text-on-surface text-sm leading-relaxed break-words${fresh ? ' reply-fresh glow-ring glow-ring--once' : ''}`}>
+                                <div className={`lv-glass-inline max-w-[80%] px-3 py-2 rounded-2xl rounded-bl-sm text-on-surface text-sm leading-relaxed break-words${fresh ? ' reply-fresh glow-ring glow-ring--once' : ''}`}>
                                     <MessageContent text={m.content} animate={fresh} />
                                 </div>
                                 {fresh && SPARKS.map((s, k) => (
@@ -187,7 +187,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                     {sending && (
                         <div className="flex items-end gap-2" aria-live="polite" aria-label="Vaulty is typing">
                             <ChibiAvatar mini action="think" />
-                            <div className="px-3 py-3 rounded-2xl rounded-bl-sm bg-surface-container-low text-on-surface-variant flex gap-1 glow-ring glow-ring--loop">
+                            <div className="lv-glass-inline px-3 py-3 rounded-2xl rounded-bl-sm text-on-surface-variant flex gap-1 glow-ring glow-ring--loop">
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
@@ -201,17 +201,17 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
             {error && !picking && <p className="px-4 pb-1 text-xs text-error">{error}</p>}
 
             {/* Input */}
-            <form onSubmit={send} className="flex items-center gap-2 p-3 border-t border-outline-variant">
+            <form onSubmit={send} className="flex items-center gap-2 p-3 border-t border-outline-variant/40">
                 <input
                     ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value.slice(0, MAX_LENGTH))}
                     placeholder="Ask me anything about LegacyVault…"
-                    className="flex-1 h-10 px-3 rounded-xl border border-outline-variant bg-background text-sm
-                               focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                    className="lv-glass-inline flex-1 h-10 px-3 rounded-xl text-sm text-on-surface
+                               focus:outline-none"
                 />
                 <button type="submit" disabled={sending || !input.trim()} aria-label="Send"
-                        className="h-10 w-10 rounded-xl bg-primary text-on-primary flex items-center justify-center disabled:opacity-50 lv-pill">
+                        className="lv-btn-primary h-10 w-10 rounded-xl bg-primary text-on-primary flex items-center justify-center disabled:opacity-50 lv-pill">
                     <Icon name="send" />
                 </button>
             </form>

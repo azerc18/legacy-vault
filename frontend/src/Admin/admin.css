@@ -64,14 +64,14 @@ html.dark .lv-admin { --adm-seal: 255 138 128; }
   font: 700 11px/1.3 var(--adm-label);
   letter-spacing: .06em; text-transform: uppercase;
   color: rgb(var(--adm-ink-soft));
-  background: rgb(var(--adm-paper-2) / .35);
-  border-bottom: 1px solid rgb(var(--adm-rule) / .65);
+  background: rgb(var(--lock-accent-rgb, 143 164 255) / .13);
+  border-bottom: 1px solid rgb(var(--lock-accent-rgb, 143 164 255) / .24);
   padding: .85rem 1rem;
   white-space: nowrap;
 }
-.lv-ledger tbody td { padding: .9rem 1rem; border-top: 1px solid rgb(var(--adm-rule) / .42); vertical-align: top; }
+.lv-ledger tbody td { padding: .9rem 1rem; border-top: 1px solid rgb(var(--adm-rule) / .38); vertical-align: top; }
 .lv-ledger tbody tr:first-child td { border-top: 0; }
-.lv-ledger tbody tr.is-row:hover td { background: rgb(var(--lock-accent-rgb, 143 164 255) / .12); }
+.lv-ledger tbody tr.is-row:hover td { background: rgb(var(--lock-accent-rgb, 143 164 255) / .10); }
 .lv-num, .lv-mono { font-family: var(--adm-mono); font-variant-numeric: tabular-nums; }
 .lv-num { text-align: right; white-space: nowrap; }
 
@@ -92,17 +92,20 @@ html.dark .lv-admin { --adm-seal: 255 138 128; }
   .lv-ledger.is-stack tbody td .items-end { align-items: flex-start; }
 }
 
-/* ---------- Nhãn trạng thái ---------- */
+/* ---------- Nhãn trạng thái (Liquid Glass Badge) ---------- */
 .lv-stamp {
   --stamp: var(--adm-ink-soft);
   display: inline-flex; align-items: center; gap: .3rem;
   font: 700 11px/1.25 var(--adm-label);
   letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
   color: rgb(var(--stamp));
-  border: 1.5px solid rgb(var(--stamp) / .85);
-  border-radius: 6px;
-  padding: 3px 8px;
-  background: rgb(var(--stamp) / .07);
+  border: 1px solid rgb(var(--stamp) / .55);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgb(var(--stamp) / .12);
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  box-shadow: inset 0 1px 0 0 rgb(255 255 255 / .28);
 }
 .lv-stamp.is-ok      { --stamp: var(--c-success); }
 .lv-stamp.is-warn    { --stamp: var(--c-warning); }
