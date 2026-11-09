@@ -31,7 +31,7 @@
   position: absolute;
   inset: 0;
   opacity: 0;
-  background: radial-gradient(240px circle at var(--mx) var(--my), rgb(var(--ac) / 0.18), transparent 70%);
+  background: radial-gradient(48px circle at var(--mx) var(--my), rgb(var(--ac) / 0.18), transparent 70%);
   transition: opacity 0.35s ease;
 }
 .lv-acc:hover .lv-acc-glare { opacity: 1; }
@@ -288,7 +288,7 @@
   opacity: 0;
   mix-blend-mode: screen;
   background:
-    radial-gradient(260px circle at var(--mx) var(--my), rgb(var(--ac) / 0.22), transparent 65%),
+    radial-gradient(50px circle at var(--mx) var(--my), rgb(var(--ac) / 0.22), transparent 65%),
     linear-gradient(115deg, transparent 35%, rgb(92 225 255 / 0.12) 43%, rgb(170 140 255 / 0.14) 50%, rgb(255 128 184 / 0.12) 57%, transparent 65%);
   background-size: 100% 100%, 220% 220%;
   background-position: 0 0, calc(var(--mx) * 0.6) calc(var(--my) * 0.6);

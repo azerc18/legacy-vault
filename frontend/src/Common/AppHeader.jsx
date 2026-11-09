@@ -14,39 +14,92 @@ import BrandMark from './BrandMark.jsx';
 
 // Cùng một độ rộng cho header và nội dung mọi trang
 const SIDE_KEY = 'lv_side_collapsed';
-// Menu mặc định khi trang không tự truyền nav: theo khu vực của URL, còn /me và /home thì theo vai trò chính của user
+const SEC_PREFIX = 'lv_nav_sec_';
+const ALERT_CACHE_KEY = 'lv_admin_alerts_cache';
+
+// Thứ tự ưu tiên vai trò để hiển thị các nhóm điều hướng nhất quán trên MỌI trang
 const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
-function roleItems(role) {
-    switch (role) {
-        case 'ADMIN': return [{ to: '/admin/users', key: 'admin', icon: 'admin_panel_settings' }];
-        case 'OWNER': return [
-            { to: '/owner/vaults', key: 'myVaults', icon: 'inventory_2' },
-            { to: '/owner/dms', key: 'dms', icon: 'favorite' },
-            { to: '/owner/executors', key: 'executors', icon: 'badge' },
-            { to: '/owner/activity', key: 'activity', icon: 'history' },
-            { to: '/billing', key: 'billing', icon: 'workspace_premium' },
-        ];
-        case 'EXECUTOR': return [{ to: '/executor/home', key: 'estates', icon: 'badge' }];
-        case 'LEGAL_VERIFIER': return [
-            { to: '/verifier', key: 'requests', icon: 'gavel', end: true },
-            { to: '/verifier/history', key: 'history', icon: 'history' },
-        ];
-        case 'BENEFICIARY': return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }];
-        default: return [];
-    }
-}
-function defaultNav(pathname, roles) {
-    const home = { to: '/home', key: 'home', icon: 'home', end: true };
-    const profile = { to: '/me', key: 'profile', icon: 'person' };
-    if (pathname.startsWith('/executor')) return [{ to: '/executor/home', key: 'estates', icon: 'badge' }, profile];
-    if (pathname.startsWith('/verifier')) {
-        return [{ to: '/verifier/home', key: 'home', icon: 'home', end: true }, ...roleItems('LEGAL_VERIFIER'), profile];
-    }
-    if (pathname.startsWith('/beneficiary')) {
-        return [{ to: '/beneficiary', key: 'myVaults', icon: 'inventory_2', end: true }, { to: '/beneficiary/guide', key: 'guide', icon: 'menu_book' }, profile];
-    }
-    const main = ROLE_ORDER.find((r) => roles.includes(r));
-    return [home, ...roleItems(main), profile];
+
+export const ADMIN_NAV_ITEMS = [
+    { to: '/admin', key: 'overview', icon: 'dashboard', end: true },
+    { to: '/admin/users', key: 'users', icon: 'group' },
+    { to: '/admin/roles', key: 'roles', icon: 'shield_person' },
+    { to: '/admin/vaults', key: 'vaults', icon: 'inventory_2' },
+    { to: '/admin/audit-logs', key: 'auditLogs', icon: 'history' },
+    { to: '/admin/alerts', key: 'alerts', icon: 'notifications_active' },
+    { to: '/admin/payments', key: 'payments', icon: 'receipt_long' },
+    { to: '/admin/plans', key: 'plans', icon: 'sell' },
+    { to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe' },
+    { to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open' },
+];
+
+function buildRoleSections(roles, pathname, tCommon, tAdmin, openAlerts = 0) {
+    const activeRoles = ROLE_ORDER.filter((r) => roles.includes(r));
+    // Chỉ hiện nhóm Beneficiary khi user đang ở trang /beneficiary hoặc chỉ có đúng 1 role BENEFICIARY
+    const filteredRoles = activeRoles.filter(
+        (r) => r !== 'BENEFICIARY' || pathname.startsWith('/beneficiary') || activeRoles.length === 1
+    );
+
+    return filteredRoles.map((role) => {
+        switch (role) {
+            case 'ADMIN':
+                return {
+                    role: 'ADMIN',
+                    label: tAdmin('workspace', { defaultValue: tCommon('roles.ADMIN') }),
+                    matchPrefix: '/admin',
+                    items: ADMIN_NAV_ITEMS.map(({ key, ...n }) => ({
+                        ...n,
+                        label: tAdmin(`nav.${key}`),
+                        ...(n.to === '/admin/alerts' && openAlerts > 0 ? { badge: openAlerts } : {}),
+                    })),
+                };
+            case 'OWNER':
+                return {
+                    role: 'OWNER',
+                    label: tCommon('roles.OWNER'),
+                    matchPrefix: '/owner',
+                    items: [
+                        { to: '/owner/vaults', label: tCommon('nav.myVaults'), icon: 'inventory_2' },
+                        { to: '/owner/dms', label: tCommon('nav.dms'), icon: 'favorite' },
+                        { to: '/owner/executors', label: tCommon('nav.executors'), icon: 'badge' },
+                        { to: '/owner/activity', label: tCommon('nav.activity'), icon: 'history' },
+                        { to: '/billing', label: tCommon('nav.billing'), icon: 'workspace_premium' },
+                    ],
+                };
+            case 'EXECUTOR':
+                return {
+                    role: 'EXECUTOR',
+                    label: tCommon('roles.EXECUTOR'),
+                    matchPrefix: '/executor',
+                    items: [
+                        { to: '/executor/home', label: tCommon('nav.estates'), icon: 'badge' },
+                    ],
+                };
+            case 'LEGAL_VERIFIER':
+                return {
+                    role: 'LEGAL_VERIFIER',
+                    label: tCommon('roles.LEGAL_VERIFIER'),
+                    matchPrefix: '/verifier',
+                    items: [
+                        { to: '/verifier/home', label: tCommon('nav.home'), icon: 'dashboard', end: true },
+                        { to: '/verifier', label: tCommon('nav.requests'), icon: 'gavel', end: true },
+                        { to: '/verifier/history', label: tCommon('nav.history'), icon: 'history' },
+                    ],
+                };
+            case 'BENEFICIARY':
+                return {
+                    role: 'BENEFICIARY',
+                    label: tCommon('roles.BENEFICIARY'),
+                    matchPrefix: '/beneficiary',
+                    items: [
+                        { to: '/beneficiary', label: tCommon('nav.myVaults'), icon: 'inventory_2', end: true },
+                        { to: '/beneficiary/guide', label: tCommon('nav.guide'), icon: 'menu_book' },
+                    ],
+                };
+            default:
+                return null;
+        }
+    }).filter(Boolean);
 }
 
 export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
@@ -54,19 +107,67 @@ export const PAGE_WIDTH = 'max-w-6xl mx-auto px-5';
 const Icon = ({ name, className = '' }) => <span className={`material-symbols-outlined ${className}`}>{name}</span>;
 
 /**
- * @param workspace  dòng nhỏ dưới chữ LegacyVault, vd. "Administration"
- * @param home       logo dẫn về đâu
- * @param nav        [{ to, label, icon, badge }] — badge là số, > 0 thì hiện chấm đỏ
- * @param extra      phần tử thêm bên phải, trước avatar (vd. NotificationBell)
- * @param userHome   true = hiện link "User home" (cho người có nhiều vai trò)
+ * @param workspace   dòng nhỏ dưới chữ LegacyVault, vd. "Administration"
+ * @param home        logo dẫn về đâu
+ * @param nav         (tuỳ chọn) ghi đè danh sách phẳng nếu trang đặc biệt cần
+ * @param alertBadge  số cảnh báo mở của Admin (đồng bộ sang sessionStorage để giữ nguyên khi chuyển trang)
+ * @param extra       phần tử thêm bên phải, trước avatar (vd. NotificationBell)
+ * @param userHome    true = hiện link "User home" (cho người có nhiều vai trò)
  */
-export default function AppHeader({ workspace, home = '/home', nav: navProp, extra, userHome = false }) {
+export default function AppHeader({ workspace, home = '/home', nav: navProp, alertBadge, extra, userHome = false }) {
     const { pathname } = useLocation();
-    const { t } = useTranslation();
+    const { t } = useTranslation('common');
+    const { t: tAdmin } = useTranslation('admin');
     const user = getUser();
-    const nav = navProp && navProp.length > 0
-        ? navProp
-        : defaultNav(pathname, Array.isArray(user?.roles) ? user.roles : []).map(({ key, ...n }) => ({ ...n, label: t(`nav.${key}`) }));
+    const roles = Array.isArray(user?.roles) ? user.roles : [user?.role].filter(Boolean);
+    const mainRole = ROLE_ORDER.find((r) => roles.includes(r));
+
+    // Lưu / đọc số badge cảnh báo của Admin để khi chuyển qua /home hay /me vẫn giữ nguyên hiển thị
+    const [storedAlerts] = useState(() => {
+        try {
+            const raw = sessionStorage.getItem(ALERT_CACHE_KEY);
+            return raw ? Number(raw) || 0 : 0;
+        } catch {
+            return 0;
+        }
+    });
+    const effectiveAlerts = typeof alertBadge === 'number' ? alertBadge : storedAlerts;
+
+    useEffect(() => {
+        if (typeof alertBadge === 'number') {
+            try { sessionStorage.setItem(ALERT_CACHE_KEY, String(alertBadge)); } catch { /* ignore */ }
+        }
+    }, [alertBadge]);
+
+    const generalItems = [
+        { to: '/home', label: t('nav.home'), icon: 'home', end: true },
+        { to: '/me', label: t('nav.profile'), icon: 'person' },
+    ];
+    const roleSections = buildRoleSections(roles, pathname, t, tAdmin, effectiveAlerts);
+
+    // Cho phép đóng/mở từng nhóm vai trò (mặc định mở để menu luôn nhất quán, dễ đoán)
+    const [openSections, setOpenSections] = useState(() => {
+        const init = {};
+        for (const r of ROLE_ORDER) {
+            try {
+                const saved = sessionStorage.getItem(SEC_PREFIX + r);
+                init[r] = saved === null ? true : saved === '1';
+            } catch {
+                init[r] = true;
+            }
+        }
+        return init;
+    });
+
+    const toggleSection = (role) => {
+        setOpenSections((prev) => {
+            const next = !prev[role];
+            try { sessionStorage.setItem(SEC_PREFIX + role, next ? '1' : '0'); } catch { /* ignore */ }
+            return { ...prev, [role]: next };
+        });
+    };
+
+    const effectiveWorkspace = workspace || (mainRole ? t(`roles.${mainRole}`) : '');
     const { t: tPayment } = useTranslation('payment');
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
@@ -134,16 +235,30 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
         return () => document.body.classList.remove('lv-side-collapsed');
     }, [collapsed]);
 
-    const linkBase = 'flex items-center gap-3 px-4 py-3 rounded-xl text-[15px] font-semibold whitespace-nowrap transition-colors';
+    const linkBase = 'lv-nav-item flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold whitespace-nowrap transition-all';
+    const renderNavLink = (n) => (
+        <NavLink key={n.to} to={n.to} end={n.end} title={n.label}
+                 className={({ isActive }) =>
+                     `${linkBase} ${isActive ? 'lv-nav-capsule text-white' : 'text-white/75 hover:text-white'}`}>
+            <Icon name={n.icon} className="text-[19px] shrink-0" />
+            <span className="lv-label truncate">{n.label}</span>
+            {n.badge > 0 && (
+                <span className="lv-badge ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center shadow-sm">
+                    {n.badge}
+                </span>
+            )}
+        </NavLink>
+    );
+
     return (
         <header className="lv-side bg-brand text-white">
             <div className="lv-side-top lg:flex lg:items-center lg:justify-between lg:gap-2">
-                <Link to={home} className="flex items-center gap-2 min-w-0 text-white">
-                    <BrandMark className="h-[30px] w-[30px] shrink-0" />
+                <Link to={home} className="flex items-center gap-2.5 min-w-0 flex-1 text-white">
+                    <BrandMark className="h-[28px] w-[28px] shrink-0" />
                     <span className="min-w-0 lv-label">
-                        <span className="font-bold text-sm tracking-[0.18em] uppercase block leading-tight">LegacyVault</span>
-                        {workspace && (
-                            <span className="text-[11px] text-white/60 font-semibold tracking-wide uppercase block truncate">{workspace}</span>
+                        <span className="font-bold text-[13px] tracking-[0.14em] uppercase block leading-tight truncate">LegacyVault</span>
+                        {effectiveWorkspace && (
+                            <span className="text-[10.5px] text-white/60 font-semibold tracking-wide uppercase block truncate">{effectiveWorkspace}</span>
                         )}
                     </span>
                 </Link>
@@ -151,25 +266,43 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                         title={collapsed ? t('header.expandSidebar', 'Expand sidebar') : t('header.collapseSidebar', 'Collapse sidebar')}
                         aria-label={collapsed ? t('header.expandSidebar', 'Expand sidebar') : t('header.collapseSidebar', 'Collapse sidebar')}
                         aria-expanded={!collapsed}
-                        className="lv-side-toggle hidden lg:flex h-8 w-8 rounded-full items-center justify-center text-white/70 hover:text-white hover:bg-white/10">
-                    <Icon name={collapsed ? 'left_panel_open' : 'left_panel_close'} className="text-[22px]" />
+                        className="lv-side-toggle shrink-0 hidden lg:flex h-8 w-8 rounded-full items-center justify-center text-white/75 hover:text-white bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 transition-all">
+                    <Icon name={collapsed ? 'left_panel_open' : 'left_panel_close'} className="text-[19px]" />
                 </button>
             </div>
 
-            {nav?.length > 0 && (
+            {navProp?.length > 0 ? (
                 <nav className="lv-side-nav">
-                    {nav.map((n) => (
-                        <NavLink key={n.to} to={n.to} end={n.end} title={n.label}
-                                 className={({ isActive }) =>
-                                     `${linkBase} ${isActive ? 'bg-brand-container text-white' : 'text-white/70 hover:text-white hover:bg-white/5'}`}>
-                            <Icon name={n.icon} className="text-[20px]" /> <span className="lv-label">{n.label}</span>
-                            {n.badge > 0 && (
-                                <span className="lv-badge ml-auto min-w-5 h-5 px-1.5 rounded-full bg-error text-on-error text-[11px] font-bold inline-flex items-center justify-center">
-                                    {n.badge}
-                                </span>
-                            )}
-                        </NavLink>
-                    ))}
+                    {navProp.map(renderNavLink)}
+                </nav>
+            ) : (
+                <nav className="lv-side-nav">
+                    {generalItems.map(renderNavLink)}
+
+                    {roleSections.map((sec) => {
+                        const isSecOpen = collapsed || openSections[sec.role] !== false;
+                        return (
+                            <div key={sec.role} className="lv-nav-section mt-1.5 pt-1.5 border-t border-white/10">
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSection(sec.role)}
+                                    aria-expanded={isSecOpen}
+                                    className="lv-nav-section-header lv-label w-full flex items-center justify-between px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/50 hover:text-white/80 transition-colors"
+                                >
+                                    <span className="truncate">{sec.label}</span>
+                                    <Icon
+                                        name={isSecOpen ? 'expand_more' : 'chevron_right'}
+                                        className="text-[16px] opacity-75"
+                                    />
+                                </button>
+                                {isSecOpen && (
+                                    <div className="lv-nav-section-items flex flex-col gap-0.5 mt-0.5">
+                                        {sec.items.map(renderNavLink)}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                 </nav>
             )}
 
@@ -178,8 +311,10 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     <Link
                         to={vipStatus?.vip ? '/billing' : '/pricing'}
                         title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
-                        className={`h-9 px-3 rounded-full text-xs font-bold inline-flex items-center gap-1.5 ${
-                            vipStatus?.vip ? 'bg-white text-brand' : 'bg-white/10 text-white hover:bg-white hover:text-brand'
+                        className={`h-9 px-3.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 border transition-all ${
+                            vipStatus?.vip
+                                ? 'bg-white/90 text-brand border-white shadow-sm'
+                                : 'bg-white/10 text-white border-white/20 hover:bg-white hover:text-brand'
                         }`}
                     >
                         <Icon name="workspace_premium" className="text-[16px]" />
@@ -188,7 +323,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                 )}
                 {userHome && (
                     <Link to="/home" title={t('header.userHome')}
-                          className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold text-white/75 hover:text-white hover:bg-white/10">
+                          className="h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold text-white/80 hover:text-white bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 transition-all">
                         <Icon name="swap_horiz" className="text-[16px]" /><span className="lv-label">{t('header.userHome')}</span>
                     </Link>
                 )}
@@ -197,13 +332,13 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     <ThemeToggle variant="dark" />
                     {extra}
                 </div>
-                <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/10 min-w-0">
-                    <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/15 min-w-0">
+                    <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1 group">
                         <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                        <span className="lv-label text-sm font-semibold text-white truncate">{user?.name}</span>
+                        <span className="lv-label text-sm font-semibold text-white/90 group-hover:text-white truncate transition-colors">{user?.name}</span>
                     </Link>
                     <button type="button" onClick={handleLogout} title={t('header.logout')} aria-label={t('header.logout')}
-                            className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10">
+                            className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 transition-all">
                         <Icon name="logout" className="text-[18px]" />
                     </button>
                 </div>
@@ -214,7 +349,6 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
 
 /**
  * Tiêu đề trang đặt trong <main>: khung Hero tương phản cao tách biệt rõ với phần nội dung bên dưới.
- * Tích hợp sẵn huy hiệu ổ khóa cơ khí nhỏ gọn bên phải để không bao giờ nổi đè lên bảng hay nội dung trang.
  * @param back { to, label }  vd. { to: '/executor/home', label: 'All estates' }
  * @param kicker dòng nhãn nhỏ phía trên tiêu đề (vd. "HỒ SƠ QUẢN TRỊ · LEGACYVAULT")
  */
@@ -223,11 +357,11 @@ export function PageTitle({ back, kicker, title, subtitle, right, className = 'm
     return (
         <div className={`lv-page-hero lv-rise ${className}`.trim()}>
             {back && (
-                <Link to={back.to} className="lv-page-hero-back inline-flex items-center gap-1.5 text-sm font-semibold mb-3 transition-colors">
+                <Link to={back.to} className="lv-page-hero-back inline-flex items-center gap-1.5 text-sm font-semibold text-[#b9c9ff] hover:text-white mb-3 transition-colors">
                     <Icon name="arrow_back" className="text-[18px]" /> {back.label || t('actions.back')}
                 </Link>
             )}
-            {kicker && <p className="lv-page-hero-kicker mb-1.5">{kicker}</p>}
+            {kicker && <p className="lv-page-hero-kicker text-[11px] font-bold uppercase tracking-[0.12em] text-[#b9c9ff] mb-1.5">{kicker}</p>}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
                     <h1 className="font-headline-md text-[28px] md:text-[32px] leading-tight font-bold tracking-tight text-white break-words">{title}</h1>

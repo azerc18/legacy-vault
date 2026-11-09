@@ -63,11 +63,11 @@ function RequestGroup({ title, items }) {
                     <Link
                         key={req.id}
                         to={`/verifier/request/${req.id}`}
-                        className="block bg-surface-container-lowest rounded-xl p-5 shadow-sm border border-outline-variant/30 hover:shadow-md transition-all"
+                        className="lv-glass-regular lv-glass-interactive block bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 transition-all"
                     >
                         <div className="flex justify-between items-start gap-3 mb-2">
                             <span className="font-label-md font-bold text-on-surface">{req.ownerName}</span>
-                            <span className={`shrink-0 text-[11px] px-2.5 py-0.5 rounded-full font-semibold ${STATUS_CLASS[req.status]}`}>
+                            <span className={`lv-glass-badge shrink-0 text-[11px] px-2.5 py-0.5 rounded-full font-semibold ${STATUS_CLASS[req.status]}`}>
                                 {statusLabel(req.status)}
                             </span>
                         </div>
