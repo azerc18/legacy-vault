@@ -308,8 +308,8 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 
 function Modal({ children, onClose }) {
     return (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-[#0e1629] border border-white/15 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-surface-container-lowest text-on-surface dark:bg-[#0e1629] dark:text-white border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
         </div>
@@ -317,37 +317,69 @@ function Modal({ children, onClose }) {
 }
 
 function AssetViewModal({ asset, schemas, onClose }) {
-    const { t } = useTranslation(['vault', 'enums']);
+    const { t } = useTranslation(['vault', 'enums', 'common']);
     const [reveal, setReveal] = useState(false);
     const schema = asset.fields ? schemaOf(schemas, asset.assetType) : null;
     const fallbackLabel = ASSET_TYPES.find((a) => a.value === asset.assetType)?.label || asset.assetType;
     const typeLabel = t(`enums:assetType.${asset.assetType}`, { defaultValue: fallbackLabel });
+    const iconName = ASSET_ICON[asset.assetType] || 'inventory_2';
 
     return (
         <Modal onClose={onClose}>
-            <div className="flex justify-between items-start">
-                <div>
-                    <p className="text-xs text-outline">{typeLabel}</p>
-                    <h3 className="font-title-lg text-title-lg">{asset.assetName}</h3>
-                </div>
-                <button onClick={onClose}><Icon name="close" className="text-outline" /></button>
-            </div>
-            {schema ? <AssetFieldsView schema={schema} fields={asset.fields} /> : (
-                <>
-                    <p className="mt-5 text-sm font-semibold text-on-surface-variant">{t('detail.assets.secretLabel')}</p>
-                    <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                        <span className="flex-1">{reveal ? asset.secret : '••••••••••••'}</span>
-                        <button onClick={() => setReveal(!reveal)}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+            <div className="flex justify-between items-start gap-3 pb-3 border-b border-outline-variant/20 dark:border-white/10">
+                <div className="min-w-0">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-container mb-1.5">
+                        <Icon name={iconName} className="text-[14px]" />
+                        <span>{typeLabel}</span>
                     </div>
-                </>
+                    <h3 className="font-title-lg text-xl font-bold text-on-surface dark:text-white truncate">{asset.assetName}</h3>
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label={t('common:actions.close', { defaultValue: 'Đóng' })}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors shrink-0"
+                >
+                    <Icon name="close" className="text-[18px]" />
+                </button>
+            </div>
+
+            {schema ? <AssetFieldsView schema={schema} fields={asset.fields} /> : (
+                <div className="my-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant/75 dark:text-white/60 mb-1">{t('detail.assets.secretLabel')}</p>
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-surface-container-low dark:bg-[#131c31] border border-outline-variant/30 dark:border-white/15 font-mono text-sm break-all">
+                        <span className="flex-1 font-semibold text-on-surface dark:text-white">{reveal ? asset.secret : '••••••••••••'}</span>
+                        <button
+                            type="button"
+                            onClick={() => setReveal(!reveal)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                        >
+                            <Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                        </button>
+                    </div>
+                </div>
             )}
+
             {asset.notes && (
-                <>
-                    <p className="mt-4 text-sm font-semibold text-on-surface-variant">{t('detail.assets.notesLabel')}</p>
-                    <p className="mt-1 text-sm whitespace-pre-wrap">{asset.notes}</p>
-                </>
+                <div className="p-3.5 rounded-xl bg-surface-container-low/70 dark:bg-white/[0.04] border border-outline-variant/25 dark:border-white/10 my-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/75 dark:text-white/60 mb-1">{t('detail.assets.notesLabel')}</p>
+                    <p className="text-sm whitespace-pre-wrap text-on-surface dark:text-white">{asset.notes}</p>
+                </div>
             )}
-            <p className="mt-5 text-xs text-outline">{t('detail.assets.auditNotice')}</p>
+
+            <div className="flex items-center justify-between pt-3 mt-4 border-t border-outline-variant/20 dark:border-white/10 text-xs">
+                <p className="flex items-center gap-1.5 text-on-surface-variant/70 dark:text-white/50">
+                    <Icon name="verified_user" className="text-[15px] text-primary" />
+                    <span>{t('detail.assets.auditNotice')}</span>
+                </p>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="h-8 px-4 rounded-xl border border-outline-variant/40 dark:border-white/20 text-on-surface dark:text-white text-xs font-semibold hover:bg-surface-container-low dark:hover:bg-white/10 transition-colors"
+                >
+                    {t('common:actions.close', { defaultValue: 'Đóng' })}
+                </button>
+            </div>
         </Modal>
     );
 }
@@ -419,21 +451,21 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                 <button
                     type="button"
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors"
                 >
                     <Icon name="close" className="text-[20px]" />
                 </button>
             </div>
             <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
-                <select value={f.assetType} onChange={changeType} className={`${inputClass} bg-[#131c31] border-white/15 text-white`}>
+                <select value={f.assetType} onChange={changeType} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`}>
                     {ASSET_TYPES.map((typeItem) => (
                         <option key={typeItem.value} value={typeItem.value}>
                             {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
                         </option>
                     ))}
                 </select>
-                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} />
+                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
                 {dynamic ? (
                     <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
                 ) : (
@@ -447,7 +479,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                         </button>
                     </div>
                 )}
-                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} />
+                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
                 {showAllocation && (
                     <AllocationFields
                         beneficiaries={beneficiaries}

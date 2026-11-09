@@ -160,31 +160,59 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
     );
 }
 
-// Xem chi tiết: hiện từng trường, trường bí mật bị che cho tới khi bấm mắt
+// Xem chi tiết: hiện từng trường dạng thẻ gọn gàng, tách biệt trường công khai và phần niêm phong bảo mật
 export function AssetFieldsView({ schema, fields }) {
     const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
+
+    const activeFields = schema.fields.filter((f) => fields[f.key]);
+    const publicFields = activeFields.filter((f) => f.type !== 'SECRET');
+    const secretFields = activeFields.filter((f) => f.type === 'SECRET');
+
     return (
-        <div className="mt-4 space-y-3">
-            {schema.fields.filter((f) => fields[f.key]).map((f) => (
-                <div key={f.key}>
-                    <p className="text-sm font-semibold text-on-surface-variant">
-                        {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
-                    </p>
-                    {f.type === 'SECRET' ? (
-                        <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                            <span className="flex-1">{shown[f.key] ? fields[f.key] : '••••••••••••'}</span>
-                            <button onClick={() => setShown((s) => ({ ...s, [f.key]: !s[f.key] }))}>
-                                <Icon name={shown[f.key] ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" />
-                            </button>
+        <div className="space-y-4 my-4">
+            {publicFields.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {publicFields.map((f) => (
+                        <div key={f.key} className="p-3 rounded-xl bg-surface-container-low/70 dark:bg-white/[0.04] border border-outline-variant/25 dark:border-white/10">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/75 dark:text-white/60 mb-1">
+                                {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
+                            </p>
+                            <p className="text-sm font-semibold text-on-surface dark:text-white break-words">
+                                {t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
+                            </p>
                         </div>
-                    ) : (
-                        <p className="mt-1 text-sm whitespace-pre-wrap break-words">
-                            {t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
-                        </p>
-                    )}
+                    ))}
                 </div>
-            ))}
+            )}
+
+            {secretFields.length > 0 && (
+                <div className="rounded-2xl border border-primary/30 bg-primary/5 dark:bg-primary/10 p-4 space-y-3">
+                    <div className="flex items-center gap-1.5 text-primary font-bold text-xs uppercase tracking-wider mb-1">
+                        <Icon name="lock" className="text-[16px]" />
+                        <span>{t('assetFields.sections.sealed', { defaultValue: 'Phần niêm phong bảo mật' })}</span>
+                    </div>
+                    {secretFields.map((f) => (
+                        <div key={f.key}>
+                            <p className="text-xs font-semibold text-on-surface-variant dark:text-white/70 mb-1">
+                                {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
+                            </p>
+                            <div className="flex items-center gap-2 p-3 rounded-xl bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/30 dark:border-white/15 font-mono text-sm break-all">
+                                <span className="flex-1 font-semibold text-on-surface dark:text-white">
+                                    {shown[f.key] ? fields[f.key] : '••••••••••••'}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setShown((s) => ({ ...s, [f.key]: !s[f.key] }))}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-outline hover:text-on-surface dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                                >
+                                    <Icon name={shown[f.key] ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

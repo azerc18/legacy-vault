@@ -6,7 +6,7 @@ import { Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, b
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 
-const textareaCls = 'w-full mt-1 px-4 py-2.5 rounded-xl border border-white/15 bg-[#131c31] text-white placeholder:text-white/40 focus:outline-none focus:border-primary';
+const textareaCls = 'w-full mt-1 px-4 py-2.5 rounded-xl border border-outline-variant/40 dark:border-white/15 bg-surface-container-lowest dark:bg-[#131c31] text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40 focus:outline-none focus:border-primary';
 
 export default function LegacyMessageSection({ vaultId, beneficiaries = [], editable }) {
     const { t } = useTranslation(['vault', 'common']);
@@ -194,14 +194,18 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal soạn / sửa */}
             {formOpen && (
-                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFormOpen(false)}>
-                    <div className="bg-[#0e1629] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-title-lg text-lg font-bold">
+                <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFormOpen(false)}>
+                    <div className="bg-surface-container-lowest text-on-surface dark:bg-[#0e1629] dark:text-white border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center pb-3 border-b border-outline-variant/20 dark:border-white/10">
+                            <h3 className="font-title-lg text-lg font-bold text-on-surface dark:text-white">
                                 {editing ? t('detail.messages.editTitle') : t('detail.messages.createTitle')}
                             </h3>
-                            <button onClick={() => setFormOpen(false)} className="text-outline hover:text-on-surface">
-                                <Icon name="close" />
+                            <button
+                                type="button"
+                                onClick={() => setFormOpen(false)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors"
+                            >
+                                <Icon name="close" className="text-[18px]" />
                             </button>
                         </div>
                         <Alert>{formError}</Alert>
@@ -209,7 +213,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                         <form onSubmit={handleSave} className="space-y-4 text-sm">
                             <div>
                                 <label className="block font-medium mb-1">{t('detail.messages.titleLabel')}</label>
-                                <input required maxLength={255} className={`${inputClass} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} value={title}
+                                <input required maxLength={255} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} value={title}
                                     placeholder={t('detail.messages.titlePlaceholder')}
                                     onChange={(e) => setTitle(e.target.value)} />
                             </div>
@@ -217,7 +221,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block font-medium mb-1">{t('detail.messages.recipientLabel')}</label>
-                                    <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={recipientType}
+                                    <select className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`} value={recipientType}
                                         onChange={(e) => setRecipientType(e.target.value)}>
                                         <option value="ALL_BENEFICIARIES">{t('detail.messages.allFamilyOption')}</option>
                                         <option value="SPECIFIC_BENEFICIARY" disabled={beneficiaries.length === 0}>
@@ -228,7 +232,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 {recipientType === 'SPECIFIC_BENEFICIARY' && (
                                     <div>
                                         <label className="block font-medium mb-1">{t('detail.messages.chooseRecipientLabel')}</label>
-                                        <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={recipientBeneficiaryId}
+                                        <select className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`} value={recipientBeneficiaryId}
                                             onChange={(e) => setRecipientBeneficiaryId(e.target.value)}>
                                             {beneficiaries.map((b) => (
                                                 <option key={b.id} value={b.id}>
@@ -243,7 +247,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block font-medium mb-1">{t('detail.messages.triggerLabel')}</label>
-                                    <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={deliveryTrigger}
+                                    <select className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`} value={deliveryTrigger}
                                         onChange={(e) => setDeliveryTrigger(e.target.value)}>
                                         <option value="ON_CLAIM">{t('detail.messages.onClaimOption')}</option>
                                         <option value="SPECIFIC_DATE">{t('detail.messages.specificDateOption')}</option>
@@ -252,7 +256,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 {deliveryTrigger === 'SPECIFIC_DATE' && (
                                     <div>
                                         <label className="block font-medium mb-1">{t('detail.messages.scheduleDateLabel')}</label>
-                                        <input type="date" required className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={deliverDate}
+                                        <input type="date" required className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`} value={deliverDate}
                                             min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
                                             onChange={(e) => setDeliverDate(e.target.value)} />
                                     </div>
@@ -280,7 +284,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                     maxSize={10 * 1024 * 1024} />
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-2">
+                            <div className="flex justify-end gap-2 pt-3 border-t border-outline-variant/20 dark:border-white/10">
                                 <button type="button" onClick={() => setFormOpen(false)} className={btnOutline}>{t('common:actions.cancel')}</button>
                                 <button type="submit" disabled={submitting} className={btnPrimary}>
                                     {submitting ? t('ui.saving') : t('detail.messages.saveButton')}
@@ -293,14 +297,18 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal xem chi tiết */}
             {viewing && (
-                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewing(null)}>
-                    <div className="bg-[#0e1629] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-title-lg text-lg font-bold flex items-center gap-2">
+                <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewing(null)}>
+                    <div className="bg-surface-container-lowest text-on-surface dark:bg-[#0e1629] dark:text-white border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center pb-3 border-b border-outline-variant/20 dark:border-white/10">
+                            <h3 className="font-title-lg text-lg font-bold flex items-center gap-2 text-on-surface dark:text-white">
                                 <Icon name="mail" className="text-primary" /> {viewing.title}
                             </h3>
-                            <button onClick={() => setViewing(null)} className="text-outline hover:text-on-surface">
-                                <Icon name="close" />
+                            <button
+                                type="button"
+                                onClick={() => setViewing(null)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors"
+                            >
+                                <Icon name="close" className="text-[18px]" />
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2 text-xs">
@@ -319,11 +327,11 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 })}
                             </span>
                         </div>
-                        <div className="p-4 rounded-xl bg-[#131c31] border border-white/15 text-sm whitespace-pre-wrap font-body max-h-60 overflow-y-auto text-white/90">
+                        <div className="p-4 rounded-xl bg-surface-container-low/70 dark:bg-[#131c31] border border-outline-variant/25 dark:border-white/15 text-sm whitespace-pre-wrap font-body max-h-60 overflow-y-auto text-on-surface dark:text-white/90">
                             {viewing.content}
                         </div>
                         {viewing.hasAttachment && (
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-[#131c31] border border-white/15 text-xs text-white">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low/70 dark:bg-[#131c31] border border-outline-variant/25 dark:border-white/15 text-xs text-on-surface dark:text-white">
                                 <div className="flex items-center gap-2 truncate">
                                     <Icon name="attachment" className="text-primary" />
                                     <span className="truncate font-medium">{viewing.attachmentName || t('detail.messages.attachmentFallback')}</span>
@@ -335,7 +343,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 </button>
                             </div>
                         )}
-                        <div className="flex justify-end pt-2">
+                        <div className="flex justify-end pt-3 border-t border-outline-variant/20 dark:border-white/10">
                             <button onClick={() => setViewing(null)} className={btnOutline}>{t('ui.close')}</button>
                         </div>
                     </div>
