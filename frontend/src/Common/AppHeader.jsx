@@ -214,8 +214,8 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     <button
                         type="button"
                         onClick={() => setGuideMenuOpen((o) => !o)}
-                        title={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
-                        aria-label={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
+                        title={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
+                        aria-label={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
                         aria-expanded={guideMenuOpen}
                         className="h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
                     >
@@ -226,9 +226,9 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
 
                     {/* Dropdown Menu lựa chọn chế độ hướng dẫn */}
                     {guideMenuOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#0e1629] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 text-white animate-in zoom-in-95 duration-150">
+                        <div className="absolute bottom-full left-0 mb-2 w-68 bg-[#0e1629] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 text-white animate-in zoom-in-95 duration-150">
                             <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-bold tracking-wider uppercase text-amber-300">
-                                {tOnboarding('welcomeTitle')}
+                                {tOnboarding('menuTitle')}
                             </div>
                             <button
                                 type="button"
@@ -241,7 +241,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                                 <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
                                 <div>
                                     <div className="font-bold">{tOnboarding('startInteractiveTour')}</div>
-                                    <div className="text-[10px] text-white/60 font-normal">Chỉ dẫn từng nút bấm & thao tác</div>
+                                    <div className="text-[10px] text-white/60 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
                                 </div>
                             </button>
                             <button
@@ -254,8 +254,8 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                             >
                                 <span className="material-symbols-outlined text-teal-400 text-[18px]">menu_book</span>
                                 <div>
-                                    <div>{tOnboarding('openCatalogue')}</div>
-                                    <div className="text-[10px] text-white/60 font-normal">Trụ cột bảo mật & AI OCR</div>
+                                    <div className="font-bold">{tOnboarding('openCatalogue')}</div>
+                                    <div className="text-[10px] text-white/60 font-normal">{tOnboarding('openCatalogueDesc')}</div>
                                 </div>
                             </button>
                             <div className="border-t border-white/10 mt-1 pt-1">
@@ -268,7 +268,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                                     className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-white/60 flex items-center gap-2 transition-colors"
                                 >
                                     <span className="material-symbols-outlined text-[15px]">refresh</span>
-                                    <span>Hỏi lại như người dùng lần đầu</span>
+                                    <span>{tOnboarding('repromptOption')}</span>
                                 </button>
                             </div>
                         </div>

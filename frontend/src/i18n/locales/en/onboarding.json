@@ -1,6 +1,6 @@
 {
   "guideBtn": "Guide",
-  "openGuide": "New User Walkthrough & What's New",
+  "openGuide": "User Guide & Feature Discovery",
   "welcomeTitle": "NEW USER WALKTHROUGH · LEGACYVAULT 101",
   "welcomeSubtitle": "4 core pillars to master digital estate preservation and transfer",
   "stepBadge": "Quest {{current}}/{{total}}",
@@ -11,65 +11,69 @@
   "dontShowAgain": "Understood, do not show automatically on login",
   "reopenHint": "You can reopen this guide anytime from the top navigation bar.",
   "newFeatureTag": "JUST UNLOCKED",
-  "startInteractiveTour": "Start Interactive Step-by-Step Tour",
-  "openCatalogue": "View Feature Digest & Guidebook",
+  "menuTitle": "HELP & GUIDE",
+  "startInteractiveTour": "Interactive Step-by-Step Tour",
+  "startInteractiveTourDesc": "Visual on-screen guidance for every button and action",
+  "openCatalogue": "Security & Feature Guidebook",
+  "openCatalogueDesc": "Explore the 4 core pillars, DMS, and AI OCR forensics",
+  "repromptOption": "Experience initial new user prompt again",
   "banner": {
-    "title": "Are you new to Legacy Vault?",
-    "subtitle": "Follow an interactive step-by-step walkthrough to master vault creation, beneficiary assignment, and asset encryption.",
+    "title": "New to Legacy Vault?",
+    "subtitle": "Follow an interactive step-by-step walkthrough to master vault creation, beneficiary assignment, and digital asset encryption.",
     "action": "Start Walkthrough",
     "exploreGuide": "View Guidebook"
   },
   "firstTimePrompt": {
     "badge": "WELCOME TO LEGACY VAULT",
     "question": "Are you new to Legacy Vault?",
-    "subtitle": "We can guide you step-by-step through every button and action to create your first digital heritage vault.",
+    "subtitle": "We are honored to guide you. Our system will walk you through each button and basic action to create your first digital heritage vault effortlessly and with complete security.",
     "newbieAction": "I'm a new user (Start Guide)",
     "experiencedAction": "I've used it before",
-    "helper": "You can always relaunch this interactive tour anytime from the Guide icon in the navigation bar."
+    "helper": "You can always relaunch this interactive tour or open the guidebook anytime from the navigation bar."
   },
   "tour": {
     "stepBadge": "Step {{current}}/{{total}}",
     "skipTour": "Skip tour",
     "prevBtn": "Back",
     "nextBtn": "Next",
-    "goToCreate": "Go to Create Vault",
+    "goToCreate": "Start Creating Vault",
     "finishBtn": "Finish Walkthrough",
     "congrats": {
       "title": "🎉 Congratulations! You've completed the tutorial!",
-      "subtitle": "You now know how to set up your first digital heritage vault.",
-      "text": "Your vault is protected with AES-256 military-grade encryption. You can now create additional vaults, assign beneficiaries, or configure your Dead Man's Switch (DMS).",
+      "subtitle": "You have mastered the foundations of digital estate preservation.",
+      "text": "Your assets are now safeguarded by AES-256 military-grade encryption standards. You can freely create additional vaults, designate heirs, or explore advanced fail-safes like DMS and AI OCR Forensics.",
       "action": "Start using Legacy Vault"
     },
     "steps": {
       "step1": {
         "title": "Select \"New Vault\"",
-        "instruction": "Click the '+ New Vault' button to begin creating your first secure digital heritage vault.",
-        "tip": "Each vault can store multiple asset categories and is protected by dedicated cryptographic keys."
+        "instruction": "Click the '+ New Vault' button to begin. A vault is an encrypted private sanctuary where you preserve your most important credentials and digital heritage.",
+        "tip": "Each vault possesses an independent encryption key and can be delegated to distinct beneficiaries."
       },
       "step2": {
         "title": "Fill in \"Vault Information\"",
-        "instruction": "Enter the vault name (e.g. 'Family Heritage', 'Investment Assets') and an optional purpose description.",
-        "tip": "A descriptive vault name helps you and your beneficiaries easily recognize its intended purpose."
+        "instruction": "Provide a memorable, meaningful name for the vault (e.g. 'Family Heritage', 'Crypto & Investments') along with an optional handover note.",
+        "tip": "A descriptive name helps your heirs immediately understand the purpose and intent when the vault unlocks."
       },
       "step3": {
         "title": "Assign \"Beneficiaries\"",
-        "instruction": "Provide the email and details of the beneficiaries who will receive access when the vault unlocks.",
-        "tip": "You can designate multiple beneficiaries with specific allocations across your assets."
+        "instruction": "Enter the email address of a loved one or trusted trustee. This individual will receive the decryption authorization when the transfer workflow triggers.",
+        "tip": "You can designate multiple beneficiaries and customize permissions for each family member."
       },
       "step4": {
         "title": "Choose \"Asset Type\"",
-        "instruction": "Select the asset category you want to protect: Bank accounts, Crypto wallets, Social media, or Legal documents.",
-        "tip": "Each asset category has customized structured fields tailored for quick handover."
+        "instruction": "Select the appropriate asset category: Bank accounts, Crypto wallets, Social media accounts, Insurance policies, or Confidential legal dossiers.",
+        "tip": "Each asset category features a specialized, standardized form to ensure your heirs receive all essential details accurately."
       },
       "step5": {
         "title": "Enter \"Asset Information\"",
-        "instruction": "Enter asset credentials and sensitive details. All secrets are end-to-end encrypted with military-grade AES-256.",
-        "tip": "Zero-knowledge encryption ensures no server or administrator can read your plaintext data."
+        "instruction": "Enter identifiers and confidential secrets (passwords, PINs, seed phrases, notes). All secrets are client-side end-to-end encrypted (E2E AES-256) before leaving your browser.",
+        "tip": "Zero-knowledge architecture ensures that neither servers nor administrators can ever read your plaintext secrets."
       },
       "step6": {
         "title": "Click \"Create Vault\" to finish",
-        "instruction": "Click the 'Create Vault' button to securely lock and register your digital estate!",
-        "tip": "You can later configure your Dead Man's Switch (DMS) check-in interval and invite executors."
+        "instruction": "Review your entered details and click 'Create Vault' to securely seal your digital estate!",
+        "tip": "After creation, you can configure your Dead Man's Switch (DMS) check-in intervals or invite legal executors."
       }
     }
   },

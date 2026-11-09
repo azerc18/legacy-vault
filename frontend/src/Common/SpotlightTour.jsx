@@ -35,7 +35,7 @@ export function resetOnboardingStatus() {
 }
 
 export default function SpotlightTour() {
-    const { t } = useTranslation('onboarding');
+    const { t } = useTranslation(['onboarding', 'common']);
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -361,7 +361,7 @@ export default function SpotlightTour() {
         }
 
         const tooltipWidth = 380;
-        const tooltipHeight = 230;
+        const tooltipHeight = 240;
         const gap = 14;
 
         let left = targetRect.left;
@@ -373,16 +373,17 @@ export default function SpotlightTour() {
         const spaceBelow = window.innerHeight - targetRect.bottom;
         const spaceAbove = targetRect.top;
 
-        if (spaceBelow >= tooltipHeight + gap || spaceBelow >= spaceAbove) {
-            // Đặt bên dưới mục tiêu
-            const top = Math.min(window.innerHeight - tooltipHeight - 16, targetRect.bottom + gap);
-            return {
-                top: `${top}px`,
-                left: `${left}px`,
-            };
+        let top;
+        if (spaceBelow >= tooltipHeight + gap) {
+            top = targetRect.bottom + gap;
+        } else if (spaceAbove >= tooltipHeight + gap) {
+            top = targetRect.top - tooltipHeight - gap;
+        } else {
+            top = window.innerHeight - tooltipHeight - 20;
         }
-        // Đặt bên trên mục tiêu
-        const top = Math.max(16, targetRect.top - tooltipHeight - gap);
+
+        top = Math.max(20, Math.min(window.innerHeight - tooltipHeight - 20, top));
+
         return {
             top: `${top}px`,
             left: `${left}px`,
@@ -411,7 +412,7 @@ export default function SpotlightTour() {
                                 type="button"
                                 onClick={handlePromptExperienced}
                                 className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                                title="Đóng"
+                                title={t('common:actions.close', { defaultValue: 'Đóng' })}
                             >
                                 <span className="material-symbols-outlined text-[20px]">close</span>
                             </button>
