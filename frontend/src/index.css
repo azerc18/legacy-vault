@@ -439,3 +439,7 @@ html.lv-snap .lv-landing footer[data-mode] {
   mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
 }
 
+/* Ô nhập sai kiểu dữ liệu: viền đỏ. Dùng box-shadow !important vì glass-inline đã đặt border !important. */
+.lv-field-invalid {
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.8) !important;
+}

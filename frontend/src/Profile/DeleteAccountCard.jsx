@@ -113,7 +113,7 @@ export default function DeleteAccountCard({ profile }) {
                                     <label className="block">
                                         <span className="block text-sm font-semibold mb-1.5">{t('deleteAccount.code')}</span>
                                         <input value={code} onChange={(e) => setCode(e.target.value)} className={inputClass}
-                                               inputMode="text" autoComplete="one-time-code" placeholder="123456 / XXXX-XXXX" />
+                                               inputMode="text" autoComplete="one-time-code" />
                                     </label>
                                 )}
                                 <label className="block">

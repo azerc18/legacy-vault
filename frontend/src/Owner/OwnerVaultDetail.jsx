@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
@@ -306,13 +307,16 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
     );
 }
 
+// Render ra document.body: nếu một thẻ cha có transform/filter (hiệu ứng vào trang) thì "fixed" bị tính theo
+// thẻ đó, hộp thoại lệch giữa trang dài và bị cắt ở đáy thay vì nằm giữa màn hình.
 function Modal({ children, onClose }) {
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
             <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

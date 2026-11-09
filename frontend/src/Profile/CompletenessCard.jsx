@@ -36,7 +36,21 @@ function Ring({ value }) {
     );
 }
 
-const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+// Cuộn tới thẻ, nháy viền, rồi làm luôn việc đó (mở chọn ảnh / focus ô số điện thoại / bắt đầu bật 2FA)
+// để bấm "Do it" luôn thấy phản ứng, kể cả khi thẻ đã nằm sẵn trong màn hình.
+const ACTIONS = {
+    'profile-summary': () => document.querySelector('#profile-summary input[type="file"]')?.click(),
+    'profile-info': () => document.getElementById('profile-phone')?.focus({ preventScroll: true }),
+    'profile-2fa': () => document.getElementById('profile-2fa-start')?.click(),
+};
+const goTo = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-secondary', 'rounded-2xl');
+    setTimeout(() => el.classList.remove('ring-2', 'ring-secondary', 'rounded-2xl'), 1600);
+    ACTIONS[id]?.();
+};
 
 export default function CompletenessCard({ profile }) {
     const { t } = useTranslation('profile');
@@ -70,7 +84,7 @@ export default function CompletenessCard({ profile }) {
                             {t(`completeness.items.${i.key}`)}
                         </span>
                         {!i.done && i.target && (
-                            <button type="button" onClick={() => scrollTo(i.target)}
+                            <button type="button" onClick={() => goTo(i.target)}
                                     className="text-xs font-semibold text-secondary hover:underline">
                                 {t('completeness.fix')}
                             </button>

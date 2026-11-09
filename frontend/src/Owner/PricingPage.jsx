@@ -12,6 +12,18 @@ const formatVnd = (n) =>
         : '0 ₫';
 
 const PROVIDER_LABEL = { VNPAY: 'VNPay', PAYPAL: 'PayPal' };
+const PROVIDER_ICON = { VNPAY: 'qr_code_2', PAYPAL: 'account_balance_wallet' };
+
+// Logo cổng thanh toán: đặt file chính thức vào public/brand/vnpay.png và paypal.png (nền trong suốt).
+// Chưa có file thì hiện biểu tượng thay thế, không vỡ giao diện.
+function ProviderMark({ code }) {
+    const [missing, setMissing] = useState(false);
+    if (missing) return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
+    return (
+        <img src={`/brand/${code.toLowerCase()}.png`} alt="" aria-hidden="true"
+             onError={() => setMissing(true)} className="h-7 w-auto max-w-[72px] object-contain" />
+    );
+}
 
 // n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
 const yearlySavingPercent = (plans) => {
@@ -116,15 +128,22 @@ export default function PricingPage() {
                     <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
                     <div className="flex flex-wrap gap-4">
                         {providers.map((code) => (
-                            <label key={code} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <label key={code}
+                                   className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors ${
+                                       provider === code
+                                           ? 'border-secondary bg-secondary/10'
+                                           : 'border-outline-variant/50 hover:border-outline'}`}>
                                 <input
                                     type="radio"
                                     name="payment-provider"
                                     value={code}
                                     checked={provider === code}
                                     onChange={() => setProvider(code)}
+                                    className="sr-only"
                                 />
-                                {PROVIDER_LABEL[code] ?? code}
+                                <ProviderMark code={code} />
+                                <span className="text-sm font-semibold">{PROVIDER_LABEL[code] ?? code}</span>
+                                {provider === code && <Icon name="check_circle" className="text-[18px] text-secondary" />}
                             </label>
                         ))}
                     </div>
