@@ -38,9 +38,9 @@ function FeatureCard({f}) {
         </>
     );
 
-    const base = 'block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30';
+    const base = 'lv-feature block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30';
     return f.to ? (
-        <Link to={f.to} className={`${base} hover:border-primary hover:shadow-sm transition-all`}>{body}</Link>
+        <Link to={f.to} className={`${base} lv-feature-link hover:border-primary`}>{body}</Link>
     ) : (
         <div className={`${base} opacity-60 cursor-not-allowed`}>{body}</div>
     );
@@ -50,7 +50,7 @@ function StatCard({icon, label, value, to}) {
     return (
         <Link
             to={to}
-            className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 hover:border-primary transition-all flex items-center gap-4"
+            className="lv-feature lv-feature-link bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 hover:border-primary flex items-center gap-4"
         >
             <div
                 className="w-11 h-11 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function VerifierHome() {
                 )}
 
                 {/* Thống kê nhanh */}
-                <section className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <section className="lv-feature-grid mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard icon="pending_actions" label={t('home.stats.pending')} value={summary?.pending} to="/verifier"/>
                     <StatCard icon="draw" label={t('home.stats.awaiting')} value={summary?.awaitingSignature} to="/verifier"/>
                     <StatCard icon="task_alt" label={t('home.stats.signed')}
@@ -127,7 +127,7 @@ export default function VerifierHome() {
                 {/* Chức năng */}
                 <section className="mb-10">
                     <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('role')}</h2>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="lv-feature-grid grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                         {FEATURES.map((f) => <FeatureCard key={f.key} f={f}/>)}
                     </div>
                 </section>
