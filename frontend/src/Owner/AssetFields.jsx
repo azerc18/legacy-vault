@@ -36,10 +36,15 @@ export const OPTION_LABEL = {
     TRANSFER_DATA: 'Download data for the family',
 };
 
-// NUMBER: số nguyên không âm (tiền VND không có phần thập phân). Cho gõ "10.000.000" / "10,000,000" / "10 000 000"
-// rồi bỏ dấu ngăn nghìn trước khi kiểm và gửi, để FE và BE (AssetFieldsValidator) cùng một luật.
+// NUMBER: số nguyên không âm (tiền VND không có phần thập phân). Chỉ bỏ dấu ngăn nghìn khi chuỗi ĐÚNG dạng nhóm 3 chữ số
+// ("10.000.000", "10,000,000", "10 000 000"). Dạng khác giữ nguyên để báo lỗi rõ thay vì đổi số im lặng:
+// "1.5" / "0.5" / "12,5" bị báo lỗi, không biến thành 15 / 5 / 125. FE và BE (AssetFieldsValidator) cùng một luật số nguyên.
 const INT_RE = /^\d+$/;
-export const normalizeNumber = (raw) => (raw || '').replace(/[.,\s]/g, '');
+const GROUPED_RE = /^\d{1,3}([.,\s]\d{3})+$/;
+export const normalizeNumber = (raw) => {
+    const v = (raw || '').trim();
+    return GROUPED_RE.test(v) ? v.replace(/[.,\s]/g, '') : v;
+};
 
 // Lỗi của MỘT ô (rỗng = hợp lệ hoặc chưa nhập): kiểu dữ liệu số và pattern từ BE
 export function fieldError(f, raw) {
