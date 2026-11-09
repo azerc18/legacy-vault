@@ -1,0 +1,33 @@
+/* =====================================================================
+   Cột trái các trang đăng nhập / đăng ký (AuthHero):
+   intro chạy 1 lần (ảnh rõ dần, tiêu đề hiện từng từ) rồi trạng thái "thở" nhẹ.
+   Chỉ animate transform / opacity để mượt; tắt hết khi giảm chuyển động.
+   ===================================================================== */
+
+.lv-hero-photo {
+  transform-origin: 55% 50%;
+  animation: lv-hero-in 1.6s cubic-bezier(0.22, 1, 0.36, 1) both, lv-hero-breathe 20s ease-in-out 1.6s infinite alternate;
+}
+.lv-hero-photo.is-replay { animation: lv-hero-breathe 20s ease-in-out infinite alternate; }
+@keyframes lv-hero-in {
+  from { opacity: 0; transform: scale(1.08); filter: blur(6px); }
+  to   { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+@keyframes lv-hero-breathe {
+  from { transform: scale(1); }
+  to   { transform: scale(1.035); }
+}
+
+/* Lớp trôi theo chuột (parallax) */
+.lv-hero-parallax { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+
+
+
+/* Chữ "thời trang": từng ký tự trượt lên qua mặt nạ rồi trượt đi */
+.lv-hero-rotator { display: block; overflow: hidden; height: 1.2em; line-height: 1.2em; }
+.lv-hero-char { display: inline-block; will-change: transform, opacity; white-space: pre; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-hero-photo, .lv-hero-photo.is-replay { animation: none; }
+  .lv-hero-parallax { transition: none; transform: none !important; }
+}

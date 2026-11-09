@@ -193,8 +193,8 @@ export function StatCard({icon, tone, label, value, foot, to, children}) {
         </div>
     );
     return to
-        ? <Link to={to} className="lv-dossier block hover:border-secondary transition-colors">{body}</Link>
-        : <div className="lv-dossier">{body}</div>;
+        ? <Link to={to} className="lv-feature lv-feature-link lv-dossier block hover:border-secondary">{body}</Link>
+        : <div className="lv-feature lv-feature-link lv-dossier">{body}</div>;
 }
 
 // 199000 -> "199.000 ₫"

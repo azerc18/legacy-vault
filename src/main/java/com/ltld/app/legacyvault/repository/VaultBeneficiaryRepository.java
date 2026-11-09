@@ -27,6 +27,20 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
         """)
     boolean existsByOwnerIdAndEmail(@Param("ownerId") UUID ownerId, @Param("email") String email);
 
+    // N25: người thụ hưởng còn chưa nhận xong của các két UNLOCKED có hạn trong [from, to)
+    @Query("""
+        SELECT b FROM VaultBeneficiary b JOIN FETCH b.vault v JOIN FETCH v.owner
+        WHERE v.status = com.ltld.app.legacyvault.enums.VaultStatus.UNLOCKED
+          AND v.claimDeadlineAt >= :from AND v.claimDeadlineAt < :to
+          AND b.status NOT IN (com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.DECLINED,
+                               com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus.WAIVED)
+          AND NOT EXISTS (SELECT c FROM BeneficiaryClaim c WHERE c.vault = v AND c.beneficiary = b.user
+                          AND c.status IN (com.ltld.app.legacyvault.enums.ClaimStatus.CLAIMED,
+                                           com.ltld.app.legacyvault.enums.ClaimStatus.DECLINED))
+        """)
+    List<VaultBeneficiary> findUnclaimedWithDeadlineBetween(@Param("from") java.time.LocalDateTime from,
+                                                            @Param("to") java.time.LocalDateTime to);
+
     // findPendingByEmail
     @Query("SELECT b FROM VaultBeneficiary b WHERE b.user IS NULL AND b.email = :email")
     List<VaultBeneficiary> findPendingByEmail(@Param("email") String email);

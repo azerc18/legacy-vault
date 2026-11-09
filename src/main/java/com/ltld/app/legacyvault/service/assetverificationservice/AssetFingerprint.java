@@ -18,7 +18,7 @@ import java.util.TreeMap;
 public final class AssetFingerprint {
 
     static final Set<String> IDENTITY_KEYS = Set.of(
-            "institutionName", "accountNumber", "accountId",
+            "institutionName", "accountNumber", "accountHolderName", "accountId", "registeredEmail",
             "walletProvider", "blockchainNetwork", "walletAddress",
             "platform", "usernameOrHandle",
             "documentTitle", "issuer", "title");

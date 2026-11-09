@@ -80,4 +80,18 @@ class AssetFingerprintTest {
         assertThat(AssetFingerprint.sha256Hex("abc"))
                 .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
+
+    @Test
+    @DisplayName("Đổi tên chủ tài khoản hoặc email đăng ký sàn → dấu vân tay đổi")
+    void holderNameOrRegisteredEmailChanged_differentFingerprint() {
+        String bankA = "{\"institutionName\":\"MB Bank\",\"accountNumber\":\"0123456789\",\"accountHolderName\":\"Nguyen Van A\"}";
+        String bankB = "{\"institutionName\":\"MB Bank\",\"accountNumber\":\"0123456789\",\"accountHolderName\":\"Nguyen Van B\"}";
+        assertThat(AssetFingerprint.compute(asset(AssetType.BANK_ACCOUNT, bankA)))
+                .isNotEqualTo(AssetFingerprint.compute(asset(AssetType.BANK_ACCOUNT, bankB)));
+
+        String exA = "{\"institutionName\":\"Binance\",\"accountId\":\"u123\",\"registeredEmail\":\"a@x.com\"}";
+        String exB = "{\"institutionName\":\"Binance\",\"accountId\":\"u123\",\"registeredEmail\":\"b@x.com\"}";
+        assertThat(AssetFingerprint.compute(asset(AssetType.EXCHANGE_ACCOUNT, exA)))
+                .isNotEqualTo(AssetFingerprint.compute(asset(AssetType.EXCHANGE_ACCOUNT, exB)));
+    }
 }

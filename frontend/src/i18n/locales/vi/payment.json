@@ -14,6 +14,8 @@
     "viewBilling": "Xem lịch sử thanh toán",
     "loading": "Đang tải danh sách gói...",
     "retry": "Thử lại",
+    "providerLabel": "Phương thức thanh toán",
+    "paypalNote": "PayPal thu số tiền quy đổi sang USD theo tỷ giá cố định. Số tiền chính xác hiện trên trang PayPal trước khi bạn thanh toán.",
     "savePercent": "Tiết kiệm {{percent}}%",
     "free": "Miễn phí",
     "perDays": "/ {{days}} ngày",
@@ -28,19 +30,19 @@
     "buttons": {
       "currentPlan": "Gói hiện tại",
       "included": "Mặc định có sẵn",
-      "redirecting": "Đang chuyển hướng sang VNPay...",
-      "extend": "Gia hạn qua VNPay",
-      "upgrade": "Nâng cấp qua VNPay"
+      "redirecting": "Đang chuyển hướng sang {{provider}}...",
+      "extend": "Gia hạn qua {{provider}}",
+      "upgrade": "Nâng cấp qua {{provider}}"
     },
     "errors": {
       "loadFailed": "Không thể tải danh sách gói thuê bao.",
       "noPlans": "Hiện chưa có gói thuê bao nào.",
-      "checkoutFailed": "Không thể khởi tạo thanh toán VNPay."
+      "checkoutFailed": "Không thể khởi tạo thanh toán."
     }
   },
   "billing": {
     "title": "Gói thuê bao & Thanh toán",
-    "subtitle": "Quản lý gói LegacyVault, quyền lợi và lịch sử thanh toán VNPay của bạn.",
+    "subtitle": "Quản lý gói LegacyVault, quyền lợi và lịch sử thanh toán của bạn.",
     "extendVip": "Gia hạn VIP",
     "upgradeToVip": "Nâng cấp lên VIP",
     "loading": "Đang tải thông tin thanh toán...",
@@ -65,7 +67,7 @@
       "plan": "Gói",
       "amount": "Số tiền",
       "status": "Trạng thái",
-      "ref": "Mã giao dịch VNPay",
+      "ref": "Mã giao dịch",
       "receipt": "Hóa đơn",
       "downloadReceipt": "Tải hóa đơn",
       "downloading": "Đang tải..."
@@ -80,8 +82,8 @@
     "failedTitle": "Thanh toán thất bại",
     "confirmingTitle": "Đang xác nhận thanh toán",
     "successSubtitle": "Gói VIP của bạn đã được kích hoạt.",
-    "failedSubtitle": "Giao dịch VNPay của bạn không thể hoàn tất.",
-    "confirmingSubtitle": "Vui lòng đợi giây lát trong khi chúng tôi xác nhận giao dịch với VNPay.",
+    "failedSubtitle": "Giao dịch của bạn không thể hoàn tất.",
+    "confirmingSubtitle": "Vui lòng đợi giây lát trong khi chúng tôi xác nhận giao dịch.",
     "successHeading": "Chào mừng bạn đến với LegacyVault VIP!",
     "confirmingHeading": "Đang kiểm tra trạng thái kích hoạt...",
     "failedHeading": "Không thể xác nhận thanh toán",
@@ -95,11 +97,11 @@
     "myVaults": "Đến danh sách Két sắt",
     "tryAgain": "Thử lại",
     "processingTitle": "Đã nhận thanh toán",
-    "processingSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "processingSubtitle": "Cổng thanh toán báo giao dịch đã thanh toán thành công.",
     "processingHeading": "Đang xử lý kích hoạt gói VIP",
     "processingMessage": "Việc này có thể mất vài phút. Bạn hãy xem lại trang Thanh toán sau ít phút, không cần thanh toán lại.",
     "loginRequiredTitle": "Thanh toán thành công",
-    "loginRequiredSubtitle": "VNPay báo giao dịch đã thanh toán thành công.",
+    "loginRequiredSubtitle": "Cổng thanh toán báo giao dịch đã thanh toán thành công.",
     "loginRequiredHeading": "Đăng nhập để xem gói của bạn",
     "loginRequiredMessage": "Thanh toán thành công, đăng nhập để xem gói.",
     "login": "Đăng nhập"

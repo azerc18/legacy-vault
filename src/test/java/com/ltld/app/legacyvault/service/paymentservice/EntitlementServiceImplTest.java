@@ -114,6 +114,8 @@ class EntitlementServiceImplTest {
         assertEquals(1, expiredCount);
         assertEquals(SubscriptionStatus.EXPIRED, expiredVipSub.getStatus());
         verify(vaultRepository, never()).delete(any());
+        // N12: báo Owner sau khi gói đã chuyển EXPIRED
+        verify(emailSender).sendSubscriptionExpiredNotice(eq("owner@example.com"), eq("Owner User"), any());
 
         // Khi tạo vault mới mà đã có >= 1 vault -> ném PlanLimitReachedException (403 PLAN_LIMIT_REACHED)
         when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))

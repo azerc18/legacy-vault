@@ -253,7 +253,7 @@ class DmsConfigIntegrationTest {
         LocalDateTime due = config(s).getLastCheckinAt().plusDays(INTERVAL_DAYS);
         LocalDateTime triggerAt = due.plusDays(GRACE_DAYS);
         doThrow(new MailSendException("SMTP down")).doNothing().when(emailSender)
-                .sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
+                .sendDmsCheckinReminder(eq(s.ownerEmail), any(), any(), anyInt(), anyInt(), any());
 
         // Lượt 1: gửi lỗi -> trả lại lần nhắc, không ghi REMINDER_SENT.
         dmsReminderService.sendDueReminders(due);

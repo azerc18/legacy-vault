@@ -72,6 +72,25 @@ public class PaymentController {
         }
     }
 
+    // PayPal redirect về đây, không có JWT; service chỉ kích hoạt gói khi PayPal xác nhận capture
+    @GetMapping("/paypal-return")
+    public ResponseEntity<Void> paypalReturn(@RequestParam(name = "token", required = false) String orderId) {
+        return redirect(paymentService.handlePaypalReturn(orderId));
+    }
+
+    @GetMapping("/paypal-cancel")
+    public ResponseEntity<Void> paypalCancel(@RequestParam(name = "token", required = false) String orderId) {
+        return redirect(paymentService.handlePaypalCancel(orderId));
+    }
+
+    @GetMapping("/providers")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<List<String>>> getProviders() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payment providers retrieved successfully",
+                paymentService.getAvailableProviders()));
+    }
+
     @GetMapping("/me")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<List<PaymentTransactionResponse>>> getMyPayments(Principal principal) {
@@ -97,6 +116,12 @@ public class PaymentController {
                 .header("X-Content-Type-Options", "nosniff")
                 .cacheControl(CacheControl.noStore())
                 .body(pdf);
+    }
+
+    private static ResponseEntity<Void> redirect(String url) {
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, URI.create(url).toString())
+                .build();
     }
 
     private String extractClientIp(HttpServletRequest request) {

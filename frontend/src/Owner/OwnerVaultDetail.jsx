@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
@@ -17,6 +17,20 @@ import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchema
 import { AllocationFields, allocationBody, allocationFromAsset, allocationSummary, emptyAllocation, validateAllocation } from './AllocationFields.jsx';
 
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
+
+// Gom tài sản theo loại, theo thứ tự ASSET_TYPES (loại lạ do BE thêm sau xếp cuối); trong nhóm giữ thứ tự BE trả về
+function groupAssetsByType(assets) {
+    const order = ASSET_TYPES.map((a) => a.value);
+    const byType = new Map();
+    for (const a of assets) {
+        if (!byType.has(a.assetType)) byType.set(a.assetType, []);
+        byType.get(a.assetType).push(a);
+    }
+    const rank = (type) => (order.includes(type) ? order.indexOf(type) : order.length);
+    return [...byType.entries()]
+        .sort((x, y) => rank(x[0]) - rank(y[0]))
+        .map(([type, items]) => ({ type, items }));
+}
 
 export default function OwnerVaultDetail() {
     const { t } = useTranslation(['vault', 'enums', 'common', 'verification']);
@@ -153,6 +167,7 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
         const fallback = ASSET_TYPES.find((a) => a.value === type)?.label || type;
         return t(`enums:assetType.${type}`, { defaultValue: fallback });
     };
+    const groups = useMemo(() => groupAssetsByType(assets), [assets]);
 
     const load = useCallback(() => {
         ownerApi.listAssets(vaultId).then(setAssets).catch((e) => setError(getErrorMessage(e, t('detail.assets.errors.load'))));
@@ -205,36 +220,45 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
                             text={editable ? t('detail.assets.emptyEditable') : t('detail.assets.emptyLocked')} />
             )}
             {assets.length > 0 && (
-                <ul className="divide-y divide-outline-variant/30 mb-4">
-                    {assets.map((a) => (
-                        <li key={a.id} className="py-3 flex items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{a.assetName}</p>
-                                <p className="text-xs text-outline">{getAssetLabel(a.assetType)} · {t('detail.assets.updatedOn', { date: formatDate(a.updatedAt) })}</p>
-                                <div className="mt-1">
-                                    <VerificationBadge status={a.verificationStatus || 'SELF_DECLARED'} method={a.verificationMethod} />
-                                </div>
-                                {beneficiaries.length >= 2 && (
-                                    <p className="text-xs text-on-surface-variant">{allocationSummary(a, beneficiaries, t)}</p>
-                                )}
-                            </div>
-                            <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.view')}</button>
-                            {editable && (
-                                <button onClick={() => setVerifying(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">
-                                    {['VERIFIED', 'VERIFIED_SANDBOX'].includes(a.verificationStatus)
-                                        ? t('verification:button.details')
-                                        : a.verificationStatus === 'EXPIRED' ? t('verification:button.reverify') : t('verification:button.verify')}
-                                </button>
-                            )}
-                            {editable && (
-                                <>
-                                    <button onClick={() => edit(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.edit')}</button>
-                                    <button onClick={() => setDeleting(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">{t('ui.delete')}</button>
-                                </>
-                            )}
-                        </li>
+                <div className="mb-4 space-y-5">
+                    {groups.map((g) => (
+                        <section key={g.type} aria-label={getAssetLabel(g.type)}>
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-1">
+                                {getAssetLabel(g.type)} <span className="text-outline">({g.items.length})</span>
+                            </h4>
+                            <ul className="divide-y divide-outline-variant/30">
+                                {g.items.map((a) => (
+                                    <li key={a.id} className="py-3 flex items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-semibold truncate">{a.assetName}</p>
+                                            <p className="text-xs text-outline">{t('detail.assets.updatedOn', { date: formatDate(a.updatedAt) })}</p>
+                                            <div className="mt-1">
+                                                <VerificationBadge status={a.verificationStatus || 'SELF_DECLARED'} method={a.verificationMethod} />
+                                            </div>
+                                            {beneficiaries.length >= 2 && (
+                                                <p className="text-xs text-on-surface-variant">{allocationSummary(a, beneficiaries, t)}</p>
+                                            )}
+                                        </div>
+                                        <button onClick={() => view(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.view')}</button>
+                                        {editable && (
+                                            <button onClick={() => setVerifying(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">
+                                                {['VERIFIED', 'VERIFIED_SANDBOX'].includes(a.verificationStatus)
+                                                    ? t('verification:button.details')
+                                                    : a.verificationStatus === 'EXPIRED' ? t('verification:button.reverify') : t('verification:button.verify')}
+                                            </button>
+                                        )}
+                                        {editable && (
+                                            <>
+                                                <button onClick={() => edit(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-primary hover:bg-surface-container-low">{t('ui.edit')}</button>
+                                                <button onClick={() => setDeleting(a)} className="h-9 px-3 rounded-lg text-sm font-semibold text-error hover:bg-error-container">{t('ui.delete')}</button>
+                                            </>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
                     ))}
-                </ul>
+                </div>
             )}
             {editable && (
                 <button disabled={schemas === null} onClick={() => setForm({ assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation() })} className={btnOutline}>

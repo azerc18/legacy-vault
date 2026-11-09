@@ -152,6 +152,7 @@
         "thresholdOption": "{{k}} trên {{n}} người",
         "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
         "vipNote": "Chia theo tỷ lệ %, người dự phòng và đồng thuận cần gói VIP.",
+        "proportionalUnavailable": "Chia theo tỷ lệ % chỉ dùng cho tài sản cần làm thủ tục pháp lý (tài khoản ngân hàng, tài khoản sàn, tài liệu), nên loại tài sản này không có lựa chọn đó.",
         "summary": {
           "ALL": "Tất cả người thụ hưởng",
           "EXCLUSIVE": "Chỉ {{name}}",
@@ -313,6 +314,8 @@
     "labels": {
       "institutionName": "Tên tổ chức / ngân hàng",
       "accountNumber": "Số tài khoản",
+      "accountHolderName": "Tên chủ tài khoản",
+      "registeredEmail": "Email đăng ký sàn giao dịch",
       "branchName": "Chi nhánh",
       "estimatedValue": "Giá trị ước tính",
       "currency": "Loại tiền tệ",
@@ -345,6 +348,8 @@
     "examples": {
       "institutionName": "VD: Vietcombank",
       "accountNumber": "VD: 0071000123456",
+      "accountHolderName": "VD: NGUYEN VAN AN",
+      "registeredEmail": "VD: ban@example.com",
       "branchName": "VD: Chi nhánh Quận 7, TP.HCM",
       "estimatedValue": "VD: 150000000",
       "legalInstruction": "VD: Mang giấy chứng tử và hồ sơ khai nhận di sản tới chi nhánh để tất toán.",

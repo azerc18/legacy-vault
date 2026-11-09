@@ -43,6 +43,7 @@ class PaymentServiceImplTest {
     @Mock private PaymentTransactionRepository paymentTransactionRepository;
     @Mock private EntitlementServiceImpl entitlementService;
     @Mock private AuditLogService auditLogService;
+    @Mock private PaypalClient paypalClient;
 
     private VnpayClient vnpayClient;
     private PaymentServiceImpl paymentService;
@@ -65,6 +66,7 @@ class PaymentServiceImplTest {
                 entitlementService,
                 client,
                 properties,
+                paypalClient,
                 auditLogService
         );
     }
@@ -381,7 +383,7 @@ class PaymentServiceImplTest {
 
         CheckoutResponse response = paymentService.checkout(
                 owner.getId(),
-                new CheckoutRequest("VIP_MONTH"),
+                new CheckoutRequest("VIP_MONTH", null),
                 "127.0.0.1"
         );
 
