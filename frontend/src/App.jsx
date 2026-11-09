@@ -47,6 +47,7 @@ import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
 import IdleLogout from './Common/IdleLogout.jsx'; // Hồ sơ > Tuỳ chọn: tự đăng xuất khi rảnh
+import SpotlightTour from './Common/SpotlightTour.jsx';
 import { useTranslation } from 'react-i18next';
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -127,6 +128,7 @@ function App() {
             <InteractiveVaultLock variant="sentinel" />
             <AssistantWidget />
             <PlanLimitUpgradeDialog />
+            <SpotlightTour />
         </BrowserRouter>
         </AnimateUIProvider>
     );

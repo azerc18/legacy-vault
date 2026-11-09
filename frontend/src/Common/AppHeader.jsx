@@ -1,7 +1,7 @@
 // Header dùng chung cho mọi trang sau đăng nhập (Owner, Admin, Beneficiary, Executor, Verifier, /me, /home).
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import { paymentApi } from '../api/paymentApi.js';
@@ -10,7 +10,8 @@ import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import BrandMark from './BrandMark.jsx';
-import OnboardingGuideModal, { ONBOARDING_STORAGE_KEY, openOnboardingGuide } from './OnboardingGuideModal.jsx';
+import OnboardingGuideModal, { openOnboardingGuide } from './OnboardingGuideModal.jsx';
+import { startSpotlightTour, openFirstTimePrompt } from './SpotlightTour.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -70,23 +71,9 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
         : defaultNav(pathname, Array.isArray(user?.roles) ? user.roles : []).map(({ key, ...n }) => ({ ...n, label: t(`nav.${key}`) }));
     const { t: tPayment } = useTranslation('payment');
     const { t: tOnboarding } = useTranslation('onboarding');
-    const [guideAutoOpen, setGuideAutoOpen] = useState(false);
+    const [guideMenuOpen, setGuideMenuOpen] = useState(false);
+    const guideMenuRef = useRef(null);
 
-    useEffect(() => {
-        if (!user) return undefined;
-        try {
-            const seen = localStorage.getItem(ONBOARDING_STORAGE_KEY);
-            if (!seen) {
-                const timer = setTimeout(() => {
-                    setGuideAutoOpen(true);
-                }, 800);
-                return () => clearTimeout(timer);
-            }
-        } catch {
-            // ignore
-        }
-        return undefined;
-    }, [user?.email]);
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
     const [vipStatus, setVipStatus] = useState(() => {
@@ -134,6 +121,18 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
             mounted = false;
         };
     }, [isOwner]);
+
+    // Đóng dropdown hướng dẫn khi click ra ngoài
+    useEffect(() => {
+        if (!guideMenuOpen) return undefined;
+        const handleOutsideClick = (e) => {
+            if (guideMenuRef.current && !guideMenuRef.current.contains(e.target)) {
+                setGuideMenuOpen(false);
+            }
+        };
+        window.addEventListener('mousedown', handleOutsideClick);
+        return () => window.removeEventListener('mousedown', handleOutsideClick);
+    }, [guideMenuOpen]);
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -211,17 +210,70 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                         <Icon name="swap_horiz" className="text-[16px]" /><span className="lv-label">{t('header.userHome')}</span>
                     </Link>
                 )}
-                <div className="lv-side-tools flex items-center gap-2">
+                <div className="lv-side-tools flex items-center gap-2 relative" ref={guideMenuRef}>
                     <button
                         type="button"
-                        onClick={openOnboardingGuide}
+                        onClick={() => setGuideMenuOpen((o) => !o)}
                         title={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
                         aria-label={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
+                        aria-expanded={guideMenuOpen}
                         className="h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
                     >
                         <Icon name="school" className="text-[17px] text-amber-300" />
                         <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
+                        <Icon name="expand_more" className="text-[14px] text-white/60" />
                     </button>
+
+                    {/* Dropdown Menu lựa chọn chế độ hướng dẫn */}
+                    {guideMenuOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#0e1629] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 text-white animate-in zoom-in-95 duration-150">
+                            <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-bold tracking-wider uppercase text-amber-300">
+                                {tOnboarding('welcomeTitle')}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setGuideMenuOpen(false);
+                                    startSpotlightTour();
+                                }}
+                                className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
+                            >
+                                <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
+                                <div>
+                                    <div className="font-bold">{tOnboarding('startInteractiveTour')}</div>
+                                    <div className="text-[10px] text-white/60 font-normal">Chỉ dẫn từng nút bấm & thao tác</div>
+                                </div>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setGuideMenuOpen(false);
+                                    openOnboardingGuide();
+                                }}
+                                className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
+                            >
+                                <span className="material-symbols-outlined text-teal-400 text-[18px]">menu_book</span>
+                                <div>
+                                    <div>{tOnboarding('openCatalogue')}</div>
+                                    <div className="text-[10px] text-white/60 font-normal">Trụ cột bảo mật & AI OCR</div>
+                                </div>
+                            </button>
+                            <div className="border-t border-white/10 mt-1 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setGuideMenuOpen(false);
+                                        openFirstTimePrompt();
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-white/60 flex items-center gap-2 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[15px]">refresh</span>
+                                    <span>Hỏi lại như người dùng lần đầu</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <LanguageSwitch variant="dark" className="lv-lang" />
                     <ThemeToggle variant="dark" />
                     {extra}
@@ -237,7 +289,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     </button>
                 </div>
             </div>
-            <OnboardingGuideModal defaultOpen={guideAutoOpen} />
+            <OnboardingGuideModal />
         </header>
     );
 }

@@ -114,49 +114,53 @@ export default function CreateVault() {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <Alert>{error}</Alert>
 
-                <Card title={t('create.detailsTitle')} icon="inventory_2">
-                    <div className="space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-semibold text-on-surface-variant">{t('create.nameLabel')}</span>
-                            <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)}
-                                   placeholder={t('create.namePlaceholder')} className={`${inputClass} mt-1`}/>
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-semibold text-on-surface-variant">{t('create.descriptionLabel')}</span>
-                            <textarea rows={2} maxLength={500} value={description}
-                                      onChange={(e) => setDescription(e.target.value)}
-                                      className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"/>
-                        </label>
-                    </div>
-                </Card>
+                <div data-tour="vault-info">
+                    <Card title={t('create.detailsTitle')} icon="inventory_2">
+                        <div className="space-y-4">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-on-surface-variant">{t('create.nameLabel')}</span>
+                                <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)}
+                                       placeholder={t('create.namePlaceholder')} className={`${inputClass} mt-1`}/>
+                            </label>
+                            <label className="block">
+                                <span className="text-sm font-semibold text-on-surface-variant">{t('create.descriptionLabel')}</span>
+                                <textarea rows={2} maxLength={500} value={description}
+                                          onChange={(e) => setDescription(e.target.value)}
+                                          className="w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary"/>
+                            </label>
+                        </div>
+                    </Card>
+                </div>
 
-                <Card title={t('create.beneficiariesTitle', {count: beneficiaries.length})} icon="family_restroom">
-                    <div className="space-y-4">
-                        {beneficiaries.map((b, i) => (
-                            <div key={i} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm font-semibold text-outline">{t('create.beneficiaryItem', {index: i + 1})}</span>
-                                    {beneficiaries.length > 1 && (
-                                        <button type="button" onClick={() => removeBeneficiaryRow(i)} className="text-sm text-error font-semibold flex items-center gap-1">
-                                            <Icon name="delete" className="text-[18px]" /> {t('ui.remove')}
-                                        </button>
-                                    )}
+                <div data-tour="beneficiary-section">
+                    <Card title={t('create.beneficiariesTitle', {count: beneficiaries.length})} icon="family_restroom">
+                        <div className="space-y-4">
+                            {beneficiaries.map((b, i) => (
+                                <div key={i} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-semibold text-outline">{t('create.beneficiaryItem', {index: i + 1})}</span>
+                                        {beneficiaries.length > 1 && (
+                                            <button type="button" onClick={() => removeBeneficiaryRow(i)} className="text-sm text-error font-semibold flex items-center gap-1">
+                                                <Icon name="delete" className="text-[18px]" /> {t('ui.remove')}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <input type="email" value={b.email} maxLength={255} onChange={(e) => updateBeneficiary(i, 'email', e.target.value)}
+                                           placeholder={t('create.emailPlaceholder')} className={inputClass} />
+                                    <div className="grid sm:grid-cols-2 gap-3">
+                                        <input value={b.fullName} maxLength={255} onChange={(e) => updateBeneficiary(i, 'fullName', e.target.value)}
+                                               placeholder={t('create.fullNamePlaceholder')} className={inputClass} />
+                                        <input value={b.relationship} maxLength={50} onChange={(e) => updateBeneficiary(i, 'relationship', e.target.value)}
+                                               placeholder={t('create.relationshipPlaceholder')} className={inputClass} />
+                                    </div>
                                 </div>
-                                <input type="email" value={b.email} maxLength={255} onChange={(e) => updateBeneficiary(i, 'email', e.target.value)}
-                                       placeholder={t('create.emailPlaceholder')} className={inputClass} />
-                                <div className="grid sm:grid-cols-2 gap-3">
-                                    <input value={b.fullName} maxLength={255} onChange={(e) => updateBeneficiary(i, 'fullName', e.target.value)}
-                                           placeholder={t('create.fullNamePlaceholder')} className={inputClass} />
-                                    <input value={b.relationship} maxLength={50} onChange={(e) => updateBeneficiary(i, 'relationship', e.target.value)}
-                                           placeholder={t('create.relationshipPlaceholder')} className={inputClass} />
-                                </div>
-                            </div>
-                        ))}
-                        <button type="button" disabled={beneficiaries.length >= 10} onClick={() => setBeneficiaries((l) => [...l, emptyBeneficiary()])} className={btnOutline}>
-                            <Icon name="add" className="text-[18px]" /> {t('create.addBeneficiary')}
-                        </button>
-                    </div>
-                </Card>
+                            ))}
+                            <button type="button" disabled={beneficiaries.length >= 10} onClick={() => setBeneficiaries((l) => [...l, emptyBeneficiary()])} className={btnOutline}>
+                                <Icon name="add" className="text-[18px]" /> {t('create.addBeneficiary')}
+                            </button>
+                        </div>
+                    </Card>
+                </div>
 
                 <Card title={t('create.assetsTitle', {count: assets.length})} icon="key">
                     <div className="space-y-5">
@@ -184,7 +188,7 @@ export default function CreateVault() {
                                 </div>
 
                                 <div className="p-4 space-y-4">
-                                    <div role="radiogroup" aria-labelledby={`asset-type-label-${i}`}>
+                                    <div data-tour="asset-type-select" role="radiogroup" aria-labelledby={`asset-type-label-${i}`}>
                                         <div id={`asset-type-label-${i}`} className="text-sm font-semibold text-on-surface mb-2">
                                             {t('create.assetTypeLabel')}
                                         </div>
@@ -203,59 +207,61 @@ export default function CreateVault() {
                                         </div>
                                     </div>
 
-                                    <div>
-                                        <label htmlFor={`asset-name-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
-                                            {t('detail.assets.assetNamePlaceholder')}
-                                        </label>
-                                        <input id={`asset-name-${i}`} value={a.assetName} maxLength={200}
-                                               onChange={(e) => updateAsset(i, 'assetName', e.target.value)}
-                                               placeholder={t('create.assetNamePlaceholder')} className={inputClass}/>
-                                    </div>
-
-                                    {schemas === null ? (
-                                        <div className="h-24 rounded-xl bg-surface-container-low animate-pulse" aria-hidden="true"/>
-                                    ) : schemaOf(schemas, a.assetType) ? (
-                                        <AssetFieldsForm schema={schemaOf(schemas, a.assetType)} values={a.fields}
-                                                         onChange={(k, v) => setAssetField(i, k, v)} isEdit={false}
-                                                         idPrefix={`asset-${i}`}/>
-                                    ) : (
+                                    <div data-tour="asset-fields" className="space-y-4">
                                         <div>
-                                            <label htmlFor={`asset-secret-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
-                                                {t('detail.assets.secretLabel')}
+                                            <label htmlFor={`asset-name-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
+                                                {t('detail.assets.assetNamePlaceholder')}
                                             </label>
-                                            <div className="relative">
-                                                <Icon name="lock" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-secondary pointer-events-none"/>
-                                                <input
-                                                    id={`asset-secret-${i}`}
-                                                    type={showSecret[i] ? 'text' : 'password'}
-                                                    value={a.secret}
-                                                    maxLength={5000}
-                                                    onChange={(e) => updateAsset(i, 'secret', e.target.value)}
-                                                    placeholder={t('create.secretPlaceholder')}
-                                                    className={`${inputClass} pl-11 pr-12 bg-surface-container-low`}
-                                                    autoComplete="new-password"
-                                                    aria-describedby={`asset-secret-hint-${i}`}
-                                                />
-                                                <button type="button" onClick={() => setShowSecret((s) => ({...s, [i]: !s[i]}))}
-                                                        aria-pressed={!!showSecret[i]} aria-label={t('detail.assets.secretLabel')}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg flex items-center justify-center text-outline hover:text-on-surface">
-                                                    <Icon name={showSecret[i] ? 'visibility_off' : 'visibility'}
-                                                          className="text-[20px]"/>
-                                                </button>
-                                            </div>
-                                            <p id={`asset-secret-hint-${i}`} className="mt-1.5 text-xs text-on-surface-variant flex items-center gap-1">
-                                                <Icon name="verified_user" className="text-[16px] text-success"/> {t('create.secretHint')}
-                                            </p>
+                                            <input id={`asset-name-${i}`} value={a.assetName} maxLength={200}
+                                                   onChange={(e) => updateAsset(i, 'assetName', e.target.value)}
+                                                   placeholder={t('create.assetNamePlaceholder')} className={inputClass}/>
                                         </div>
-                                    )}
 
-                                    <div>
-                                        <label htmlFor={`asset-notes-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
-                                            {t('detail.assets.notesLabel')}
-                                        </label>
-                                        <input id={`asset-notes-${i}`} value={a.notes} maxLength={2000}
-                                               onChange={(e) => updateAsset(i, 'notes', e.target.value)}
-                                               placeholder={t('create.notesPlaceholder')} className={inputClass}/>
+                                        {schemas === null ? (
+                                            <div className="h-24 rounded-xl bg-surface-container-low animate-pulse" aria-hidden="true"/>
+                                        ) : schemaOf(schemas, a.assetType) ? (
+                                            <AssetFieldsForm schema={schemaOf(schemas, a.assetType)} values={a.fields}
+                                                             onChange={(k, v) => setAssetField(i, k, v)} isEdit={false}
+                                                             idPrefix={`asset-${i}`}/>
+                                        ) : (
+                                            <div>
+                                                <label htmlFor={`asset-secret-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
+                                                    {t('detail.assets.secretLabel')}
+                                                </label>
+                                                <div className="relative">
+                                                    <Icon name="lock" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[20px] text-secondary pointer-events-none"/>
+                                                    <input
+                                                        id={`asset-secret-${i}`}
+                                                        type={showSecret[i] ? 'text' : 'password'}
+                                                        value={a.secret}
+                                                        maxLength={5000}
+                                                        onChange={(e) => updateAsset(i, 'secret', e.target.value)}
+                                                        placeholder={t('create.secretPlaceholder')}
+                                                        className={`${inputClass} pl-11 pr-12 bg-surface-container-low`}
+                                                        autoComplete="new-password"
+                                                        aria-describedby={`asset-secret-hint-${i}`}
+                                                    />
+                                                    <button type="button" onClick={() => setShowSecret((s) => ({...s, [i]: !s[i]}))}
+                                                            aria-pressed={!!showSecret[i]} aria-label={t('detail.assets.secretLabel')}
+                                                            className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 rounded-lg flex items-center justify-center text-outline hover:text-on-surface">
+                                                        <Icon name={showSecret[i] ? 'visibility_off' : 'visibility'}
+                                                              className="text-[20px]"/>
+                                                    </button>
+                                                </div>
+                                                <p id={`asset-secret-hint-${i}`} className="mt-1.5 text-xs text-on-surface-variant flex items-center gap-1">
+                                                    <Icon name="verified_user" className="text-[16px] text-success"/> {t('create.secretHint')}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <label htmlFor={`asset-notes-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
+                                                {t('detail.assets.notesLabel')}
+                                            </label>
+                                            <input id={`asset-notes-${i}`} value={a.notes} maxLength={2000}
+                                                   onChange={(e) => updateAsset(i, 'notes', e.target.value)}
+                                                   placeholder={t('create.notesPlaceholder')} className={inputClass}/>
+                                        </div>
                                     </div>
                                 </div>
                             </fieldset>
@@ -282,7 +288,7 @@ export default function CreateVault() {
                     <button type="button" onClick={() => navigate('/owner/vaults')} className={btnOutline}>
                         {t('common:actions.cancel')}
                     </button>
-                    <button type="submit" disabled={loading || !!partial} className={btnPrimary}>
+                    <button type="submit" data-tour="submit-vault-btn" disabled={loading || !!partial} className={btnPrimary}>
                         {loading ? t('create.creating') : t('create.submit')}
                     </button>
                 </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { startSpotlightTour } from './SpotlightTour.jsx';
 
 export const ONBOARDING_STORAGE_KEY = 'lv_onboarding_seen_v1';
 export const OPEN_ONBOARDING_EVENT = 'lv_open_onboarding';
@@ -199,15 +200,28 @@ export default function OnboardingGuideModal({ defaultOpen = false, onDismiss })
 
                 {/* Footer Controls */}
                 <div className="px-6 sm:px-8 py-4 bg-white/[0.02] border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-                    <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white/80 cursor-pointer select-none">
-                        <input
-                            type="checkbox"
-                            checked={dontShowAgain}
-                            onChange={(e) => setDontShowAgain(e.target.checked)}
-                            className="rounded border-white/30 bg-white/10 text-amber-400 focus:ring-amber-400/30"
-                        />
-                        <span>{t('dontShowAgain')}</span>
-                    </label>
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <label className="flex items-center gap-2.5 text-xs text-white/60 hover:text-white/80 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={dontShowAgain}
+                                onChange={(e) => setDontShowAgain(e.target.checked)}
+                                className="rounded border-white/30 bg-white/10 text-amber-400 focus:ring-amber-400/30"
+                            />
+                            <span>{t('dontShowAgain')}</span>
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                handleClose();
+                                startSpotlightTour();
+                            }}
+                            className="hidden md:inline-flex h-9 px-3 rounded-lg border border-amber-400/40 text-amber-300 hover:bg-amber-400/10 text-xs font-bold items-center gap-1.5 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">rocket_launch</span>
+                            <span>{t('startInteractiveTour')}</span>
+                        </button>
+                    </div>
 
                     <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                         {currentStep > 0 && (

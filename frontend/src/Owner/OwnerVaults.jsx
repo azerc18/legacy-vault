@@ -11,6 +11,7 @@ import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx'
 import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
 import { openOnboardingGuide } from '../Common/OnboardingGuideModal.jsx';
+import { startSpotlightTour } from '../Common/SpotlightTour.jsx';
 
 export default function OwnerVaults() {
     const { t } = useTranslation('vault');
@@ -37,14 +38,14 @@ export default function OwnerVaults() {
                 <div className="flex items-center gap-2.5">
                     <button
                         type="button"
-                        onClick={openOnboardingGuide}
+                        onClick={startSpotlightTour}
                         className="h-10 px-3.5 rounded-full border border-outline-variant/40 hover:border-primary text-xs font-bold inline-flex items-center gap-1.5 bg-surface-container-lowest text-on-surface hover:text-primary transition-colors shadow-sm"
-                        title={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
+                        title={tOnboarding('startInteractiveTour', 'Bắt đầu hướng dẫn từng bước (Interactive Tour)')}
                     >
-                        <Icon name="school" className="text-[18px] text-amber-500" />
+                        <Icon name="rocket_launch" className="text-[18px] text-amber-500" />
                         <span>{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
                     </button>
-                    <Link to="/owner/vaults/new" className={btnPrimary}>
+                    <Link to="/owner/vaults/new" data-tour="new-vault-btn" className={btnPrimary}>
                         <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
                     </Link>
                 </div>
@@ -78,14 +79,23 @@ export default function OwnerVaults() {
                                 <p className="text-sm text-on-surface-variant mt-1 max-w-xl">{tOnboarding('banner.subtitle')}</p>
                             </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={openOnboardingGuide}
-                            className="shrink-0 h-10 px-4 rounded-xl bg-primary text-on-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                        >
-                            <span>{tOnboarding('banner.action')}</span>
-                            <Icon name="arrow_forward" className="text-[16px]" />
-                        </button>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                            <button
+                                type="button"
+                                onClick={openOnboardingGuide}
+                                className="h-10 px-3.5 rounded-xl border border-outline-variant/60 hover:bg-surface-container-low text-xs font-semibold text-on-surface transition-colors"
+                            >
+                                <span>{tOnboarding('banner.exploreGuide', 'Xem cẩm nang')}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={startSpotlightTour}
+                                className="h-10 px-4 rounded-xl bg-primary text-on-primary text-xs font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <span>{tOnboarding('banner.action')}</span>
+                                <Icon name="rocket_launch" className="text-[16px]" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             ) : (
@@ -99,31 +109,29 @@ export default function OwnerVaults() {
                                             to={`/owner/vaults/${v.id}`}
                                             className="block h-full bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 hover:border-secondary transition-colors"
                                         >
-                                            <div className="flex justify-between items-start gap-3">
-                                                <h3 className="font-title-lg text-title-lg">{v.name}</h3>
-                                                <div className="flex items-center gap-2">
-                                                    {!v.modifiable && (
-                                                        <span
-                                                            title={v.lockReason}
-                                                            className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
-                                                        >
-                                                            <Icon name="lock" className="text-[14px]" /> {t('list.locked')}
-                                                        </span>
-                                                    )}
-                                                    <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                                                        {t(`status.${v.status}`, { defaultValue: v.status })}
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-12 h-12 rounded-2xl bg-surface-container-high flex items-center justify-center text-primary border border-outline-variant/30">
+                                                        <Icon name="inventory_2" className="text-[26px]" />
                                                     </span>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <h3 className="font-title-lg text-title-lg text-on-surface">{v.name}</h3>
+                                                            {v.isSealed && (
+                                                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-primary/10 text-primary">
+                                                                    <Icon name="lock" className="text-[13px]" /> {t('detail.sealed')}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-on-surface-variant mt-0.5">
+                                                            {t('list.created', { date: formatDate(v.createdAt) })}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            {v.description && <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">{v.description}</p>}
-                                            <div className="mt-4 flex flex-wrap gap-4 text-xs text-on-surface-variant">
-                                                <span>{t('list.beneficiary')} <strong className="text-on-surface">{v.beneficiaryEmail || t('list.none')}</strong></span>
-                                                <span>·</span>
-                                                <span>{t('list.assetsCount', { count: v.totalAssets ?? 0 })}</span>
-                                                <span>·</span>
-                                                <span>{t('list.docsCount', { count: v.totalDocuments ?? 0 })}</span>
-                                            </div>
-                                            <p className="mt-2 text-xs text-outline">{t('list.createdOn', { date: formatDate(v.createdAt) })}</p>
+                                            {v.description && (
+                                                <p className="text-sm text-on-surface-variant line-clamp-2 mt-4">{v.description}</p>
+                                            )}
                                         </Link>
                                     </TiltContent>
                                 </Tilt>

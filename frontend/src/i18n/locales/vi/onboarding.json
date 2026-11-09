@@ -11,10 +11,67 @@
   "dontShowAgain": "Đã hiểu, không tự động hiển thị lại khi đăng nhập",
   "reopenHint": "Bạn có thể mở lại hướng dẫn này bất cứ lúc nào từ thanh menu.",
   "newFeatureTag": "MỚI MỞ KHÓA",
+  "startInteractiveTour": "Bắt đầu hướng dẫn từng bước (Interactive Tour)",
+  "openCatalogue": "Xem cẩm nang tính năng & Tân thủ",
   "banner": {
     "title": "Bạn là người dùng mới?",
-    "subtitle": "Xem hướng dẫn tân thủ 4 bước để hiểu cách hoạt động của Két sắt, DMS và Xác thực tài sản số.",
-    "action": "Xem hướng dẫn"
+    "subtitle": "Xem hướng dẫn từng bước trực quan để nắm vững cách tạo két sắt, chỉ định người thụ hưởng và mã hóa tài sản.",
+    "action": "Bắt đầu hướng dẫn",
+    "exploreGuide": "Xem cẩm nang"
+  },
+  "firstTimePrompt": {
+    "badge": "CHÀO MỪNG TÂN THỦ",
+    "question": "Bạn chưa từng sử dụng ứng dụng Legacy Vault?",
+    "subtitle": "Chúng tôi có thể hướng dẫn bạn từng bước qua từng nút bấm và thao tác để làm quen với quy trình tạo két sắt di sản đầu tiên.",
+    "newbieAction": "Tôi chưa từng dùng (Bắt đầu hướng dẫn)",
+    "experiencedAction": "Tôi đã dùng rồi",
+    "helper": "Bạn luôn có thể mở lại hướng dẫn bất cứ lúc nào từ biểu tượng Hướng dẫn trên thanh điều hướng."
+  },
+  "tour": {
+    "stepBadge": "Bước {{current}}/{{total}}",
+    "skipTour": "Bỏ qua hướng dẫn",
+    "prevBtn": "Quay lại",
+    "nextBtn": "Tiếp tục",
+    "goToCreate": "Đi tới Tạo két mới",
+    "finishBtn": "Hoàn tất hướng dẫn",
+    "congrats": {
+      "title": "🎉 Chúc mừng bạn đã hoàn tất hướng dẫn!",
+      "subtitle": "Bạn đã nắm rõ toàn bộ quy trình thiết lập két sắt di sản đầu tiên.",
+      "text": "Két sắt của bạn được bảo vệ bằng mã hóa cấp quân sự AES-256. Giờ đây bạn có thể tự do tạo thêm két sắt, mời Người thụ hưởng, hoặc thiết lập Công tắc tử thần (DMS).",
+      "action": "Bắt đầu sử dụng ngay"
+    },
+    "steps": {
+      "step1": {
+        "title": "Chọn \"Tạo két mới\"",
+        "instruction": "Bấm vào nút '+ Tạo két mới' để khởi tạo két sắt di sản đầu tiên của bạn.",
+        "tip": "Mỗi két sắt có thể chứa nhiều loại tài sản số và được mã hóa bằng khóa riêng biệt."
+      },
+      "step2": {
+        "title": "Điền \"Thông tin két sắt\"",
+        "instruction": "Nhập tên két sắt (ví dụ: 'Két sắt gia đình', 'Tài sản đầu tư') và ghi chú mục đích lưu trữ.",
+        "tip": "Tên két sắt rõ ràng giúp bạn và người thừa kế dễ dàng nhận diện và tra cứu."
+      },
+      "step3": {
+        "title": "Chọn / Gán \"Người thụ hưởng\"",
+        "instruction": "Gán email người thụ hưởng sẽ nhận quyền thừa kế tài sản khi két được mở khóa chuyển giao.",
+        "tip": "Bạn có thể gán nhiều người thụ hưởng cho các phần tài sản khác nhau trong két."
+      },
+      "step4": {
+        "title": "Chọn \"Loại tài sản\"",
+        "instruction": "Chọn danh mục tài sản số cần bảo vệ: Tài khoản ngân hàng, Tiền mã hóa (Crypto), Mạng xã hội, Bảo hiểm hoặc Ghi chú bảo mật.",
+        "tip": "Mỗi loại tài sản có biểu mẫu chuyên biệt giúp lưu trữ đầy đủ thông tin chuẩn xác nhất."
+      },
+      "step5": {
+        "title": "Nhập \"Thông tin tài sản\"",
+        "instruction": "Điền tên tài sản và các trường thông tin nhạy cảm. Toàn bộ mật mã và khóa bí mật được mã hóa đầu cuối (E2E) bằng AES-256.",
+        "tip": "Không ai — kể cả quản trị viên máy chủ — có thể đọc được dữ liệu gốc của bạn."
+      },
+      "step6": {
+        "title": "Ấn \"Tạo két sắt\" để hoàn thành",
+        "instruction": "Nhấn nút 'Tạo két sắt' để lưu trữ và bảo vệ vĩnh viễn khối tài sản di sản của bạn!",
+        "tip": "Sau khi tạo két xong, bạn có thể thiết lập Công tắc tử thần (DMS) hoặc mời thêm Người thực thi."
+      }
+    }
   },
   "steps": [
     {
