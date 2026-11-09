@@ -13,6 +13,11 @@ const PUBLIC_ROUTES = [
     '/reset-password',
 ];
 
+// Trang đăng nhập / đăng ký / quên mật khẩu / OTP (AuthShell chia 2 cột): không vẽ cú nền,
+// vì cú nằm giữa màn hình nên bị đường chia 2 cột cắt đôi.
+// Lấy từ PUBLIC_ROUTES để thêm trang auth mới chỉ phải sửa một chỗ.
+const AUTH_ROUTES = PUBLIC_ROUTES.filter((p) => p !== '/');
+
 const DIAL_TICKS_24 = Array.from({ length: 24 }, (_, i) => i * 15);
 
 const ARCHETYPE_ORDER = ['AUTO', 'ADMIN', 'VIP', 'FREE', 'VERIFIER', 'EXECUTOR', 'BENEFICIARY'];
@@ -664,7 +669,7 @@ export default function InteractiveVaultLock({
     }
 
     // ==================== CHẾ ĐỘ 3: BIỂU TƯỢNG CÚ - Ổ KHÓA XOAY NỀN PHÍA SAU LỚP KÍNH LIQUID GLASS ====================
-    if (location.pathname === '/') {
+    if (location.pathname === '/' || AUTH_ROUTES.includes(location.pathname)) {
         return (
             <div
                 aria-hidden="true"
