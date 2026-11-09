@@ -1,5 +1,6 @@
 // Chuông thông báo trong app: Beneficiary (FR-16) và Executor (D6, FR-11 / FR-12 / FR-14)
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { executorApi } from '../api/executorApi.js';
@@ -61,6 +62,7 @@ export default function NotificationBell({ source = 'beneficiary' }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
     const btnRef = useRef(null);
+    const panelRef = useRef(null);
     const [pos, setPos] = useState(null);
 
     // Tải lại mỗi lần mở để thấy thông báo mới mà không cần F5
@@ -72,7 +74,8 @@ export default function NotificationBell({ source = 'beneficiary' }) {
     // Click ra ngoài thì đóng
     useEffect(() => {
         if (!open) return;
-        const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+        const onClick = (e) => { if (ref.current?.contains(e.target) || panelRef.current?.contains(e.target)) return;
+            setOpen(false); };
         document.addEventListener('mousedown', onClick);
         return () => document.removeEventListener('mousedown', onClick);
     }, [open]);
@@ -118,8 +121,9 @@ export default function NotificationBell({ source = 'beneficiary' }) {
                     </span>
                 )}
             </button>
-            {open && pos && (
-                <div style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-30 lv-pop text-on-surface">
+            {/* Portal ra body + z-[60]: thanh bên và các thẻ kính (backdrop-filter) tạo stacking context riêng nên z-30 bị nền trang đè lên */}
+            {open && pos && createPortal(
+                <div ref={panelRef} style={pos} className="fixed w-80 max-w-[calc(100vw-24px)] overflow-y-auto bg-surface-container-lowest rounded-2xl border border-outline-variant/30 shadow-lg z-[60] lv-pop text-on-surface">
                     <p className="px-4 py-3 text-sm font-semibold border-b border-outline-variant/30">{t('notifications.title')}</p>
                     {items.length === 0 && <p className="px-4 py-6 text-sm text-on-surface-variant text-center">{t('notifications.empty')}</p>}
                     {items.map((n) => (
@@ -131,7 +135,8 @@ export default function NotificationBell({ source = 'beneficiary' }) {
                             </span>
                         </button>
                     ))}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

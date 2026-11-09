@@ -219,7 +219,7 @@ function ProfileForm({ profile, onSaved }) {
                         <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} className={inputClass} />
                     </Field>
                     <Field label={t('info.phone')} hint={t('info.optional')}>
-                        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0901 234 567" className={inputClass} />
+                        <input id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0901 234 567" className={inputClass} />
                     </Field>
                 </div>
                 <Field label={t('info.email')} hint={t('info.emailHint')}>

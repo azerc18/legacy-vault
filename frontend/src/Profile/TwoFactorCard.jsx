@@ -50,8 +50,8 @@ export default function TwoFactorCard({ profile, onChanged }) {
         URL.revokeObjectURL(url);
     };
 
-    const codeInput = (placeholder) => (
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder={placeholder}
+    const codeInput = () => (
+        <input value={code} onChange={(e) => setCode(e.target.value)}
                autoComplete="one-time-code" maxLength={9} className={`${inputClass} text-center tracking-[0.2em]`} />
     );
 
@@ -94,7 +94,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                 {/* --- Đang tắt, chưa thiết lập --- */}
                 {!profile.mfaEnabled && !setup && (
                     <div className="flex justify-end">
-                        <button type="button" onClick={startSetup} disabled={busy} className={btnPrimary}>
+                        <button id="profile-2fa-start" type="button" onClick={startSetup} disabled={busy} className={btnPrimary}>
                             {busy ? t('mfa.wait') : t('mfa.turnOn')}
                         </button>
                     </div>
@@ -114,7 +114,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                                 <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
                             </div>
                         </div>
-                        {codeInput('123456')}
+                        {codeInput()}
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
                                 {t('common:actions.cancel')}
@@ -137,7 +137,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                 {profile.mfaEnabled && disabling && (
                     <form onSubmit={confirmDisable} className="space-y-4">
                         <p className="text-sm">{t('mfa.disableHint')}</p>
-                        {codeInput(t('mfa.disablePlaceholder'))}
+                        {codeInput()}
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>
                                 {t('common:actions.cancel')}

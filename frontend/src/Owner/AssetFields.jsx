@@ -36,6 +36,27 @@ export const OPTION_LABEL = {
     TRANSFER_DATA: 'Download data for the family',
 };
 
+// NUMBER: số nguyên không âm (tiền VND không có phần thập phân). Chỉ bỏ dấu ngăn nghìn khi chuỗi ĐÚNG dạng nhóm 3 chữ số
+// ("10.000.000", "10,000,000", "10 000 000"). Dạng khác giữ nguyên để báo lỗi rõ thay vì đổi số im lặng:
+// "1.5" / "0.5" / "12,5" bị báo lỗi, không biến thành 15 / 5 / 125. FE và BE (AssetFieldsValidator) cùng một luật số nguyên.
+const INT_RE = /^\d+$/;
+const GROUPED_RE = /^\d{1,3}([.,\s]\d{3})+$/;
+export const normalizeNumber = (raw) => {
+    const v = (raw || '').trim();
+    return GROUPED_RE.test(v) ? v.replace(/[.,\s]/g, '') : v;
+};
+
+// Lỗi của MỘT ô (rỗng = hợp lệ hoặc chưa nhập): kiểu dữ liệu số và pattern từ BE
+export function fieldError(f, raw) {
+    const t = i18n.getFixedT(null, 'vault');
+    const v = (raw || '').trim();
+    if (!v) return '';
+    const label = t(`assetFields.labels.${f.key}`, { defaultValue: f.label });
+    if (f.type === 'NUMBER' && !INT_RE.test(normalizeNumber(v))) return t('assetFields.errors.numberInvalid', { label });
+    if (f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label });
+    return '';
+}
+
 // Trả về thông báo lỗi đầu tiên hoặc ''
 export function validateFields(schema, values, isEdit) {
     const t = i18n.getFixedT(null, 'vault');
@@ -48,15 +69,20 @@ export function validateFields(schema, values, isEdit) {
         const v = (values[f.key] || '').trim();
         const fieldLabel = t(`assetFields.labels.${f.key}`, { defaultValue: f.label });
         if (!v && f.required && !(isEdit && f.sensitive)) return t('assetFields.errors.fieldRequired', { label: fieldLabel });
-        if (v && f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label: fieldLabel });
+        const bad = fieldError(f, v);
+        if (bad) return bad;
     }
     return '';
 }
 
-// Chỉ gửi trường có giá trị
-export function cleanFields(values) {
+// Chỉ gửi trường có giá trị; trường NUMBER gửi chuỗi chữ số đã bỏ dấu ngăn nghìn
+export function cleanFields(values, schema) {
+    const numberKeys = new Set((schema?.fields || []).filter((f) => f.type === 'NUMBER').map((f) => f.key));
     const out = {};
-    Object.entries(values).forEach(([k, v]) => { if (v && String(v).trim()) out[k] = String(v).trim(); });
+    Object.entries(values).forEach(([k, v]) => {
+        if (!v || !String(v).trim()) return;
+        out[k] = numberKeys.has(k) ? normalizeNumber(String(v).trim()) : String(v).trim();
+    });
     return out;
 }
 
@@ -71,6 +97,7 @@ const MECHANISM_ICON = {
 export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = 'asset-field' }) {
     const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
+    const [touched, setTouched] = useState({});
     const publicFields = schema.fields.filter((f) => f.type !== 'SECRET');
     const secretFields = schema.fields.filter((f) => f.type === 'SECRET');
 
@@ -83,7 +110,19 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
         const set = (e) => onChange(f.key, e.target.value);
         const v = values[f.key] || '';
         // Không dùng thuộc tính required của trình duyệt: hàng tài sản để trống phải được bỏ qua, validateFields lo phần kiểm tra
-        const common = { id, value: v, onChange: set, 'aria-describedby': hintId, 'aria-required': f.required && !(isEdit && f.sensitive) };
+        // Báo lỗi kiểu dữ liệu ngay khi gõ sai (ô đã có giá trị) hoặc khi rời ô
+        const err = (touched[f.key] || v) ? fieldError(f, v) : '';
+        const errId = err ? `${id}-err` : undefined;
+        // Chỉ mô tả bằng phần tử đang hiển thị: lỗi thay chỗ gợi ý
+        const describedBy = err ? errId : (hint ? hintId : undefined);
+        const common = {
+            id, value: v, onChange: set,
+            onBlur: () => setTouched((s) => ({ ...s, [f.key]: true })),
+            'aria-describedby': describedBy,
+            'aria-invalid': err ? true : undefined,
+            'aria-required': f.required && !(isEdit && f.sensitive),
+        };
+        const errCls = err ? ' lv-field-invalid' : '';
         return (
             <div key={f.key} className={f.type === 'TEXTAREA' ? 'sm:col-span-2' : ''}>
                 <label htmlFor={id} className="block text-sm font-semibold text-on-surface mb-1.5">
@@ -101,17 +140,17 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
                 )}
                 {f.type === 'TEXTAREA' && (
                     <textarea {...common} rows={3} maxLength={2000} placeholder={example}
-                              className={`${inputClass} h-auto min-h-24 py-3 leading-relaxed`} />
+                              className={`${inputClass} h-auto min-h-24 py-3 leading-relaxed${errCls}`} />
                 )}
                 {(f.type === 'TEXT' || f.type === 'NUMBER') && (
-                    <input {...common} type={f.type === 'NUMBER' ? 'number' : 'text'} min={f.type === 'NUMBER' ? 0 : undefined}
-                           inputMode={f.type === 'NUMBER' ? 'numeric' : undefined}
-                           maxLength={500} placeholder={example} className={inputClass} />
+                    <input {...common} type="text"
+                           inputMode={f.type === 'NUMBER' ? 'decimal' : undefined}
+                           maxLength={500} placeholder={example} className={inputClass + errCls} />
                 )}
                 {f.type === 'SECRET' && (
                     <div className="relative">
                         <input {...common} type={shown[f.key] ? 'text' : 'password'} maxLength={2000}
-                               autoComplete="new-password" className={`${inputClass} pr-12 bg-surface-container-lowest`}
+                               autoComplete="new-password" className={`${inputClass} pr-12 bg-surface-container-lowest${errCls}`}
                                placeholder={isEdit ? t('assetFields.keepCurrentPlaceholder') : example} />
                         <button type="button" onClick={() => setShown((s) => ({ ...s, [f.key]: !s[f.key] }))}
                                 aria-label={translatedLabel} aria-pressed={!!shown[f.key]}
@@ -120,7 +159,11 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
                         </button>
                     </div>
                 )}
-                {hint && <p id={hintId} className="mt-1.5 text-xs text-on-surface-variant">{hint}</p>}
+                {err
+                    // role="alert" chỉ khi đã rời ô; đang gõ thì aria-live polite để trình đọc màn hình không đọc lại từng phím
+                    ? <p id={errId} role={touched[f.key] ? 'alert' : undefined} aria-live={touched[f.key] ? undefined : 'polite'}
+                         className="mt-1.5 text-xs font-semibold text-error">{err}</p>
+                    : hint && <p id={hintId} className="mt-1.5 text-xs text-on-surface-variant">{hint}</p>}
             </div>
         );
     };

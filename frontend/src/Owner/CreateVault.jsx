@@ -90,7 +90,7 @@ export default function CreateVault() {
                     await ownerApi.addAsset(vault.id, {
                         assetType: a.assetType,
                         assetName: a.assetName.trim(),
-                        fields: cleanFields(a.fields),
+                        fields: cleanFields(a.fields, schemaOf(schemas, a.assetType)),
                         notes: a.notes.trim() || null,
                     });
                 } catch {

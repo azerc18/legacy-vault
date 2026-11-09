@@ -74,7 +74,6 @@
     "verifyOn": "Verify and turn on",
     "verifying": "Verifying...",
     "disableHint": "Enter a code from your authenticator app or one of your backup codes to turn off 2FA.",
-    "disablePlaceholder": "123456 or XXXX-XXXX",
     "confirmOff": "Turn off 2FA",
     "backupTitle": "Save your backup codes",
     "backupWarning": "Store these codes somewhere safe. Each code works once if you lose your phone. They will not be shown again.",

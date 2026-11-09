@@ -12,6 +12,13 @@ const formatVnd = (n) =>
         : '0 ₫';
 
 const PROVIDER_LABEL = { VNPAY: 'VNPay', PAYPAL: 'PayPal' };
+const PROVIDER_ICON = { VNPAY: 'qr_code_2', PAYPAL: 'account_balance_wallet' };
+
+// Biểu tượng cổng thanh toán. Chưa có logo chính thức trong public/brand nên dùng biểu tượng; khi có file thì
+// đổi thành <img> trực tiếp (không dò file lúc chạy để tránh 404 ở mỗi lần mở trang).
+function ProviderMark({ code }) {
+    return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
+}
 
 // n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
 const yearlySavingPercent = (plans) => {
@@ -116,15 +123,22 @@ export default function PricingPage() {
                     <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
                     <div className="flex flex-wrap gap-4">
                         {providers.map((code) => (
-                            <label key={code} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <label key={code}
+                                   className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 ${
+                                       provider === code
+                                           ? 'border-secondary bg-secondary/10'
+                                           : 'border-outline-variant/50 hover:border-outline'}`}>
                                 <input
                                     type="radio"
                                     name="payment-provider"
                                     value={code}
                                     checked={provider === code}
                                     onChange={() => setProvider(code)}
+                                    className="sr-only"
                                 />
-                                {PROVIDER_LABEL[code] ?? code}
+                                <ProviderMark code={code} />
+                                <span className="text-sm font-semibold">{PROVIDER_LABEL[code] ?? code}</span>
+                                {provider === code && <Icon name="check_circle" className="text-[18px] text-secondary" />}
                             </label>
                         ))}
                     </div>

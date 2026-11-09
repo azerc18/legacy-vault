@@ -74,7 +74,6 @@
     "verifyOn": "Xác nhận và bật",
     "verifying": "Đang kiểm tra...",
     "disableHint": "Nhập mã từ ứng dụng xác thực hoặc một mã dự phòng để tắt xác thực 2 lớp.",
-    "disablePlaceholder": "123456 hoặc XXXX-XXXX",
     "confirmOff": "Tắt xác thực 2 lớp",
     "backupTitle": "Lưu các mã dự phòng",
     "backupWarning": "Hãy cất các mã này ở nơi an toàn. Mỗi mã dùng được 1 lần khi bạn mất điện thoại. Mã sẽ không được hiển thị lại.",

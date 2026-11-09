@@ -240,7 +240,6 @@ export default function Login() {
                             inputMode={useBackup ? 'text' : 'numeric'}
                             autoComplete="one-time-code"
                             maxLength={useBackup ? 9 : 6}
-                            placeholder={useBackup ? 'XXXX-XXXX' : '123456'}
                             className={`${inputCls} text-center text-xl tracking-[0.3em] font-semibold`}
                         />
                         <button

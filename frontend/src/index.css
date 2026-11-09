@@ -271,6 +271,12 @@ body.lv-has-side #root {
   body.lv-side-collapsed .lv-side-user {
     gap: 8px;
   }
+  /* Thanh bên thu nhỏ chỉ rộng 52px: nút giao diện sáng/tối và chuông phải xếp dọc, nếu để hàng ngang thì chuông bị cắt */
+  body.lv-side-collapsed .lv-side-tools-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
   body.lv-side-collapsed .lv-lang {
     flex-direction: column;
     height: auto;
@@ -439,3 +445,7 @@ html.lv-snap .lv-landing footer[data-mode] {
   mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
 }
 
+/* Ô nhập sai kiểu dữ liệu: viền đỏ. Dùng box-shadow !important vì glass-inline đã đặt border !important. */
+.lv-field-invalid {
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.8) !important;
+}

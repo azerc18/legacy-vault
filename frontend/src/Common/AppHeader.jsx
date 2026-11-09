@@ -454,7 +454,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
 
                 <div className="lv-side-tools flex items-center justify-between gap-2 w-full">
                     <LanguageSwitch variant="dark" className="lv-lang shrink-0" />
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="lv-side-tools-actions flex items-center gap-2 shrink-0">
                         <ThemeToggle variant="dark" />
                         {extra}
                     </div>
