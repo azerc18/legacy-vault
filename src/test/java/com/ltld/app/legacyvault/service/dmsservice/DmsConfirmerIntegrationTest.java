@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.service.auditservice.AuditMailListener;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.entity.*;
@@ -49,6 +50,10 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
     private EmailSender emailSender;                                     // không gửi mail thật
     @MockitoBean
     private ExecutorNotificationService executorNotificationService;   // không gửi mail thật
+    // Mail theo audit (#224) chạy @Async trên thread khác và gọi emailSender ngay sau upsertConfig/checkIn.
+    // Nếu nó chen vào giữa doThrow(..).when(emailSender) thì Mockito báo UnfinishedStubbing (test chập chờn).
+    @MockitoBean
+    private AuditMailListener auditMailListener;
     // T1 đã merge: thêm người xác nhận là tính năng VIP; test này về luồng xác nhận, không về gói (gói có test riêng)
     @MockitoSpyBean
     private EntitlementServiceImpl entitlementService;
