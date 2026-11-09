@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import BrandMark from './BrandMark.jsx';
+import OnboardingGuideModal, { ONBOARDING_STORAGE_KEY, openOnboardingGuide } from './OnboardingGuideModal.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -68,6 +69,24 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
         ? navProp
         : defaultNav(pathname, Array.isArray(user?.roles) ? user.roles : []).map(({ key, ...n }) => ({ ...n, label: t(`nav.${key}`) }));
     const { t: tPayment } = useTranslation('payment');
+    const { t: tOnboarding } = useTranslation('onboarding');
+    const [guideAutoOpen, setGuideAutoOpen] = useState(false);
+
+    useEffect(() => {
+        if (!user) return undefined;
+        try {
+            const seen = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+            if (!seen) {
+                const timer = setTimeout(() => {
+                    setGuideAutoOpen(true);
+                }, 800);
+                return () => clearTimeout(timer);
+            }
+        } catch {
+            // ignore
+        }
+        return undefined;
+    }, [user?.email]);
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
     const [vipStatus, setVipStatus] = useState(() => {
@@ -193,6 +212,16 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     </Link>
                 )}
                 <div className="lv-side-tools flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={openOnboardingGuide}
+                        title={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
+                        aria-label={tOnboarding('openGuide', 'Hướng dẫn tân thủ & Tính năng mới')}
+                        className="h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                    >
+                        <Icon name="school" className="text-[17px] text-amber-300" />
+                        <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
+                    </button>
                     <LanguageSwitch variant="dark" className="lv-lang" />
                     <ThemeToggle variant="dark" />
                     {extra}
@@ -208,6 +237,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                     </button>
                 </div>
             </div>
+            <OnboardingGuideModal defaultOpen={guideAutoOpen} />
         </header>
     );
 }

@@ -1,0 +1,74 @@
+{
+  "guideBtn": "Hướng dẫn",
+  "openGuide": "Hướng dẫn tân thủ & Tính năng mới",
+  "welcomeTitle": "HƯỚNG DẪN TÂN THỦ · NHẬP MÔN LEGACYVAULT",
+  "welcomeSubtitle": "4 bước cốt lõi để làm chủ hệ thống bảo vệ và bàn giao di sản số",
+  "stepBadge": "Nhiệm vụ {{current}}/{{total}}",
+  "skip": "Bỏ qua",
+  "prev": "Quay lại",
+  "next": "Tiếp theo",
+  "finish": "Bắt đầu khám phá",
+  "dontShowAgain": "Đã hiểu, không tự động hiển thị lại khi đăng nhập",
+  "reopenHint": "Bạn có thể mở lại hướng dẫn này bất cứ lúc nào từ thanh menu.",
+  "newFeatureTag": "MỚI MỞ KHÓA",
+  "banner": {
+    "title": "Bạn là người dùng mới?",
+    "subtitle": "Xem hướng dẫn tân thủ 4 bước để hiểu cách hoạt động của Két sắt, DMS và Xác thực tài sản số.",
+    "action": "Xem hướng dẫn"
+  },
+  "steps": [
+    {
+      "key": "vault",
+      "tag": "TRỤ CỘT 1 · CƠ BẢN",
+      "title": "Khởi tạo Két Sắt & Mã Hóa Đầu Cuối (E2E Vault)",
+      "subtitle": "Bảo vệ thông tin bí mật với chuẩn mã hóa cấp quân sự AES-256",
+      "description": "Két sắt số là nơi bạn lưu trữ toàn bộ di sản số: tài khoản ngân hàng, mật khẩu, tài sản crypto và tài liệu thừa kế. Dữ liệu nhạy cảm được mã hóa trước khi lưu trữ — ngay cả máy chủ và quản trị viên cũng không thể đọc được nội dung của bạn.",
+      "points": [
+        "Mã hóa đầu cuối: Chỉ bạn và người được ủy quyền mới có khóa giải mã",
+        "Hỗ trợ 8 loại tài sản chuyên biệt: Ngân hàng, Tiền mã hóa, Mạng xã hội, Email, v.v.",
+        "Phân tách két độc lập: Tạo các két riêng biệt cho Gia đình, Công việc và Tài chính"
+      ],
+      "tip": "Mẹo tân thủ: Bắt đầu bằng việc bấm '+ Tạo két mới' và lưu trữ những thông tin quan trọng nhất trước."
+    },
+    {
+      "key": "guardians",
+      "tag": "TRỤ CỘT 2 · CHỈ ĐỊNH",
+      "title": "Người Thụ Hưởng & Người Thực Thi (Guardians & Heirs)",
+      "subtitle": "Thiết lập mạng lưới bàn giao an toàn và minh bạch",
+      "description": "LegacyVault phân định rõ ràng giữa người nhận tài sản và người hỗ trợ làm thủ tục pháp lý. Bạn toàn quyền quyết định ai nhận tài sản gì, và ai là người được ủy quyền đại diện xử lý di nguyện.",
+      "points": [
+        "Người thụ hưởng (Beneficiary): Nhận tài sản và tài liệu theo di nguyện khi két mở khóa",
+        "Người thực thi (Executor): Kiểm tra thực địa, nộp hồ sơ pháp lý và bàn giao tài sản",
+        "Cơ chế chuyển giao linh hoạt: Toàn bộ, chia tỷ lệ, độc quyền hoặc đồng thuận đa bên (Shamir)"
+      ],
+      "tip": "Mẹo tân thủ: Nên chỉ định người thân làm Người thụ hưởng và bạn thân hoặc luật sư uy tín làm Người thực thi."
+    },
+    {
+      "key": "dms",
+      "tag": "TRỤ CỘT 3 · AN TOÀN",
+      "title": "Công Tắc Tự Động (Dead Man's Switch - DMS)",
+      "subtitle": "Bàn giao di sản đúng thời điểm mà không sợ kích hoạt nhầm",
+      "description": "Hệ thống tự động theo dõi trạng thái của bạn thông qua các lần Check-in định kỳ (qua Web hoặc Email 1-chạm). Nếu bạn vắng mặt quá thời hạn cam kết, quy trình kiểm chứng an toàn 3 lớp sẽ bắt đầu trước khi mở khóa.",
+      "points": [
+        "Check-in 1-chạm thuận tiện từ Email hoặc trang quản lý của bạn",
+        "Người xác nhận chéo (Confirmer): Xác thực tình trạng thực tế trước khi kích hoạt",
+        "Cảnh báo leo thang 3 lớp: Gửi email nhắc nhở liên tục trước khi đến hạn chót"
+      ],
+      "tip": "Mẹo tân thủ: Hãy thêm ít nhất một Người xác nhận chéo đáng tin cậy để tránh tình trạng kích hoạt ngoài ý muốn."
+    },
+    {
+      "key": "forensics",
+      "tag": "MỚI MỞ KHÓA · TÍNH NĂNG MỚI",
+      "title": "Giám Định AI OCR & Xác Thực Tài Sản Đa Phương Thức",
+      "subtitle": "Đảm bảo tính chân thực và toàn vẹn của hồ sơ thừa kế",
+      "description": "LegacyVault vừa cập nhật bộ tính năng giám định nâng cao giúp xác thực tính chính chủ và tính pháp lý của hồ sơ trước khi chuyển giao:",
+      "points": [
+        "AI OCR Giấy chứng tử (Gemini 3.6 Flash): Tự động bóc tách họ tên, số trích lục, cơ quan cấp và dấu mộc đỏ",
+        "Ký thông điệp ví Crypto (Personal Sign): Chứng minh quyền kiểm soát ví MetaMask qua chữ ký secp256k1 ecRecover mà không để lộ khóa bí mật",
+        "Xác thực OTP Email & SMS Sandbox: Xác minh chính chủ hộp thư và số điện thoại ví điện tử",
+        "Dấu vân tay số (Asset Fingerprint): Tự động phát hiện nếu tài sản bị chỉnh sửa sau khi xác thực"
+      ],
+      "tip": "Mẹo tân thủ: Trong trang chi tiết Két sắt, bấm vào huy hiệu trạng thái của từng tài sản để trải nghiệm các phương thức xác thực mới!"
+    }
+  ]
+}

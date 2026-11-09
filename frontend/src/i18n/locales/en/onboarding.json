@@ -1,0 +1,74 @@
+{
+  "guideBtn": "Guide",
+  "openGuide": "Newbie Guide & Feature Discovery",
+  "welcomeTitle": "NEWBIE GUIDE · LEGACYVAULT QUEST",
+  "welcomeSubtitle": "4 core steps to master digital legacy protection and automated handover",
+  "stepBadge": "Quest {{current}}/{{total}}",
+  "skip": "Skip",
+  "prev": "Back",
+  "next": "Next",
+  "finish": "Start Exploring",
+  "dontShowAgain": "Understood, do not show automatically on login",
+  "reopenHint": "You can reopen this guide anytime from the menu bar.",
+  "newFeatureTag": "NEWLY UNLOCKED",
+  "banner": {
+    "title": "New to LegacyVault?",
+    "subtitle": "Explore our 4-step walkthrough to master Vaults, DMS, and Digital Asset Verification.",
+    "action": "View Guide"
+  },
+  "steps": [
+    {
+      "key": "vault",
+      "tag": "PILLAR 1 · FOUNDATION",
+      "title": "Create Vault & End-to-End Encryption (E2E)",
+      "subtitle": "Protect sensitive credentials with military-grade AES-256 encryption",
+      "description": "Digital vaults safeguard your sensitive digital legacy: bank accounts, passwords, crypto assets, and inheritance documents. All sensitive data is encrypted before storage — not even server administrators can read your secrets.",
+      "points": [
+        "End-to-end encryption: Only you and designated guardians hold decryption capability",
+        "8 specialized asset types: Banking, Cryptocurrency, Social Media, Email, and more",
+        "Independent vaults: Separate vaults for Family, Work, and Financial assets"
+      ],
+      "tip": "Pro-tip: Start by clicking '+ New Vault' to store your most critical assets and instructions."
+    },
+    {
+      "key": "guardians",
+      "tag": "PILLAR 2 · DELEGATION",
+      "title": "Beneficiaries & Executors (Guardians & Heirs)",
+      "subtitle": "Establish a secure, transparent handover network",
+      "description": "LegacyVault cleanly separates asset recipients from legal procedural agents. You decide exactly who receives which assets and who is authorized to carry out your wishes.",
+      "points": [
+        "Beneficiary: Receives designated assets and documents when the vault unlocks",
+        "Executor: Conducts forensic checks, submits legal filings, and oversees handover",
+        "Flexible allocations: Exclusive, proportional, full, or multi-party joint consensus (Shamir)"
+      ],
+      "tip": "Pro-tip: Assign trusted family members as Beneficiaries and trusted counsel as Executors."
+    },
+    {
+      "key": "dms",
+      "tag": "PILLAR 3 · SAFETY",
+      "title": "Dead Man's Switch & Presence Tracking (DMS)",
+      "subtitle": "Hand over your legacy on time with zero false alarms",
+      "description": "The system monitors your presence via periodic check-ins (via Web or 1-click email). If you miss a deadline, a 3-layer safeguard workflow begins before any vault is unlocked.",
+      "points": [
+        "1-click check-in: Effortlessly confirm you are safe from email or website",
+        "Cross-confirmers: Real-world witnesses verify condition before activation",
+        "3-tier escalation: Proactive notifications sent before any trigger"
+      ],
+      "tip": "Pro-tip: Add at least one reliable cross-confirmer to prevent unintended activations."
+    },
+    {
+      "key": "forensics",
+      "tag": "NEWLY UNLOCKED · FEATURE SPOTLIGHT",
+      "title": "AI OCR Forensics & Multi-Proof Asset Verification",
+      "subtitle": "Ensure authenticity and integrity of digital assets",
+      "description": "LegacyVault now features advanced forensic verification tools to prove ownership and legal validity before handover:",
+      "points": [
+        "Death Certificate AI OCR (Gemini 3.6 Flash): Automatically extracts names, registry numbers, seals, and issuing authorities",
+        "Crypto Wallet Signature (Personal Sign): Proves MetaMask ownership via secp256k1 ecRecover without revealing private keys",
+        "Email OTP & SMS Sandbox: Verifies ownership of inboxes and e-wallet phone numbers",
+        "Cryptographic Fingerprint: Instantly invalidates verified status if asset metadata is modified"
+      ],
+      "tip": "Pro-tip: In any Vault detail page, click the verification status badge to test out the new verification methods!"
+    }
+  ]
+}
