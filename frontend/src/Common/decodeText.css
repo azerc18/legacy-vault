@@ -1,0 +1,4 @@
+/* Chữ "giải mã" (DecodeText.jsx): phần đã khoá giữ màu chữ của khối cha, phần đang nhảy có màu nhấn và phát sáng nhẹ */
+.lv-decode-line { display: block; white-space: pre-wrap; }
+.lv-decode-noise--gold { color: rgba(246, 227, 176, .75); text-shadow: 0 0 14px rgba(246, 227, 176, .35); }
+.lv-decode-noise--blue { color: rgba(185, 201, 255, .8); text-shadow: 0 0 16px rgba(143, 164, 255, .45); }

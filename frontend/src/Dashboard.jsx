@@ -1,10 +1,13 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
 import BrandMark from './Common/BrandMark.jsx';
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
+import { DecodeLoop } from './Common/DecodeText.jsx';
+import CipherField from './Common/CipherField.jsx';
+import { useReducedMotion } from 'motion/react';
 import { Tilt, TiltContent } from '@animate-ui/react/primitives/effects/tilt';
 import { Magnetic } from '@animate-ui/react/primitives/effects/magnetic';
 import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
@@ -79,6 +82,12 @@ function Icon({ name, className = '' }) {
 // ---------- Trang ----------
 export default function Dashboard() {
     const { t } = useTranslation('landing');
+    const reduceMotion = useReducedMotion();
+    // Tiêu đề hero chia dòng sẵn trong i18n (hero.titleLines); thiếu thì dùng cả câu
+    const heroLines = useMemo(() => {
+        const l = t('hero.titleLines', { returnObjects: true });
+        return Array.isArray(l) && l.length ? l : [t('hero.title')];
+    }, [t]);
     const [openFaq, setOpenFaq] = useState(0);
     const [mode, setMode] = useState('dark');
     const rootRef = useRef(null);
@@ -267,14 +276,15 @@ export default function Dashboard() {
 
             {/* 1. HERO */}
             <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center">
+                <CipherField />
                 <img src="/key-photo.jpg" alt="" aria-hidden="true"
                      className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
                      style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
                 <div className="relative max-w-3xl mx-auto">
-                    <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight pb-2">
-                        {t('hero.title').split(' ').map((w, i) => (
-                            <span key={i} className="lv-word lv-shine inline-block pb-[0.14em] mr-[0.25em]" style={{ animationDelay: `${0.12 * i}s, ${1.6 + 0.12 * i}s` }}>{w}</span>
-                        ))}
+                    {/* Tiêu đề "giải mã" lặp lại (dùng chung với trang đăng nhập) */}
+                    <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight pb-2"
+                        aria-label={t('hero.title')}>
+                        <DecodeLoop lines={heroLines} reduce={reduceMotion} startDelay={0.2} noiseClassName="lv-decode-noise--blue" />
                     </h1>
                     <p className="lv-hero-rv mt-5 text-body-lg text-white/80">{t('hero.text')}</p>
                     <div className="lv-hero-rv mt-8 flex flex-col sm:flex-row gap-3 justify-center items-center">
