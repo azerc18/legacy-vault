@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.verificationtokenservice;
 import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
+import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
@@ -10,9 +11,12 @@ import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
+import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.*;
+import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -34,6 +38,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -67,6 +72,9 @@ public class VerificationTokenServiceImplTest {
 
     @Mock
     private VaultBeneficiaryRepository vaultBeneficiaryRepository;
+
+    @Mock
+    private BeneficiaryClaimRepository claimRepository;
 
     @InjectMocks
     private VerificationTokenServiceImpl tokenService;
@@ -421,6 +429,72 @@ public class VerificationTokenServiceImplTest {
             assertThat(row.getStatus()).isEqualTo(BeneficiaryInviteStatus.INVITED);
         }
         verify(vaultBeneficiaryRepository).saveAll(List.of(firstRow, secondRow));
+    }
+
+    @Test
+    void linkPendingBeneficiaryVaults_vaultAlreadyUnlocked_createsPendingClaimWithVaultDeadline() {
+        User user = pendingUser();
+        LocalDateTime deadline = LocalDateTime.now().plusDays(60);
+        Vault unlocked = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.UNLOCKED)
+                .claimDeadlineAt(deadline).build();
+        VaultBeneficiary row = VaultBeneficiary.builder().vault(unlocked).email("test@example.com").build();
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com")).thenReturn(List.of());
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com")).thenReturn(List.of(row));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(unlocked.getId(), user.getId())).thenReturn(Optional.empty());
+
+        tokenService.linkPendingBeneficiaryVaults(user);
+
+        ArgumentCaptor<BeneficiaryClaim> captor = ArgumentCaptor.forClass(BeneficiaryClaim.class);
+        verify(claimRepository).save(captor.capture());
+        BeneficiaryClaim claim = captor.getValue();
+        assertThat(claim.getVault()).isSameAs(unlocked);
+        assertThat(claim.getBeneficiary()).isSameAs(user);
+        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.PENDING);
+        assertThat(claim.getClaimDeadlineAt()).isEqualTo(deadline);
+    }
+
+    @Test
+    void linkPendingBeneficiaryVaults_claimAlreadyExists_doesNotCreateAnother() {
+        User user = pendingUser();
+        Vault unlocked = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.UNLOCKED)
+                .claimDeadlineAt(LocalDateTime.now().plusDays(60)).build();
+        VaultBeneficiary row = VaultBeneficiary.builder().vault(unlocked).email("test@example.com").build();
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com")).thenReturn(List.of());
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com")).thenReturn(List.of(row));
+        when(claimRepository.findByVaultIdAndBeneficiaryId(unlocked.getId(), user.getId()))
+                .thenReturn(Optional.of(BeneficiaryClaim.builder().build()));
+
+        tokenService.linkPendingBeneficiaryVaults(user);
+
+        verify(claimRepository, never()).save(any());
+    }
+
+    @Test
+    void linkPendingBeneficiaryVaults_unlockedVaultWithoutDeadline_doesNotCreateClaim() {
+        User user = pendingUser();
+        Vault noDeadline = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.UNLOCKED).build();
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com")).thenReturn(List.of());
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com")).thenReturn(List.of(
+                VaultBeneficiary.builder().vault(noDeadline).email("test@example.com").build()));
+
+        tokenService.linkPendingBeneficiaryVaults(user);
+
+        verifyNoInteractions(claimRepository);
+    }
+
+    @Test
+    void linkPendingBeneficiaryVaults_vaultNotUnlocked_doesNotCreateClaim() {
+        User user = pendingUser();
+        Vault active = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.ACTIVE).build();
+        Vault claimed = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.CLAIMED).build();
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com")).thenReturn(List.of());
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com")).thenReturn(List.of(
+                VaultBeneficiary.builder().vault(active).email("test@example.com").build(),
+                VaultBeneficiary.builder().vault(claimed).email("test@example.com").build()));
+
+        tokenService.linkPendingBeneficiaryVaults(user);
+
+        verifyNoInteractions(claimRepository);
     }
 
     @Test

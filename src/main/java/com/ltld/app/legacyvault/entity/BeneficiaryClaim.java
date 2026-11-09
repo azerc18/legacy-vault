@@ -53,4 +53,18 @@ public class BeneficiaryClaim {
     // FR-16 (R1): thời điểm thử gửi gần nhất, dùng để giãn cách các lần thử lại
     @Column(name = "last_notify_attempt_at")
     private LocalDateTime lastNotifyAttemptAt;
+
+    /**
+     * Claim PENDING mới cho một người thụ hưởng, hạn nhận lấy theo hạn của Vault. Dùng chung cho lúc Vault mở khóa
+     * (BeneficiaryNotificationListener) và lúc người thụ hưởng đăng ký sau khi Vault đã mở khóa
+     * (VerificationTokenServiceImpl), để hai đường tạo claim không lệch nhau.
+     */
+    public static BeneficiaryClaim pendingFor(Vault vault, User beneficiary) {
+        return BeneficiaryClaim.builder()
+                .vault(vault)
+                .beneficiary(beneficiary)
+                .status(ClaimStatus.PENDING)
+                .claimDeadlineAt(vault.getClaimDeadlineAt())
+                .build();
+    }
 }
