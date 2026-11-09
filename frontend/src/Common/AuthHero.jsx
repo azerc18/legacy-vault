@@ -129,6 +129,83 @@ function Rotator({ words, start, reduce }) {
     );
 }
 
+/* ---------------- Tiêu đề "giải mã" từng dòng rồi lặp lại ----------------
+ * Mỗi dòng: ký tự ngẫu nhiên (chỉ chữ cái và số) nhảy liên tục rồi lần lượt "khoá" thành chữ thật
+ * từ trái sang phải; dòng sau bắt đầu trễ LINE_GAP. Giải mã xong giữ HOLD giây, rồi cả tiêu đề
+ * mờ đi cùng lúc (FADE) và bắt đầu vòng mới. Hợp với ý "mã hoá đầu cuối" của sản phẩm.
+ * Cập nhật ~30 khung/giây bằng requestAnimationFrame (tab ẩn thì trình duyệt tự dừng). */
+const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const DECODE = 1.1;      // giây để giải mã xong một dòng
+const LINE_GAP = 0.35;   // dòng sau bắt đầu trễ
+const HOLD = 3;          // giữ nguyên để đọc (tính từ lúc dòng cuối giải mã xong)
+const FADE = 0.45;       // cả tiêu đề mờ đi cùng lúc
+const PAUSE = 0.35;      // nghỉ trống trước vòng mới
+
+const randGlyph = () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+
+/** Một dòng tại thời điểm u (giây, tính từ lúc dòng này bắt đầu); trả về [phần đã giải mã, phần đang nhảy]. */
+function frameOf(text, u) {
+    const n = text.length;
+    if (u < 0) return ['', ''];
+    if (u >= DECODE) return [text, ''];
+    const scramble = (from, to) => [...text.slice(from, to)].map((c) => (c === ' ' ? ' ' : randGlyph())).join('');
+    // Ký tự hiện dần (đang nhảy) và khoá dần, khoá chậm hơn hiện một nhịp
+    const shown = Math.ceil(n * easeOut(Math.min(1, u / (DECODE * 0.55))));
+    const locked = Math.floor(n * easeOut(Math.max(0, (u - DECODE * 0.25) / (DECODE * 0.75))));
+    return [text.slice(0, locked), scramble(locked, shown)];
+}
+
+function DecodeLoop({ lines, reduce, startDelay }) {
+    const [state, setState] = useState(() => ({ frames: lines.map(() => ['', '']), opacity: 1 }));
+
+    useEffect(() => {
+        if (reduce) return undefined;
+        const decoded = DECODE + LINE_GAP * (lines.length - 1);   // lúc dòng cuối giải mã xong
+        const fadeAt = decoded + HOLD;
+        const cycle = fadeAt + FADE + PAUSE;
+        const t0 = performance.now() + startDelay * 1000;
+        let raf = 0;
+        let last = 0;
+        const tick = (now) => {
+            raf = requestAnimationFrame(tick);
+            if (now - last < 33) return;   // ~30 khung/giây là đủ cho hiệu ứng nhảy chữ
+            last = now;
+            const elapsed = (now - t0) / 1000;
+            if (elapsed < 0) return;
+            const tc = elapsed % cycle;
+            if (tc >= fadeAt + FADE) {   // đã mờ hết: để trống chờ vòng mới
+                setState({ frames: lines.map(() => ['', '']), opacity: 1 });
+                return;
+            }
+            setState({
+                frames: lines.map((text, k) => frameOf(text, tc - k * LINE_GAP)),
+                opacity: tc < fadeAt ? 1 : 1 - (tc - fadeAt) / FADE,
+            });
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [lines, reduce, startDelay]);
+
+    if (reduce) {
+        return lines.map((l) => <span key={l} className="block">{l}</span>);
+    }
+    return (
+        <span className="block" style={{ opacity: state.opacity }} aria-hidden="true">
+            {lines.map((line, k) => {
+                const [done, noise] = state.frames[k] || ['', ''];
+                return (
+                    <span key={line} className="lv-hero-line">
+                        {done}
+                        <span className="lv-hero-noise">{noise}</span>
+                        {!done && !noise && '\u00a0'}
+                    </span>
+                );
+            })}
+        </span>
+    );
+}
+
 export default function AuthHero() {
     const { t } = useTranslation('auth');
     const reduce = useReducedMotion();
@@ -141,7 +218,11 @@ export default function AuthHero() {
         const w = t('brand.rotating', { returnObjects: true });
         return Array.isArray(w) ? w : [];
     }, [t]);
-    const titleWords = useMemo(() => t('brand.tagline').split(' '), [t]);
+    // Tiêu đề chia sẵn từng dòng trong i18n (brand.taglineLines); thiếu thì dùng cả câu làm một dòng
+    const titleLines = useMemo(() => {
+        const l = t('brand.taglineLines', { returnObjects: true });
+        return Array.isArray(l) && l.length ? l : [t('brand.tagline')];
+    }, [t]);
 
     useEffect(() => {
         introPlayed = true;
@@ -191,27 +272,17 @@ export default function AuthHero() {
             </motion.div>
 
             <div className="relative max-w-[520px] flex flex-col gap-5">
-                <h1 className="font-headline-lg text-[44px] leading-[1.1] font-semibold tracking-tight" aria-label={t('brand.tagline')}>
-                    {titleWords.map((w, k) => (
-                        <motion.span
-                            key={`${w}-${k}`}
-                            aria-hidden="true"
-                            className={`inline-block mr-[0.25em] ${k >= titleWords.length - 2 ? 'lv-hero-sheen' : ''}`}
-                            initial={replay || reduce ? false : { opacity: 0, y: '0.6em', filter: 'blur(8px)' }}
-                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                            transition={{ duration: 0.65, ease: EASE, delay: delay(0.3 + k * 0.07) }}
-                        >
-                            {w}
-                        </motion.span>
-                    ))}
+                <h1 className="font-headline-lg text-[44px] leading-[1.12] font-semibold tracking-tight min-h-[3.4em]"
+                    aria-label={t('brand.tagline')}>
+                    <DecodeLoop lines={titleLines} reduce={reduce} startDelay={replay ? 0 : 0.3} />
                 </h1>
 
-                <motion.p {...appear(0.3 + titleWords.length * 0.07 + 0.15)}
+                <motion.p {...appear(0.3 + titleLines.length * 0.25 + 0.15)}
                           className="font-headline-lg text-[52px] leading-none italic font-semibold tracking-tight text-[#f6e3b0] -mt-1">
                     <Rotator words={words} start={ready} reduce={reduce} />
                 </motion.p>
 
-                <motion.p {...appear(0.3 + titleWords.length * 0.07 + 0.3)} className="text-lg text-white/80">
+                <motion.p {...appear(0.3 + titleLines.length * 0.25 + 0.3)} className="text-lg text-white/80">
                     {t('brand.footer')}
                 </motion.p>
             </div>

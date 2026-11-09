@@ -21,26 +21,16 @@
 /* Lớp trôi theo chuột (parallax) */
 .lv-hero-parallax { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
 
-/* Vệt sáng quét qua chữ cuối của tiêu đề mỗi ~8s */
-.lv-hero-sheen {
-  background-image: linear-gradient(100deg, #fff 0%, #fff 40%, #f6e3b0 50%, #fff 60%, #fff 100%);
-  background-size: 250% 100%;
-  background-position: 100% 0;
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: lv-hero-sheen 8s ease-in-out 2.4s infinite;
-}
-@keyframes lv-hero-sheen {
-  0%, 70% { background-position: 100% 0; }
-  85%     { background-position: 0% 0; }
-  100%    { background-position: 0% 0; }
-}
+
+/* Tiêu đề "giải mã": phần đã khoá là chữ trắng, phần đang nhảy màu vàng nhạt, hơi mờ, phát sáng nhẹ */
+.lv-hero-line { display: block; white-space: pre-wrap; }
+.lv-hero-noise { color: rgba(246, 227, 176, .75); text-shadow: 0 0 14px rgba(246, 227, 176, .35); }
 
 /* Chữ "thời trang": từng ký tự trượt lên qua mặt nạ rồi trượt đi */
 .lv-hero-rotator { display: block; overflow: hidden; height: 1.2em; line-height: 1.2em; }
 .lv-hero-char { display: inline-block; will-change: transform, opacity; white-space: pre; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lv-hero-photo, .lv-hero-photo.is-replay, .lv-hero-sheen { animation: none; }
-  .lv-hero-sheen { color: #fff; background: none; }
+  .lv-hero-photo, .lv-hero-photo.is-replay { animation: none; }
   .lv-hero-parallax { transition: none; transform: none !important; }
 }
