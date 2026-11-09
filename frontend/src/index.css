@@ -137,11 +137,22 @@ textarea {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.lv-side::-webkit-scrollbar,
-.lv-side-nav::-webkit-scrollbar {
+.lv-side::-webkit-scrollbar {
   display: none;
   width: 0;
   height: 0;
+}
+/* Menu nhiều vai trò có thể dài hơn màn hình: giữ thanh cuộn mảnh để người dùng biết còn mục bên dưới */
+.lv-side-nav::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.lv-side-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+}
+.lv-side-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 .lv-side-top {
   padding: 2px 4px 8px;
@@ -155,8 +166,14 @@ textarea {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+/* Nhóm vai trò đang đóng: chỉ ẩn trên desktop, nơi có nút mở nhóm (điện thoại hiện mọi link trên một hàng cuộn ngang) */
+@media (min-width: 1024px) {
+  .lv-nav-section-items--closed {
+    display: none !important;   /* Tailwind CDN chèn <style> sau CSS của app, không có !important thì .flex thắng */
+  }
 }
 .lv-side-bottom {
   margin-top: auto;
@@ -266,10 +283,11 @@ body.lv-has-side #root {
     overflow-x: auto;
     order: 3;
     width: 100%;
+    flex: 0 0 100%;   /* bản desktop đặt flex: 1 (basis 0) làm hàng menu bị bóp lại khi xuống dòng */
   }
   .lv-nav-section,
   .lv-nav-section-items {
-    display: contents;
+    display: contents !important;   /* thắng .flex của Tailwind CDN để mọi link nằm trên một hàng cuộn ngang */
   }
   .lv-nav-section-header {
     display: none !important;
@@ -284,6 +302,20 @@ body.lv-has-side #root {
   .lv-side-bottom > div:last-child {
     border-top: 0;
     padding-top: 0;
+  }
+  /* Không để hàng nút dưới (Nâng cấp, ngôn ngữ, giao diện, tài khoản) đẩy trang rộng hơn màn hình */
+  .lv-side-bottom {
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media (max-width: 639px) {
+  .lv-side-user .lv-label {
+    display: none;
+  }
+  .lv-side-user {
+    flex: 0 0 auto;
   }
 }
 

@@ -1,5 +1,7 @@
 {
   "nav": {
+    "problem": "Vấn đề",
+    "assets": "Kho của bạn",
     "how": "Cách hoạt động",
     "security": "Bảo mật",
     "roles": "Vai trò",
@@ -103,8 +105,7 @@
       "legal": "Di chúc, giấy tờ nhà đất, hợp đồng bảo hiểm, kèm những gì cần để nhận.",
       "notes": "Thư riêng và lời dặn bạn muốn người thân đọc đúng lúc.",
       "files": "Ảnh và tài liệu quan trọng, được mã hoá trước khi lưu."
-    },
-    "hint": "Rê chuột hoặc chạm vào ô để mở"
+    }
   },
   "rolesSection": {
     "eyebrow": "Những ai tham gia",
@@ -153,7 +154,6 @@
     "eyebrow": "Xem trước",
     "title": "Mọi thứ về di sản số, trong một màn hình",
     "text": "Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập.",
-    "hint": "Bản demo bấm thử được: chuyển trang ở cột trái và thử các nút.",
     "demo": {
       "name": "An",
       "vaults": [
@@ -185,7 +185,7 @@
   "footerNav": {
     "tagline": "Giữ trọn di sản số, trao đúng người, đúng lúc.",
     "product": "SẢN PHẨM",
-    "features": "Tính năng",
+    "faq": "Câu hỏi thường gặp",
     "how": "Cách hoạt động",
     "security": "Bảo mật",
     "forWho": "DÀNH CHO",
@@ -193,13 +193,17 @@
     "beneficiary": "Người thụ hưởng",
     "executor": "Người thi hành",
     "verifier": "Người xác minh",
-    "account": "TÀI KHOẢN",
+    "start": "BẮT ĐẦU",
     "signIn": "Đăng nhập",
     "signUp": "Đăng ký",
-    "forgot": "Quên mật khẩu",
     "project": "DỰ ÁN",
     "contact": "Liên hệ nhóm",
     "legal1": "© 2026 LegacyVault · Dự án SWP391, FPT University",
     "legal2": "Đây là sản phẩm học tập, không thay thế tư vấn pháp lý."
+  },
+  "orb": {
+    "alt": "Hai bàn tay, một già một trẻ, cùng nâng quả cầu vàng chứa biểu tượng cú giữ khoá của LegacyVault",
+    "aria": "Mở khoá để đăng nhập vào LegacyVault",
+    "tip": "Bấm để đăng nhập"
   }
 }
