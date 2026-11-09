@@ -1,0 +1,21 @@
+/* Mưa ký tự nền chung của trang chủ: cố định sau toàn trang, mờ ở giữa màn hình để chữ luôn dễ đọc */
+.lv-cipher-rain {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.7s ease;
+  -webkit-mask-image: radial-gradient(ellipse 40% 52% at 50% 48%, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.4) 55%, #000 100%);
+          mask-image: radial-gradient(ellipse 40% 52% at 50% 48%, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.4) 55%, #000 100%);
+}
+/* Phần nền sáng: chỉ thoáng thấy chuyển động phía sau */
+.lv-cipher-rain[data-mode="light"] {
+  opacity: 0.09;
+}
+@media (max-width: 640px) {
+  .lv-cipher-rain { opacity: 0.32; }
+  .lv-cipher-rain[data-mode="light"] { opacity: 0.06; }
+}

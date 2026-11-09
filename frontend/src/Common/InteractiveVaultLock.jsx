@@ -758,16 +758,13 @@ export default function InteractiveVaultLock({
                         transform: `perspective(700px) translate3d(${cursor.pullX}px, ${cursor.pullY}px, 0) rotateX(${cursor.tiltX}deg) rotateY(${cursor.tiltY}deg)`,
                         transition: 'transform 140ms cubic-bezier(0.22, 1, 0.36, 1)',
                     }}
-                    className="group relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b9c9ff] rounded-3xl p-2 text-white"
+                    className="group relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#b9c9ff] rounded-3xl p-2 text-white flex flex-col items-center"
                 >
                     {renderOwlLockSvg('w-36 h-36 md:w-40 md:h-40', false)}
 
                     <span className="mt-2 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur text-xs font-semibold text-white tracking-wide group-hover:bg-white/20 transition-colors">
                         <span className="w-2 h-2 rounded-full bg-[#8fa4ff]" />
                         <span>{heroLabel}</span>
-                        <span className="text-[#b9c9ff] tabular-nums font-bold">
-                            {String(cursor.dialAngle).padStart(3, '0')}°
-                        </span>
                     </span>
                 </button>
             </div>

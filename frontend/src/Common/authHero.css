@@ -22,9 +22,6 @@
 .lv-hero-parallax { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
 
 
-/* Tiêu đề "giải mã": phần đã khoá là chữ trắng, phần đang nhảy màu vàng nhạt, hơi mờ, phát sáng nhẹ */
-.lv-hero-line { display: block; white-space: pre-wrap; }
-.lv-hero-noise { color: rgba(246, 227, 176, .75); text-shadow: 0 0 14px rgba(246, 227, 176, .35); }
 
 /* Chữ "thời trang": từng ký tự trượt lên qua mặt nạ rồi trượt đi */
 .lv-hero-rotator { display: block; overflow: hidden; height: 1.2em; line-height: 1.2em; }
