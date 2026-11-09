@@ -554,6 +554,7 @@ export default function SpotlightTour() {
         }
 
         left = Math.max(margin, Math.min(window.innerWidth - tooltipWidth - margin, left));
+        top = Math.max(margin, Math.min(window.innerHeight - tooltipHeight - margin, top));
 
         return {
             top: top + 'px',
