@@ -82,6 +82,8 @@
     "alerts": "Cảnh báo liên quan",
     "logs": "10 nhật ký gần nhất",
     "noVaults": "Chưa có kho nào.",
+    "assetVerifications": "Xác thực tài sản",
+    "noAssetVerifications": "Chưa có tài sản nào.",
     "noAlerts": "Không có cảnh báo nào.",
     "noLogs": "Chưa có nhật ký.",
     "on": "Bật",
