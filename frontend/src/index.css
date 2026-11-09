@@ -419,3 +419,19 @@ html.lv-snap .lv-landing footer[data-mode] {
   -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
   mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
 }
+
+/* Khóa cuộn trang khi Tour Onboarding đang chạy để chống lệch ô highlight / mất nút Next */
+html.lv-tour-locked,
+body.lv-tour-locked {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+}
+
+html.lv-tour-locked::-webkit-scrollbar,
+body.lv-tour-locked::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

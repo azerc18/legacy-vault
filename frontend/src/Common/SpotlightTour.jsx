@@ -314,7 +314,74 @@ export default function SpotlightTour() {
         };
     }, [activeTour, updateTargetRect]);
 
-    // 6. Click trực tiếp vào nút Tạo két ở Bước 1
+
+    // 6. Khóa cứng cuộn chuột & màn hình khi Tour Onboarding đang chạy (tránh làm lệch ô highlight và tooltip)
+    useEffect(() => {
+        const isLocked = Boolean(activeTour || showPrompt || showCongrats);
+        if (!isLocked) return undefined;
+
+        document.documentElement.classList.add('lv-tour-locked');
+        document.body.classList.add('lv-tour-locked');
+
+        // Chặn hoàn toàn cuộn chuột (wheel)
+        const handleWheel = (e) => {
+            // Cho phép cuộn bên trong tooltip nếu nội dung tooltip dài hơn chiều cao hiển thị
+            if (tooltipRef.current && tooltipRef.current.contains(e.target)) {
+                const el = tooltipRef.current;
+                if (el.scrollHeight > el.clientHeight) {
+                    e.stopPropagation();
+                    return;
+                }
+            }
+            e.preventDefault();
+        };
+
+        // Chặn vuốt chạm cuộn (touchmove)
+        const handleTouchMove = (e) => {
+            if (tooltipRef.current && tooltipRef.current.contains(e.target)) {
+                const el = tooltipRef.current;
+                if (el.scrollHeight > el.clientHeight) {
+                    e.stopPropagation();
+                    return;
+                }
+            }
+            e.preventDefault();
+        };
+
+        // Chặn phím điều hướng cuộn (ArrowUp, ArrowDown, PageUp, PageDown, Home, End, Space)
+        const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar'];
+        const handleKeyScroll = (e) => {
+            if (SCROLL_KEYS.includes(e.key)) {
+                const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName);
+                if (!isInput) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        // Chặn chuột giữa (middle-click autoscroll)
+        const handlePointerDown = (e) => {
+            if (e.button === 1) {
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+        window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+        window.addEventListener('keydown', handleKeyScroll, { capture: true });
+        window.addEventListener('pointerdown', handlePointerDown, { capture: true });
+
+        return () => {
+            document.documentElement.classList.remove('lv-tour-locked');
+            document.body.classList.remove('lv-tour-locked');
+            window.removeEventListener('wheel', handleWheel, { capture: true });
+            window.removeEventListener('touchmove', handleTouchMove, { capture: true });
+            window.removeEventListener('keydown', handleKeyScroll, { capture: true });
+            window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+        };
+    }, [activeTour, showPrompt, showCongrats]);
+
+    // 7. Click trực tiếp vào nút Tạo két ở Bước 1
     useEffect(() => {
         if (!activeTour || activeTour.type !== 'vault_creation' || currentStep !== 1) return undefined;
         const btn = document.querySelector('[data-tour="new-vault-btn"]');
@@ -332,7 +399,7 @@ export default function SpotlightTour() {
         return () => btn.removeEventListener('click', onTargetClick);
     }, [activeTour, currentStep]);
 
-    // 7. ESC handler
+    // 8. ESC handler
     useEffect(() => {
         if (!activeTour && !showPrompt && !showCongrats) return undefined;
         const handleKeyDown = (e) => {
@@ -651,7 +718,7 @@ export default function SpotlightTour() {
                     <div
                         ref={tooltipRef}
                         id="spotlight-tour-tooltip"
-                        className="fixed z-[9999] w-[360px] sm:w-[380px] bg-[#0e1629] border border-amber-400/50 rounded-2xl p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
+                        className="fixed z-[9999] w-[360px] sm:w-[380px] max-h-[calc(100vh-32px)] overflow-y-auto bg-[#0e1629] border border-amber-400/50 rounded-2xl p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
                         style={getTooltipStyle()}
                     >
                         <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
