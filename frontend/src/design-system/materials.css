@@ -25,8 +25,8 @@
       transparent 48%,
       rgb(var(--lock-accent-rgb, 143 164 255) / 0.06) 100%
     );
-  backdrop-filter: blur(var(--lv-glass-blur-clear)) saturate(var(--lv-glass-saturation));
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-clear)) saturate(var(--lv-glass-saturation));
+  backdrop-filter: blur(var(--lv-glass-blur-clear)) saturate(var(--lv-glass-saturation));
   border: 1px solid var(--lv-glass-border) !important;
   box-shadow:
     inset 0 1px 0 0 var(--lv-glass-inner-edge),
@@ -62,8 +62,8 @@ main .bg-surface-container-high:not(.lv-surface-secure):not(.lv-glass-secure):no
       transparent 44%,
       rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.03 + var(--g-prox, 0) * 0.07)) 100%
     );
-  backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(var(--lv-glass-saturation));
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(var(--lv-glass-saturation));
+  backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(var(--lv-glass-saturation));
   border: 1px solid rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.18 + var(--g-prox, 0) * 0.34)) !important;
   box-shadow:
     inset 0 1px 0 0 var(--lv-glass-inner-edge),
@@ -120,8 +120,8 @@ a.lv-glass-regular:hover {
       transparent 48%,
       rgb(var(--lock-accent-rgb, 143 164 255) / 0.04) 100%
     );
-  backdrop-filter: blur(var(--lv-glass-blur-thick)) saturate(180%);
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-thick)) saturate(180%);
+  backdrop-filter: blur(var(--lv-glass-blur-thick)) saturate(180%);
   border: 1px solid var(--lv-glass-border) !important;
   box-shadow:
     inset 0 1px 0 0 var(--lv-glass-inner-edge),
@@ -159,8 +159,8 @@ html:not(.dark) .lv-glass-table {
       rgb(var(--lock-accent-rgb, 143 164 255) / 0.16) 52%,
       rgb(var(--lock-accent-rgb, 143 164 255) / 0.28) 100%
     );
-  backdrop-filter: blur(16px) saturate(175%);
   -webkit-backdrop-filter: blur(16px) saturate(175%);
+  backdrop-filter: blur(16px) saturate(175%);
   border: 1px solid rgb(var(--lock-accent-rgb, 143 164 255) / 0.45);
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.38),
@@ -195,8 +195,8 @@ html:not(.dark) .lv-glass-table {
       rgb(13 20 42 / 0.94) 55%,
       rgb(10 15 30 / 0.96) 100%
     ) !important;
-  backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(175%);
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(175%);
+  backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(175%);
   border: 1px solid rgb(143 164 255 / 0.20) !important;
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.22),
@@ -238,8 +238,8 @@ html.dark .lv-page-hero {
       transparent 42%,
       rgb(var(--lock-accent-rgb, 143 164 255) / 0.04) 100%
     ) !important;
-  backdrop-filter: blur(var(--lv-glass-blur-secure)) saturate(var(--lv-glass-saturation));
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-secure)) saturate(var(--lv-glass-saturation));
+  backdrop-filter: blur(var(--lv-glass-blur-secure)) saturate(var(--lv-glass-saturation));
   border: 1px solid var(--lv-glass-border) !important;
   box-shadow:
     inset 0 1px 0 0 var(--lv-glass-inner-edge),
@@ -275,8 +275,8 @@ main textarea:not(.bg-transparent),
     rgb(255 255 255 / 0.14) 0%,
     transparent 60%
   );
-  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(150%);
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(150%);
+  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(150%);
   border: 1px solid rgb(var(--lock-accent-rgb, 143 164 255) / 0.24) !important;
   box-shadow:
     inset 0 1px 2px rgb(0 0 0 / 0.06),
@@ -338,8 +338,8 @@ html:not(.dark) select option {
       rgb(61 90 224 / 0.05) 100%
     ),
     var(--lv-side-glass-fill) !important;
-  backdrop-filter: blur(20px) saturate(165%);
   -webkit-backdrop-filter: blur(20px) saturate(165%);
+  backdrop-filter: blur(20px) saturate(165%);
   border-right: 1px solid var(--lv-side-glass-border) !important;
   box-shadow:
     inset -1px 0 0 0 var(--lv-side-glass-edge),
@@ -356,8 +356,8 @@ html:not(.dark) select option {
     rgb(61 90 224 / 0.24) 52%,
     rgb(30 46 102 / 0.38) 100%
   ) !important;
-  backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid rgb(143 164 255 / 0.22) !important;
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.20),
@@ -435,8 +435,8 @@ button.bg-primary:active:not(:disabled) {
     var(--lv-glass-specular-diag) 0%,
     transparent 60%
   );
-  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(155%);
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(155%);
+  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(155%);
   border: 1px solid var(--lv-glass-border) !important;
   box-shadow:
     inset 0 1px 0 0 var(--lv-glass-inner-edge),
@@ -465,8 +465,8 @@ html:not(.dark) .lv-btn-secondary {
     rgb(255 255 255 / 0.20) 0%,
     transparent 55%
   );
-  backdrop-filter: blur(12px) saturate(160%);
   -webkit-backdrop-filter: blur(12px) saturate(160%);
+  backdrop-filter: blur(12px) saturate(160%);
   border: 1px solid rgb(220 53 69 / 0.38) !important;
   box-shadow:
     inset 0 1px 0 0 rgb(255 255 255 / 0.30),
@@ -488,8 +488,8 @@ html:not(.dark) .lv-btn-secondary {
   padding: 0.25rem;
   border-radius: var(--lv-glass-radius-md);
   background-color: var(--lv-glass-inline-fill);
-  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(160%);
   -webkit-backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(160%);
+  backdrop-filter: blur(var(--lv-glass-blur-inline)) saturate(160%);
   border: 1px solid var(--lv-glass-border);
   box-shadow:
     inset 0 1px 2px rgb(0 0 0 / 0.08),
@@ -521,8 +521,8 @@ html:not(.dark) .lv-btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  backdrop-filter: blur(10px) saturate(155%);
   -webkit-backdrop-filter: blur(10px) saturate(155%);
+  backdrop-filter: blur(10px) saturate(155%);
   border: 1px solid rgb(255 255 255 / 0.26);
   box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.34);
 }

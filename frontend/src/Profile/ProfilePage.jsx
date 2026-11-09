@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Effects } from '@animate-ui/react/primitives/effects/effect';
 import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import UserAvatar from '../Common/UserAvatar.jsx';
@@ -334,31 +333,27 @@ export default function ProfilePage() {
                     <ReducedMotionConfig remount>
                         <div className="grid lg:grid-cols-3 gap-6 items-start">
                             <div className="min-w-0 space-y-6">
-                                <Effects fade slide={{ direction: 'up', offset: 14 }} holdDelay={55}>
-                                    <div id="profile-summary" className="scroll-mt-6">
-                                        <SummaryCard profile={profile} onChanged={handleSaved} />
-                                    </div>
-                                    <CompletenessCard profile={profile} />
-                                </Effects>
+                                <div id="profile-summary" className="scroll-mt-6">
+                                    <SummaryCard profile={profile} onChanged={handleSaved} />
+                                </div>
+                                <CompletenessCard profile={profile} />
                             </div>
                             <div className="min-w-0 lg:col-span-2 space-y-6">
-                                <Effects fade slide={{ direction: 'up', offset: 14 }} holdDelay={55}>
-                                    {profile.roles?.includes('OWNER') && <LegacyOverviewCard />}
-                                    {profile.roles?.includes('OWNER') && <LifeEventsCard />}
-                                    <div id="profile-info" className="scroll-mt-6">
-                                        <ProfileForm profile={profile} onSaved={handleSaved} />
-                                    </div>
-                                    <PreferencesCard />
-                                    <ChangePasswordForm />
-                                    <div id="profile-2fa" className="scroll-mt-6">
-                                        <TwoFactorCard profile={profile} onChanged={setProfile} />
-                                    </div>
-                                    <div id="profile-sessions" className="scroll-mt-6">
-                                        <SessionsCard />
-                                    </div>
-                                    <DataExportCard profile={profile} />
-                                    <DeleteAccountCard profile={profile} />
-                                </Effects>
+                                {profile.roles?.includes('OWNER') && <LegacyOverviewCard />}
+                                {profile.roles?.includes('OWNER') && <LifeEventsCard />}
+                                <div id="profile-info" className="scroll-mt-6">
+                                    <ProfileForm profile={profile} onSaved={handleSaved} />
+                                </div>
+                                <PreferencesCard />
+                                <ChangePasswordForm />
+                                <div id="profile-2fa" className="scroll-mt-6">
+                                    <TwoFactorCard profile={profile} onChanged={setProfile} />
+                                </div>
+                                <div id="profile-sessions" className="scroll-mt-6">
+                                    <SessionsCard />
+                                </div>
+                                <DataExportCard profile={profile} />
+                                <DeleteAccountCard profile={profile} />
                             </div>
                         </div>
                     </ReducedMotionConfig>

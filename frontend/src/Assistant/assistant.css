@@ -13,6 +13,13 @@
     transform: translateY(-2px) scale(1.02);
 }
 
+/* Kéo thả widget: con cú và thanh tiêu đề khung chat là chỗ cầm */
+.lv-assistant-handle { cursor: grab; touch-action: none; user-select: none; }
+.lv-assistant-handle .chibi { cursor: inherit; }   /* con cú 2D dự phòng cũng hiện grab */
+.lv-assistant--dragging,
+.lv-assistant--dragging .lv-assistant-handle { cursor: grabbing; }
+.lv-assistant--dragging .lv-assistant-launcher { transform: scale(1.06); }
+
 .chibi-body   { animation: chibi-bob 3s ease-in-out infinite; }
 .chibi-eyes   { transform-origin: center; animation: chibi-blink 4s infinite; }
 .chibi-arm-r  { transform-origin: 20% 5%; }
