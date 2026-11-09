@@ -279,7 +279,39 @@ export default function SpotlightTour() {
             if (cancelled) return;
             const el = document.querySelector(cfg.selector);
             if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const rect = el.getBoundingClientRect();
+                const isMobile = window.innerWidth < 640;
+                const estTooltipHeight = tooltipRef.current?.offsetHeight || 220;
+                const gap = 16;
+                const headerOffset = 75;
+
+                if (isMobile) {
+                    if (cfg.placement === 'top') {
+                        // Nút submit ở cuối: cuộn lên nửa trên màn hình để không bị bottom sheet che
+                        const targetY = window.scrollY + rect.top - 120;
+                        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+                    } else {
+                        // Trên mobile: cuộn đỉnh khối xuống dưới header (~64px) để toàn bộ phần đầu khối lộ rõ phía trên bottom sheet
+                        const targetY = window.scrollY + rect.top - 64;
+                        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+                    }
+                } else if (cfg.placement === 'top') {
+                    // Cần khoảng trống PHÍA TRÊN khối cho tooltip: cuộn sao cho khối nằm ở nửa dưới màn hình
+                    const targetY = window.scrollY + rect.top - (window.innerHeight - 120);
+                    window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+                } else {
+                    const neededBelow = rect.height + estTooltipHeight + gap + headerOffset;
+                    if (neededBelow <= window.innerHeight) {
+                        // Đủ chỗ đặt tooltip ở phía dưới: cuộn đỉnh khối lên sát header (~75px)
+                        const targetY = window.scrollY + rect.top - 75;
+                        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+                    } else {
+                        // Không đủ chỗ ở phía dưới (khối quá cao): cuộn sao cho đầu khối nằm ngay dưới tooltip (đặt tooltip ở trên)
+                        const targetY = window.scrollY + rect.top - (headerOffset + estTooltipHeight + gap);
+                        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+                    }
+                }
+
                 const start = performance.now();
                 const pollScroll = () => {
                     if (cancelled) return;
@@ -315,73 +347,9 @@ export default function SpotlightTour() {
     }, [activeTour, updateTargetRect]);
 
 
-    // 6. Khóa cứng cuộn chuột & màn hình khi Tour Onboarding đang chạy (tránh làm lệch ô highlight và tooltip)
-    useEffect(() => {
-        const isLocked = Boolean(activeTour || showPrompt || showCongrats);
-        if (!isLocked) return undefined;
 
-        document.documentElement.classList.add('lv-tour-locked');
-        document.body.classList.add('lv-tour-locked');
 
-        // Chặn hoàn toàn cuộn chuột (wheel)
-        const handleWheel = (e) => {
-            // Cho phép cuộn bên trong tooltip nếu nội dung tooltip dài hơn chiều cao hiển thị
-            if (tooltipRef.current && tooltipRef.current.contains(e.target)) {
-                const el = tooltipRef.current;
-                if (el.scrollHeight > el.clientHeight) {
-                    e.stopPropagation();
-                    return;
-                }
-            }
-            e.preventDefault();
-        };
-
-        // Chặn vuốt chạm cuộn (touchmove)
-        const handleTouchMove = (e) => {
-            if (tooltipRef.current && tooltipRef.current.contains(e.target)) {
-                const el = tooltipRef.current;
-                if (el.scrollHeight > el.clientHeight) {
-                    e.stopPropagation();
-                    return;
-                }
-            }
-            e.preventDefault();
-        };
-
-        // Chặn phím điều hướng cuộn (ArrowUp, ArrowDown, PageUp, PageDown, Home, End, Space)
-        const SCROLL_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' ', 'Spacebar'];
-        const handleKeyScroll = (e) => {
-            if (SCROLL_KEYS.includes(e.key)) {
-                const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target?.tagName);
-                if (!isInput) {
-                    e.preventDefault();
-                }
-            }
-        };
-
-        // Chặn chuột giữa (middle-click autoscroll)
-        const handlePointerDown = (e) => {
-            if (e.button === 1) {
-                e.preventDefault();
-            }
-        };
-
-        window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-        window.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
-        window.addEventListener('keydown', handleKeyScroll, { capture: true });
-        window.addEventListener('pointerdown', handlePointerDown, { capture: true });
-
-        return () => {
-            document.documentElement.classList.remove('lv-tour-locked');
-            document.body.classList.remove('lv-tour-locked');
-            window.removeEventListener('wheel', handleWheel, { capture: true });
-            window.removeEventListener('touchmove', handleTouchMove, { capture: true });
-            window.removeEventListener('keydown', handleKeyScroll, { capture: true });
-            window.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-        };
-    }, [activeTour, showPrompt, showCongrats]);
-
-    // 7. Click trực tiếp vào nút Tạo két ở Bước 1
+    // 6. Click trực tiếp vào nút Tạo két ở Bước 1
     useEffect(() => {
         if (!activeTour || activeTour.type !== 'vault_creation' || currentStep !== 1) return undefined;
         const btn = document.querySelector('[data-tour="new-vault-btn"]');
@@ -399,7 +367,7 @@ export default function SpotlightTour() {
         return () => btn.removeEventListener('click', onTargetClick);
     }, [activeTour, currentStep]);
 
-    // 8. ESC handler
+    // 7. ESC handler
     useEffect(() => {
         if (!activeTour && !showPrompt && !showCongrats) return undefined;
         const handleKeyDown = (e) => {
@@ -511,7 +479,7 @@ export default function SpotlightTour() {
         }
     };
 
-    // Định vị Popover Tooltip (không bao giờ che phần tử mục tiêu)
+    // Định vị Popover Tooltip (không bao giờ che phần tử mục tiêu, ghim đáy trên mobile)
     const getTooltipStyle = () => {
         if (!targetRect) {
             return {
@@ -521,80 +489,75 @@ export default function SpotlightTour() {
             };
         }
 
+        // Trên điện thoại (màn hình < 640px): ghim dạng bottom sheet ở đáy màn hình
+        if (window.innerWidth < 640) {
+            return {
+                bottom: '12px',
+                left: '12px',
+                right: '12px',
+            };
+        }
+
         const tooltipWidth = tooltipRef.current?.offsetWidth || 380;
-        const tooltipHeight = tooltipRef.current?.offsetHeight || 320;
-        const gap = 16;
-        const margin = 20;
+        const tooltipHeight = tooltipRef.current?.offsetHeight || 220;
+        const gap = 12;
+        const margin = 16;
 
         const spaceBelow = window.innerHeight - targetRect.bottom;
         const spaceAbove = targetRect.top;
-        const spaceLeft = targetRect.left;
         const spaceRight = window.innerWidth - targetRect.right;
+        const spaceLeft = targetRect.left;
 
         const placement = currentStepItem?.placement;
-        const preferTop = placement === 'top' || (!placement && targetRect.bottom > window.innerHeight * 0.6);
-
         let top;
         let left;
 
-        if (preferTop && spaceAbove >= tooltipHeight + gap) {
-            top = targetRect.top - tooltipHeight - gap;
-            if (targetRect.right > window.innerWidth / 2) {
-                left = targetRect.right - tooltipWidth;
+        if (placement === 'top') {
+            if (spaceAbove >= tooltipHeight + gap) {
+                top = targetRect.top - tooltipHeight - gap;
             } else {
-                left = targetRect.left;
+                top = targetRect.bottom + gap;
             }
-        } else if (spaceBelow >= tooltipHeight + gap) {
-            top = targetRect.bottom + gap;
-            if (targetRect.right > window.innerWidth / 2) {
-                left = targetRect.right - tooltipWidth;
-            } else {
-                left = targetRect.left;
-            }
-        } else if (spaceAbove >= tooltipHeight + gap) {
-            top = targetRect.top - tooltipHeight - gap;
-            left = targetRect.right > window.innerWidth / 2 ? targetRect.right - tooltipWidth : targetRect.left;
-        } else if (spaceLeft >= tooltipWidth + gap) {
-            left = targetRect.left - tooltipWidth - gap;
-            top = targetRect.top + (targetRect.height - tooltipHeight) / 2;
-        } else if (spaceRight >= tooltipWidth + gap) {
-            left = targetRect.right + gap;
-            top = targetRect.top + (targetRect.height - tooltipHeight) / 2;
         } else {
-            if (spaceAbove >= spaceBelow) {
-                top = Math.max(margin, targetRect.top - tooltipHeight - gap);
+            if (spaceBelow >= tooltipHeight + gap) {
+                top = targetRect.bottom + gap;
+            } else if (spaceAbove >= tooltipHeight + gap) {
+                top = targetRect.top - tooltipHeight - gap;
+            } else if (spaceRight >= tooltipWidth + gap) {
+                top = Math.max(margin, targetRect.top);
+                left = targetRect.right + gap;
+            } else if (spaceLeft >= tooltipWidth + gap) {
+                top = Math.max(margin, targetRect.top);
+                left = targetRect.left - tooltipWidth - gap;
+            } else if (spaceBelow >= spaceAbove) {
+                top = targetRect.bottom + gap;
             } else {
-                top = Math.min(window.innerHeight - tooltipHeight - margin, targetRect.bottom + gap);
+                top = targetRect.top - tooltipHeight - gap;
             }
-            left = targetRect.left;
+        }
+
+        // Đảm bảo tuyệt đối không đè lên phần tử mục tiêu
+        if (top !== undefined && top < targetRect.bottom && top + tooltipHeight > targetRect.top) {
+            if (targetRect.top >= tooltipHeight + gap + margin) {
+                top = targetRect.top - tooltipHeight - gap;
+            } else {
+                top = targetRect.bottom + gap;
+            }
+        }
+
+        if (left === undefined) {
+            if (targetRect.right > window.innerWidth / 2) {
+                left = targetRect.right - tooltipWidth;
+            } else {
+                left = targetRect.left;
+            }
         }
 
         left = Math.max(margin, Math.min(window.innerWidth - tooltipWidth - margin, left));
-        top = Math.max(margin, Math.min(window.innerHeight - tooltipHeight - margin, top));
-
-        // Kiểm tra an toàn: Tuyệt đối không để tooltip đè lên targetRect
-        const tooltipBottom = top + tooltipHeight;
-        const tooltipRight = left + tooltipWidth;
-        const hasOverlap = !(
-            tooltipRight < targetRect.left ||
-            left > targetRect.right ||
-            tooltipBottom < targetRect.top ||
-            top > targetRect.bottom
-        );
-
-        if (hasOverlap) {
-            if (targetRect.left >= tooltipWidth + gap + margin) {
-                left = targetRect.left - tooltipWidth - gap;
-            } else if (spaceAbove > spaceBelow) {
-                top = Math.max(10, targetRect.top - tooltipHeight - gap);
-            } else {
-                top = Math.min(window.innerHeight - tooltipHeight - 10, targetRect.bottom + gap);
-            }
-        }
 
         return {
-            top: `${top}px`,
-            left: `${left}px`,
+            top: top + 'px',
+            left: left + 'px',
         };
     };
 
@@ -718,7 +681,7 @@ export default function SpotlightTour() {
                     <div
                         ref={tooltipRef}
                         id="spotlight-tour-tooltip"
-                        className="fixed z-[9999] w-[360px] sm:w-[380px] max-h-[calc(100vh-32px)] overflow-y-auto bg-[#0e1629] border border-amber-400/50 rounded-2xl p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
+                        className="fixed z-[9999] w-[calc(100vw-24px)] sm:w-[380px] max-h-[calc(100vh-32px)] overflow-y-auto bg-[#0e1629] border border-amber-400/50 rounded-2xl p-4 sm:p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
                         style={getTooltipStyle()}
                     >
                         <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">

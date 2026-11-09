@@ -82,7 +82,7 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     if (!open) return null;
     return (
         <div className="fixed inset-0 z-40 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200" onClick={onCancel}>
-            <div className="bg-surface-container-lowest text-on-surface dark:bg-[#0e1629] dark:text-white border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200"
+            <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant dark:text-white/70">{message}</p>

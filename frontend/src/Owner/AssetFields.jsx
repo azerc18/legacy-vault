@@ -178,7 +178,7 @@ export function AssetFieldsView({ schema, fields }) {
                             <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/75 dark:text-white/60 mb-1">
                                 {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
                             </p>
-                            <p className="text-sm font-semibold text-on-surface dark:text-white break-words">
+                            <p className="text-sm font-semibold text-on-surface dark:text-white break-words whitespace-pre-wrap">
                                 {t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
                             </p>
                         </div>
