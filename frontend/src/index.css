@@ -271,6 +271,12 @@ body.lv-has-side #root {
   body.lv-side-collapsed .lv-side-user {
     gap: 8px;
   }
+  /* Thanh bên thu nhỏ chỉ rộng 52px: nút giao diện sáng/tối và chuông phải xếp dọc, nếu để hàng ngang thì chuông bị cắt */
+  body.lv-side-collapsed .lv-side-tools-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
   body.lv-side-collapsed .lv-lang {
     flex-direction: column;
     height: auto;
