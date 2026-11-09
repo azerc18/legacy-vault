@@ -111,7 +111,7 @@ export default function AdminDashboard() {
             {s && (
                 <>
                     <ReducedMotionConfig remount>
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="lv-feature-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                             <StatCard icon="group" label={t('overview.cards.users')} value={<CountingNumber number={sum(s.usersByStatus)} thousandSeparator="," />} to="/admin/users">
                                 <StatusSplit counts={s.usersByStatus} order={USER_ORDER} label={(k) => t(`users.status.${k}`)} />
                             </StatCard>
