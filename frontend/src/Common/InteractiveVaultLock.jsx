@@ -15,7 +15,8 @@ const PUBLIC_ROUTES = [
 
 // Trang đăng nhập / đăng ký / quên mật khẩu / OTP (AuthShell chia 2 cột): không vẽ cú nền,
 // vì cú nằm giữa màn hình nên bị đường chia 2 cột cắt đôi.
-const AUTH_ROUTES = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+// Lấy từ PUBLIC_ROUTES để thêm trang auth mới chỉ phải sửa một chỗ.
+const AUTH_ROUTES = PUBLIC_ROUTES.filter((p) => p !== '/');
 
 const DIAL_TICKS_24 = Array.from({ length: 24 }, (_, i) => i * 15);
 

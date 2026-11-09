@@ -359,7 +359,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                         title={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
                         aria-label={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
                         aria-expanded={guideMenuOpen}
-                        className="lv-guide-btn h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
+                        className="lv-guide-btn h-8 px-2.5 rounded-full inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
                     >
                         <Icon name="school" className="text-[17px] text-amber-300" />
                         <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>

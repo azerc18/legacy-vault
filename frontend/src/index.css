@@ -242,7 +242,7 @@ body.lv-has-side #root {
     right: 8px;
     margin: 0;
   }
-  /* Sidebar mở full (220px bên trong) không đủ chỗ cho Hướng dẫn + EN/VI + giao diện trên 1 hàng:
+  /* Sidebar mở full (220px bên trong = 248px trừ padding 14px mỗi bên) không đủ chỗ cho Hướng dẫn + EN/VI + giao diện trên 1 hàng:
      nút Hướng dẫn chiếm 1 hàng riêng, hàng dưới là ngôn ngữ (giãn ra) + nút sáng/tối */
   body:not(.lv-side-collapsed) .lv-side-tools {
     flex-wrap: wrap;
