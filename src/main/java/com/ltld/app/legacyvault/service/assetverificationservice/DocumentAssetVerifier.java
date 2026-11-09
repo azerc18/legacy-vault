@@ -1,15 +1,22 @@
 package com.ltld.app.legacyvault.service.assetverificationservice;
 
 import com.ltld.app.legacyvault.entity.DigitalAsset;
+import com.ltld.app.legacyvault.entity.DmsConfirmer;
 import com.ltld.app.legacyvault.entity.LegalDocument;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
+import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,7 +36,7 @@ import java.util.UUID;
  * - FILE_HASH (REAL): Owner tải bản gốc lên kho tài liệu của vault, server tự giải mã và băm SHA-256
  *   (không nhận hash do client gửi). Kết quả chỉ chứng minh "tệp này đã được lưu nguyên vẹn từ thời điểm đó",
  *   KHÔNG chứng minh tài liệu là thật; FE ghi rõ điều này ở bước tải tệp.
- * - SECOND_PERSON_CONFIRM: làm ở đợt sau (cần người xác nhận thứ hai).
+ * - SECOND_PERSON_CONFIRM (REAL): mã gửi tới DMS confirmer của Owner, Owner nhập lại mã; chỉ chứng minh có người thứ hai đã nhận mã.
  */
 @Slf4j
 @Component
@@ -37,10 +44,16 @@ import java.util.UUID;
 public class DocumentAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 15;
+    private static final int SECOND_PERSON_TTL_MINUTES = 60;
 
     private final LegalDocumentRepository legalDocumentRepository;
     private final FileStorageService fileStorageService;
     private final CryptoService cryptoService;
+    private final DmsConfigRepository dmsConfigRepository;
+    private final DmsConfirmerRepository dmsConfirmerRepository;
+    private final OtpGenerator otpGenerator;
+    private final OtpHasher otpHasher;
+    private final EmailSender emailSender;
 
     @Override
     public AssetType type() {
@@ -49,7 +62,7 @@ public class DocumentAssetVerifier implements AssetVerifier {
 
     @Override
     public List<AssetVerificationMethod> methods() {
-        return List.of(AssetVerificationMethod.FILE_HASH);
+        return List.of(AssetVerificationMethod.FILE_HASH, AssetVerificationMethod.SECOND_PERSON_CONFIRM);
     }
 
     @Override
@@ -64,6 +77,7 @@ public class DocumentAssetVerifier implements AssetVerifier {
                     null,
                     Map.of("documentTitle", title),
                     LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
+            case SECOND_PERSON_CONFIRM -> startSecondPerson(asset, ownerId);
             default -> throw unsupported(method);
         };
     }
@@ -80,6 +94,7 @@ public class DocumentAssetVerifier implements AssetVerifier {
         Map<String, String> safePayload = payload == null ? Map.of() : payload;
         return switch (method) {
             case FILE_HASH -> confirmFileHash(asset, safePayload);
+            case SECOND_PERSON_CONFIRM -> confirmSecondPerson(asset, safePayload, challengeHash);
             default -> throw unsupported(method);
         };
     }
@@ -135,6 +150,58 @@ public class DocumentAssetVerifier implements AssetVerifier {
         }
         return new VerifyResult(true, VerificationProvider.REAL,
                 "Document fingerprint (SHA-256) stored; this does not prove the document is genuine", evidence);
+    }
+
+    private StartResult startSecondPerson(DigitalAsset asset, UUID ownerId) {
+        List<DmsConfirmer> confirmers = dmsConfigRepository.findByOwnerId(ownerId)
+                .map(c -> dmsConfirmerRepository.findAllByDmsConfigIdOrderByCreatedAtAsc(c.getId()))
+                .orElse(List.of()).stream()
+                .filter(c -> c.getStatus() != DmsConfirmerStatus.CONFIRMED_UNREACHABLE)
+                .toList();
+        if (confirmers.isEmpty()) {
+            throw new VaultException(
+                    "Add a trusted confirmer in your dead man's switch settings before using this method",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        String otp = otpGenerator.generate();
+        String challengeHash = otpHasher.hash(saltId(asset), otp);
+        // TODO(Duy N17): đổi sang hàm mail riêng cho người xác nhận (mẫu assetOtp hiện nói về "email tài sản")
+        for (DmsConfirmer c : confirmers) {
+            emailSender.sendAssetVerificationOtpEmail(c.getEmail(), otp, SECOND_PERSON_TTL_MINUTES);
+        }
+
+        String masked = confirmers.stream()
+                .map(c -> EmailAssetVerifier.maskEmail(c.getEmail()))
+                .collect(java.util.stream.Collectors.joining(", "));
+        Map<String, String> clientData = new LinkedHashMap<>();
+        clientData.put("maskedEmail", masked);
+        return new StartResult(VerificationProvider.REAL,
+                "A confirmation code was sent to your trusted confirmer(s): " + masked,
+                challengeHash, clientData,
+                LocalDateTime.now().plusMinutes(SECOND_PERSON_TTL_MINUTES));
+    }
+
+    private VerifyResult confirmSecondPerson(DigitalAsset asset, Map<String, String> payload, String challengeHash) {
+        String code = firstNonBlank(payload, "code", "otp", "verificationCode");
+        if (code == null) {
+            return fail("Confirmation code is required");
+        }
+        if (challengeHash == null || challengeHash.isBlank()) {
+            return fail("Verification challenge has not been started");
+        }
+        if (!otpHasher.matches(saltId(asset), code, challengeHash)) {
+            return fail("Invalid confirmation code");
+        }
+        Map<String, String> evidence = new LinkedHashMap<>();
+        evidence.put("check", "SECOND_PERSON_CODE");
+        return new VerifyResult(true, VerificationProvider.REAL,
+                "A second person confirmed they saw the original; this does not prove the document is genuine",
+                evidence);
+    }
+
+    private static UUID saltId(DigitalAsset asset) {
+        return asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
     }
 
     private static VerifyResult fail(String message) {

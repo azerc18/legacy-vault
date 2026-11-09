@@ -44,6 +44,12 @@ security:
     cookie-secure: ${JWT_COOKIE_SECURE:false}
 
 app:
+  verification:
+    bank:
+#      account-lengths:
+      # Khóa = tên ngân hàng viết thường, không dấu, không khoảng trắng.
+      # Nhóm điền từ nguồn chính thức, KHÔNG điền theo trí nhớ. Ví dụ định dạng:
+      # tennganhang: [10, 13]
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
   # Địa chỉ frontend (Vite, cổng 5173), dùng để tạo link trong email. BẮT BUỘC đặt FRONTEND_BASE_URL=https://... khi deploy, nếu không mail sẽ chứa link localhost.

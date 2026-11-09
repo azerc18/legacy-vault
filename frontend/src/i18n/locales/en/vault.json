@@ -313,6 +313,8 @@
     "labels": {
       "institutionName": "Institution / bank name",
       "accountNumber": "Account number",
+      "accountHolderName": "Account holder name",
+      "registeredEmail": "Email registered with the exchange",
       "branchName": "Branch",
       "estimatedValue": "Estimated value",
       "currency": "Currency",
@@ -345,6 +347,8 @@
     "examples": {
       "institutionName": "e.g. Vietcombank",
       "accountNumber": "e.g. 0071000123456",
+      "accountHolderName": "e.g. NGUYEN VAN AN",
+      "registeredEmail": "e.g. you@example.com",
       "branchName": "e.g. District 7 branch, HCMC",
       "estimatedValue": "e.g. 150000000",
       "legalInstruction": "e.g. Bring the death certificate and the inheritance dossier to the branch to close the account.",

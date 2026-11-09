@@ -35,6 +35,7 @@ public final class AssetSchemaRegistry {
                 text("institutionName", "Bank name", true),
                 text("accountNumber", "Account number", true, "^\\d{6,19}$"),
                 text("branchName", "Branch", true),
+                text("accountHolderName", "Account holder name", false),
                 number("estimatedValue", "Estimated value", true),
                 select("currency", "Currency", true, CURRENCIES),
                 textarea("legalInstruction", "Instructions for settling the account", true),
@@ -43,6 +44,7 @@ public final class AssetSchemaRegistry {
         register(AssetType.EXCHANGE_ACCOUNT, "Exchange account", TransferMechanism.LEGAL_CLAIM_DOSSIER, List.of(
                 text("institutionName", "Exchange name", true),
                 text("accountId", "Account ID", true),
+                text("registeredEmail", "Email registered with the exchange", false),
                 number("estimatedValue", "Estimated value", true),
                 select("currency", "Currency", true, CURRENCIES),
                 textarea("legalInstruction", "Instructions for claiming the account", true),

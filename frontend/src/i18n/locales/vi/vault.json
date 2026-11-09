@@ -313,6 +313,8 @@
     "labels": {
       "institutionName": "Tên tổ chức / ngân hàng",
       "accountNumber": "Số tài khoản",
+      "accountHolderName": "Tên chủ tài khoản",
+      "registeredEmail": "Email đăng ký sàn giao dịch",
       "branchName": "Chi nhánh",
       "estimatedValue": "Giá trị ước tính",
       "currency": "Loại tiền tệ",
@@ -345,6 +347,8 @@
     "examples": {
       "institutionName": "VD: Vietcombank",
       "accountNumber": "VD: 0071000123456",
+      "accountHolderName": "VD: NGUYEN VAN AN",
+      "registeredEmail": "VD: ban@example.com",
       "branchName": "VD: Chi nhánh Quận 7, TP.HCM",
       "estimatedValue": "VD: 150000000",
       "legalInstruction": "VD: Mang giấy chứng tử và hồ sơ khai nhận di sản tới chi nhánh để tất toán.",
