@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.verificationservice;
 import com.ltld.app.legacyvault.dto.forgotpassworddto.ForgotPasswordRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
 import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
+import com.ltld.app.legacyvault.entity.BeneficiaryClaim;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
@@ -10,9 +11,12 @@ import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
+import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
+import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.*;
+import com.ltld.app.legacyvault.repository.BeneficiaryClaimRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
@@ -43,6 +47,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
     private final VaultRepository vaultRepository;
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final OtpHasher otpHasher;
+    private final BeneficiaryClaimRepository claimRepository;
 
     private static final int MAX_ATTEMPTS = 5;
     private static final int OTP_TTL = 300;
@@ -208,6 +213,28 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
             row.setStatus(BeneficiaryInviteStatus.INVITED);
         }
         vaultBeneficiaryRepository.saveAll(pendingRows);
+        createClaimsForUnlockedVaults(user, pendingRows);
+    }
+
+    // Claim PENDING thường chỉ được tạo lúc Vault mở khóa, cho người đã có tài khoản (BeneficiaryNotificationListener).
+    // Người đăng ký SAU khi Vault đã UNLOCKED sẽ không có claim, trang Vault báo "No verification session" và không
+    // hiện form xác minh. Tạo bù claim ở đây, cùng hạn nhận của Vault; đã có claim thì bỏ qua.
+    private void createClaimsForUnlockedVaults(User user, List<VaultBeneficiary> linkedRows) {
+        for (VaultBeneficiary row : linkedRows) {
+            Vault vault = row.getVault();
+            if (vault == null || vault.getStatus() != VaultStatus.UNLOCKED || vault.getClaimDeadlineAt() == null) {
+                continue;
+            }
+            if (claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), user.getId()).isPresent()) {
+                continue;
+            }
+            claimRepository.save(BeneficiaryClaim.builder()
+                    .vault(vault)
+                    .beneficiary(user)
+                    .status(ClaimStatus.PENDING)
+                    .claimDeadlineAt(vault.getClaimDeadlineAt())
+                    .build());
+        }
     }
 
     private void runAfterCommit(Runnable action) {
