@@ -101,13 +101,15 @@ function AvatarEditor({ profile, onChanged }) {
                     version={profile.avatarUpdatedAt}
                     previewUrl={preview}
                 />
+                {/* !absolute: liquid glass (materials.css) đặt button.bg-primary { position: relative },
+                    mạnh hơn .absolute nên nút camera rơi xuống dưới ảnh thay vì nằm ở góc */}
                 <button
                     type="button"
                     onClick={() => inputRef.current?.click()}
                     disabled={busy}
                     title={t('avatar.change')}
                     aria-label={t('avatar.change')}
-                    className="absolute bottom-0 right-0 w-9 h-9 rounded-full bg-primary text-on-primary border-4 border-surface-container-lowest flex items-center justify-center hover:bg-primary-container disabled:opacity-60"
+                    className="!absolute bottom-0 right-0 w-9 h-9 rounded-full bg-primary text-on-primary border-4 border-surface-container-lowest flex items-center justify-center hover:bg-primary-container disabled:opacity-60"
                 >
                     <Icon name={busy ? 'progress_activity' : 'photo_camera'} className={`text-[18px] ${busy ? 'animate-spin' : ''}`} />
                 </button>
