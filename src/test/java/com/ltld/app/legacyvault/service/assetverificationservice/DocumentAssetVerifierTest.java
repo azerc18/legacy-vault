@@ -1,15 +1,19 @@
 package com.ltld.app.legacyvault.service.assetverificationservice;
 
-import com.ltld.app.legacyvault.entity.DigitalAsset;
-import com.ltld.app.legacyvault.entity.LegalDocument;
-import com.ltld.app.legacyvault.entity.Vault;
+import com.ltld.app.legacyvault.entity.*;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
+import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.DmsConfirmerRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
+import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,14 +23,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DocumentAssetVerifier – C.3.7 xác thực tài sản DOCUMENT (FILE_HASH)")
@@ -35,6 +36,10 @@ class DocumentAssetVerifierTest {
     @Mock private LegalDocumentRepository legalDocumentRepository;
     @Mock private FileStorageService fileStorageService;
     @Mock private CryptoService cryptoService;
+    @Mock private DmsConfigRepository dmsConfigRepository;
+    @Mock private DmsConfirmerRepository dmsConfirmerRepository;
+    @Mock private OtpGenerator otpGenerator;
+    @Mock private EmailSender emailSender;
 
     private DocumentAssetVerifier verifier;
     private UUID ownerId;
@@ -43,7 +48,8 @@ class DocumentAssetVerifierTest {
 
     @BeforeEach
     void setUp() {
-        verifier = new DocumentAssetVerifier(legalDocumentRepository, fileStorageService, cryptoService);
+        verifier = new DocumentAssetVerifier(legalDocumentRepository, fileStorageService, cryptoService,
+                dmsConfigRepository, dmsConfirmerRepository, otpGenerator, new OtpHasher(), emailSender);
         ownerId = UUID.randomUUID();
         vaultId = UUID.randomUUID();
         vault = Vault.builder().id(vaultId).build();
@@ -74,10 +80,11 @@ class DocumentAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("methods(): chỉ có FILE_HASH và type() là DOCUMENT")
+    @DisplayName("methods(): FILE_HASH và SECOND_PERSON_CONFIRM, type() là DOCUMENT")
     void methodsAndType() {
         assertThat(verifier.type()).isEqualTo(AssetType.DOCUMENT);
-        assertThat(verifier.methods()).containsExactly(AssetVerificationMethod.FILE_HASH);
+        assertThat(verifier.methods()).containsExactly(
+                AssetVerificationMethod.FILE_HASH, AssetVerificationMethod.SECOND_PERSON_CONFIRM);
     }
 
     @Test
@@ -163,13 +170,112 @@ class DocumentAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("Cách chưa hỗ trợ (SECOND_PERSON_CONFIRM) bị từ chối ở start và confirm")
+    @DisplayName("Cách không thuộc DOCUMENT (BANK_FORMAT_CHECK) bị từ chối ở start và confirm")
     void unsupportedMethod_throws() {
         DigitalAsset asset = documentAsset(null);
 
-        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId))
+        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.BANK_FORMAT_CHECK, ownerId))
                 .isInstanceOf(VaultException.class);
-        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.BANK_FORMAT_CHECK,
                 Map.of(), ownerId, null)).isInstanceOf(VaultException.class);
+    }
+
+    // ---------- SECOND_PERSON_CONFIRM ----------
+
+    private static DmsConfirmer confirmer(String email, DmsConfirmerStatus status) {
+        return DmsConfirmer.builder().id(UUID.randomUUID()).name("Witness").email(email).status(status).build();
+    }
+
+    private void givenConfirmers(DmsConfirmer... confirmers) {
+        UUID configId = UUID.randomUUID();
+        when(dmsConfigRepository.findByOwnerId(ownerId))
+                .thenReturn(Optional.of(DmsConfig.builder().id(configId).build()));
+        when(dmsConfirmerRepository.findAllByDmsConfigIdOrderByCreatedAtAsc(configId))
+                .thenReturn(List.of(confirmers));
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM start: Owner chưa có cấu hình DMS thì từ chối, không gửi mail")
+    void secondPerson_start_noDmsConfig_throws() {
+        when(dmsConfigRepository.findByOwnerId(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> verifier.start(documentAsset(null),
+                AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId)).isInstanceOf(VaultException.class);
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM start: chỉ có confirmer đã báo không liên lạc được thì từ chối")
+    void secondPerson_start_onlyUnreachableConfirmers_throws() {
+        givenConfirmers(confirmer("gone@x.com", DmsConfirmerStatus.CONFIRMED_UNREACHABLE));
+
+        assertThatThrownBy(() -> verifier.start(documentAsset(null),
+                AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId)).isInstanceOf(VaultException.class);
+        verifyNoInteractions(emailSender);
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM start: gửi mã tới confirmer còn dùng được, bỏ qua UNREACHABLE, che email")
+    void secondPerson_start_sendsToUsableConfirmersOnly() {
+        givenConfirmers(
+                confirmer("witness@x.com", DmsConfirmerStatus.ACTIVE),
+                confirmer("friend@x.com", DmsConfirmerStatus.CONFIRMED_ALIVE),
+                confirmer("gone@x.com", DmsConfirmerStatus.CONFIRMED_UNREACHABLE));
+        when(otpGenerator.generate()).thenReturn("482910");
+
+        AssetVerifier.StartResult start = verifier.start(documentAsset(null),
+                AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.REAL);
+        assertThat(start.challengeHash()).hasSize(64);
+        assertThat(start.challengeExpiresAt()).isNotNull();
+        assertThat(start.clientData().get("maskedEmail"))
+                .contains("w***s@x.com", "f***d@x.com")
+                .doesNotContain("witness@x.com", "friend@x.com", "gone");
+        verify(emailSender).sendSecondPersonConfirmEmail("witness@x.com", "482910", 60);
+        verify(emailSender).sendSecondPersonConfirmEmail("friend@x.com", "482910", 60);
+        verify(emailSender, never()).sendSecondPersonConfirmEmail(eq("gone@x.com"), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM confirm: đúng mã thì thành công, REAL, evidence không chứa email")
+    void secondPerson_confirm_correctCode_success() {
+        givenConfirmers(confirmer("witness@x.com", DmsConfirmerStatus.ACTIVE));
+        when(otpGenerator.generate()).thenReturn("482910");
+        DigitalAsset asset = documentAsset(null);
+        AssetVerifier.StartResult start = verifier.start(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId);
+
+        AssetVerifier.VerifyResult result = verifier.confirm(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                Map.of("code", "482910"), ownerId, start.challengeHash());
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.REAL);
+        assertThat(result.evidence()).containsEntry("check", "SECOND_PERSON_CODE");
+        assertThat(result.evidence().values()).noneMatch(v -> v.contains("@"));
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM confirm: sai mã thì thất bại")
+    void secondPerson_confirm_wrongCode_fails() {
+        givenConfirmers(confirmer("witness@x.com", DmsConfirmerStatus.ACTIVE));
+        when(otpGenerator.generate()).thenReturn("482910");
+        DigitalAsset asset = documentAsset(null);
+        AssetVerifier.StartResult start = verifier.start(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM, ownerId);
+
+        AssetVerifier.VerifyResult result = verifier.confirm(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                Map.of("code", "000000"), ownerId, start.challengeHash());
+
+        assertThat(result.success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("SECOND_PERSON_CONFIRM confirm: thiếu mã hoặc chưa start (không có challengeHash) thì thất bại")
+    void secondPerson_confirm_missingCodeOrChallenge_fails() {
+        DigitalAsset asset = documentAsset(null);
+
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                Map.of(), ownerId, "a".repeat(64)).success()).isFalse();
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                Map.of("code", "482910"), ownerId, null).success()).isFalse();
     }
 }
