@@ -6,7 +6,6 @@ import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
-import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,14 +14,15 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * C.3.3: Xác thực tài sản BANK_ACCOUNT. Cả bốn cách đều là SANDBOX (nhãn "Mô phỏng"):
  * - BANK_NAME_LOOKUP_MOCK: so tên chủ tài khoản đã nhập với tên chủ két (bỏ dấu, hoa thường); KHÔNG gọi ngân hàng thật.
  * - BANK_FORMAT_CHECK: độ dài số tài khoản theo bảng ngân hàng (BankAccountRules); chỉ chứng minh đúng định dạng.
  * - STATEMENT_UPLOAD: tải sao kê lên kho tài liệu mã hóa, server băm SHA-256; chưa đọc nội dung sao kê.
- * - MICRO_DEPOSIT_MOCK: giả lập một khoản tiền nhỏ kèm mã nội dung, Owner nhập lại mã; không có tiền thật, không gọi ngân hàng,
- *   mã hiện ngay trên màn hình nên không chứng minh Owner sở hữu tài khoản.
+ * - MICRO_DEPOSIT_MOCK: giả lập một khoản tiền nhỏ ngẫu nhiên, Owner nhập lại số tiền; không có tiền thật, không gọi ngân hàng,
+ *   số tiền hiện ngay trên màn hình nên không chứng minh Owner sở hữu tài khoản.
  * Bằng chứng không chứa số tài khoản, tên người hay tên tệp.
  */
 @Slf4j
@@ -31,11 +31,11 @@ import java.util.*;
 public class BankAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 15;
-    private static final String REFERENCE_PREFIX = "LV-";
+    private static final int MIN_DEPOSIT_VND = 1_000;
+    private static final int MAX_DEPOSIT_VND = 9_999;
 
     private final BankAccountRules rules;
     private final VaultFileHasher fileHasher;
-    private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
 
     @Override
@@ -103,30 +103,28 @@ public class BankAssetVerifier implements AssetVerifier {
     }
 
     private StartResult startMicroDeposit(DigitalAsset asset) {
-        String code = otpGenerator.generate();
-        // Mã mô phỏng chỉ trả về trong clientData, không ghi log
+        // Số tiền mô phỏng hiện ngay cho Owner nên không cần nguồn ngẫu nhiên an toàn; trả số thô để FE format theo ngôn ngữ
+        String amount = String.valueOf(ThreadLocalRandom.current().nextInt(MIN_DEPOSIT_VND, MAX_DEPOSIT_VND + 1));
         Map<String, String> clientData = new LinkedHashMap<>();
         clientData.put("mode", "SANDBOX");
-        clientData.put("amount", "1.234 VND");
-        clientData.put("reference", REFERENCE_PREFIX + code);
+        clientData.put("amount", amount);
         return new StartResult(VerificationProvider.SANDBOX,
-                "Simulated micro-deposit created; no real money was moved. Enter the reference code to confirm",
-                otpHasher.hash(saltId(asset), code), clientData,
+                "Simulated micro-deposit created; no real money was moved. Enter the amount to confirm",
+                otpHasher.hash(saltId(asset), amount), clientData,
                 LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
     }
 
     private VerifyResult confirmMicroDeposit(DigitalAsset asset, Map<String, String> payload, String challengeHash) {
-        String code = payload.get("code");
-        if (code == null || code.isBlank()) {
-            return fail("Reference code is required");
+        // Ô nhập của FE gửi qua khóa "code"; bỏ dấu phân cách để "1.234", "1,234" và "1234 VND" đều khớp
+        String digits = payload.getOrDefault("code", "").replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            return fail("Deposit amount is required");
         }
         if (challengeHash == null || challengeHash.isBlank()) {
             return fail("Verification challenge has not been started");
         }
-        // Màn hình hiện "LV-123456" nên Owner có thể gõ cả tiền tố
-        String digits = code.trim().toUpperCase(Locale.ROOT).replaceFirst("^" + REFERENCE_PREFIX, "");
         if (!otpHasher.matches(saltId(asset), digits, challengeHash)) {
-            return fail("Invalid reference code");
+            return fail("The amount does not match the simulated deposit");
         }
         Map<String, String> evidence = new LinkedHashMap<>();
         evidence.put("check", "MICRO_DEPOSIT");

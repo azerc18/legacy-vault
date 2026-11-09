@@ -7,7 +7,6 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
-import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,7 +41,7 @@ class BankAssetVerifierTest {
     void setUp() {
         rules = new BankAccountRules();
         rules.setAccountLengths(Map.of("TestBank", List.of(10, 12)));
-        verifier = new BankAssetVerifier(rules, fileHasher, new OtpGenerator(), otpHasher);
+        verifier = new BankAssetVerifier(rules, fileHasher, otpHasher);
         ownerId = UUID.randomUUID();
         vaultId = UUID.randomUUID();
         User owner = User.builder().id(ownerId).fullName("Nguyễn Văn An").build();
@@ -196,26 +195,27 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("MICRO_DEPOSIT_MOCK start: SANDBOX, có số tiền giả, mã LV-6 số và challengeHash không phải mã thô")
+    @DisplayName("MICRO_DEPOSIT_MOCK start: SANDBOX, số tiền thô 1000-9999 và challengeHash không phải số tiền")
     void microDeposit_start() {
         AssetVerifier.StartResult start = verifier.start(bank("TestBank", "1234567890", null),
                 AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
 
         assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
-        assertThat(start.clientData()).containsEntry("mode", "SANDBOX").containsKey("amount");
-        assertThat(start.clientData().get("reference")).matches("LV-\\d{6}");
-        assertThat(start.challengeHash()).isNotBlank()
-                .doesNotContain(start.clientData().get("reference").substring(3));
+        assertThat(start.clientData()).containsEntry("mode", "SANDBOX").doesNotContainKey("reference");
+        String amount = start.clientData().get("amount");
+        assertThat(Integer.parseInt(amount)).isBetween(1000, 9999);
+        assertThat(start.challengeHash()).isNotBlank().isNotEqualTo(amount);
     }
 
     @Test
-    @DisplayName("MICRO_DEPOSIT_MOCK confirm: đúng mã (có hoặc không tiền tố LV-) thì thành công, evidence không có số tài khoản")
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: đúng số tiền (có dấu phân cách hoặc VND) thì thành công, evidence không có số tài khoản")
     void microDeposit_correctCode() {
         DigitalAsset asset = bank("TestBank", "1234567890", null);
         AssetVerifier.StartResult start = verifier.start(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
-        String reference = start.clientData().get("reference");
+        String amount = start.clientData().get("amount");
+        String grouped = amount.charAt(0) + "." + amount.substring(1);
 
-        for (String typed : List.of(reference, reference.substring(3), " " + reference.toLowerCase() + " ")) {
+        for (String typed : List.of(amount, grouped, " " + amount + " VND ")) {
             AssetVerifier.VerifyResult result = confirmMicro(asset, Map.of("code", typed), start.challengeHash());
             assertThat(result.success()).isTrue();
             assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
@@ -224,16 +224,17 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("MICRO_DEPOSIT_MOCK confirm: sai mã, thiếu mã, payload null hoặc chưa start đều thất bại")
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: sai số tiền, thiếu số tiền, không có chữ số, payload null hoặc chưa start đều thất bại")
     void microDeposit_failures() {
         DigitalAsset asset = bank("TestBank", "1234567890", null);
-        String hash = otpHasher.hash(asset.getId(), "123456");
+        String hash = otpHasher.hash(asset.getId(), "1234");
 
-        assertThat(confirmMicro(asset, Map.of("code", "123456"), hash).success()).isTrue();
-        assertThat(confirmMicro(asset, Map.of("code", "654321"), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "1234"), hash).success()).isTrue();
+        assertThat(confirmMicro(asset, Map.of("code", "4321"), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "abc"), hash).success()).isFalse();
         assertThat(confirmMicro(asset, Map.of("code", "  "), hash).success()).isFalse();
         assertThat(confirmMicro(asset, Map.of(), hash).success()).isFalse();
         assertThat(confirmMicro(asset, null, hash).success()).isFalse();
-        assertThat(confirmMicro(asset, Map.of("code", "123456"), null).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "1234"), null).success()).isFalse();
     }
 }
