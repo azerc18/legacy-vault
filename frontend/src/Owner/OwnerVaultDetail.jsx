@@ -831,7 +831,16 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             )}
             {updatingDoc && (
                 <Modal onClose={() => { setUpdatingDoc(null); setNewVersionFile(null); }}>
-                    <h3 className="font-title-lg text-title-lg mb-2">{t('detail.documents.uploadNewVersionTitle')}</h3>
+                    <div className="flex justify-between items-start pb-3 border-b border-outline-variant/20 dark:border-white/10 mb-3">
+                        <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{t('detail.documents.uploadNewVersionTitle')}</h3>
+                        <button
+                            type="button"
+                            onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors shrink-0"
+                        >
+                            <Icon name="close" className="text-[18px]" />
+                        </button>
+                    </div>
                     <p className="text-sm text-on-surface-variant mb-4">
                         {t('detail.documents.replacingDesc', {
                             fileName: updatingDoc.fileName,
@@ -852,8 +861,19 @@ function DocumentSection({ vaultId, editable, onChanged }) {
             )}
             {historyDoc && (
                 <Modal onClose={() => setHistoryDoc(null)}>
-                    <h3 className="font-title-lg text-title-lg mb-1">{t('detail.documents.historyTitle')}</h3>
-                    <p className="text-xs text-outline mb-4">{getDocTypeLabel(historyDoc.documentType)}</p>
+                    <div className="flex justify-between items-start pb-3 border-b border-outline-variant/20 dark:border-white/10 mb-3">
+                        <div>
+                            <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{t('detail.documents.historyTitle')}</h3>
+                            <p className="text-xs text-outline">{getDocTypeLabel(historyDoc.documentType)}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setHistoryDoc(null)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-on-surface-variant dark:text-white/70 transition-colors shrink-0"
+                        >
+                            <Icon name="close" className="text-[18px]" />
+                        </button>
+                    </div>
                     {historyLoading ? (
                         <p className="text-sm text-on-surface-variant">{t('ui.loading')}</p>
                     ) : (
