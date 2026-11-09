@@ -20,13 +20,13 @@
     "STATEMENT_UPLOAD": { "label": "Sao kê ngân hàng", "desc": "Tải tệp sao kê ngân hàng lên két để đối chiếu.", "fileIntro": "Tải bản sao kê ngân hàng (PDF, PNG hoặc JPG, tối đa 10 MB) để lưu vào tài liệu của két." },
     "MICRO_DEPOSIT_MOCK": { "label": "Giao dịch nhỏ (mô phỏng)", "desc": "Nhập mã giao dịch thử nghiệm gửi vào tài khoản ngân hàng." },
     "EXCHANGE_EMAIL_CODE": { "label": "Mã xác thực email sàn giao dịch", "desc": "Nhận mã xác thực gửi tới email đăng ký sàn giao dịch." },
-    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (mô phỏng)", "desc": "Kiểm tra kết nối chỉ đọc tới tài khoản sàn giao dịch." },
+    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (mô phỏng)", "desc": "Chỉ kiểm định dạng khóa API, không gọi sàn. Đừng dán khóa có quyền giao dịch hay rút tiền. Dán khóa thật vào để kiểm định dạng cũng không chứng minh được gì, nên chỉ dùng khóa có quyền tối thiểu." },
     "ADDRESS_CHECKSUM": { "label": "Kiểm tra địa chỉ ví", "desc": "Kiểm tra định dạng và checksum của địa chỉ ví." },
     "BIP39_CHECK": { "label": "Kiểm tra cụm từ khôi phục", "desc": "Kiểm tra cụm từ khôi phục đã lưu có hợp lệ theo BIP-39." },
     "PUBLIC_BALANCE": { "label": "Tra số dư công khai", "desc": "Tra số dư công khai của địa chỉ ví trên blockchain." },
     "WALLET_SIGNATURE": { "label": "Ký bằng ví", "desc": "Ký thông điệp bằng ví để chứng minh bạn nắm khóa." },
     "BIO_CHALLENGE_MOCK": { "label": "Mã trong tiểu sử (mô phỏng)", "desc": "Đặt mã thử thách vào phần tiểu sử của tài khoản." },
-    "SCREENSHOT_UPLOAD": { "label": "Ảnh chụp hồ sơ", "desc": "Tải ảnh chụp trang hồ sơ tài khoản lên két." }
+    "SCREENSHOT_UPLOAD": { "label": "Ảnh chụp hồ sơ", "desc": "Tải ảnh chụp trang hồ sơ hoặc trang tài khoản lên két.", "fileIntro": "Tải ảnh chụp trang hồ sơ hoặc trang tài khoản (PNG hoặc JPG, tối đa 10 MB). Ảnh được lưu vào tài liệu của két." }
   },
   "button": { "verify": "Xác thực", "reverify": "Xác thực lại", "details": "Trạng thái xác thực" },
   "dialog": {
@@ -40,6 +40,8 @@
     "codeEnter": "Nhập mã bạn đã nhận.",
     "codeLabel": "Mã xác thực",
     "codePlaceholder": "Nhập mã",
+    "apiKeyLabel": "Khóa API chỉ đọc",
+    "apiKeyPlaceholder": "Dán khóa API chỉ đọc",
     "sandboxNotice": "Chế độ mô phỏng: kết quả sẽ hiện nhãn \"Mô phỏng\", chưa phải xác thực thật.",
     "sandboxCode": "Mã mô phỏng của bạn: {{code}}",
     "challengeLabel": "Thông điệp cần ký",

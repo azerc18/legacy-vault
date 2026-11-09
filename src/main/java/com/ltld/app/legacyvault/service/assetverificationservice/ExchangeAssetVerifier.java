@@ -138,7 +138,7 @@ public class ExchangeAssetVerifier implements AssetVerifier {
         evidence.put("mode", "SIMULATED");
         evidence.put("keyLast4", "****" + key.substring(key.length() - 4));
         return new VerifyResult(true, VerificationProvider.SANDBOX,
-                "Simulated check: the key format looks valid and a read-only balance was simulated; no exchange was contacted",
+                "Simulated check: the key format looks valid; no exchange was contacted",
                 evidence);
     }
 
