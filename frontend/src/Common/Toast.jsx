@@ -25,11 +25,11 @@ function ToastItem({ toast, onClose }) {
 
     return (
         <div role={toast.type === 'error' ? 'alert' : 'status'}
-             className={`pointer-events-auto flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg border border-outline-variant/30 text-sm ${style.box}`}>
+             className={`pointer-events-auto lv-glass-frosted lv-rise flex items-start gap-3 rounded-2xl px-4 py-3.5 shadow-xl border border-outline-variant/40 text-sm backdrop-blur-xl ${style.box}`}>
             <span className="material-symbols-outlined text-[20px] shrink-0" aria-hidden="true">{style.icon}</span>
-            <span className="flex-1 min-w-0 break-words">{toast.message}</span>
+            <span className="flex-1 min-w-0 font-medium break-words">{toast.message}</span>
             <button type="button" onClick={() => onClose(toast.id)} aria-label={t('toast.close', 'Close')}
-                    className="shrink-0 opacity-70 hover:opacity-100">
+                    className="shrink-0 opacity-70 hover:opacity-100 transition-opacity">
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">close</span>
             </button>
         </div>

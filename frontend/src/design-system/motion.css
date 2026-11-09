@@ -1,26 +1,10 @@
 /* =====================================================================
    LEGACYVAULT DESIGN SYSTEM — APPLE-INSPIRED MOTION & REDUCED MOTION
-   Chỉ biến đổi transform và opacity để đạt hiệu suất 60/120fps ổn định
+   Lưu ý kỹ thuật W3C Filter Effects Level 2:
+   KHÔNG áp dụng animation transform/opacity lên thẻ <main> hoặc khung bao,
+   vì sẽ tạo "Backdrop Root" khiến các khối kính bên trong không thể làm mờ
+   (backdrop-filter: blur) hình Cú - Ổ Khóa ở nền phía sau.
    ===================================================================== */
-
-.lv-rise {
-  animation: lv-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes lv-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-main {
-  animation: lv-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 
 .lv-route-bar {
   transform-origin: left center;
@@ -42,30 +26,26 @@ main {
   }
 }
 
-/* Lưới ô chức năng: rê vào ô nào thì ô đó phóng to, các ô còn lại thu nhỏ nhẹ */
+/* Lưới ô chức năng: rê vào ô nào thì ô đó nổi lên mượt mà */
 .lv-feature {
   transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-  opacity 0.28s ease, border-color 0.2s ease, box-shadow 0.28s ease;
-  will-change: transform;
+    border-color 0.2s ease, box-shadow 0.28s ease;
 }
 
 @media (hover: hover) {
   .lv-feature-grid:has(.lv-feature-link:hover) .lv-feature:not(:hover) {
-    transform: scale(0.96);
-    opacity: 0.85;
+    transform: scale(0.98);
   }
 
   .lv-feature-link:hover {
-    transform: scale(1.04);
+    transform: translateY(-2px) scale(1.015);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
     position: relative;
-    z-index: 1;
+    z-index: 2;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lv-rise,
-  main,
   .lv-route-bar,
   .lv-word,
   .lv-shine,
@@ -74,4 +54,3 @@ main {
     transition: none;
   }
 }
-

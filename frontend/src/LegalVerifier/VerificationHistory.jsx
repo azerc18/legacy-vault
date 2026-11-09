@@ -88,9 +88,9 @@ export default function VerificationHistory() {
                 ))}
 
                 {items.length > 0 && (
-                    <div className={`bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 overflow-x-auto transition-opacity ${loading ? 'opacity-50' : ''}`}>
+                    <div className={`lv-glass-thick bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-x-auto transition-opacity ${loading ? 'opacity-50' : ''}`}>
                         <table className="w-full text-left">
-                            <thead className="bg-surface-container-low text-sm text-on-surface-variant">
+                            <thead className="text-sm text-on-surface-variant">
                             <tr>
                                 <th className="p-4">{t('history.cols.decided')}</th>
                                 <th className="p-4">{t('history.cols.owner')}</th>
@@ -104,7 +104,7 @@ export default function VerificationHistory() {
                                 <tr
                                     key={h.id}
                                     onClick={() => navigate(`/verifier/request/${h.id}`)}
-                                    className="border-t border-outline-variant/20 hover:bg-surface-container-low cursor-pointer"
+                                    className="border-t border-outline-variant/20 cursor-pointer"
                                 >
                                     <td className="p-4 whitespace-nowrap">{formatDate(h.decidedAt, true)}</td>
                                     <td className="p-4 font-bold">
@@ -112,7 +112,7 @@ export default function VerificationHistory() {
                                     </td>
                                     <td className="p-4">{h.executorName}</td>
                                     <td className="p-4">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${STATUS_CLASS[h.status]}`}>
+                                        <span className={`lv-glass-badge px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${STATUS_CLASS[h.status]}`}>
                                             {statusLabel(h.status)}
                                         </span>
                                     </td>

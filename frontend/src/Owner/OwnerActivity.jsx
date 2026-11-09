@@ -79,7 +79,7 @@ export default function OwnerActivity() {
             }
         >
             <ReducedMotionConfig>
-                <div className="mb-6 flex flex-wrap gap-2 bg-surface-container-low p-1 rounded-xl w-fit">
+                <div className="lv-segmented-track mb-6 flex flex-wrap gap-1.5 p-1.5 rounded-2xl w-fit">
                     {tabs.map((tabItem) => {
                         const active = tab === tabItem.id;
                         return (
@@ -87,15 +87,15 @@ export default function OwnerActivity() {
                                 key={tabItem.id}
                                 type="button"
                                 onClick={() => { setTab(tabItem.id); setPage(0); }}
-                                className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                                    active ? 'text-on-secondary' : 'text-on-surface-variant hover:text-on-surface'
+                                className={`relative px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+                                    active ? 'text-on-surface font-bold' : 'text-on-surface-variant hover:text-on-surface'
                                 }`}
                             >
                                 {active && (
                                     <motion.span
                                         layoutId="owner-activity-tab-pill"
                                         transition={spring.selection}
-                                        className="absolute inset-0 rounded-lg bg-secondary"
+                                        className="lv-glass-tinted absolute inset-0 rounded-xl"
                                     />
                                 )}
                                 <span className="relative z-10 inline-flex items-center gap-1.5">
@@ -108,7 +108,7 @@ export default function OwnerActivity() {
                 </div>
             </ReducedMotionConfig>
             <Alert>{error}</Alert>
-            <Card>
+            <Card className="lv-glass-thick">
                 {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
                 {data && rows.length === 0 && (
                     <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
@@ -116,18 +116,18 @@ export default function OwnerActivity() {
                                 text={days > 0 ? t('empty.periodText') : (isAccess ? tAccess('emptyText') : t('empty.noneText'))} />
                 )}
                 {rows.length > 0 && (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto -mx-6 -my-2">
                         <table className="w-full text-sm text-left">
-                            <thead className="text-on-surface-variant">
-                                <tr><th className="py-2 pr-4">{t('columns.time')}</th><th className="py-2 pr-4">{t('columns.action')}</th><th className="py-2 pr-4">{t('columns.by')}</th><th className="py-2">{t('columns.details')}</th></tr>
+                            <thead className="text-xs uppercase tracking-wider text-on-surface-variant">
+                                <tr><th className="py-3 px-6">{t('columns.time')}</th><th className="py-3 px-4">{t('columns.action')}</th><th className="py-3 px-4">{t('columns.by')}</th><th className="py-3 px-6">{t('columns.details')}</th></tr>
                             </thead>
                             <tbody>
                                 {rows.map((r) => (
-                                    <tr key={r.id} className="border-t border-outline-variant/20">
-                                        <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.createdAt, true)}</td>
-                                        <td className="py-2 pr-4 font-semibold">{actionLabel(t, i18n, r.action)}</td>
-                                        <td className="py-2 pr-4">{actorLabel(t, r.actorName)}</td>
-                                        <td className="py-2 text-on-surface-variant">{r.description || '—'}</td>
+                                    <tr key={r.id} className="border-t border-outline-variant/25">
+                                        <td className="py-3 px-6 whitespace-nowrap tabular-nums">{formatDate(r.createdAt, true)}</td>
+                                        <td className="py-3 px-4 font-semibold">{actionLabel(t, i18n, r.action)}</td>
+                                        <td className="py-3 px-4">{actorLabel(t, r.actorName)}</td>
+                                        <td className="py-3 px-6 text-on-surface-variant">{r.description || '—'}</td>
                                     </tr>
                                 ))}
                             </tbody>

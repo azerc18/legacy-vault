@@ -4,8 +4,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import { ownerApi, PROTECTION_CHANGED } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { useToast } from '../Common/Toast.jsx';
 import { Card, Alert, Icon, formatDate, btnPrimary } from '../Owner/ownerUi.jsx';
 
 // Mỗi sự kiện: biểu tượng + các việc gợi ý (key i18n -> đường dẫn; '#id' = cuộn tới thẻ trên trang Hồ sơ)
@@ -35,6 +37,7 @@ function TaskLink({ to, children }) {
 
 export default function LifeEventsCard() {
     const { t } = useTranslation('profile');
+    const toast = useToast();
     const [dms, setDmsState] = useState(undefined);  // undefined = đang tải, null = chưa cấu hình
     const [overdue, setOverdue] = useState(false);
     // Tính "quá 6 tháng" ngay khi nhận dữ liệu (không gọi Date.now trong lúc render)
@@ -63,6 +66,7 @@ export default function LifeEventsCard() {
             setDms(updated);
             setSelected([]);
             setSuccess(t('lifeEvents.reviewed'));
+            toast.success(t('lifeEvents.reviewed'));
             window.dispatchEvent(new Event(PROTECTION_CHANGED));   // điểm sẵn sàng thừa kế tải lại
         } catch (e) {
             setError(getErrorMessage(e, t('lifeEvents.errors.review')));
@@ -109,19 +113,21 @@ export default function LifeEventsCard() {
                 })}
             </div>
 
-            {uniqueTasks.length > 0 && (
-                <div className="mt-5">
-                    <p className="text-sm font-semibold mb-2">{t('lifeEvents.suggested')}</p>
-                    <div className="grid sm:grid-cols-2 gap-2">
-                        {uniqueTasks.map((task) => (
-                            <TaskLink key={task.key} to={task.to}>
-                                <Icon name="arrow_circle_right" className="text-[18px] text-secondary" />
-                                <span className="flex-1">{t(`lifeEvents.tasks.${task.key}`)}</span>
-                            </TaskLink>
-                        ))}
+            <AutoHeight>
+                {uniqueTasks.length > 0 && (
+                    <div className="pt-5">
+                        <p className="text-sm font-semibold mb-2">{t('lifeEvents.suggested')}</p>
+                        <div className="grid sm:grid-cols-2 gap-2">
+                            {uniqueTasks.map((task) => (
+                                <TaskLink key={task.key} to={task.to}>
+                                    <Icon name="arrow_circle_right" className="text-[18px] text-secondary" />
+                                    <span className="flex-1">{t(`lifeEvents.tasks.${task.key}`)}</span>
+                                </TaskLink>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </AutoHeight>
 
             <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
                 {dms !== undefined && !canCheckIn && (

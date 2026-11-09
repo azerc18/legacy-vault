@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sessionApi, parseUserAgent } from '../api/sessionApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { useToast } from '../Common/Toast.jsx';
 import { Card, Alert, Icon, ConfirmDialog, formatDate, btnOutline } from '../Owner/ownerUi.jsx';
 
 function deviceIcon({ mobile, browser }) {
@@ -12,6 +13,7 @@ function deviceIcon({ mobile, browser }) {
 
 export default function SessionsCard() {
     const { t } = useTranslation('profile');
+    const toast = useToast();
     const [sessions, setSessions] = useState(null);
     const [error, setError] = useState('');
 
@@ -29,7 +31,9 @@ export default function SessionsCard() {
         setActionError(''); setSuccess(''); setBusyId(id);
         try {
             const res = await fn();
-            setSuccess(typeof okMsg === 'function' ? okMsg(res) : okMsg);
+            const msg = typeof okMsg === 'function' ? okMsg(res) : okMsg;
+            setSuccess(msg);
+            toast.success(msg);
             await onReload();
         } catch (e) {
             setActionError(getErrorMessage(e, t('sessions.errors.failed')));

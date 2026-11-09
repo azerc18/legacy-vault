@@ -128,17 +128,14 @@ export default function AssistantWidget() {
 
             {bubble && !open && (
                 <button type="button" onClick={toggle}
-                        className="chibi-bubble pointer-events-auto relative max-w-[220px] mr-6 px-3 py-2 rounded-2xl
-                                   bg-background border border-outline-variant shadow-lg text-sm text-on-surface text-left">
+                        className="chibi-bubble lv-glass-thick pointer-events-auto relative max-w-[220px] mr-3 px-3.5 py-2.5 rounded-2xl
+                                   text-sm text-on-surface text-left">
                     {bubble}
-                    {/* đuôi khung thoại chỉ xuống nhân vật */}
-                    <span className="absolute -bottom-1.5 right-8 h-3 w-3 rotate-45 bg-background
-                                     border-r border-b border-outline-variant" />
                 </button>
             )}
 
             <button type="button" onClick={toggle} aria-label={open ? 'Close assistant' : 'Open assistant'}
-                    className="pointer-events-auto rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    className="lv-assistant-launcher lv-glass-clear pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
                     <Owl3D action={thinking ? 'think' : action} costume={costume} />
                 </Suspense>

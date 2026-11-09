@@ -34,27 +34,27 @@ export const DOCUMENT_TYPES = [
 export function Alert({type = 'error', children}) {
     if (!children) return null;
     const cls = {
-        error: 'bg-error-container text-on-error-container',
-        info: 'bg-secondary-fixed text-on-secondary-fixed',
-        success: 'bg-success-container text-on-success-container',
-        warning: 'bg-warning-container text-on-warning-container',
+        error: 'bg-error-container/85 text-on-error-container border border-error/25',
+        info: 'bg-secondary-fixed/85 text-on-secondary-fixed border border-secondary/25',
+        success: 'bg-success-container/85 text-on-success-container border border-success/25',
+        warning: 'bg-warning-container/85 text-on-warning-container border border-warning/25',
     }[type];
-    return <div className={`mb-4 p-3 rounded-lg text-sm ${cls}`}>{children}</div>;
+    return <div className={`mb-4 p-3.5 rounded-xl text-sm backdrop-blur-md shadow-sm ${cls}`}>{children}</div>;
 }
 
 export const inputClass =
-    'w-full h-11 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
+    'lv-glass-inline w-full h-11 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 export const btnPrimary =
-    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
+    'lv-btn-primary h-11 px-5 rounded-xl bg-primary text-on-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
 export const btnOutline =
-    'h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
+    'lv-btn-secondary h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold inline-flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 export const btnDanger =
-    'h-11 px-5 rounded-xl bg-error-container text-on-error-container font-bold inline-flex items-center justify-center gap-2 hover:bg-error hover:text-on-error disabled:opacity-60 disabled:cursor-not-allowed';
+    'lv-btn-danger h-11 px-5 rounded-xl bg-error-container text-on-error-container font-bold inline-flex items-center justify-center gap-2 hover:bg-error hover:text-on-error disabled:opacity-60 disabled:cursor-not-allowed';
 
 export function Card({title, icon, children, className = ''}) {
     return (
         <section
-            className={`bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ${className}`}>
+            className={`lv-glass-regular bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 ${className}`}>
             {title && (
                 <h2 className="font-title-lg text-title-lg flex items-center gap-2 mb-4">
                     {icon && <Icon name={icon} className="text-secondary"/>} {title}
@@ -70,8 +70,8 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     const {t} = useTranslation(['vault', 'common']);
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onCancel}>
-            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
+        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center px-4" onClick={onCancel}>
+            <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant">{message}</p>
@@ -87,17 +87,9 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
 }
 
 export function OwnerLayout({title, subtitle, back, actions, children}) {
-    const {t} = useTranslation('vault');
-    const nav = [
-        {to: '/owner/vaults', label: t('nav.myVaults'), icon: 'inventory_2'},
-        {to: '/owner/dms', label: t('nav.dms'), icon: 'favorite'},
-        {to: '/owner/executors', label: t('nav.executors'), icon: 'badge'},
-        {to: '/owner/activity', label: t('nav.activity'), icon: 'history'},
-        {to: '/billing', label: t('nav.billing'), icon: 'workspace_premium'},
-    ];
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader nav={nav} extra={<NotificationBell source="owner" />}/>
+            <AppHeader extra={<NotificationBell source="owner" />}/>
             <main className={`${PAGE_WIDTH} py-10`}>
                 <ProtectionBanner/>
                 <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>
