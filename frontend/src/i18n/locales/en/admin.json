@@ -85,6 +85,8 @@
     "alerts": "Related alerts",
     "logs": "10 latest log entries",
     "noVaults": "No vaults yet.",
+    "assetVerifications": "Asset verification",
+    "noAssetVerifications": "No assets yet.",
     "noAlerts": "No alerts.",
     "noLogs": "No log entries yet.",
     "on": "On",

@@ -8,6 +8,8 @@ import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
 import { ReasonDialog, Stamp, toneOf } from './adminUi.jsx';
+import VerificationBadge from '../Common/VerificationBadge.jsx';
+import { tEnum } from '../i18n/format.js';
 
 const HIDDEN_ROLES = ['BENEFICIARY'];
 
@@ -154,6 +156,23 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                                 </p>
                                             </div>
                                             <Stamp tone={v.status === 'ACTIVE' ? 'info' : v.status === 'UNLOCKED' ? 'warn' : toneOf(v.status)} flat>{t(`vaults.status.${v.status}`, { defaultValue: v.status })}</Stamp>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Section>
+
+                            <Section title={t('drawer.assetVerifications')} count={(u.assetVerifications || []).length}>
+                                {(u.assetVerifications || []).length === 0 && <p className="text-sm text-on-surface-variant">{t('drawer.noAssetVerifications')}</p>}
+                                <ul className="lv-todo">
+                                    {(u.assetVerifications || []).map((a) => (
+                                        <li key={a.assetId} className="py-2 flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold truncate">{tEnum('assetType', a.assetType)}</p>
+                                                <p className="text-[11px] text-outline truncate">
+                                                    {a.vaultName}{a.expiresAt && <> · {t('drawer.until', { date: formatDate(a.expiresAt) })}</>}
+                                                </p>
+                                            </div>
+                                            <VerificationBadge status={a.status} method={a.method} />
                                         </li>
                                     ))}
                                 </ul>

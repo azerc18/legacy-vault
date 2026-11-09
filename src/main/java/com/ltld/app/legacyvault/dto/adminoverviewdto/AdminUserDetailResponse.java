@@ -37,6 +37,7 @@ public class AdminUserDetailResponse {
     private List<VaultItem> vaults;
     private List<AdminAuditLogResponse> recentLogs;
     private List<AlertItem> alerts;
+    private List<AssetVerificationItem> assetVerifications;
 
     @Getter
     @Builder
@@ -46,6 +47,20 @@ public class AdminUserDetailResponse {
         private String status;
         private LocalDateTime claimDeadlineAt;
         private LocalDateTime createdAt;
+    }
+
+    // B.4: chỉ loại tài sản và trạng thái xác thực, không có tên hay nội dung tài sản
+    @Getter
+    @Builder
+    public static class AssetVerificationItem {
+        private UUID assetId;
+        private String assetType;
+        private String vaultName;
+        private String status;
+        private String method;
+        private String provider;
+        private LocalDateTime verifiedAt;
+        private LocalDateTime expiresAt;
     }
 
     @Getter
