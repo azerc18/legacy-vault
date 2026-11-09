@@ -1,5 +1,7 @@
 {
   "nav": {
+    "problem": "The problem",
+    "assets": "Your vault",
     "how": "How it works",
     "security": "Security",
     "roles": "Roles",
@@ -101,8 +103,7 @@
       "legal": "Wills, property deeds and insurance papers, together with what is needed to claim them.",
       "notes": "Personal letters and instructions you want read at the right time.",
       "files": "Photos and documents that matter, encrypted before they are saved."
-    },
-    "hint": "Hover or tap a box to open it"
+    }
   },
   "rolesSection": {
     "eyebrow": "Who is involved",
@@ -151,7 +152,6 @@
     "eyebrow": "Preview",
     "title": "Your whole digital legacy on one screen",
     "text": "See your readiness, what to do next and handover progress as soon as you sign in.",
-    "hint": "Interactive demo: switch pages on the left and try the buttons.",
     "demo": {
       "name": "An",
       "vaults": [
@@ -199,5 +199,9 @@
     "contact": "Contact the team",
     "legal1": "© 2026 LegacyVault · SWP391 project, FPT University",
     "legal2": "This is a student project and does not replace legal advice."
+  },
+  "orb": {
+    "alt": "An elderly hand and a young hand cradling a golden sphere that holds LegacyVault's owl-padlock emblem",
+    "aria": "Unlock to sign in to LegacyVault"
   }
 }
