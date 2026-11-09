@@ -96,7 +96,7 @@
       },
       "step3": {
         "title": "Lịch sử truy cập & Kiểm toán",
-        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thực thi và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
+        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thi hành và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
         "tip": "Mọi thao tác đều được ghi nhận kèm mã định danh, địa chỉ và thời gian bất biến (Immutable Audit Log)."
       }
     },
@@ -168,9 +168,9 @@
       }
     },
     "executor_home": {
-      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THỰC THI",
+      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THI HÀNH",
       "step1": {
-        "title": "Thống kê nhiệm vụ thực thi",
+        "title": "Thống kê nhiệm vụ thi hành",
         "instruction": "Theo dõi tổng số hồ sơ cần xử lý ngay, hồ sơ đang chờ thẩm định pháp lý và hồ sơ đã bàn giao thành công.",
         "tip": "Hồ sơ có hạn chót gấp sẽ được đánh dấu cảnh báo để bạn kịp thời xử lý."
       },
@@ -211,7 +211,7 @@
     {
       "key": "guardians",
       "tag": "TRỤ CỘT 2 · CHỈ ĐỊNH",
-      "title": "Người Thụ Hưởng & Người Thực Thi (Guardians & Heirs)",
+      "title": "Người Thụ Hưởng & Người Thi Hành (Guardians & Heirs)",
       "subtitle": "Thiết lập mạng lưới bàn giao an toàn và minh bạch",
       "description": "LegacyVault phân định rõ ràng giữa người nhận tài sản và người hỗ trợ làm thủ tục pháp lý. Bạn toàn quyền quyết định ai nhận tài sản gì, và ai là người được ủy quyền đại diện xử lý di nguyện.",
       "points": [

@@ -101,10 +101,10 @@
     "download": "Tải về"
   },
   "executor": {
-    "title": "Tiến độ của người thực thi với các tài khoản trực tuyến",
-    "intro": "Người thực thi xử lý các tài khoản này theo di nguyện của chủ sở hữu: đã xong {{done}}/{{total}}.",
+    "title": "Tiến độ của người thi hành với các tài khoản trực tuyến",
+    "intro": "Người thi hành xử lý các tài khoản này theo di nguyện của chủ sở hữu: đã xong {{done}}/{{total}}.",
     "account": "Tài khoản",
-    "note": "Ghi chú của người thực thi: {{note}}",
+    "note": "Ghi chú của người thi hành: {{note}}",
     "wish": {
       "MEMORIALIZE": "Chuyển tài khoản sang chế độ tưởng niệm",
       "DELETE": "Xóa tài khoản",

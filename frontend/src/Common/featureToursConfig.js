@@ -67,7 +67,7 @@ export const FEATURE_TOURS = [
         ],
     },
 
-    // 3. Owner: Người thực thi di chúc (/owner/executors)
+    // 3. Owner: Người thi hành di chúc (/owner/executors)
     {
         id: 'owner_executors',
         role: 'OWNER',
@@ -153,7 +153,7 @@ export const FEATURE_TOURS = [
         ],
     },
 
-    // 6. Executor: Bảng hồ sơ thực thi (/executor/home)
+    // 6. Executor: Bảng hồ sơ thi hành (/executor/home)
     {
         id: 'executor_home',
         role: 'EXECUTOR',
