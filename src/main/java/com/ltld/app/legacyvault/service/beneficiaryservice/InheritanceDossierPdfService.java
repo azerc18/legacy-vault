@@ -82,7 +82,8 @@ public class InheritanceDossierPdfService {
             Map.entry(AssetVerificationMethod.BIO_CHALLENGE_MOCK, "mã thử thách trên hồ sơ"),
             Map.entry(AssetVerificationMethod.SCREENSHOT_UPLOAD, "ảnh chụp màn hình"),
             Map.entry(AssetVerificationMethod.FILE_HASH, "mã băm tệp"),
-            Map.entry(AssetVerificationMethod.SECOND_PERSON_CONFIRM, "người thứ hai xác nhận"));
+            Map.entry(AssetVerificationMethod.SECOND_PERSON_CONFIRM, "người thứ hai xác nhận"),
+            Map.entry(AssetVerificationMethod.DOCUMENT_TIMESTAMP, "dấu thời gian"));
     private static final Map<String, String> FIELD_LABEL = Map.ofEntries(
             // Ngân hàng / sàn
             Map.entry("institutionName", "Ngân hàng / sàn"),

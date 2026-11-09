@@ -35,6 +35,7 @@ const METHOD_KIND = {
     BIO_CHALLENGE_MOCK: 'bio',
     SCREENSHOT_UPLOAD: 'file',
     FILE_HASH: 'file',
+    DOCUMENT_TIMESTAMP: 'file',
     STATEMENT_UPLOAD: 'file',
 };
 const IS_VERIFIED = ['VERIFIED', 'VERIFIED_SANDBOX'];
@@ -42,7 +43,7 @@ const SCREENSHOT_TYPES = '.png,.jpg,.jpeg';
 const DOC_TYPES = '.pdf,.doc,.docx,.png,.jpg,.jpeg';
 // Định dạng tệp theo từng cách (khớp loại tệp BE nhận ở /documents/upload: PDF, DOC/DOCX, JPG/PNG)
 const FILE_ACCEPT = { SCREENSHOT_UPLOAD: SCREENSHOT_TYPES, FILE_HASH: DOC_TYPES,
-    STATEMENT_UPLOAD: '.pdf,.png,.jpg,.jpeg' };
+    DOCUMENT_TIMESTAMP: DOC_TYPES, STATEMENT_UPLOAD: '.pdf,.png,.jpg,.jpeg' };
 const MAX_SIZE = 10 * 1024 * 1024;
 const EMPTY_INPUT = { code: '', signature: '', bio: '', file: null };
 

@@ -9,6 +9,7 @@
   },
   "methods": {
     "FILE_HASH": { "label": "File fingerprint (SHA-256)", "desc": "Upload the original to the vault; the system stores the file's SHA-256 fingerprint.", "fileIntro": "Upload the original document (PDF, DOC/DOCX, PNG or JPG, up to 10 MB). The system stores its SHA-256 fingerprint so a later change to the file can be detected. This does not prove the document is genuine." },
+    "DOCUMENT_TIMESTAMP": { "label": "Timestamp (Simulated)", "desc": "Record that the file existed at this point in time, bound to its SHA-256 fingerprint on the system.", "fileIntro": "Upload the original document (PDF, DOC/DOCX, PNG or JPG, up to 10 MB). The system computes its SHA-256 hash and records a simulated timestamp proving the file existed." },
     "SECOND_PERSON_CONFIRM": { "label": "Second-person confirmation", "desc": "A code is sent to your trusted (DMS) confirmers; whoever has seen the original reads it back to you to enter." },
     "OTP_EMAIL": { "label": "Email OTP code", "desc": "Receive a code at the asset's email and enter it." },
     "GOOGLE_LOGIN": { "label": "Google sign-in", "desc": "Sign in with the Google account you declared." },
