@@ -499,6 +499,62 @@ public class EmailSender {
                 roleLabel(lang, type), ownerLabel(ownerName, ownerEmail), ownerDisplayName(ownerName, ownerEmail))));
     }
 
+    // N9: thanh toán thành công, đính kèm hóa đơn PDF (pdf null thì gửi không đính kèm)
+    @Async
+    public void sendPaymentSucceededNotice(String to, String fullName, String planName, long amountVnd,
+                                           String receiptNo, byte[] pdf) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.paymentOk.body", planName, String.format(java.util.Locale.US, "%,d", amountVnd), receiptNo));
+        if (pdf != null) {
+            paras.add(MailMessages.get(lang, "mail.paymentOk.attached"));
+        }
+        deliver(to, lang, Style.BILLING, MailMessages.get(lang, "mail.paymentOk.subject"),
+                MailMessages.get(lang, "mail.paymentOk.title"), paras, null, null,
+                "hoa-don-" + receiptNo + ".pdf", pdf);
+    }
+
+    // N10: thanh toán thất bại hoặc bị hủy
+    @Async
+    public void sendPaymentFailedNotice(String to, String fullName) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.paymentFailed.body"));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.paymentFailed.button") + ": " + base + "/pricing");
+        }
+        sendKeyed(to, lang, Style.NOTICE, "mail.paymentFailed", paras);
+    }
+
+    // N11: gói VIP đã kích hoạt (expiresAt null thì không ghi ngày)
+    @Async
+    public void sendVipActivatedNotice(String to, String fullName, String planName, LocalDateTime expiresAt) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.vipActive.body", planName));
+        if (expiresAt != null) {
+            paras.add(MailMessages.get(lang, "mail.vipActive.until", formatDeadline(expiresAt)));
+        }
+        sendKeyed(to, lang, Style.SUCCESS, "mail.vipActive", paras);
+    }
+
+    /** N12: gói đã hết hạn. Không @Async, người gọi tự bắt lỗi từng mail như mail nhắc trước hạn. */
+    public void sendSubscriptionExpiredNotice(String to, String fullName, String planName) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.subExpired.body", planName));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.subExpiry.button") + ": " + base + "/pricing");
+        }
+        sendKeyed(to, lang, Style.URGENT, "mail.subExpired", paras);
+    }
+
     // T1: Nhắc Owner trước 7 ngày khi gói VIP sắp hết hạn
     public void sendSubscriptionExpiryReminder(String to, String ownerName, String planName, LocalDateTime expiresAt) {
         AppLanguage lang = languageResolver.forEmail(to);
@@ -550,6 +606,12 @@ public class EmailSender {
 
     private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
                          List<String> paragraphs, String code, String footerNote) {
+        deliver(to, lang, style, subject, title, paragraphs, code, footerNote, null, null);
+    }
+
+    private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
+                         List<String> paragraphs, String code, String footerNote,
+                         String pdfName, byte[] pdf) {
         String brand = MailMessages.get(lang, "mail.brand");
         String html = MailHtml.render(style, title, paragraphs, code, footerNote, brand);
         String text = MailHtml.renderText(title, paragraphs, code, footerNote);
@@ -562,6 +624,9 @@ public class EmailSender {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(text, html);
+            if (pdf != null) {
+                helper.addAttachment(pdfName, new org.springframework.core.io.ByteArrayResource(pdf), "application/pdf");
+            }
             javaMailSender.send(message);
         } catch (MessagingException e) {
             throw new MailPreparationException(e);
