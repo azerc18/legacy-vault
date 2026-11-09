@@ -59,6 +59,7 @@ export function getUser() {
 export function clearAuth() {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('lv_demo_mode');
 }
 
 // Xoá local + báo BE thu hồi refresh token (không cần chờ)

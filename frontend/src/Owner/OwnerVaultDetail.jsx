@@ -76,9 +76,15 @@ export default function OwnerVaultDetail() {
 
             {vault && (
                 <div className="space-y-6">
-                    <DetailsSection vault={vault} editable={editable} onSaved={reload} />
-                    <AssetSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onChanged={reload} />
-                    <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
+                    <div data-tour="vault-detail-info">
+                        <DetailsSection vault={vault} editable={editable} onSaved={reload} />
+                    </div>
+                    <div data-tour="vault-detail-assets">
+                        <AssetSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onChanged={reload} />
+                    </div>
+                    <div data-tour="vault-detail-beneficiaries">
+                        <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
+                    </div>
                     <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
                     <LegacyMessageSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} />
                     <ActivitySection vaultId={vaultId} />

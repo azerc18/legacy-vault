@@ -73,13 +73,15 @@ export default function OwnerActivity() {
             title={t('title')}
             subtitle={isAccess ? tAccess('subtitle') : t('subtitle')}
             actions={
-                <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
+                <div data-tour="activity-filter">
+                    <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
                     {RANGES.map((r) => <option key={r.value} value={r.value}>{t(r.labelKey)}</option>)}
                 </select>
+                </div>
             }
         >
             <ReducedMotionConfig>
-                <div className="lv-segmented-track mb-6 flex flex-wrap gap-1.5 p-1.5 rounded-2xl w-fit">
+                <div data-tour="activity-header" className="lv-segmented-track mb-6 flex flex-wrap gap-1.5 p-1.5 rounded-2xl w-fit">
                     {tabs.map((tabItem) => {
                         const active = tab === tabItem.id;
                         return (
@@ -108,6 +110,7 @@ export default function OwnerActivity() {
                 </div>
             </ReducedMotionConfig>
             <Alert>{error}</Alert>
+            <div data-tour="activity-list">
             <Card className="lv-glass-thick">
                 {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
                 {data && rows.length === 0 && (
@@ -142,6 +145,7 @@ export default function OwnerActivity() {
                     </div>
                 )}
             </Card>
+            </div>
         </OwnerLayout>
     );
 }

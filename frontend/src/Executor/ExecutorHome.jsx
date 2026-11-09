@@ -177,14 +177,14 @@ export default function ExecutorHome() {
                 {error && <div
                     className="mb-6 p-4 rounded-xl bg-error-container text-on-error-container text-sm">{error}</div>}
 
-                <section className="lv-feature-grid mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <section data-tour="executor-stats" className="lv-feature-grid mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard icon="assignment_late" label={t('home.stats.needAction')} value={cases && needAction}/>
                     <StatCard icon="hourglass_top" label={t('home.stats.waiting')} value={cases && waiting}/>
                     <StatCard icon="lock_open" label={t('home.stats.unlocked')} value={cases && unlocked}/>
                     <StatCard icon="pause_circle" label={t('home.stats.standby')} value={cases && standby.length}/>
                 </section>
 
-                <section className="mb-10">
+                <section data-tour="executor-cases-list" className="mb-10">
                     <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('home.activeTitle')}</h2>
                     {cases === null && <p className="text-on-surface-variant">{t('loading')}</p>}
                     {cases !== null && active.length === 0 &&

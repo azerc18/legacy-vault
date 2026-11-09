@@ -1,0 +1,252 @@
+{
+  "guideBtn": "Guide",
+  "openGuide": "User Guide & Feature Discovery",
+  "welcomeTitle": "NEW USER WALKTHROUGH · LEGACYVAULT 101",
+  "welcomeSubtitle": "4 core pillars to master digital estate preservation and transfer",
+  "stepBadge": "Quest {{current}}/{{total}}",
+  "skip": "Skip",
+  "prev": "Back",
+  "next": "Next",
+  "finish": "Start Exploring",
+  "dontShowAgain": "Understood, do not show automatically on login",
+  "reopenHint": "You can reopen this guide anytime from the top navigation bar.",
+  "newFeatureTag": "JUST UNLOCKED",
+  "menuTitle": "HELP & GUIDE",
+  "startInteractiveTour": "Interactive Step-by-Step Tour",
+  "startInteractiveTourDesc": "Visual on-screen guidance for every button and action",
+  "openCatalogue": "Security & Feature Guidebook",
+  "openCatalogueDesc": "Explore the 4 core pillars, DMS, and AI OCR forensics",
+  "repromptOption": "Experience initial new user prompt again",
+  "replayCurrentTour": "Replay guide for this feature",
+  "banner": {
+    "title": "New to Legacy Vault?",
+    "subtitle": "Follow an interactive step-by-step walkthrough to master vault creation, beneficiary assignment, and digital asset encryption.",
+    "action": "Start Walkthrough",
+    "exploreGuide": "View Guidebook"
+  },
+  "firstTimePrompt": {
+    "badge": "WELCOME TO LEGACY VAULT",
+    "question": "Are you new to Legacy Vault?",
+    "subtitle": "We are honored to guide you. Our system will walk you through each button and basic action to create your first digital heritage vault effortlessly and with complete security.",
+    "newbieAction": "I'm a new user (Start Guide)",
+    "experiencedAction": "I've used it before",
+    "helper": "You can always relaunch this interactive tour or open the guidebook anytime from the navigation bar."
+  },
+  "tour": {
+    "stepBadge": "Step {{current}}/{{total}}",
+    "skipTour": "Skip tour",
+    "prevBtn": "Back",
+    "nextBtn": "Next",
+    "goToCreate": "Start Creating Vault",
+    "finishBtn": "Finish Walkthrough",
+    "gotIt": "Got it",
+    "congrats": {
+      "title": "🎉 Congratulations! You've completed the tutorial!",
+      "subtitle": "You have mastered the foundations of digital estate preservation.",
+      "text": "Your assets are now safeguarded by AES-256 military-grade encryption standards. You can freely create additional vaults, designate heirs, or explore advanced fail-safes like DMS and AI OCR Forensics.",
+      "action": "Start using Legacy Vault"
+    },
+    "steps": {
+      "step1": {
+        "title": "Select \"New Vault\"",
+        "instruction": "Click the '+ New Vault' button to begin. A vault is an encrypted private sanctuary where you preserve your most important credentials and digital heritage.",
+        "tip": "Each vault possesses an independent encryption key and can be delegated to distinct beneficiaries."
+      },
+      "step2": {
+        "title": "Fill in \"Vault Information\"",
+        "instruction": "Provide a memorable, meaningful name for the vault (e.g. 'Family Heritage', 'Crypto & Investments') along with an optional handover note.",
+        "tip": "A descriptive name helps your heirs immediately understand the purpose and intent when the vault unlocks."
+      },
+      "step3": {
+        "title": "Assign \"Beneficiaries\"",
+        "instruction": "Enter the email address of a loved one or trusted trustee. This individual will receive the decryption authorization when the transfer workflow triggers.",
+        "tip": "You can designate multiple beneficiaries and customize permissions for each family member."
+      },
+      "step4": {
+        "title": "Choose \"Asset Type\"",
+        "instruction": "Select the appropriate asset category: Bank accounts, Crypto wallets, Social media accounts, Insurance policies, or Confidential legal dossiers.",
+        "tip": "Each asset category features a specialized, standardized form to ensure your heirs receive all essential details accurately."
+      },
+      "step5": {
+        "title": "Enter \"Asset Information\"",
+        "instruction": "Enter identifiers and confidential secrets (passwords, PINs, seed phrases, notes). All secrets are client-side end-to-end encrypted (E2E AES-256) before leaving your browser.",
+        "tip": "Zero-knowledge architecture ensures that neither servers nor administrators can ever read your plaintext secrets."
+      },
+      "step6": {
+        "title": "Click \"Create Vault\" to finish",
+        "instruction": "Review your entered details and click 'Create Vault' to securely seal your digital estate!",
+        "tip": "After creation, you can configure your Dead Man's Switch (DMS) check-in intervals or invite legal executors."
+      }
+    }
+  },
+  "featureTours": {
+    "quickBadge": "FEATURE QUICK TOUR",
+    "gotIt": "Got it",
+    "owner_activity": {
+      "badge": "QUICK GUIDE · ACTIVITY LOGS",
+      "step1": {
+        "title": "Security Activity Logs",
+        "instruction": "Track all asset accesses, credential views, security changes, and system operations in real time.",
+        "tip": "Switch between System DMS events and who viewed or downloaded estate assets."
+      },
+      "step2": {
+        "title": "Time Period Filter",
+        "instruction": "Quickly filter the audit history by 30 days, 90 days, 1 year, or all-time access logs.",
+        "tip": "Review suspicious timestamp intervals or conduct routine security checks."
+      },
+      "step3": {
+        "title": "Access History & Audit Trail",
+        "instruction": "Every asset view, executor action, and DMS state change appears in chronological detail here.",
+        "tip": "All events are recorded with actor identities, IP addresses, and immutable timestamps."
+      }
+    },
+    "owner_dms": {
+      "badge": "QUICK GUIDE · DEAD MAN'S SWITCH (DMS)",
+      "step1": {
+        "title": "Dead Man's Switch Status",
+        "instruction": "Monitor active fail-safe status and use the 1-click Check-in button to confirm you are safe.",
+        "tip": "Check in anytime directly from this screen or via the 1-click secure link sent to your email."
+      },
+      "step2": {
+        "title": "Check-in Interval Configuration",
+        "instruction": "Configure periodic check-in intervals, grace periods, and reminder frequencies before handover begins.",
+        "tip": "The grace period ensures you are not accidentally triggered while traveling or offline."
+      },
+      "step3": {
+        "title": "Trusted Social Confirmers",
+        "instruction": "Appoint trusted loved ones to cross-verify real-world circumstances before vault handover occurs.",
+        "tip": "Confirmers receive verification prompts to ensure zero unintended triggers."
+      }
+    },
+    "owner_executors": {
+      "badge": "QUICK GUIDE · ESTATE EXECUTORS",
+      "step1": {
+        "title": "Executors Overview",
+        "instruction": "Appoint legal representatives to manage handover paperwork and file verification records.",
+        "tip": "Executors act as legal stewards and never have access to decrypt your private secrets."
+      },
+      "step2": {
+        "title": "Primary Executor",
+        "instruction": "Your primary legal representative responsible for physical verification and government filings.",
+        "tip": "Select a trusted attorney, notary public, or reliable confidant."
+      },
+      "step3": {
+        "title": "Backup Executor",
+        "instruction": "Assumes representative duties if the primary executor is unavailable or declines duty.",
+        "tip": "Guarantees your digital succession workflow never stalls."
+      }
+    },
+    "owner_vault_detail": {
+      "badge": "QUICK GUIDE · VAULT DETAILS",
+      "step1": {
+        "title": "Vault Information & Seal",
+        "instruction": "Inspect vault naming, description, and cryptographic seal status. Edit details whenever unlocked.",
+        "tip": "Each vault is independently secured with military-grade AES-256 encryption."
+      },
+      "step2": {
+        "title": "Digital Assets & AI OCR",
+        "instruction": "Manage encrypted digital assets. Click status badges to test AI OCR forensics or MetaMask signing.",
+        "tip": "Supports 8 specialized asset categories designed for seamless succession."
+      },
+      "step3": {
+        "title": "Beneficiaries & Allocations",
+        "instruction": "Review and allocate inheritance shares across designated family members and heirs.",
+        "tip": "Distribute asset permissions and percentages with granular customization."
+      }
+    },
+    "beneficiary_vaults": {
+      "badge": "QUICK GUIDE · BENEFICIARY SANCTUARY",
+      "step1": {
+        "title": "Your Inherited Vaults",
+        "instruction": "Central hub for all heritage vaults where you are designated as the rightful beneficiary.",
+        "tip": "You gain decryption access once the legal handover and verification conditions are met."
+      },
+      "step2": {
+        "title": "Vault List & Unlock Status",
+        "instruction": "Track status: Sealed, Awaiting Verification, or Fully Handed Over.",
+        "tip": "Once unlocked, click any vault to view decrypted credentials and personal legacy messages."
+      }
+    },
+    "executor_home": {
+      "badge": "QUICK GUIDE · EXECUTOR DASHBOARD",
+      "step1": {
+        "title": "Case Workload & Statistics",
+        "instruction": "Track estates needing immediate action, cases pending legal verification, and completed handovers.",
+        "tip": "Time-sensitive cases approaching deadlines are highlighted for rapid action."
+      },
+      "step2": {
+        "title": "Assigned Estate Cases",
+        "instruction": "Accept duties, upload Death Certificates (AI OCR scan), and collaborate with legal verifiers.",
+        "tip": "Click any case to execute the 4-step succession workflow according to the owner's will."
+      }
+    },
+    "verifier_dashboard": {
+      "badge": "QUICK GUIDE · LEGAL VERIFIER",
+      "step1": {
+        "title": "Audit History & Determinations",
+        "instruction": "Review all past forensic verification decisions, approvals, and rejection records.",
+        "tip": "All examiner determinations are preserved in immutable audit logs."
+      },
+      "step2": {
+        "title": "Forensic Request Queue",
+        "instruction": "Review submitted death certificates, examine Gemini AI OCR extracts, and render rulings.",
+        "tip": "AI OCR cross-checks deceased records, seal authenticity, and detects forged extracts."
+      }
+    }
+  },
+  "steps": [
+    {
+      "key": "vault",
+      "tag": "PILLAR 1 · FOUNDATION",
+      "title": "Vault Creation & End-to-End Encryption (E2E Vault)",
+      "subtitle": "Safeguard confidential credentials with AES-256 military-grade encryption",
+      "description": "Digital vaults are where you preserve your vital digital estate: bank logins, seed phrases, crypto keys, and legal documents. Sensitive assets are encrypted locally before transmission — neither servers nor administrators can ever read your secrets.",
+      "points": [
+        "Zero-knowledge End-to-End Encryption: Only you and authorized heirs hold the decryption keys",
+        "8 tailored asset types: Bank Accounts, Cryptocurrencies, Social Accounts, Legal Papers, etc.",
+        "Domain separation: Create separate vaults for Family, Business, and Financial portfolios"
+      ],
+      "tip": "Pro Tip: Start by clicking '+ New Vault' and protecting your highest-priority credentials first."
+    },
+    {
+      "key": "guardians",
+      "tag": "PILLAR 2 · DELEGATION",
+      "title": "Beneficiaries & Executors (Guardians & Heirs)",
+      "subtitle": "Establish a transparent, tamper-proof succession framework",
+      "description": "LegacyVault cleanly separates the people who receive assets from those who verify legal conditions. You maintain granular control over who inherits each asset and who executes legal obligations.",
+      "points": [
+        "Beneficiary: Inherits specified assets and documents when the vault unlocks",
+        "Executor: Conducts field verification, files legal notices, and assists distribution",
+        "Flexible distribution rules: Full, split percentage, sole heir, or multi-party consensus (Shamir)"
+      ],
+      "tip": "Pro Tip: Designate trusted loved ones as Beneficiaries, and trusted legal counsel as Executors."
+    },
+    {
+      "key": "dms",
+      "tag": "PILLAR 3 · FAIL-SAFE",
+      "title": "Automated Fail-Safe (Dead Man's Switch - DMS)",
+      "subtitle": "Hand over assets at the exact right moment with zero accidental triggers",
+      "description": "The system continuously tracks your presence via periodic check-ins (1-click via Email or Web). If you miss your schedule, an escalating 3-tier verification procedure verifies your status before any assets unlock.",
+      "points": [
+        "Frictionless 1-click check-in from email or web dashboard",
+        "Cross-confirmers: Trusted contacts verify real-world circumstances before activation",
+        "3-tier escalation warnings: Timely reminders sent before any grace period expires"
+      ],
+      "tip": "Pro Tip: Always add at least one trusted Confirmer to prevent unintended activations."
+    },
+    {
+      "key": "forensics",
+      "tag": "JUST UNLOCKED · NEW CAPABILITIES",
+      "title": "AI OCR Forensics & Multi-Modal Asset Verifiers",
+      "subtitle": "Ensure authenticity, integrity, and proof of ownership before estate transfer",
+      "description": "LegacyVault features advanced digital forensics to verify identity, ownership, and document legality:",
+      "points": [
+        "AI OCR Death Certificate Forensics (Gemini 3.6 Flash): Automatic extraction of deceased name, extract number, issuing authority, and red seal",
+        "Crypto Wallet Personal Sign: Cryptographically prove MetaMask control via secp256k1 ecRecover without revealing private keys",
+        "OTP Email & SMS Sandbox Verifier: Real-time ownership verification of emails and mobile wallets",
+        "Digital Asset Fingerprints: Instant detection if stored assets have been altered after verification"
+      ],
+      "tip": "Pro Tip: Open any Vault detail page and click the asset status badges to test the verification tools!"
+    }
+  ]
+}

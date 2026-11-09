@@ -344,6 +344,9 @@ export default function Dashboard() {
                                 <Icon name="arrow_forward" className="text-[18px]" /> {t('hero.cta')}
                             </Link>
                         </Magnetic>
+                        <Link to="/demo" className="h-12 px-6 rounded-full border border-amber-400/50 hover:border-amber-400 text-amber-300 hover:bg-amber-400/10 font-bold flex items-center justify-center gap-2 transition-all">
+                            <Icon name="rocket_launch" className="text-[18px] text-amber-400" /> {t('hero.demoCta', 'Dùng thử nhanh')}
+                        </Link>
                         <a href="#how" className="h-12 px-7 rounded-full border border-white/40 text-white font-bold flex items-center justify-center hover:bg-white/10">
                             {t('hero.how')}
                         </a>

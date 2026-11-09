@@ -170,6 +170,7 @@ export default function DeadMansSwitch() {
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
                     <div className="space-y-6">
                     {/* Trạng thái + check-in */}
+                    <div data-tour="dms-status">
                     <Card>
                         {!configured ? (
                             <div className="text-center py-6">
@@ -215,9 +216,11 @@ export default function DeadMansSwitch() {
                             </>
                         )}
                     </Card>
+                    </div>
 
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
+                        <div data-tour="dms-confirmers">
                         <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
                             <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
@@ -289,10 +292,12 @@ export default function DeadMansSwitch() {
                                 </form>
                             )}
                         </Card>
+                        </div>
                     )}
                     </div>
 
                     {/* Cấu hình */}
+                    <div data-tour="dms-interval">
                     <Card title={<>{t('dms.schedule')} <InfoTip term="dms" /></>} icon="tune">
                         <form onSubmit={save} className="space-y-4">
                             {Object.entries(LIMITS).map(([k, l]) => (
@@ -312,6 +317,7 @@ export default function DeadMansSwitch() {
                             </button>
                         </form>
                     </Card>
+                    </div>
                 </div>
             )}
         </OwnerLayout>

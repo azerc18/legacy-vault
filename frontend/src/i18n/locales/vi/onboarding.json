@@ -1,0 +1,252 @@
+{
+  "guideBtn": "Hướng dẫn",
+  "openGuide": "Hướng dẫn sử dụng & Khám phá tính năng",
+  "welcomeTitle": "HƯỚNG DẪN TÂN THỦ · NHẬP MÔN LEGACYVAULT",
+  "welcomeSubtitle": "4 bước cốt lõi để làm chủ hệ thống bảo vệ và bàn giao di sản số",
+  "stepBadge": "Nhiệm vụ {{current}}/{{total}}",
+  "skip": "Bỏ qua",
+  "prev": "Quay lại",
+  "next": "Tiếp theo",
+  "finish": "Bắt đầu khám phá",
+  "dontShowAgain": "Đã hiểu, không tự động hiển thị lại khi đăng nhập",
+  "reopenHint": "Bạn có thể mở lại hướng dẫn này bất cứ lúc nào từ thanh menu.",
+  "newFeatureTag": "MỚI MỞ KHÓA",
+  "menuTitle": "TRỢ GIÚP & HƯỚNG DẪN",
+  "startInteractiveTour": "Tour hướng dẫn từng bước (Interactive Tour)",
+  "startInteractiveTourDesc": "Chỉ dẫn trực quan từng nút bấm & thao tác trên màn hình",
+  "openCatalogue": "Cẩm nang tính năng & An toàn số",
+  "openCatalogueDesc": "Khám phá 4 trụ cột bảo mật, DMS và Giám định AI OCR",
+  "repromptOption": "Trải nghiệm lại câu hỏi tân thủ ban đầu",
+  "replayCurrentTour": "Xem lại hướng dẫn tính năng này",
+  "banner": {
+    "title": "Bạn là người dùng mới bắt đầu?",
+    "subtitle": "Khám phá quy trình trực quan từng bước để nắm vững cách thiết lập két sắt, chỉ định người thừa kế và bảo vệ di sản số trọn vẹn.",
+    "action": "Bắt đầu hướng dẫn",
+    "exploreGuide": "Xem cẩm nang"
+  },
+  "firstTimePrompt": {
+    "badge": "CHÀO MỪNG BẠN ĐẾN VỚI LEGACYVAULT",
+    "question": "Bạn chưa từng sử dụng ứng dụng Legacy Vault?",
+    "subtitle": "Chúng tôi rất hân hạnh đồng hành cùng bạn. Hệ thống sẽ dẫn dắt bạn qua từng nút bấm và thao tác cơ bản để hoàn thành việc khởi tạo két sắt di sản đầu tiên một cách dễ dàng và an toàn tuyệt đối.",
+    "newbieAction": "Tôi chưa từng dùng (Bắt đầu hướng dẫn)",
+    "experiencedAction": "Tôi đã dùng rồi",
+    "helper": "Bạn luôn có thể xem lại hướng dẫn hoặc mở cẩm nang tính năng bất cứ lúc nào từ thanh điều hướng."
+  },
+  "tour": {
+    "stepBadge": "Bước {{current}}/{{total}}",
+    "skipTour": "Bỏ qua hướng dẫn",
+    "prevBtn": "Quay lại",
+    "nextBtn": "Tiếp tục",
+    "goToCreate": "Bắt đầu tạo két sắt",
+    "finishBtn": "Hoàn tất hướng dẫn",
+    "gotIt": "Đã hiểu",
+    "congrats": {
+      "title": "🎉 Chúc mừng bạn đã hoàn tất hướng dẫn!",
+      "subtitle": "Bạn đã nắm vững toàn bộ quy trình gìn giữ và bảo vệ di sản số.",
+      "text": "Khối tài sản của bạn giờ đây đã được bảo vệ bởi tiêu chuẩn mã hóa quân sự AES-256. Bạn có thể tự do khởi tạo thêm các két sắt mới, gán thêm người thụ hưởng, hoặc khám phá các tính năng mở rộng như DMS và Giám định AI OCR.",
+      "action": "Bắt đầu sử dụng ngay"
+    },
+    "steps": {
+      "step1": {
+        "title": "Chọn \"Tạo két mới\"",
+        "instruction": "Nhấn vào nút '+ Tạo két mới' để bắt đầu thiết lập. Két sắt là không gian riêng tư được mã hóa, nơi bạn lưu giữ toàn bộ thông tin và tài sản di sản quan trọng.",
+        "tip": "Mỗi két sắt sở hữu khóa mã hóa độc lập và có thể phân quyền cho những người thừa kế khác nhau."
+      },
+      "step2": {
+        "title": "Điền \"Thông tin két sắt\"",
+        "instruction": "Đặt một tên gọi gần gũi, dễ nhớ cho két (ví dụ: 'Di sản gia đình', 'Tài sản số & Đầu tư') cùng ghi chú ý nghĩa hoặc lời dặn dò ban đầu.",
+        "tip": "Tên gọi rõ ràng giúp người thụ hưởng hiểu ngay mục đích và tâm nguyện của bạn khi két sắt được kích hoạt mở khóa."
+      },
+      "step3": {
+        "title": "Chọn / Gán \"Người thụ hưởng\"",
+        "instruction": "Nhập địa chỉ email của người thân hoặc người được ủy thác. Đây là người sẽ nhận quyền giải mã và tiếp quản tài sản khi quy trình chuyển giao được kích hoạt.",
+        "tip": "Bạn có thể chỉ định nhiều người thụ hưởng và thiết lập quyền riêng cho từng thành viên trong gia đình."
+      },
+      "step4": {
+        "title": "Chọn \"Loại tài sản\"",
+        "instruction": "Lựa chọn đúng danh mục tài sản bạn cần bảo vệ: Tài khoản ngân hàng, Ví tiền mã hóa (Crypto), Mạng xã hội, Bảo hiểm hoặc Tài liệu pháp lý bí mật.",
+        "tip": "Mỗi loại tài sản đều có biểu mẫu chuyên biệt giúp bạn lưu trữ đầy đủ các thông tin then chốt nhất một cách chuẩn xác."
+      },
+      "step5": {
+        "title": "Nhập \"Thông tin tài sản\"",
+        "instruction": "Nhập các trường định danh và dữ liệu nhạy cảm (mật khẩu, mã PIN, khóa bảo mật, ghi chú). Mọi dữ liệu được mã hóa đầu cuối (E2E AES-256) ngay tại trình duyệt trước khi gửi lên máy chủ.",
+        "tip": "Tiêu chuẩn mã hóa Zero-Knowledge đảm bảo không một ai — kể cả quản trị viên máy chủ — có thể đọc được dữ liệu gốc của bạn."
+      },
+      "step6": {
+        "title": "Ấn \"Tạo két sắt\" để hoàn thành",
+        "instruction": "Kiểm tra lại toàn bộ thông tin và nhấn 'Tạo két sắt' để niêm phong an toàn khối tài sản di sản của bạn!",
+        "tip": "Sau khi tạo két thành công, bạn có thể thiết lập thêm Công tắc tử thần (DMS) hoặc mời thêm Người thực thi di chúc (Executor)."
+      }
+    }
+  },
+  "featureTours": {
+    "quickBadge": "HƯỚNG DẪN NHANH TÍNH NĂNG",
+    "gotIt": "Đã hiểu",
+    "owner_activity": {
+      "badge": "HƯỚNG DẪN NHANH · NHẬT KÝ HOẠT ĐỘNG",
+      "step1": {
+        "title": "Nhật ký hoạt động bảo mật",
+        "instruction": "Tính năng này giúp bạn theo dõi toàn bộ các lượt truy cập vào tài sản, thao tác bảo mật và sự kiện hệ thống.",
+        "tip": "Bạn có thể chuyển đổi giữa Nhật ký hệ thống và Nhật ký ai đã truy cập xem di sản số."
+      },
+      "step2": {
+        "title": "Bộ lọc thời gian",
+        "instruction": "Cho phép bạn lọc nhanh lịch sử truy cập theo 30 ngày, 90 ngày, 1 năm hoặc toàn bộ thời gian.",
+        "tip": "Giúp bạn nhanh chóng rà soát các mốc thời gian đáng ngờ hoặc kiểm tra lịch sử định kỳ."
+      },
+      "step3": {
+        "title": "Lịch sử truy cập & Kiểm toán",
+        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thực thi và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
+        "tip": "Mọi thao tác đều được ghi nhận kèm mã định danh, địa chỉ và thời gian bất biến (Immutable Audit Log)."
+      }
+    },
+    "owner_dms": {
+      "badge": "HƯỚNG DẪN NHANH · CÔNG TẮC TỬ THẦN (DMS)",
+      "step1": {
+        "title": "Trạng thái Công tắc tử thần (DMS)",
+        "instruction": "Theo dõi tình trạng hoạt động và nút Check-in định kỳ để báo hiệu cho hệ thống biết bạn vẫn an toàn.",
+        "tip": "Bạn có thể check-in nhanh bất cứ lúc nào từ trang này hoặc qua liên kết an toàn 1-chạm gửi về Email."
+      },
+      "step2": {
+        "title": "Thiết lập chu kỳ Check-in",
+        "instruction": "Cấu hình khoảng thời gian check-in định kỳ, thời gian ân hạn và số lần gửi email nhắc nhở trước khi kích hoạt.",
+        "tip": "Khoảng thời gian ân hạn giúp bạn không bị kích hoạt nhầm khi đi du lịch hoặc mất kết nối tạm thời."
+      },
+      "step3": {
+        "title": "Người xác nhận an toàn (Confirmers)",
+        "instruction": "Chỉ định người thân tin cậy để xác nhận chéo tình trạng thực tế trước khi mở khóa, tạo hàng rào phòng vệ kép.",
+        "tip": "Hệ thống sẽ gửi yêu cầu xác thực tới người xác nhận trước khi cho phép tiến hành mở két."
+      }
+    },
+    "owner_executors": {
+      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THỰC THI DI CHÚC",
+      "step1": {
+        "title": "Tổng quan Người thực thi (Executors)",
+        "instruction": "Chỉ định người đại diện pháp lý hỗ trợ thủ tục bàn giao tài sản và nộp hồ sơ giám định khi có sự kiện thừa kế.",
+        "tip": "Người thực thi đóng vai trò cầu nối pháp lý, hoàn toàn không được quyền giải mã tài sản của bạn."
+      },
+      "step2": {
+        "title": "Người thực thi chính (Primary Executor)",
+        "instruction": "Đại diện chính chịu trách nhiệm kiểm tra thực địa, nộp trích lục khai tử và làm việc với Giám định viên.",
+        "tip": "Nên chọn luật sư, công chứng viên hoặc bạn thân có uy tín và am hiểu thủ tục."
+      },
+      "step3": {
+        "title": "Người thực thi dự phòng (Backup Executor)",
+        "instruction": "Kế nhiệm quyền đại diện nếu Người thực thi chính không thể liên lạc hoặc từ chối thực hiện nhiệm vụ.",
+        "tip": "Đảm bảo quy trình thừa kế không bao giờ bị đình trệ hay gián đoạn."
+      }
+    },
+    "owner_vault_detail": {
+      "badge": "HƯỚNG DẪN NHANH · CHI TIẾT KÉT SẮT",
+      "step1": {
+        "title": "Thông tin & Niêm phong két",
+        "instruction": "Xem tên két, mô tả và tình trạng niêm phong. Bạn có thể chỉnh sửa lại thông tin khi két ở trạng thái mở.",
+        "tip": "Két sắt được bảo vệ bằng mã hóa cấp quân sự AES-256 độc lập cho từng két."
+      },
+      "step2": {
+        "title": "Kho tài sản số & Giám định AI OCR",
+        "instruction": "Quản lý các tài sản số đã mã hóa. Bấm vào trạng thái để kiểm tra tính năng Giám định AI OCR hoặc ký ví MetaMask.",
+        "tip": "Hỗ trợ 8 danh mục tài sản số chuẩn hóa phục vụ bàn giao chính xác."
+      },
+      "step3": {
+        "title": "Người thụ hưởng & Tỷ lệ thừa kế",
+        "instruction": "Xem và quản lý danh sách người thừa kế được quyền nhận khóa giải mã khi sự kiện bàn giao kích hoạt.",
+        "tip": "Bạn có thể phân chia tỷ lệ tài sản linh hoạt cho từng người thụ hưởng."
+      }
+    },
+    "beneficiary_vaults": {
+      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THỤ HƯỞNG",
+      "step1": {
+        "title": "Két sắt di sản của bạn",
+        "instruction": "Nơi tổng hợp các két sắt mà bạn được chỉ định làm người thừa kế để tiếp quản tài sản di sản số.",
+        "tip": "Bạn chỉ có thể xem được nội dung giải mã khi két sắt hoàn tất đầy đủ quy trình mở khóa hợp pháp."
+      },
+      "step2": {
+        "title": "Danh sách két & Trạng thái mở khóa",
+        "instruction": "Theo dõi tình trạng từng két: Đang niêm phong, Chờ xác minh thực địa, hoặc Đã mở khóa bàn giao toàn quyền.",
+        "tip": "Khi két mở khóa, bấm vào để xem toàn bộ thông tin tài sản và tài liệu tâm thư được ủy thác."
+      }
+    },
+    "executor_home": {
+      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THỰC THI",
+      "step1": {
+        "title": "Thống kê nhiệm vụ thực thi",
+        "instruction": "Theo dõi tổng số hồ sơ cần xử lý ngay, hồ sơ đang chờ thẩm định pháp lý và hồ sơ đã bàn giao thành công.",
+        "tip": "Hồ sơ có hạn chót gấp sẽ được đánh dấu cảnh báo để bạn kịp thời xử lý."
+      },
+      "step2": {
+        "title": "Danh sách hồ sơ di sản",
+        "instruction": "Nơi bạn tiếp nhận nhiệm vụ, nộp Giấy chứng tử (AI OCR scan) và phối hợp với Giám định viên pháp lý.",
+        "tip": "Bấm vào từng hồ sơ để thực hiện quy trình xác minh 4 bước theo đúng di nguyện của chủ két."
+      }
+    },
+    "verifier_dashboard": {
+      "badge": "HƯỚNG DẪN NHANH · GIÁM ĐỊNH VIÊN PHÁP LÝ",
+      "step1": {
+        "title": "Lịch sử & Biên bản kiểm chứng",
+        "instruction": "Tra cứu toàn bộ biên bản giám định và các quyết định phê duyệt/từ chối hồ sơ đã thực hiện trước đây.",
+        "tip": "Mọi phán quyết của Giám định viên đều được lưu trữ kiểm toán bất biến."
+      },
+      "step2": {
+        "title": "Hàng đợi yêu cầu thẩm định",
+        "instruction": "Tiếp nhận hồ sơ giấy chứng tử, đối chiếu kết quả bóc tách tự động của AI Gemini và ra quyết định phê duyệt.",
+        "tip": "AI OCR hỗ trợ phát hiện giả mạo, kiểm tra mộc đỏ và đối chiếu chéo thông tin người mất với dữ liệu hệ thống."
+      }
+    }
+  },
+  "steps": [
+    {
+      "key": "vault",
+      "tag": "TRỤ CỘT 1 · CƠ BẢN",
+      "title": "Khởi tạo Két Sắt & Mã Hóa Đầu Cuối (E2E Vault)",
+      "subtitle": "Bảo vệ thông tin bí mật với chuẩn mã hóa cấp quân sự AES-256",
+      "description": "Két sắt số là nơi bạn lưu trữ toàn bộ di sản số: tài khoản ngân hàng, mật khẩu, tài sản crypto và tài liệu thừa kế. Dữ liệu nhạy cảm được mã hóa trước khi lưu trữ — ngay cả máy chủ và quản trị viên cũng không thể đọc được nội dung của bạn.",
+      "points": [
+        "Mã hóa đầu cuối: Chỉ bạn và người được ủy quyền mới có khóa giải mã",
+        "Hỗ trợ 8 loại tài sản chuyên biệt: Ngân hàng, Tiền mã hóa, Mạng xã hội, Email, v.v.",
+        "Phân tách két độc lập: Tạo các két riêng biệt cho Gia đình, Công việc và Tài chính"
+      ],
+      "tip": "Mẹo tân thủ: Bắt đầu bằng việc bấm '+ Tạo két mới' và lưu trữ những thông tin quan trọng nhất trước."
+    },
+    {
+      "key": "guardians",
+      "tag": "TRỤ CỘT 2 · CHỈ ĐỊNH",
+      "title": "Người Thụ Hưởng & Người Thực Thi (Guardians & Heirs)",
+      "subtitle": "Thiết lập mạng lưới bàn giao an toàn và minh bạch",
+      "description": "LegacyVault phân định rõ ràng giữa người nhận tài sản và người hỗ trợ làm thủ tục pháp lý. Bạn toàn quyền quyết định ai nhận tài sản gì, và ai là người được ủy quyền đại diện xử lý di nguyện.",
+      "points": [
+        "Người thụ hưởng (Beneficiary): Nhận tài sản và tài liệu theo di nguyện khi két mở khóa",
+        "Người thực thi (Executor): Kiểm tra thực địa, nộp hồ sơ pháp lý và bàn giao tài sản",
+        "Cơ chế chuyển giao linh hoạt: Toàn bộ, chia tỷ lệ, độc quyền hoặc đồng thuận đa bên (Shamir)"
+      ],
+      "tip": "Mẹo tân thủ: Nên chỉ định người thân làm Người thụ hưởng và bạn thân hoặc luật sư uy tín làm Người thực thi."
+    },
+    {
+      "key": "dms",
+      "tag": "TRỤ CỘT 3 · AN TOÀN",
+      "title": "Công Tắc Tự Động (Dead Man's Switch - DMS)",
+      "subtitle": "Bàn giao di sản đúng thời điểm mà không sợ kích hoạt nhầm",
+      "description": "Hệ thống tự động theo dõi trạng thái của bạn thông qua các lần Check-in định kỳ (qua Web hoặc Email 1-chạm). Nếu bạn vắng mặt quá thời hạn cam kết, quy trình kiểm chứng an toàn 3 lớp sẽ bắt đầu trước khi mở khóa.",
+      "points": [
+        "Check-in 1-chạm thuận tiện từ Email hoặc trang quản lý của bạn",
+        "Người xác nhận chéo (Confirmer): Xác thực tình trạng thực tế trước khi kích hoạt",
+        "Cảnh báo leo thang 3 lớp: Gửi email nhắc nhở liên tục trước khi đến hạn chót"
+      ],
+      "tip": "Mẹo tân thủ: Hãy thêm ít nhất một Người xác nhận chéo đáng tin cậy để tránh tình trạng kích hoạt ngoài ý muốn."
+    },
+    {
+      "key": "forensics",
+      "tag": "MỚI MỞ KHÓA · TÍNH NĂNG MỚI",
+      "title": "Giám Định AI OCR & Xác Thực Tài Sản Đa Phương Thức",
+      "subtitle": "Đảm bảo tính chân thực và toàn vẹn của hồ sơ thừa kế",
+      "description": "LegacyVault vừa cập nhật bộ tính năng giám định nâng cao giúp xác thực tính chính chủ và tính pháp lý của hồ sơ trước khi chuyển giao:",
+      "points": [
+        "AI OCR Giấy chứng tử (Gemini 3.6 Flash): Tự động bóc tách họ tên, số trích lục, cơ quan cấp và dấu mộc đỏ",
+        "Ký thông điệp ví Crypto (Personal Sign): Chứng minh quyền kiểm soát ví MetaMask qua chữ ký secp256k1 ecRecover mà không để lộ khóa bí mật",
+        "Xác thực OTP Email & SMS Sandbox: Xác minh chính chủ hộp thư và số điện thoại ví điện tử",
+        "Dấu vân tay số (Asset Fingerprint): Tự động phát hiện nếu tài sản bị chỉnh sửa sau khi xác thực"
+      ],
+      "tip": "Mẹo tân thủ: Trong trang chi tiết Két sắt, bấm vào huy hiệu trạng thái của từng tài sản để trải nghiệm các phương thức xác thực mới!"
+    }
+  ]
+}

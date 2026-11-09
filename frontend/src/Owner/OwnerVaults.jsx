@@ -10,9 +10,11 @@ import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
+import { startSpotlightTour } from '../Common/SpotlightTour.jsx';
 
 export default function OwnerVaults() {
     const { t } = useTranslation('vault');
+    const { t: tOnboarding } = useTranslation('onboarding');
     const user = getUser();
     const [vaults, setVaults] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -32,9 +34,20 @@ export default function OwnerVaults() {
             title={t('list.title')}
             subtitle={t('list.subtitle')}
             actions={
-                <Link to="/owner/vaults/new" className={btnPrimary}>
-                    <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
-                </Link>
+                <div className="flex items-center gap-2.5">
+                    <button
+                        type="button"
+                        onClick={startSpotlightTour}
+                        className="h-10 px-3.5 rounded-full border border-outline-variant/40 hover:border-primary text-xs font-bold inline-flex items-center gap-1.5 bg-surface-container-lowest text-on-surface hover:text-primary transition-colors shadow-sm"
+                        title={tOnboarding('startInteractiveTour', 'Bắt đầu hướng dẫn từng bước (Interactive Tour)')}
+                    >
+                        <Icon name="rocket_launch" className="text-[18px] text-amber-500" />
+                        <span>{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
+                    </button>
+                    <Link to="/owner/vaults/new" data-tour="new-vault-btn" className={btnPrimary}>
+                        <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
+                    </Link>
+                </div>
             }
         >
             <Alert>{error}</Alert>

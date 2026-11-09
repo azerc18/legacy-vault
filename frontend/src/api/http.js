@@ -1,13 +1,83 @@
 import axios from 'axios';
 import { getToken, setToken, clearAuth } from '../auth/auth.js';
 import i18n from '../i18n/index.js';
+import {
+    DEMO_USER,
+    DEMO_VAULTS,
+    DEMO_ASSETS,
+    DEMO_DOCUMENTS,
+    DEMO_MESSAGES,
+    DEMO_LOGS,
+    DEMO_DMS,
+    DEMO_EXECUTORS,
+    DEMO_READINESS,
+    DEMO_BENEFICIARY_VAULTS,
+    DEMO_EXECUTOR_CASES,
+    DEMO_VERIFIER_REQUESTS
+} from '../Common/demoMockData.js';
 
 const http = axios.create({ baseURL: '/api', withCredentials: true });
 
+function handleDemoMock(config) {
+    const url = config.url || '';
+    const method = (config.method || 'get').toLowerCase();
+    let data = { success: true, data: [] };
+
+    if (url.includes('/dms/check-in') || (url.endsWith('/dms') && (method === 'put' || method === 'post'))) {
+        data = { success: true, data: DEMO_DMS };
+    } else if (url.includes('/dms/confirmers') && method === 'post') {
+        data = { success: true, data: { id: 'c-' + Date.now(), name: 'Người xác nhận mới', email: 'confirmer@example.com', relationship: 'Bạn bè', status: 'CONFIRMED' } };
+    } else if (method === 'post' || method === 'put' || method === 'patch') {
+        data = { success: true, data: { id: 'demo-' + Date.now(), success: true, status: 'SUCCESS' } };
+    } else if (url.includes('/users/me')) {
+        data = { success: true, data: DEMO_USER };
+    } else if (url.includes('/plans/my-subscription')) {
+        data = { success: true, data: { vip: true, planName: 'VIP_UNLIMITED' } };
+    } else if (url.includes('/owner/readiness')) {
+        data = { success: true, data: DEMO_READINESS };
+    } else if (url.includes('/documents')) {
+        data = { success: true, data: DEMO_DOCUMENTS };
+    } else if (url.includes('/messages')) {
+        data = { success: true, data: DEMO_MESSAGES };
+    } else if (url.includes('/dms/confirmers')) {
+        data = { success: true, data: DEMO_DMS.confirmers };
+    } else if (url.includes('/dms')) {
+        data = { success: true, data: DEMO_DMS };
+    } else if (url.includes('/owner/executors')) {
+        data = { success: true, data: DEMO_EXECUTORS };
+    } else if (url.includes('/vaults/v-demo-1/assets') || url.includes('/assets')) {
+        data = { success: true, data: DEMO_ASSETS };
+    } else if (url.includes('/vaults/v-demo-1')) {
+        data = { success: true, data: DEMO_VAULTS[0] };
+    } else if (url.includes('/vaults')) {
+        data = { success: true, data: DEMO_VAULTS };
+    } else if (url.includes('/owner/activity-logs') || url.includes('/activity')) {
+        data = { success: true, data: DEMO_LOGS };
+    } else if (url.includes('/beneficiaries/vaults')) {
+        data = { success: true, data: DEMO_BENEFICIARY_VAULTS };
+    } else if (url.includes('/executor/assignments/me') || url.includes('/executor')) {
+        data = { success: true, data: DEMO_EXECUTOR_CASES };
+    } else if (url.includes('/verifier')) {
+        data = { success: true, data: DEMO_VERIFIER_REQUESTS };
+    }
+
+    return {
+        data,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+    };
+}
+
 // Gắn Bearer token vào mọi request
 http.interceptors.request.use((config) => {
+    const isAuthCall = config.url?.startsWith('/auth/') || config.url?.includes('/auth/');
+    if (!isAuthCall && localStorage.getItem('lv_demo_mode') === 'true') {
+        config.adapter = async (cfg) => handleDemoMock(cfg);
+    }
     const token = getToken();
-    const isAuthCall = config.url?.startsWith('/auth/');
+
     if (token && !isAuthCall) config.headers.Authorization = `Bearer ${token}`;
     config.headers['Accept-Language'] = i18n.resolvedLanguage || 'en';   // ← thêm
     return config;

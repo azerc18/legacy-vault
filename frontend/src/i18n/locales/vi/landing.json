@@ -9,11 +9,13 @@
   },
   "signIn": "Đăng nhập",
   "getStarted": "Bắt đầu",
+  "demoNav": "Dùng thử",
   "hero": {
     "title": "Cuộc sống số của bạn cũng cần một kế hoạch.",
     "titleLines": ["Cuộc sống số của bạn", "cũng cần một kế hoạch."],
     "text": "Lưu mật khẩu, tài khoản và giấy tờ trong một kho được mã hoá, và đảm bảo chúng đến đúng người vào đúng lúc.",
     "cta": "Tạo kho di sản",
+    "demoCta": "Dùng thử nhanh",
     "how": "Cách hoạt động"
   },
   "badges": {

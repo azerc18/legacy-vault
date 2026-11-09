@@ -114,6 +114,7 @@ export default function CreateVault() {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <Alert>{error}</Alert>
 
+                <div data-tour="vault-info">
                 <Card title={t('create.detailsTitle')} icon="inventory_2">
                     <div className="space-y-4">
                         <label className="block">
@@ -129,7 +130,9 @@ export default function CreateVault() {
                         </label>
                     </div>
                 </Card>
+                </div>
 
+                <div data-tour="beneficiary-section">
                 <Card title={t('create.beneficiariesTitle', {count: beneficiaries.length})} icon="family_restroom">
                     <div className="space-y-4">
                         {beneficiaries.map((b, i) => (
@@ -157,6 +160,7 @@ export default function CreateVault() {
                         </button>
                     </div>
                 </Card>
+                </div>
 
                 <Card title={t('create.assetsTitle', {count: assets.length})} icon="key">
                     <div className="space-y-5">
@@ -184,7 +188,7 @@ export default function CreateVault() {
                                 </div>
 
                                 <div className="p-4 space-y-4">
-                                    <div role="radiogroup" aria-labelledby={`asset-type-label-${i}`}>
+                                    <div data-tour="asset-type-select" role="radiogroup" aria-labelledby={`asset-type-label-${i}`}>
                                         <div id={`asset-type-label-${i}`} className="text-sm font-semibold text-on-surface mb-2">
                                             {t('create.assetTypeLabel')}
                                         </div>
@@ -212,6 +216,7 @@ export default function CreateVault() {
                                                placeholder={t('create.assetNamePlaceholder')} className={inputClass}/>
                                     </div>
 
+                                    <div data-tour="asset-fields">
                                     {schemas === null ? (
                                         <div className="h-24 rounded-xl bg-surface-container-low animate-pulse" aria-hidden="true"/>
                                     ) : schemaOf(schemas, a.assetType) ? (
@@ -249,6 +254,7 @@ export default function CreateVault() {
                                         </div>
                                     )}
 
+                                    </div>
                                     <div>
                                         <label htmlFor={`asset-notes-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
                                             {t('detail.assets.notesLabel')}
@@ -282,7 +288,7 @@ export default function CreateVault() {
                     <button type="button" onClick={() => navigate('/owner/vaults')} className={btnOutline}>
                         {t('common:actions.cancel')}
                     </button>
-                    <button type="submit" disabled={loading || !!partial} className={btnPrimary}>
+                    <button type="submit" data-tour="submit-vault-btn" disabled={loading || !!partial} className={btnPrimary}>
                         {loading ? t('create.creating') : t('create.submit')}
                     </button>
                 </div>

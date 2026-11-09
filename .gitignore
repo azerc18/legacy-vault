@@ -38,6 +38,11 @@ build/
 ### Uploads ###
 uploads/
 
+### Test Artifacts ###
+test-artifacts/
+test-e2e/
+
+
 ### File cấu hình công cụ AI trên máy (không commit) ###
 .mcp.json
 CLAUDE.md

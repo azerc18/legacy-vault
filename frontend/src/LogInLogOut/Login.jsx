@@ -1,10 +1,10 @@
 import AuthShell from '../Common/AuthShell.jsx';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
@@ -34,8 +34,18 @@ export default function Login() {
     // http.js chuyển về /login?expired=1 khi refresh token hết hạn
     const expired = new URLSearchParams(location.search).has('expired');
 
+    useEffect(() => {
+        if (localStorage.getItem('lv_demo_mode') === 'true') {
+            clearAuth();
+        }
+    }, []);
+
+
+
     // Đã đăng nhập -> không cho vào lại trang login
-    const current = getUser();
+    // Bỏ qua phiên đăng nhập demo để người dùng có thể đăng nhập tài khoản thật
+    const isDemo = typeof window !== 'undefined' && localStorage.getItem('lv_demo_mode') === 'true';
+    const current = isDemo ? null : getUser();
     if (current) {
         return <Navigate to={from || homeFor(current)} replace />;
     }
@@ -200,6 +210,18 @@ export default function Login() {
                         </button>
                     </form>
                     <GoogleSignInButton onCredential={handleGoogle} disabled={loading} />
+                    <div className="relative flex py-1 items-center">
+                        <div className="flex-grow border-t border-outline-variant/30" />
+                        <span className="flex-shrink mx-3 text-[11px] font-bold text-outline uppercase tracking-wider">{t('demo.orDemo', 'HOẶC DÙNG THỬ NHANH')}</span>
+                        <div className="flex-grow border-t border-outline-variant/30" />
+                    </div>
+                    <Link
+                        to="/demo"
+                        className="w-full h-12 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-bold hover:brightness-110 shadow-md shadow-amber-400/20 flex items-center justify-center gap-2 transition-all"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">rocket_launch</span>
+                        <span>{t('demo.tryDemo', 'Vào Thẳng Dashboard (Chế độ Dùng Thử)')}</span>
+                    </Link>
                     </div>
                 ) : (
                     /* ---------- Bước 2: mã 2FA (H4) ---------- */

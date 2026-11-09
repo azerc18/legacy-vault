@@ -43,7 +43,7 @@ export default function OwnerExecutors() {
         <OwnerLayout title={t('executors.title')} subtitle={t('executors.subtitle')}>
             <Alert>{error}</Alert>
             {loading ? <p className="text-on-surface-variant">{t('executors.loading')}</p> : (
-                <div className="grid md:grid-cols-2 gap-6">
+                <div data-tour="executors-overview" className="grid md:grid-cols-2 gap-6">
                     {POSITIONS.map((p) => (
                         <ExecutorCard key={p.type} position={p} assignment={current(p.type)} onChanged={load} />
                     ))}
@@ -94,6 +94,7 @@ function ExecutorCard({ position, assignment, onChanged }) {
     const st = assignment && STATUS[stKey];
 
     return (
+        <div data-tour={position.type === 'PRIMARY' ? 'executors-primary' : 'executors-backup'}>
         <Card>
             <div className="flex items-start justify-between gap-3">
                 <div>
@@ -163,5 +164,6 @@ function ExecutorCard({ position, assignment, onChanged }) {
                 onCancel={() => setRevokeOpen(false)}
             />
         </Card>
+        </div>
     );
 }
