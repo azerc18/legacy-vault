@@ -48,7 +48,7 @@ const MAX_SIZE = 10 * 1024 * 1024;
 const EMPTY_INPUT = { code: '', signature: '', bio: '', file: null };
 
 function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged }) {
-    const { t } = useTranslation('verification');
+    const { t, i18n } = useTranslation('verification');
     const { spring, transition: motionTransition, scale, blur } = useMotionTokens();
     const reduce = useShouldReduceMotion();
     const [current, setCurrent] = useState(null);   // trạng thái hiện tại từ BE
@@ -255,13 +255,13 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                                 {kind === 'code' && (
                                     <>
                                         <p className="text-sm text-on-surface-variant">
-                                            {codeTarget ? t('dialog.codeSent', { target: codeTarget }) : t('dialog.codeEnter')}
+                                            {codeTarget ? t('dialog.codeSent', { target: codeTarget }) : cd.amount ? t('dialog.microDeposit', { amount: new Intl.NumberFormat(i18n.language).format(Number(cd.amount)) }) : t('dialog.codeEnter')}
                                         </p>
                                         {cd.sandboxCode && <p className="text-sm font-mono p-2 rounded-lg bg-surface-container-low">{t('dialog.sandboxCode', { code: cd.sandboxCode })}</p>}
                                         <label className="block">
-                                            <span className="text-sm font-semibold text-on-surface-variant">{t('dialog.codeLabel')}</span>
+                                            <span className="text-sm font-semibold text-on-surface-variant">{t(cd.amount ? 'dialog.amountLabel' : 'dialog.codeLabel')}</span>
                                             <input value={input.code} maxLength={64} onChange={(e) => setIn('code', e.target.value)}
-                                                placeholder={t('dialog.codePlaceholder')} className={`${inputClass} mt-1`} autoComplete="one-time-code" />
+                                                placeholder={t(cd.amount ? 'dialog.amountPlaceholder' : 'dialog.codePlaceholder')} className={`${inputClass} mt-1`} autoComplete="one-time-code" />
                                         </label>
                                     </>
                                 )}

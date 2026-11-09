@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -13,12 +14,15 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * C.3.3: Xác thực tài sản BANK_ACCOUNT. Cả ba cách đều là SANDBOX (nhãn "Mô phỏng"):
+ * C.3.3: Xác thực tài sản BANK_ACCOUNT. Cả bốn cách đều là SANDBOX (nhãn "Mô phỏng"):
  * - BANK_NAME_LOOKUP_MOCK: so tên chủ tài khoản đã nhập với tên chủ két (bỏ dấu, hoa thường); KHÔNG gọi ngân hàng thật.
  * - BANK_FORMAT_CHECK: độ dài số tài khoản theo bảng ngân hàng (BankAccountRules); chỉ chứng minh đúng định dạng.
  * - STATEMENT_UPLOAD: tải sao kê lên kho tài liệu mã hóa, server băm SHA-256; chưa đọc nội dung sao kê.
+ * - MICRO_DEPOSIT_MOCK: giả lập một khoản tiền nhỏ ngẫu nhiên, Owner nhập lại số tiền; không có tiền thật, không gọi ngân hàng,
+ *   số tiền hiện ngay trên màn hình nên không chứng minh Owner sở hữu tài khoản.
  * Bằng chứng không chứa số tài khoản, tên người hay tên tệp.
  */
 @Slf4j
@@ -27,9 +31,12 @@ import java.util.*;
 public class BankAssetVerifier implements AssetVerifier {
 
     private static final int CHALLENGE_TTL_MINUTES = 15;
+    private static final int MIN_DEPOSIT_VND = 1_000;
+    private static final int MAX_DEPOSIT_VND = 9_999;
 
     private final BankAccountRules rules;
     private final VaultFileHasher fileHasher;
+    private final OtpHasher otpHasher;
 
     @Override
     public AssetType type() {
@@ -44,6 +51,7 @@ public class BankAssetVerifier implements AssetVerifier {
             methods.add(AssetVerificationMethod.BANK_FORMAT_CHECK);
         }
         methods.add(AssetVerificationMethod.STATEMENT_UPLOAD);
+        methods.add(AssetVerificationMethod.MICRO_DEPOSIT_MOCK);
         return List.copyOf(methods);
     }
 
@@ -69,6 +77,7 @@ public class BankAssetVerifier implements AssetVerifier {
             }
             case STATEMENT_UPLOAD -> sandboxStart(
                     "Upload a recent bank statement to the vault, then confirm to store its SHA-256 fingerprint");
+            case MICRO_DEPOSIT_MOCK -> startMicroDeposit(asset);
             default -> throw unsupported(method);
         };
     }
@@ -88,8 +97,41 @@ public class BankAssetVerifier implements AssetVerifier {
             case BANK_NAME_LOOKUP_MOCK -> confirmNameLookup(asset, fields);
             case BANK_FORMAT_CHECK -> confirmFormatCheck(fields);
             case STATEMENT_UPLOAD -> confirmStatementUpload(asset, safePayload);
+            case MICRO_DEPOSIT_MOCK -> confirmMicroDeposit(asset, safePayload, challengeHash);
             default -> throw unsupported(method);
         };
+    }
+
+    private StartResult startMicroDeposit(DigitalAsset asset) {
+        // Số tiền mô phỏng hiện ngay cho Owner nên không cần nguồn ngẫu nhiên an toàn; trả số thô để FE format theo ngôn ngữ
+        String amount = String.valueOf(ThreadLocalRandom.current().nextInt(MIN_DEPOSIT_VND, MAX_DEPOSIT_VND + 1));
+        Map<String, String> clientData = new LinkedHashMap<>();
+        clientData.put("mode", "SANDBOX");
+        clientData.put("amount", amount);
+        return new StartResult(VerificationProvider.SANDBOX,
+                "Simulated micro-deposit created; no real money was moved. Enter the amount to confirm",
+                otpHasher.hash(saltId(asset), amount), clientData,
+                LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
+    }
+
+    private VerifyResult confirmMicroDeposit(DigitalAsset asset, Map<String, String> payload, String challengeHash) {
+        // Ô nhập của FE gửi qua khóa "code"; bỏ dấu phân cách để "1.234", "1,234" và "1234 VND" đều khớp
+        String digits = depositDigits(payload.getOrDefault("code", ""));
+        if (digits.isEmpty()) {
+            return fail("Deposit amount is required");
+        }
+        if (challengeHash == null || challengeHash.isBlank()) {
+            return fail("Verification challenge has not been started");
+        }
+        if (!otpHasher.matches(saltId(asset), digits, challengeHash)) {
+            return fail("The amount does not match the simulated deposit");
+        }
+        Map<String, String> evidence = new LinkedHashMap<>();
+        evidence.put("check", "MICRO_DEPOSIT");
+        evidence.put("mode", "SIMULATED");
+        return new VerifyResult(true, VerificationProvider.SANDBOX,
+                "Simulated micro-deposit confirmed; no real bank was contacted and account ownership is not proven",
+                evidence);
     }
 
     private VerifyResult confirmNameLookup(DigitalAsset asset, Map<String, String> fields) {
@@ -165,6 +207,19 @@ public class BankAssetVerifier implements AssetVerifier {
     private StartResult sandboxStart(String message) {
         return new StartResult(VerificationProvider.SANDBOX, message, null,
                 Map.of("mode", "SANDBOX"), LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
+    }
+
+    /**
+     * Lấy phần số nguyên của số tiền Owner gõ. Phần thập phân toàn số 0 ở cuối (",00", ".0") được bỏ trước,
+     * nếu không "1.234,00" sẽ thành "123400". Phần thập phân khác 0 ("1.234,5") giữ nguyên nên sẽ không khớp.
+     */
+    static String depositDigits(String typed) {
+        String trimmed = typed == null ? "" : typed.trim().replaceFirst("[.,]0{1,2}(?=\\D*$)", "");
+        return trimmed.replaceAll("\\D", "");
+    }
+
+    private static UUID saltId(DigitalAsset asset) {
+        return asset.getId() != null ? asset.getId() : new UUID(0L, 0L);
     }
 
     private static String ownerFullName(DigitalAsset asset) {
