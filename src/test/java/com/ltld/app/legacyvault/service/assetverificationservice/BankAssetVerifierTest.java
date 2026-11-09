@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ class BankAssetVerifierTest {
 
     private BankAccountRules rules;
     private BankAssetVerifier verifier;
+    private final OtpHasher otpHasher = new OtpHasher();
     private UUID ownerId;
     private UUID vaultId;
     private Vault vault;
@@ -39,7 +41,7 @@ class BankAssetVerifierTest {
     void setUp() {
         rules = new BankAccountRules();
         rules.setAccountLengths(Map.of("TestBank", List.of(10, 12)));
-        verifier = new BankAssetVerifier(rules, fileHasher);
+        verifier = new BankAssetVerifier(rules, fileHasher, otpHasher);
         ownerId = UUID.randomUUID();
         vaultId = UUID.randomUUID();
         User owner = User.builder().id(ownerId).fullName("Nguyễn Văn An").build();
@@ -54,11 +56,12 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("type() là BANK_ACCOUNT, methods() có đúng 3 cách")
+    @DisplayName("type() là BANK_ACCOUNT, methods() có đúng 4 cách")
     void typeAndMethods() {
         assertThat(verifier.type()).isEqualTo(AssetType.BANK_ACCOUNT);
         assertThat(verifier.methods()).containsExactly(AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK,
-                AssetVerificationMethod.BANK_FORMAT_CHECK, AssetVerificationMethod.STATEMENT_UPLOAD);
+                AssetVerificationMethod.BANK_FORMAT_CHECK, AssetVerificationMethod.STATEMENT_UPLOAD,
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK);
     }
 
     @Test
@@ -169,12 +172,12 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("Cách chưa hỗ trợ (MICRO_DEPOSIT_MOCK) bị từ chối ở start và confirm")
+    @DisplayName("Cách chưa hỗ trợ (OTP_EMAIL) bị từ chối ở start và confirm")
     void unsupportedMethod_throws() {
         DigitalAsset asset = bank("TestBank", "1234567890", null);
-        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId))
+        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.OTP_EMAIL, ownerId))
                 .isInstanceOf(VaultException.class);
-        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, Map.of(),
+        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.OTP_EMAIL, Map.of(),
                 ownerId, null)).isInstanceOf(VaultException.class);
     }
 
@@ -183,6 +186,67 @@ class BankAssetVerifierTest {
     void methods_emptyLengthTable_hidesFormatCheck() {
         rules.setAccountLengths(Map.of());
         assertThat(verifier.methods()).containsExactly(
-                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, AssetVerificationMethod.STATEMENT_UPLOAD);
+                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, AssetVerificationMethod.STATEMENT_UPLOAD,
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK);
+    }
+
+    private AssetVerifier.VerifyResult confirmMicro(DigitalAsset asset, Map<String, String> payload, String hash) {
+        return verifier.confirm(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, payload, ownerId, hash);
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK start: SANDBOX, số tiền thô 1000-9999 và challengeHash không phải số tiền")
+    void microDeposit_start() {
+        AssetVerifier.StartResult start = verifier.start(bank("TestBank", "1234567890", null),
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(start.clientData()).containsEntry("mode", "SANDBOX").doesNotContainKey("reference");
+        String amount = start.clientData().get("amount");
+        assertThat(Integer.parseInt(amount)).isBetween(1000, 9999);
+        assertThat(start.challengeHash()).isNotBlank().isNotEqualTo(amount);
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: đúng số tiền (có dấu phân cách hoặc VND) thì thành công, evidence không có số tài khoản")
+    void microDeposit_correctCode() {
+        DigitalAsset asset = bank("TestBank", "1234567890", null);
+        AssetVerifier.StartResult start = verifier.start(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
+        String amount = start.clientData().get("amount");
+        String grouped = amount.charAt(0) + "." + amount.substring(1);
+
+        for (String typed : List.of(amount, grouped, " " + amount + " VND ", grouped + ",00", amount + ".00 VND", grouped + ",0")) {
+            AssetVerifier.VerifyResult result = confirmMicro(asset, Map.of("code", typed), start.challengeHash());
+            assertThat(result.success()).isTrue();
+            assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+            assertThat(result.evidence()).containsOnly(Map.entry("check", "MICRO_DEPOSIT"), Map.entry("mode", "SIMULATED"));
+        }
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: sai số tiền, thiếu số tiền, không có chữ số, payload null hoặc chưa start đều thất bại")
+    void microDeposit_failures() {
+        DigitalAsset asset = bank("TestBank", "1234567890", null);
+        String hash = otpHasher.hash(asset.getId(), "1234");
+
+        assertThat(confirmMicro(asset, Map.of("code", "1234"), hash).success()).isTrue();
+        assertThat(confirmMicro(asset, Map.of("code", "4321"), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "abc"), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "  "), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of(), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, null, hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "1234"), null).success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("depositDigits: bỏ phần thập phân toàn số 0, giữ phần thập phân khác 0")
+    void depositDigits_decimals() {
+        assertThat(BankAssetVerifier.depositDigits("1.234,00")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1,234.00 VND")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1234,0")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1.234")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1.000")).isEqualTo("1000");
+        assertThat(BankAssetVerifier.depositDigits("1.234,5")).isEqualTo("12345");
+        assertThat(BankAssetVerifier.depositDigits(null)).isEmpty();
     }
 }

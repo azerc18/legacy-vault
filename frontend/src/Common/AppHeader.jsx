@@ -20,7 +20,7 @@ const ALERT_CACHE_KEY = 'lv_admin_alerts_cache';
 // Thứ tự ưu tiên vai trò để hiển thị các nhóm điều hướng nhất quán trên MỌI trang
 const ROLE_ORDER = ['ADMIN', 'OWNER', 'EXECUTOR', 'LEGAL_VERIFIER', 'BENEFICIARY'];
 
-export const ADMIN_NAV_ITEMS = [
+const ADMIN_NAV_ITEMS = [
     { to: '/admin', key: 'overview', icon: 'dashboard', end: true },
     { to: '/admin/users', key: 'users', icon: 'group' },
     { to: '/admin/roles', key: 'roles', icon: 'shield_person' },
@@ -145,23 +145,29 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
     ];
     const roleSections = buildRoleSections(roles, pathname, t, tAdmin, effectiveAlerts);
 
-    // Cho phép đóng/mở từng nhóm vai trò (mặc định mở để menu luôn nhất quán, dễ đoán)
+    // Cho phép đóng/mở từng nhóm vai trò. Chưa chọn gì (null) thì chỉ mở nhóm của trang đang xem
+    // (ở /home, /me thì mở nhóm đầu tiên) để menu nhiều vai trò không dài quá màn hình.
     const [openSections, setOpenSections] = useState(() => {
         const init = {};
         for (const r of ROLE_ORDER) {
             try {
                 const saved = sessionStorage.getItem(SEC_PREFIX + r);
-                init[r] = saved === null ? true : saved === '1';
+                init[r] = saved === null ? null : saved === '1';
             } catch {
-                init[r] = true;
+                init[r] = null;
             }
         }
         return init;
     });
+    const sectionMatches = (sec) =>
+        pathname.startsWith(sec.matchPrefix) || sec.items.some((n) => pathname === n.to || pathname.startsWith(`${n.to}/`));
+    const activeRole = (roleSections.find(sectionMatches) || roleSections[0])?.role;
+    const isSectionOpen = (sec) => openSections[sec.role] ?? sec.role === activeRole;
 
     const toggleSection = (role) => {
         setOpenSections((prev) => {
-            const next = !prev[role];
+            const sec = roleSections.find((s) => s.role === role);
+            const next = !(prev[role] ?? (sec ? sec.role === activeRole : true));
             try { sessionStorage.setItem(SEC_PREFIX + role, next ? '1' : '0'); } catch { /* ignore */ }
             return { ...prev, [role]: next };
         });
@@ -280,7 +286,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                     {generalItems.map(renderNavLink)}
 
                     {roleSections.map((sec) => {
-                        const isSecOpen = collapsed || openSections[sec.role] !== false;
+                        const isSecOpen = collapsed || isSectionOpen(sec);
                         return (
                             <div key={sec.role} className="lv-nav-section mt-1.5 pt-1.5 border-t border-white/10">
                                 <button
@@ -295,11 +301,10 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                                         className="text-[16px] opacity-75"
                                     />
                                 </button>
-                                {isSecOpen && (
-                                    <div className="lv-nav-section-items flex flex-col gap-0.5 mt-0.5">
-                                        {sec.items.map(renderNavLink)}
-                                    </div>
-                                )}
+                                {/* Luôn render link: dưới 1024px không có nút mở nhóm, nên chỉ ẩn bằng CSS trên desktop */}
+                                <div className={`lv-nav-section-items flex flex-col gap-0.5 mt-0.5${isSecOpen ? '' : ' lv-nav-section-items--closed'}`}>
+                                    {sec.items.map(renderNavLink)}
+                                </div>
                             </div>
                         );
                     })}

@@ -30,7 +30,7 @@ export default function ProblemTimeline({ items }) {
                 {items.map((p, i) => (
                     <li key={p.key} className={`lv-pt-item lv-pt-s${i}`} style={{ '--i': i }}>
                         <span aria-hidden="true" className="lv-pt-dot" />
-                        <Tilt maxTilt={reduce ? 0 : 7} perspective={900} className="h-full">
+                        <Tilt maxTilt={reduce ? 0 : 4} perspective={900} className="h-full">
                             <TiltContent className="h-full">
                                 <div className="lv-pt-card">
                                     <span className="lv-pt-icon"><span className="material-symbols-outlined">{p.icon}</span></span>
