@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.assetverificationservice;
 
 import com.ltld.app.legacyvault.entity.DigitalAsset;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
@@ -16,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,13 +32,14 @@ class ExchangeAssetVerifierTest {
 
     @Mock private OtpGenerator otpGenerator;
     @Mock private EmailSender emailSender;
+    @Mock private VaultFileHasher fileHasher;
 
     private ExchangeAssetVerifier verifier;
     private UUID ownerId;
 
     @BeforeEach
     void setUp() {
-        verifier = new ExchangeAssetVerifier(otpGenerator, new OtpHasher(), emailSender);
+        verifier = new ExchangeAssetVerifier(otpGenerator, new OtpHasher(), emailSender, fileHasher);
         ownerId = UUID.randomUUID();
     }
 
@@ -55,10 +58,11 @@ class ExchangeAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("type() là EXCHANGE_ACCOUNT, methods() chỉ có EXCHANGE_EMAIL_CODE")
+    @DisplayName("type() là EXCHANGE_ACCOUNT, methods() có 3 cách: email, API key mô phỏng, ảnh chụp")
     void typeAndMethods() {
         assertThat(verifier.type()).isEqualTo(AssetType.EXCHANGE_ACCOUNT);
-        assertThat(verifier.methods()).containsExactly(AssetVerificationMethod.EXCHANGE_EMAIL_CODE);
+        assertThat(verifier.methods()).containsExactly(AssetVerificationMethod.EXCHANGE_EMAIL_CODE,
+                AssetVerificationMethod.API_READONLY_MOCK, AssetVerificationMethod.SCREENSHOT_UPLOAD);
     }
 
     @Test
@@ -154,6 +158,103 @@ class ExchangeAssetVerifierTest {
                 Map.of(), ownerId, "a".repeat(64)).success()).isFalse();
         assertThat(verifier.confirm(asset, AssetVerificationMethod.EXCHANGE_EMAIL_CODE,
                 Map.of("code", "482910"), ownerId, null).success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("API_READONLY_MOCK start: SANDBOX, không gửi mail, clientData có mode SANDBOX")
+    void apiKey_start_isSandbox() {
+        AssetVerifier.StartResult start = verifier.start(exchangeAsset("u123", null),
+                AssetVerificationMethod.API_READONLY_MOCK, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(start.clientData()).containsEntry("mode", "SANDBOX");
+        verifyNoInteractions(emailSender, otpGenerator);
+    }
+
+    @Test
+    @DisplayName("API_READONLY_MOCK confirm: khóa hợp lệ thì thành công, evidence chỉ có 4 ký tự cuối")
+    void apiKey_valid_success() {
+        String key = "AbCd1234_efgh-5678WXYZ";
+
+        AssetVerifier.VerifyResult result = verifier.confirm(exchangeAsset("u123", null),
+                AssetVerificationMethod.API_READONLY_MOCK, Map.of("code", key), ownerId, null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(result.evidence())
+                .containsEntry("check", "API_READONLY")
+                .containsEntry("mode", "SIMULATED")
+                .containsEntry("keyLast4", "****WXYZ");
+        assertThat(result.evidence().values()).noneMatch(v -> v.contains(key));
+    }
+
+    @Test
+    @DisplayName("API_READONLY_MOCK confirm: quá ngắn, quá dài, ký tự lạ hoặc thiếu khóa thì thất bại")
+    void apiKey_invalid_fails() {
+        DigitalAsset asset = exchangeAsset("u123", null);
+        for (String bad : new String[]{"short123", "a".repeat(129), "abcd1234abcd123!", "abcd 1234 abcd 1234"}) {
+            assertThat(verifier.confirm(asset, AssetVerificationMethod.API_READONLY_MOCK,
+                    Map.of("code", bad), ownerId, null).success()).as(bad).isFalse();
+        }
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.API_READONLY_MOCK,
+                Map.of(), ownerId, null).success()).isFalse();
+    }
+
+    private static DigitalAsset assetInVault(UUID vaultId) {
+        DigitalAsset asset = exchangeAsset("u123", null);
+        asset.setVault(Vault.builder().id(vaultId).build());
+        return asset;
+    }
+
+    @Test
+    @DisplayName("SCREENSHOT_UPLOAD start: SANDBOX")
+    void screenshot_start_isSandbox() {
+        AssetVerifier.StartResult start = verifier.start(exchangeAsset("u123", null),
+                AssetVerificationMethod.SCREENSHOT_UPLOAD, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(start.clientData()).containsEntry("mode", "SANDBOX");
+    }
+
+    @Test
+    @DisplayName("SCREENSHOT_UPLOAD confirm: tài liệu thuộc két thì thành công, evidence có SHA-256")
+    void screenshot_success() {
+        UUID vaultId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        when(fileHasher.hash(vaultId, docId))
+                .thenReturn(Optional.of(new VaultFileHasher.HashedFile(docId, "abc123")));
+
+        AssetVerifier.VerifyResult result = verifier.confirm(assetInVault(vaultId),
+                AssetVerificationMethod.SCREENSHOT_UPLOAD, Map.of("documentId", docId.toString()), ownerId, null);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(result.evidence())
+                .containsEntry("documentId", docId.toString())
+                .containsEntry("hashAlgorithm", "SHA-256")
+                .containsEntry("sha256", "abc123");
+    }
+
+    @Test
+    @DisplayName("SCREENSHOT_UPLOAD confirm: tài liệu thuộc két khác, UUID sai, thiếu documentId hoặc lỗi đọc thì thất bại")
+    void screenshot_failures() {
+        UUID vaultId = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        UUID broken = UUID.randomUUID();
+        when(fileHasher.hash(vaultId, other)).thenReturn(Optional.empty());
+        when(fileHasher.hash(vaultId, broken)).thenThrow(new IllegalStateException("boom"));
+        DigitalAsset asset = assetInVault(vaultId);
+
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("documentId", other.toString()), ownerId, null).success()).isFalse();
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("documentId", broken.toString()), ownerId, null).success()).isFalse();
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("documentId", "not-a-uuid"), ownerId, null).success()).isFalse();
+        assertThat(verifier.confirm(asset, AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of(), ownerId, null).success()).isFalse();
+        assertThat(verifier.confirm(exchangeAsset("u123", null), AssetVerificationMethod.SCREENSHOT_UPLOAD,
+                Map.of("documentId", other.toString()), ownerId, null).success()).isFalse();
     }
 
     @Test
