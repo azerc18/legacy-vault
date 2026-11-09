@@ -259,9 +259,9 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                                         </p>
                                         {cd.sandboxCode && <p className="text-sm font-mono p-2 rounded-lg bg-surface-container-low">{t('dialog.sandboxCode', { code: cd.sandboxCode })}</p>}
                                         <label className="block">
-                                            <span className="text-sm font-semibold text-on-surface-variant">{t(cd.amount ? 'dialog.amountLabel' : 'dialog.codeLabel')}</span>
-                                            <input value={input.code} maxLength={64} onChange={(e) => setIn('code', e.target.value)}
-                                                placeholder={t(cd.amount ? 'dialog.amountPlaceholder' : 'dialog.codePlaceholder')} className={`${inputClass} mt-1`} autoComplete="one-time-code" />
+                                            <span className="text-sm font-semibold text-on-surface-variant">{t(method === 'API_READONLY_MOCK' ? 'dialog.apiKeyLabel' : cd.amount ? 'dialog.amountLabel' : 'dialog.codeLabel')}</span>
+                                            <input value={input.code} maxLength={128} type={method === 'API_READONLY_MOCK' ? 'password' : 'text'} onChange={(e) => setIn('code', e.target.value)}
+                                                placeholder={t(method === 'API_READONLY_MOCK' ? 'dialog.apiKeyPlaceholder' : cd.amount ? 'dialog.amountPlaceholder' : 'dialog.codePlaceholder')} className={`${inputClass} mt-1`} autoComplete={method === 'API_READONLY_MOCK' ? 'off' : 'one-time-code'} />
                                         </label>
                                     </>
                                 )}
