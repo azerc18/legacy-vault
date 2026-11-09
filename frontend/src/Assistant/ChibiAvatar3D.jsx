@@ -998,7 +998,7 @@ function Owl3D({ action, costume }) {
     if (failed) return <ChibiAvatar action={action} />;
     return (
         <div ref={hostRef} aria-hidden="true"
-             style={{ width: W, height: H, cursor: 'pointer', lineHeight: 0 }} />
+             style={{ width: W, height: H, cursor: 'inherit', lineHeight: 0 }} />
     );
 }
 

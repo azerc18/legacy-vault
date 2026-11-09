@@ -20,13 +20,13 @@
     "STATEMENT_UPLOAD": { "label": "Tải sao kê ngân hàng", "desc": "Tải bản sao kê gần nhất để chứng minh tài khoản đang hoạt động hợp lệ.", "fileIntro": "Tải lên bản sao kê ngân hàng gần nhất (PDF hoặc ảnh, tối đa 10 MB) để lưu trữ an toàn trong két." },
     "MICRO_DEPOSIT_MOCK": { "label": "Chuyển khoản thử nghiệm (Mô phỏng)", "desc": "Hệ thống gửi một số tiền nhỏ ngẫu nhiên, bạn nhập lại đúng số tiền đó để xác thực." },
     "EXCHANGE_EMAIL_CODE": { "label": "Mã xác thực từ sàn giao dịch", "desc": "Nhận mã bảo mật gửi tới email đăng ký tài khoản sàn giao dịch." },
-    "API_READONLY_MOCK": { "label": "Kết nối API chỉ đọc (Mô phỏng)", "desc": "Kiểm tra kết nối an toàn ở chế độ chỉ đọc tới tài khoản sàn giao dịch." },
-    "ADDRESS_CHECKSUM": { "label": "Kiểm tra địa chỉ ví", "desc": "Kiểm tra định dạng và mã kiểm tra (checksum) của địa chỉ ví tiền mã hóa." },
-    "BIP39_CHECK": { "label": "Kiểm tra cụm từ khôi phục ví", "desc": "Kiểm tra cụm từ khôi phục đã lưu có đúng chuẩn quốc tế BIP-39 hay không." },
+    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (Mô phỏng)", "desc": "Chỉ kiểm định dạng khóa API ở chế độ mô phỏng, không gọi sàn thật và không lưu trữ khóa." },
+    "ADDRESS_CHECKSUM": { "label": "Kiểm tra địa chỉ ví tiền số", "desc": "Kiểm tra cấu trúc và tính hợp lệ của địa chỉ ví tiền mã hóa." },
+    "BIP39_CHECK": { "label": "Kiểm tra cụm từ khôi phục (BIP-39)", "desc": "Kiểm tra định dạng danh sách từ khóa khôi phục hạt giống theo chuẩn quốc tế BIP-39." },
     "PUBLIC_BALANCE": { "label": "Tra cứu số dư trên Blockchain", "desc": "Tra cứu số dư công khai của địa chỉ ví trực tiếp từ sổ cái chuỗi khối." },
     "WALLET_SIGNATURE": { "label": "Ký xác thực bằng ví điện tử", "desc": "Dùng ví điện tử ký thông điệp bảo mật để chứng minh bạn nắm giữ khóa riêng tư." },
     "BIO_CHALLENGE_MOCK": { "label": "Mã xác nhận trong tiểu sử (Mô phỏng)", "desc": "Tạm thời điền mã bảo mật vào phần giới thiệu (Bio) trang cá nhân để xác minh quyền sở hữu." },
-    "SCREENSHOT_UPLOAD": { "label": "Ảnh chụp màn hình tài khoản", "desc": "Tải ảnh chụp trang hồ sơ tài khoản hiển thị rõ tên hoặc ID để đối chiếu." }
+    "SCREENSHOT_UPLOAD": { "label": "Ảnh chụp màn hình tài khoản", "desc": "Tải ảnh chụp trang hồ sơ hoặc trang tài khoản lên két để lưu trữ và đối chiếu.", "fileIntro": "Tải ảnh chụp trang hồ sơ hoặc trang tài khoản (PNG hoặc JPG, tối đa 10 MB). Ảnh được lưu an toàn vào tài liệu của két." }
   },
   "button": { "verify": "Xác thực", "reverify": "Xác thực lại", "details": "Trạng thái xác thực" },
   "dialog": {
@@ -40,6 +40,8 @@
     "codeEnter": "Nhập mã bạn đã nhận.",
     "codeLabel": "Mã xác thực",
     "codePlaceholder": "Nhập mã",
+    "apiKeyLabel": "Khóa API chỉ đọc",
+    "apiKeyPlaceholder": "Dán khóa API chỉ đọc",
     "sandboxNotice": "Chế độ mô phỏng: kết quả sẽ hiện nhãn \"Mô phỏng\", chưa phải xác thực thật.",
     "sandboxCode": "Mã mô phỏng của bạn: {{code}}",
     "microDeposit": "Hệ thống mô phỏng một khoản tiền {{amount}} VND vào tài khoản (không có tiền thật). Nhập lại đúng số tiền này.",
