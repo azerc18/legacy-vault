@@ -15,6 +15,7 @@
 
 /* Kéo thả widget: con cú và thanh tiêu đề khung chat là chỗ cầm */
 .lv-assistant-handle { cursor: grab; touch-action: none; user-select: none; }
+.lv-assistant-handle .chibi { cursor: inherit; }   /* con cú 2D dự phòng cũng hiện grab */
 .lv-assistant--dragging,
 .lv-assistant--dragging .lv-assistant-handle { cursor: grabbing; }
 .lv-assistant--dragging .lv-assistant-launcher { transform: scale(1.06); }

@@ -64,7 +64,8 @@ export default function AssistantWidget() {
     const boxRef = useRef(null);
     const drag = useRef(null);        // thông tin lượt kéo đang diễn ra
     const justDragged = useRef(false); // chặn cú click ngay sau khi thả chuột
-    const [pos, setPos] = useState(readPos);
+    const [pos, setPos] = useState(readPos);     // vị trí user chọn (đã lưu)
+    const [view, setView] = useState(pos);       // vị trí đang hiện, đã kẹp vào màn hình
     const [dragging, setDragging] = useState(false);
 
     // Chạy 1 animation rồi quay về idle
@@ -132,7 +133,7 @@ export default function AssistantWidget() {
     const startDrag = (e) => {
         if (e.button !== undefined && e.button !== 0) return;
         if (e.target.closest?.('[data-no-drag]')) return;   // nút trong thanh tiêu đề vẫn bấm bình thường
-        drag.current = { x: e.clientX, y: e.clientY, right: pos.right, bottom: pos.bottom, moved: false, id: e.pointerId };
+        drag.current = { x: e.clientX, y: e.clientY, right: view.right, bottom: view.bottom, moved: false, id: e.pointerId };
         e.currentTarget.setPointerCapture?.(e.pointerId);
     };
 
@@ -143,7 +144,9 @@ export default function AssistantWidget() {
         const dy = e.clientY - d.y;
         if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         if (!d.moved) { d.moved = true; setDragging(true); }
-        setPos(clampPos({ right: d.right - dx, bottom: d.bottom - dy }, boxRef.current));
+        const next = clampPos({ right: d.right - dx, bottom: d.bottom - dy }, boxRef.current);
+        d.last = next;
+        setView(next);
     };
 
     const endDrag = (e) => {
@@ -151,29 +154,31 @@ export default function AssistantWidget() {
         if (!d || d.id !== e.pointerId) return;
         drag.current = null;
         if (d.moved) {
+            // Chặn đúng cú click đi liền sau lượt kéo. Kéo bằng thanh tiêu đề hoặc cảm ứng
+            // thì không có click nào tới con cú, nên phải tự xoá cờ ở task kế tiếp.
             justDragged.current = true;
+            setTimeout(() => { justDragged.current = false; });
             setDragging(false);
-            setPos((p) => { writePos(p); return p; });
+            if (d.last) { setPos(d.last); writePos(d.last); }
         }
     };
 
     const dragHandlers = { onPointerDown: startDrag, onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag };
 
     // Mở/đóng khung chat, hiện câu thoại hay đổi cỡ cửa sổ thì kéo widget về lại trong màn hình
+    // Chỉ đổi vị trí đang hiện; đóng khung chat thì cú về lại đúng chỗ user đã chọn
     useLayoutEffect(() => {
         if (hidden) return;
-        setPos((p) => {
-            const c = clampPos(p, boxRef.current);
-            return c.right === p.right && c.bottom === p.bottom ? p : c;
-        });
-    }, [hidden, open, bubble]);
+        const c = clampPos(pos, boxRef.current);
+        setView((v) => (c.right === v.right && c.bottom === v.bottom ? v : c));
+    }, [hidden, open, bubble, pos]);
 
     useEffect(() => {
         if (hidden) return;
-        const onResize = () => setPos((p) => clampPos(p, boxRef.current));
+        const onResize = () => setView(clampPos(pos, boxRef.current));
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
-    }, [hidden]);
+    }, [hidden, pos]);
 
     const toggle = () => {
         if (justDragged.current) { justDragged.current = false; return; }
@@ -187,7 +192,7 @@ export default function AssistantWidget() {
     if (hidden) return null;
 
     return (
-        <div ref={boxRef} style={{ right: pos.right, bottom: pos.bottom }}
+        <div ref={boxRef} style={{ right: view.right, bottom: view.bottom }}
              className={`lv-assistant fixed z-50 flex flex-col items-end gap-2 pointer-events-none${dragging ? ' lv-assistant--dragging' : ''}`}>
             {open && (
                 <div className="pointer-events-auto">
