@@ -68,9 +68,13 @@ class AssetSchemaTest {
         badCur.put("currency", "GOLD");
         Map<String, String> badNum = bank();
         badNum.put("estimatedValue", "-5");
+        Map<String, String> badDecimal = bank();
+        badDecimal.put("estimatedValue", "10.5");
+        Map<String, String> badExponent = bank();
+        badExponent.put("estimatedValue", "1e5");
         Map<String, String> unknown = bank();
         unknown.put("hack", "x");
-        for (Map<String, String> m : java.util.List.of(badAcc, badCur, badNum, unknown)) {
+        for (Map<String, String> m : java.util.List.of(badAcc, badCur, badNum, badDecimal, badExponent, unknown)) {
             assertThatThrownBy(() -> AssetFieldsValidator.validate(AssetType.BANK_ACCOUNT, m))
                     .isInstanceOf(VaultException.class);
         }

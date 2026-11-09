@@ -14,15 +14,10 @@ const formatVnd = (n) =>
 const PROVIDER_LABEL = { VNPAY: 'VNPay', PAYPAL: 'PayPal' };
 const PROVIDER_ICON = { VNPAY: 'qr_code_2', PAYPAL: 'account_balance_wallet' };
 
-// Logo cổng thanh toán: đặt file chính thức vào public/brand/vnpay.png và paypal.png (nền trong suốt).
-// Chưa có file thì hiện biểu tượng thay thế, không vỡ giao diện.
+// Biểu tượng cổng thanh toán. Chưa có logo chính thức trong public/brand nên dùng biểu tượng; khi có file thì
+// đổi thành <img> trực tiếp (không dò file lúc chạy để tránh 404 ở mỗi lần mở trang).
 function ProviderMark({ code }) {
-    const [missing, setMissing] = useState(false);
-    if (missing) return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
-    return (
-        <img src={`/brand/${code.toLowerCase()}.png`} alt="" aria-hidden="true"
-             onError={() => setMissing(true)} className="h-7 w-auto max-w-[72px] object-contain" />
-    );
+    return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
 }
 
 // n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
@@ -129,7 +124,7 @@ export default function PricingPage() {
                     <div className="flex flex-wrap gap-4">
                         {providers.map((code) => (
                             <label key={code}
-                                   className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors ${
+                                   className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-secondary focus-within:ring-offset-2 ${
                                        provider === code
                                            ? 'border-secondary bg-secondary/10'
                                            : 'border-outline-variant/50 hover:border-outline'}`}>

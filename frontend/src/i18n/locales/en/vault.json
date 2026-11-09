@@ -380,7 +380,7 @@
       "cryptoSecretRequired": "Seed phrase or private key is required.",
       "fieldRequired": "{{label}} is required.",
       "fieldInvalid": "{{label}} has an invalid format.",
-      "numberInvalid": "{{label}} must be a number (digits only, e.g. 10000000)."
+      "numberInvalid": "{{label}} must be a whole number (digits only, e.g. 10000000)."
     }
   }
 }

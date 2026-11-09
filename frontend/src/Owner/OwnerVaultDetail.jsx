@@ -432,7 +432,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                 assetName: f.assetName.trim(),
                 notes: isEdit ? f.notes.trim() : (f.notes.trim() || null), // sửa: "" = xoá ghi chú
             };
-            if (dynamic) body.fields = cleanFields(f.fields || {});
+            if (dynamic) body.fields = cleanFields(f.fields || {}, schema);
             else body.secret = f.secret ? f.secret : null;     // sửa: để trống = giữ nguyên secret cũ
             if (showAllocation) {
                 const allocation = allocationBody(f.allocation, initial.allocation, isEdit);

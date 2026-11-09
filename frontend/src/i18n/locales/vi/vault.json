@@ -380,7 +380,7 @@
       "cryptoSecretRequired": "Cần nhập cụm từ khôi phục (seed phrase) hoặc khoá riêng tư (private key).",
       "fieldRequired": "{{label}} là trường bắt buộc.",
       "fieldInvalid": "{{label}} không đúng định dạng.",
-      "numberInvalid": "{{label}} phải là số (chỉ gồm chữ số, ví dụ 10000000)."
+      "numberInvalid": "{{label}} phải là số nguyên (chỉ gồm chữ số, ví dụ 10000000)."
     }
   }
 }

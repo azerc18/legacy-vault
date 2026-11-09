@@ -43,6 +43,7 @@ const ACTIONS = {
     'profile-info': () => document.getElementById('profile-phone')?.focus({ preventScroll: true }),
     'profile-2fa': () => document.getElementById('profile-2fa-start')?.click(),
 };
+// Lưu ý: với mục 2FA, "Do it" bấm luôn nút bật tức là gọi API tạo secret ngay (chấp nhận được vì người dùng đã chủ động bấm).
 const goTo = (id) => {
     const el = document.getElementById(id);
     if (!el) return;
