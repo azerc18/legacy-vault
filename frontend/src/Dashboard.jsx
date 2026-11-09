@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { getUser } from './auth/auth.js';
 import LanguageSwitch from './Common/LanguageSwitch.jsx';
 import BrandMark from './Common/BrandMark.jsx';
-import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
+import HeroOrb from './Common/HeroOrb.jsx';
 import { DecodeLoop } from './Common/DecodeText.jsx';
 import CipherField from './Common/CipherField.jsx';
 import ProblemTimeline from './Common/ProblemTimeline.jsx';
@@ -18,9 +18,12 @@ import { Magnetic } from '@animate-ui/react/primitives/effects/magnetic';
 import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 
 // ---------- Cấu trúc (icon + khoá). Chữ nằm trong locales/{en,vi}/landing.json ----------
+// Thứ tự đúng như các phần bên dưới trang
 const NAV = [
+    { key: 'problem', href: '#problem' },
     { key: 'how', href: '#how' },
     { key: 'security', href: '#security' },
+    { key: 'assets', href: '#assets' },
     { key: 'roles', href: '#roles' },
     { key: 'faq', href: '#faq' },
 ];
@@ -67,7 +70,7 @@ const FAQS = ['staff', 'forget', 'unlock', 'change'];
 function Section({ id, eyebrow, title, subtitle, children, mode = 'light' }) {
     const dark = mode === 'dark';
     return (
-        <section id={id} data-mode={mode} className="relative z-10 py-24 px-5 min-h-[70vh] flex items-center">
+        <section id={id} data-mode={mode} className="relative z-10 py-24 px-5 min-h-[70vh] flex items-center scroll-mt-16">
             <div className="max-w-6xl mx-auto w-full">
                 <div className="lv-reveal text-center max-w-2xl mx-auto mb-12">
                     {eyebrow && <p className={`font-label-sm uppercase tracking-wider mb-2 ${dark ? 'text-[#b9c9ff]' : 'text-secondary'}`}>{eyebrow}</p>}
@@ -86,7 +89,7 @@ function Icon({ name, className = '' }) {
 
 // ---------- Trang ----------
 export default function Dashboard() {
-    const { t } = useTranslation('landing');
+    const { t, i18n } = useTranslation('landing');
     const reduceMotion = useReducedMotion();
     // Tiêu đề hero chia dòng sẵn trong i18n (hero.titleLines); thiếu thì dùng cả câu
     const heroLines = useMemo(() => {
@@ -95,8 +98,34 @@ export default function Dashboard() {
     }, [t]);
     const [openFaq, setOpenFaq] = useState(0);
     const [mode, setMode] = useState('dark');
+    const [hoverNav, setHoverNav] = useState('');
+    const [bar, setBar] = useState({ x: 0, w: 0 });     // vị trí/độ rộng thanh sáng dưới navbar
+    const navRef = useRef(null);
+    const noSnapUntil = useRef(0);   // bấm mục navbar: tạm không tự khớp, nếu không trang sẽ trượt tiếp sang phần kế
+    const [activeNav, setActiveNav] = useState('');   // mục navbar ứng với phần đang nằm giữa màn hình
     const rootRef = useRef(null);
     const light = mode === 'light';
+
+    // Thanh sáng trượt tới mục đang rê chuột (hoặc mục đang xem)
+    const barKey = hoverNav || activeNav;
+    useLayoutEffect(() => {
+        const nav = navRef.current;
+        const el = nav && barKey ? nav.querySelector(`[data-nav="${barKey}"]`) : null;
+        if (el) setBar({ x: el.offsetLeft, w: el.offsetWidth });
+    }, [barKey, i18n.language]);
+
+    // Navbar: sáng mục tương ứng với phần đang xem
+    useEffect(() => {
+        if (!('IntersectionObserver' in window)) return undefined;
+        const els = NAV.map((n) => document.getElementById(n.key)).filter(Boolean);
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((e) => { if (e.isIntersecting) setActiveNav(e.target.id); });
+        }, { rootMargin: '-45% 0px -50% 0px' });
+        els.forEach((el) => io.observe(el));
+        const onScroll = () => { if (window.scrollY < 200) setActiveNav(''); };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => { io.disconnect(); window.removeEventListener('scroll', onScroll); };
+    }, []);
 
     // Nền đổi sáng/tối theo phần đang nằm giữa màn hình
     useEffect(() => {
@@ -162,7 +191,7 @@ export default function Dashboard() {
         let raf = 0;
 
         const snap = () => {
-            if (touching || pressed) return;
+            if (touching || pressed || performance.now() < noSnapUntil.current) return;
             const vh = window.innerHeight;
             const head = root.querySelector('header');
             const off = head ? head.offsetHeight : 0;
@@ -229,6 +258,9 @@ export default function Dashboard() {
         window.addEventListener('pointerup', onMouseUp);
         window.addEventListener('pointercancel', onMouseUp);
         window.addEventListener('blur', onMouseUp);
+        // Mọi liên kết neo (#how, #faq...) đều tạm tắt tự khớp để tới đúng phần được bấm
+        const onAnchor = (e) => { if (e.target.closest && e.target.closest('a[href^="#"]')) noSnapUntil.current = performance.now() + 1500; };
+        window.addEventListener('click', onAnchor);
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('touchstart', down, { passive: true });
         window.addEventListener('touchend', up, { passive: true });
@@ -243,6 +275,7 @@ export default function Dashboard() {
             window.removeEventListener('pointercancel', onMouseUp);
             window.removeEventListener('blur', onMouseUp);
             window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('click', onAnchor);
             window.removeEventListener('touchstart', down);
             window.removeEventListener('touchend', up);
         };
@@ -260,16 +293,31 @@ export default function Dashboard() {
             <header className={`sticky top-0 z-20 backdrop-blur border-b transition-colors duration-500 ${light
                 ? 'bg-white/80 border-black/10 text-brand'
                 : 'bg-brand/95 border-white/10 text-white'}`}>
-                <div className="max-w-6xl mx-auto h-16 px-5 flex items-center justify-between">
+                <div className="max-w-[66.5rem] mx-auto h-16 px-5 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2 font-bold tracking-[0.18em] text-sm">
                         <span className={`rounded-lg transition-colors duration-500 ${light ? 'bg-brand p-[3px]' : 'p-[3px]'}`}>
                             <BrandMark className="h-[30px] w-[30px]" />
                         </span>LEGACYVAULT
                     </Link>
-                    <nav className={`hidden md:flex gap-8 text-sm font-semibold ${light ? 'text-brand/70' : 'text-white/75'}`}>
-                        {NAV.map((n) => (
-                            <a key={n.href} href={n.href} className={light ? 'hover:text-brand' : 'hover:text-white'}>{t(`nav.${n.key}`)}</a>
-                        ))}
+                    <nav ref={navRef} onMouseLeave={() => setHoverNav('')}
+                         className={`relative hidden lg:flex gap-7 text-sm font-semibold ${light ? 'text-brand/70' : 'text-white/75'}`}>
+                        {NAV.map((n) => {
+                            const lit = (hoverNav || activeNav) === n.key;
+                            return (
+                                <a key={n.href} href={n.href} data-nav={n.key} aria-current={activeNav === n.key ? 'true' : undefined}
+                                   onClick={() => { noSnapUntil.current = performance.now() + 1500; }} onMouseEnter={() => setHoverNav(n.key)} onFocus={() => setHoverNav(n.key)} onBlur={() => setHoverNav('')}
+                                   className={`relative z-10 h-16 flex items-center transition-colors duration-300 ${lit ? (light ? 'text-brand' : 'text-white') : ''}`}>
+                                    {t(`nav.${n.key}`)}
+                                </a>
+                            );
+                        })}
+                        {/* Một thanh sáng duy nhất: trượt tới mục đang rê chuột (hoặc mục đang xem) và làm mục đó sáng lên */}
+                        <span aria-hidden="true"
+                              className={`pointer-events-none absolute left-0 -bottom-[2px] h-[3px] rounded-full transition-[transform,width,opacity] duration-500 ease-out ${barKey ? 'opacity-100' : 'opacity-0'} ${light ? 'bg-brand' : 'bg-[#b9c9ff]'}`}
+                              style={{ width: bar.w, transform: `translateX(${bar.x}px)`, filter: 'blur(1.5px)' }} />
+                        <span aria-hidden="true"
+                              className={`pointer-events-none absolute left-0 -bottom-4 h-6 rounded-full blur-xl transition-[transform,width,opacity] duration-500 ease-out ${barKey ? 'opacity-100' : 'opacity-0'} ${light ? 'bg-brand/30' : 'bg-[#8fa4ff]/50'}`}
+                              style={{ width: bar.w, transform: `translateX(${bar.x}px)` }} />
                     </nav>
                     <div className="flex items-center gap-3">
                         <LanguageSwitch variant={light ? 'light' : 'dark'} />
@@ -283,9 +331,6 @@ export default function Dashboard() {
 
             {/* 1. HERO */}
             <section data-mode="dark" className="relative z-10 overflow-hidden text-white px-5 pt-24 pb-20 text-center">
-                <img src="/key-photo.jpg" alt="" aria-hidden="true"
-                     className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[52%] min-h-[280px] w-auto max-w-none opacity-80 pointer-events-none select-none"
-                     style={{ WebkitMaskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)', maskImage: 'radial-gradient(ellipse 52% 56% at 50% 52%, #000 28%, rgba(0,0,0,.55) 55%, transparent 100%)' }} />
                 <div className="relative max-w-3xl mx-auto">
                     {/* Tiêu đề "giải mã" lặp lại (dùng chung với trang đăng nhập) */}
                     <h1 className="font-headline-lg text-[40px] md:text-[64px] leading-[1.08] font-bold tracking-tight pb-2"
@@ -303,12 +348,13 @@ export default function Dashboard() {
                             {t('hero.how')}
                         </a>
                     </div>
-                    <div className="mt-12 flex justify-center">
-                        <InteractiveVaultLock variant="hero" to="/register" />
-                    </div>
+                </div>
+                {/* Ảnh quả cầu: nằm ngoài khối chữ (max-w-3xl) để được rộng gần hết màn hình ngay khi vào trang */}
+                <div className="lv-hero-rv relative mt-4 sm:mt-6 -mx-5 sm:mx-0">
+                    <HeroOrb />
                 </div>
                 {/* Trust badges */}
-                <div className="lv-hero-badges relative mt-20 md:mt-28 flex flex-wrap justify-center gap-3">
+                <div className="lv-hero-badges relative mt-8 md:mt-10 flex flex-wrap justify-center gap-3">
                     {BADGES.map((b) => (
                         <span key={b.key} className="flex items-center gap-2 px-4 h-9 rounded-full bg-white/10 border border-white/15 text-sm text-white/85 backdrop-blur">
                             <Icon name={b.icon} className="text-[18px] text-[#b9c9ff]" /> {t(`badges.${b.key}`)}
@@ -333,11 +379,10 @@ export default function Dashboard() {
                         <AppPreview />
                     </div>
                 </div>
-                <p className="lv-ap-hint"><Icon name="touch_app" className="text-[18px] text-[#b9c9ff]" /> {t('preview.hint')}</p>
             </section>
 
             {/* 2. PROBLEM — dòng thời gian 3D, dữ liệu "hỏng" dần theo thời gian */}
-            <Section mode="dark" eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
+            <Section id="problem" mode="dark" eyebrow={t('problem.eyebrow')} title={t('problem.title')}>
                 <ProblemTimeline items={PROBLEMS.map((p) => ({
                     key: p.key, icon: p.icon,
                     when: t(`problem.items.${p.key}.when`), text: t(`problem.items.${p.key}.text`),
@@ -363,14 +408,13 @@ export default function Dashboard() {
             </Section>
 
             {/* 5. WHAT YOU CAN STORE — hộp ký gửi: rê chuột/chạm để mở cửa ô, xem mô tả bên trong */}
-            <Section mode="dark" eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
+            <Section id="assets" mode="dark" eyebrow={t('assets.eyebrow')} title={t('assets.title')}>
                 <div className="lv-stagger grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
                     {ASSETS.map((a) => (
                         <VaultBox key={a.key} icon={a.icon} accent={ACCENT.assets[a.key]}
                                   label={t(`assets.items.${a.key}`)} desc={t(`assets.desc.${a.key}`)} />
                     ))}
                 </div>
-                <p className="lv-box-hint">{t('assets.hint')}</p>
             </Section>
 
             {/* 6. ROLES — thẻ định danh có ánh kim; tên vai trò dùng chung common:roles */}
@@ -451,7 +495,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div aria-hidden="true" className="lv-wordmark mt-16 font-headline-lg font-bold select-none whitespace-nowrap overflow-hidden text-center"
-                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em' }}>
+                         style={{ fontSize: 'clamp(40px,10.4vw,160px)', lineHeight: 1.15, paddingBottom: '0.08em', letterSpacing: '0.02em', width: '100vw', marginLeft: 'calc(50% - 50vw)' }}>
                         LEGACYVAULT
                     </div>
                     <div className="mt-6 pt-5 border-t border-white/10 flex flex-wrap justify-between gap-3 text-sm text-white/70">
