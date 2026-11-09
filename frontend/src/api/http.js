@@ -23,7 +23,11 @@ function handleDemoMock(config) {
     const method = (config.method || 'get').toLowerCase();
     let data = { success: true, data: [] };
 
-    if (method === 'post' || method === 'put' || method === 'patch') {
+    if (url.includes('/dms/check-in') || (url.endsWith('/dms') && (method === 'put' || method === 'post'))) {
+        data = { success: true, data: DEMO_DMS };
+    } else if (url.includes('/dms/confirmers') && method === 'post') {
+        data = { success: true, data: { id: 'c-' + Date.now(), name: 'Người xác nhận mới', email: 'confirmer@example.com', relationship: 'Bạn bè', status: 'CONFIRMED' } };
+    } else if (method === 'post' || method === 'put' || method === 'patch') {
         data = { success: true, data: { id: 'demo-' + Date.now(), success: true, status: 'SUCCESS' } };
     } else if (url.includes('/users/me')) {
         data = { success: true, data: DEMO_USER };

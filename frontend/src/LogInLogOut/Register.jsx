@@ -1,7 +1,7 @@
 import AuthShell from '../Common/AuthShell.jsx';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { getUser, homeFor, saveSession, updateStoredUser, emailFromCredential } from '../auth/auth.js';
+import { getUser, homeFor, saveSession, updateStoredUser, emailFromCredential, clearAuth } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
@@ -29,13 +29,18 @@ export default function Register() {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    // Mở trang register khi đang ở demo mode -> tự động dọn sạch phiên demo để tạo tài khoản thật
-    if (localStorage.getItem('lv_demo_mode') === 'true') {
-        clearAuth();
-    }
+    useEffect(() => {
+        if (localStorage.getItem('lv_demo_mode') === 'true') {
+            clearAuth();
+        }
+    }, []);
+
+
 
     // Đã đăng nhập -> về trang chủ theo role (giống Login)
-    const current = getUser();
+    // Bỏ qua phiên đăng nhập demo để người dùng có thể tạo tài khoản thật
+    const isDemo = typeof window !== 'undefined' && localStorage.getItem('lv_demo_mode') === 'true';
+    const current = isDemo ? null : getUser();
     if (current) return <Navigate to={homeFor(current)} replace />;
 
 

@@ -321,10 +321,6 @@ export default function Dashboard() {
                     </nav>
                     <div className="flex items-center gap-3">
                         <LanguageSwitch variant={light ? 'light' : 'dark'} />
-                        <Link to="/demo" className="h-9 px-3.5 rounded-full text-xs font-bold flex items-center gap-1.5 border border-amber-400/50 text-amber-300 hover:bg-amber-400/10 transition-colors">
-                            <Icon name="rocket_launch" className="text-[15px]" />
-                            <span>{t('demoNav', 'Dùng thử')}</span>
-                        </Link>
                         <Link to="/login" className={`hidden sm:block text-sm font-semibold ${light ? 'text-brand/80 hover:text-brand' : 'text-white/85 hover:text-white'}`}>{t('signIn')}</Link>
                         <Link to="/register" className={`h-10 px-5 rounded-full text-sm font-bold flex items-center ${light ? 'bg-brand text-white hover:bg-brand-container' : 'bg-white text-brand hover:bg-white/85'}`}>
                             {t('getStarted')}

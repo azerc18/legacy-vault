@@ -111,11 +111,16 @@ export const DEMO_DMS = {
     checkinIntervalDays: 30,
     gracePeriodDays: 7,
     reminderCount: 3,
-    lastCheckIn: '2026-11-09T08:30:00',
-    nextCheckInDeadline: '2026-12-09T08:30:00',
+    remindersSent: 0,
+    notificationChannel: 'EMAIL',
+    lastCheckinAt: '2026-11-01T08:30:00',
+    checkinDueAt: '2026-12-01T08:30:00',
+    triggerAt: '2026-12-08T08:30:00',
+    nextReminderAt: '2026-11-25T08:30:00',
     hasUsableExecutor: true,
     confirmers: [
-        { id: 'c-1', name: 'BS. Trần Văn Hưng', email: 'hung.tran@bvchoray.vn', relationship: 'Bác sĩ gia đình', status: 'CONFIRMED' }
+        { id: 'c-1', name: 'BS. Trần Văn Hưng', email: 'hung.tran@bvchoray.vn', relationship: 'Bác sĩ gia đình', status: 'CONFIRMED' },
+        { id: 'c-2', name: 'LS. Nguyễn Đức Trọng', email: 'trong.lawyer@vanphongluat.vn', relationship: 'Luật sư riêng', status: 'CONFIRMED' }
     ]
 };
 
@@ -143,14 +148,21 @@ DEMO_EXECUTORS.primaryExecutor = DEMO_EXECUTORS[0];
 DEMO_EXECUTORS.backupExecutor = DEMO_EXECUTORS[1];
 
 export const DEMO_READINESS = {
-    score: 88,
+    score: 85,
     maxScore: 100,
     grade: 'GOOD',
+    completedItems: 5,
+    totalItems: 7,
+    assetsNeedReverification: 0,
+    assetsExpiringSoon: 0,
     items: [
-        { key: 'item-vault', done: true, title: 'Đã tạo két di sản bảo mật', description: 'Đã thiết lập két chính với mã hóa đầu cuối' },
-        { key: 'item-ben', done: true, title: 'Đã chỉ định Người thụ hưởng', description: 'Có 2 người thừa kế hợp lệ đã xác nhận' },
-        { key: 'item-dms', done: true, title: 'Đã kích hoạt Dead Man\'s Switch', description: 'Chu kỳ điểm danh 30 ngày an toàn' },
-        { key: 'item-exec', done: true, title: 'Đã bổ nhiệm Người giám hộ', description: 'Người giám hộ chính và dự phòng sẵn sàng' }
+        { key: 'masterVaultAndAsset', titleKey: 'items.masterVaultAndAsset', title: 'Tạo két di sản chính và thêm ít nhất 1 tài sản số', done: true, points: 20, fixUrl: '/owner/vaults' },
+        { key: 'assetBeneficiaryAllocated', titleKey: 'items.assetBeneficiaryAllocated', title: 'Chọn người nhận cụ thể cho từng tài sản số', done: true, points: 20, fixUrl: '/owner/vaults' },
+        { key: 'legalWillDocument', titleKey: 'items.legalWillDocument', title: 'Tải lên Di chúc cho các tài sản ngân hàng và tài sản cần hồ sơ pháp lý', done: false, points: 15, fixUrl: '/owner/vaults' },
+        { key: 'executorsAssigned', titleKey: 'items.executorsAssigned', title: 'Chỉ định cả người thi hành chính và người thi hành dự phòng', done: true, points: 15, fixUrl: '/owner/executors' },
+        { key: 'dmsActive', titleKey: 'items.dmsActive', title: 'Bật Dead Man\'s Switch', done: true, points: 15, fixUrl: '/owner/dms' },
+        { key: 'safetyNetConfigured', titleKey: 'items.safetyNetConfigured', title: 'Chỉ định người thụ hưởng dự phòng hoặc người xác nhận chéo DMS', done: false, points: 10, fixUrl: '/owner/dms' },
+        { key: 'recentReview', titleKey: 'items.recentReview', title: 'Rà soát hoặc check-in hồ sơ di sản trong 6 tháng gần nhất', done: true, points: 5, fixUrl: '/owner/dms' }
     ]
 };
 

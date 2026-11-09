@@ -1,10 +1,10 @@
 import AuthShell from '../Common/AuthShell.jsx';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
@@ -34,13 +34,18 @@ export default function Login() {
     // http.js chuyển về /login?expired=1 khi refresh token hết hạn
     const expired = new URLSearchParams(location.search).has('expired');
 
-    // Mở trang login khi đang ở demo mode -> tự động dọn sạch phiên demo để đăng nhập thật
-    if (localStorage.getItem('lv_demo_mode') === 'true') {
-        clearAuth();
-    }
+    useEffect(() => {
+        if (localStorage.getItem('lv_demo_mode') === 'true') {
+            clearAuth();
+        }
+    }, []);
+
+
 
     // Đã đăng nhập -> không cho vào lại trang login
-    const current = getUser();
+    // Bỏ qua phiên đăng nhập demo để người dùng có thể đăng nhập tài khoản thật
+    const isDemo = typeof window !== 'undefined' && localStorage.getItem('lv_demo_mode') === 'true';
+    const current = isDemo ? null : getUser();
     if (current) {
         return <Navigate to={from || homeFor(current)} replace />;
     }
