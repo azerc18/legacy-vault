@@ -470,6 +470,19 @@ public class VerificationTokenServiceImplTest {
     }
 
     @Test
+    void linkPendingBeneficiaryVaults_unlockedVaultWithoutDeadline_doesNotCreateClaim() {
+        User user = pendingUser();
+        Vault noDeadline = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.UNLOCKED).build();
+        when(vaultRepository.findByBeneficiaryEmailAndBeneficiaryIsNull("test@example.com")).thenReturn(List.of());
+        when(vaultBeneficiaryRepository.findPendingByEmail("test@example.com")).thenReturn(List.of(
+                VaultBeneficiary.builder().vault(noDeadline).email("test@example.com").build()));
+
+        tokenService.linkPendingBeneficiaryVaults(user);
+
+        verifyNoInteractions(claimRepository);
+    }
+
+    @Test
     void linkPendingBeneficiaryVaults_vaultNotUnlocked_doesNotCreateClaim() {
         User user = pendingUser();
         Vault active = Vault.builder().id(UUID.randomUUID()).status(VaultStatus.ACTIVE).build();

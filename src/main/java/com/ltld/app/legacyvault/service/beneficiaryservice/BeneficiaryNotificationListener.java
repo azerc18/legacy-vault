@@ -321,12 +321,7 @@ public class BeneficiaryNotificationListener {
 
         // Tạo claim PENDING cho người này nếu chưa có; initializeClaim sẽ dùng lại claim này
         BeneficiaryClaim claim = claimRepository.findByVaultIdAndBeneficiaryId(vaultId, beneficiary.getId())
-                .orElseGet(() -> claimRepository.save(BeneficiaryClaim.builder()
-                        .vault(vault)
-                        .beneficiary(beneficiary)
-                        .status(ClaimStatus.PENDING)
-                        .claimDeadlineAt(vault.getClaimDeadlineAt())
-                        .build()));
+                .orElseGet(() -> claimRepository.save(BeneficiaryClaim.pendingFor(vault, beneficiary)));
 
         // Đã gửi rồi (hoặc claim không còn PENDING): không gửi lại
         if (claim.getStatus() != ClaimStatus.PENDING || claim.getNotifiedAt() != null) {

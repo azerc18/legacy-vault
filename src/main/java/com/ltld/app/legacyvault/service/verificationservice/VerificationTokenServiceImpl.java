@@ -11,7 +11,6 @@ import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
-import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.VaultStatus;
@@ -228,12 +227,7 @@ public class VerificationTokenServiceImpl implements VerificationTokenService {
             if (claimRepository.findByVaultIdAndBeneficiaryId(vault.getId(), user.getId()).isPresent()) {
                 continue;
             }
-            claimRepository.save(BeneficiaryClaim.builder()
-                    .vault(vault)
-                    .beneficiary(user)
-                    .status(ClaimStatus.PENDING)
-                    .claimDeadlineAt(vault.getClaimDeadlineAt())
-                    .build());
+            claimRepository.save(BeneficiaryClaim.pendingFor(vault, user));
         }
     }
 
