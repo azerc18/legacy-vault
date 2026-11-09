@@ -28,5 +28,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     @EntityGraph(attributePaths = {"user", "plan"})
     @Query("SELECT p FROM PaymentTransaction p WHERE p.id = :id")
     Optional<PaymentTransaction> findByIdForUpdate(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"user", "plan"})
+    @Query("SELECT p FROM PaymentTransaction p WHERE p.gatewayTxnRef = :ref")
+    Optional<PaymentTransaction> findByGatewayTxnRefForUpdate(@Param("ref") String ref);
 }
 

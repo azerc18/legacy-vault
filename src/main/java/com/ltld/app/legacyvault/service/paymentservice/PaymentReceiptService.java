@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.paymentservice;
 
 import com.ltld.app.legacyvault.dto.paymentdto.PaymentReceiptData;
 import com.ltld.app.legacyvault.entity.PaymentTransaction;
+import com.ltld.app.legacyvault.enums.PaymentProvider;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
@@ -25,7 +26,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PaymentReceiptService {
 
-    // Hiện chỉ có VNPay; khi có thêm cổng khác thì suy ra từ provider của giao dịch
     private static final String PAYMENT_METHOD_VNPAY = "VNPay";
     private static final DateTimeFormatter RECEIPT_DATE = DateTimeFormatter.ofPattern("yyyyMMdd");
 
@@ -79,7 +79,14 @@ public class PaymentReceiptService {
                 tx.getPaidAt(),
                 issuedAt,
                 invoiceNumber,
-                PAYMENT_METHOD_VNPAY);
+                paymentMethod(tx));
+    }
+
+    private static String paymentMethod(PaymentTransaction tx) {
+        if (tx.getProvider() == PaymentProvider.PAYPAL && tx.getAmountUsdCents() != null) {
+            return "PayPal (" + PaypalClient.formatUsd(tx.getAmountUsdCents()) + " USD)";
+        }
+        return PAYMENT_METHOD_VNPAY;
     }
 
     /** Số biên lai ổn định cho mỗi giao dịch: LV-{ngày thanh toán}-{8 ký tự đầu của id}, vd. LV-20261107-1A2B3C4D. */

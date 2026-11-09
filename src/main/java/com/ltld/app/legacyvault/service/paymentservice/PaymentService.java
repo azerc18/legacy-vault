@@ -17,6 +17,14 @@ public interface PaymentService {
 
     String handleVnpayReturn(Map<String, String> params);
 
+    /** Trả về URL frontend để redirect người mua; chỉ PayPal capture thành công mới kích hoạt gói. */
+    String handlePaypalReturn(String orderId);
+
+    String handlePaypalCancel(String orderId);
+
+    /** Các cổng đã cấu hình khóa; cổng chưa cấu hình thì ẩn. */
+    List<String> getAvailableProviders();
+
     SubscriptionMeResponse getMySubscription(UUID userId);
 
     List<PaymentTransactionResponse> getMyPayments(UUID userId);

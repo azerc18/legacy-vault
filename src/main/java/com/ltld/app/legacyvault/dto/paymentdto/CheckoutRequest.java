@@ -14,5 +14,8 @@ public class CheckoutRequest {
 
     @NotBlank(message = "Plan code is required")
     private String planCode;
+
+    // VNPAY hoặc PAYPAL; để trống là VNPAY (client cũ không gửi trường này)
+    private String provider;
 }
 

@@ -11,6 +11,8 @@ const formatVnd = (n) =>
         ? n.toLocaleString('vi-VN') + ' ₫'
         : '0 ₫';
 
+const PROVIDER_LABEL = { VNPAY: 'VNPay', PAYPAL: 'PayPal' };
+
 // n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
 const yearlySavingPercent = (plans) => {
     const month = plans.find((p) => p.code === 'VIP_MONTH');
@@ -28,6 +30,21 @@ export default function PricingPage() {
     const [error, setError] = useState('');
     const [loadError, setLoadError] = useState('');
     const [reloadKey, setReloadKey] = useState(0);
+    const [providers, setProviders] = useState(['VNPAY']);
+    const [provider, setProvider] = useState('VNPAY');
+
+    // Lỗi thì giữ VNPay như trước khi có nhiều cổng
+    useEffect(() => {
+        paymentApi
+            .getProviders()
+            .then((list) => {
+                if (list?.length) {
+                    setProviders(list);
+                    setProvider(list[0]);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     // n1: danh sách gói lấy từ API (availablePlans của /subscriptions/me), không có danh sách viết cứng
     useEffect(() => {
@@ -51,7 +68,7 @@ export default function PricingPage() {
         setError('');
         setBusyCode(planCode);
         try {
-            const res = await paymentApi.checkout(planCode);
+            const res = await paymentApi.checkout(planCode, provider);
             if (res?.paymentUrl) {
                 window.location.href = res.paymentUrl;
             }
@@ -63,6 +80,7 @@ export default function PricingPage() {
 
     const plans = sub?.availablePlans ?? [];
     const savingPercent = yearlySavingPercent(plans);
+    const providerName = PROVIDER_LABEL[provider] ?? provider;
 
     return (
         <OwnerLayout
@@ -91,6 +109,29 @@ export default function PricingPage() {
                         <Icon name="receipt_long" className="text-[18px]" /> {t('pricing.viewBilling')}
                     </Link>
                 </div>
+            )}
+
+            {providers.length > 1 && (
+                <fieldset className="mb-6">
+                    <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
+                    <div className="flex flex-wrap gap-4">
+                        {providers.map((code) => (
+                            <label key={code} className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="payment-provider"
+                                    value={code}
+                                    checked={provider === code}
+                                    onChange={() => setProvider(code)}
+                                />
+                                {PROVIDER_LABEL[code] ?? code}
+                            </label>
+                        ))}
+                    </div>
+                    {provider === 'PAYPAL' && (
+                        <p className="mt-2 text-xs text-on-surface-variant">{t('pricing.paypalNote')}</p>
+                    )}
+                </fieldset>
             )}
 
             {loading ? (
@@ -191,10 +232,10 @@ export default function PricingPage() {
                                         >
                                             <Icon name="payments" className="text-[18px]" />
                                             {busyCode === p.code
-                                                ? t('pricing.buttons.redirecting')
+                                                ? t('pricing.buttons.redirecting', { provider: providerName })
                                                 : isCurrent
-                                                ? t('pricing.buttons.extend')
-                                                : t('pricing.buttons.upgrade')}
+                                                ? t('pricing.buttons.extend', { provider: providerName })
+                                                : t('pricing.buttons.upgrade', { provider: providerName })}
                                         </button>
                                     )}
                                 </div>
