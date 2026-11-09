@@ -215,7 +215,7 @@ class BankAssetVerifierTest {
         String amount = start.clientData().get("amount");
         String grouped = amount.charAt(0) + "." + amount.substring(1);
 
-        for (String typed : List.of(amount, grouped, " " + amount + " VND ")) {
+        for (String typed : List.of(amount, grouped, " " + amount + " VND ", grouped + ",00", amount + ".00 VND", grouped + ",0")) {
             AssetVerifier.VerifyResult result = confirmMicro(asset, Map.of("code", typed), start.challengeHash());
             assertThat(result.success()).isTrue();
             assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
@@ -236,5 +236,17 @@ class BankAssetVerifierTest {
         assertThat(confirmMicro(asset, Map.of(), hash).success()).isFalse();
         assertThat(confirmMicro(asset, null, hash).success()).isFalse();
         assertThat(confirmMicro(asset, Map.of("code", "1234"), null).success()).isFalse();
+    }
+
+    @Test
+    @DisplayName("depositDigits: bỏ phần thập phân toàn số 0, giữ phần thập phân khác 0")
+    void depositDigits_decimals() {
+        assertThat(BankAssetVerifier.depositDigits("1.234,00")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1,234.00 VND")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1234,0")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1.234")).isEqualTo("1234");
+        assertThat(BankAssetVerifier.depositDigits("1.000")).isEqualTo("1000");
+        assertThat(BankAssetVerifier.depositDigits("1.234,5")).isEqualTo("12345");
+        assertThat(BankAssetVerifier.depositDigits(null)).isEmpty();
     }
 }

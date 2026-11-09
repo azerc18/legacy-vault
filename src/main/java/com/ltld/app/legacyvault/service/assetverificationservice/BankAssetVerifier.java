@@ -116,7 +116,7 @@ public class BankAssetVerifier implements AssetVerifier {
 
     private VerifyResult confirmMicroDeposit(DigitalAsset asset, Map<String, String> payload, String challengeHash) {
         // Ô nhập của FE gửi qua khóa "code"; bỏ dấu phân cách để "1.234", "1,234" và "1234 VND" đều khớp
-        String digits = payload.getOrDefault("code", "").replaceAll("\\D", "");
+        String digits = depositDigits(payload.getOrDefault("code", ""));
         if (digits.isEmpty()) {
             return fail("Deposit amount is required");
         }
@@ -207,6 +207,15 @@ public class BankAssetVerifier implements AssetVerifier {
     private StartResult sandboxStart(String message) {
         return new StartResult(VerificationProvider.SANDBOX, message, null,
                 Map.of("mode", "SANDBOX"), LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
+    }
+
+    /**
+     * Lấy phần số nguyên của số tiền Owner gõ. Phần thập phân toàn số 0 ở cuối (",00", ".0") được bỏ trước,
+     * nếu không "1.234,00" sẽ thành "123400". Phần thập phân khác 0 ("1.234,5") giữ nguyên nên sẽ không khớp.
+     */
+    static String depositDigits(String typed) {
+        String trimmed = typed == null ? "" : typed.trim().replaceFirst("[.,]0{1,2}(?=\\D*$)", "");
+        return trimmed.replaceAll("\\D", "");
     }
 
     private static UUID saltId(DigitalAsset asset) {
