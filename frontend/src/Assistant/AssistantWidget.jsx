@@ -1,5 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import ChatPanel, { WELCOME } from './ChatPanel.jsx';
 import { pickGreeting, pickTip } from './assistantLines.js';
@@ -44,6 +45,7 @@ function clampPos(pos, el) {
 }
 
 export default function AssistantWidget() {
+    const { t } = useTranslation();
     const { pathname } = useLocation();
     const user = getUser();
     const hidden = !user || PUBLIC_PATHS.includes(pathname);
@@ -96,8 +98,8 @@ export default function AssistantWidget() {
     useEffect(() => {
         if (hidden || readGreeted() === userId) return;
         writeGreeted(userId);
-        const t = setTimeout(() => say(pickGreeting(userName), 'wave', 6000), 800);
-        return () => clearTimeout(t);
+        const timer = setTimeout(() => say(pickGreeting(userName), 'wave', 6000), 800);
+        return () => clearTimeout(timer);
     }, [hidden, userId, userName, say]);
 
     // Thỉnh thoảng nói 1 mẹo, chỉ khi panel đóng và không có câu nào đang hiện
@@ -168,14 +170,14 @@ export default function AssistantWidget() {
     // Mở/đóng khung chat, hiện câu thoại hay đổi cỡ cửa sổ thì kéo widget về lại trong màn hình
     // Chỉ đổi vị trí đang hiện; đóng khung chat thì cú về lại đúng chỗ user đã chọn
     useLayoutEffect(() => {
-        if (hidden) return;
+        if (hidden || drag.current?.moved) return;   // đang kéo thì moveDrag tự kẹp, đừng kéo widget về chỗ cũ
         const c = clampPos(pos, boxRef.current);
         setView((v) => (c.right === v.right && c.bottom === v.bottom ? v : c));
     }, [hidden, open, bubble, pos]);
 
     useEffect(() => {
         if (hidden) return;
-        const onResize = () => setView(clampPos(pos, boxRef.current));
+        const onResize = () => { if (!drag.current?.moved) setView(clampPos(pos, boxRef.current)); };
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
     }, [hidden, pos]);
@@ -217,8 +219,8 @@ export default function AssistantWidget() {
                 </button>
             )}
 
-            <button type="button" onClick={toggle} aria-label={open ? 'Close assistant' : 'Open assistant'}
-                    title="Click to chat, drag to move" {...dragHandlers}
+            <button type="button" onClick={toggle} aria-label={t(open ? 'assistant.close' : 'assistant.open')}
+                    title={t('assistant.launcherHint')} {...dragHandlers}
                     className="lv-assistant-launcher lv-assistant-handle lv-glass-clear pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
                     <Owl3D action={thinking ? 'think' : action} costume={costume} />

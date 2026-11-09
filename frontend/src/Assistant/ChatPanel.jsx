@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { assistantApi } from '../api/assistantApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon } from '../Owner/ownerUi.jsx';
@@ -69,6 +70,7 @@ function MessageContent({ text, animate = false }) {
 }
 
 export default function ChatPanel({ messages, setMessages, onClose, onReply, onThinking, costume = 'none', onCostumeChange, dragHandlers }) {
+    const { t } = useTranslation();
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState('');
@@ -119,7 +121,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
         <div className="lv-glass-thick w-[340px] max-w-[calc(100vw-2rem)] h-[460px] max-h-[calc(100vh-10rem)] flex flex-col
                         rounded-2xl overflow-hidden chibi-bubble">
             {/* Header */}
-            <div {...dragHandlers} title="Drag to move"
+            <div {...dragHandlers} title={t('assistant.dragHint')}
                  className="lv-assistant-handle flex items-center justify-between px-4 py-3 bg-brand/85 backdrop-blur-md border-b border-white/15 text-white">
                 <div>
                     <p className="font-semibold leading-tight">Vaulty</p>
