@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.security.MessageDigest;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -37,6 +38,8 @@ import java.util.UUID;
  *   (không nhận hash do client gửi). Kết quả chỉ chứng minh "tệp này đã được lưu nguyên vẹn từ thời điểm đó",
  *   KHÔNG chứng minh tài liệu là thật; FE ghi rõ điều này ở bước tải tệp.
  * - SECOND_PERSON_CONFIRM (REAL): mã gửi tới DMS confirmer của Owner, Owner nhập lại mã; chỉ chứng minh mã đã tới người thứ hai và được nhập lại đúng; không chứng minh họ đã xem bản gốc
+ * - DOCUMENT_TIMESTAMP (SANDBOX): Owner tải bản gốc lên két, server băm SHA-256 và gắn mốc thời gian UTC (mô phỏng)
+ *   chứng minh tệp đã tồn tại ở thời điểm đó.
  */
 @Slf4j
 @Component
@@ -62,7 +65,10 @@ public class DocumentAssetVerifier implements AssetVerifier {
 
     @Override
     public List<AssetVerificationMethod> methods() {
-        return List.of(AssetVerificationMethod.FILE_HASH, AssetVerificationMethod.SECOND_PERSON_CONFIRM);
+        return List.of(
+                AssetVerificationMethod.FILE_HASH,
+                AssetVerificationMethod.SECOND_PERSON_CONFIRM,
+                AssetVerificationMethod.DOCUMENT_TIMESTAMP);
     }
 
     @Override
@@ -74,6 +80,12 @@ public class DocumentAssetVerifier implements AssetVerifier {
             case FILE_HASH -> new StartResult(
                     VerificationProvider.REAL,
                     "Upload the original document to the vault, then confirm to store its SHA-256 fingerprint",
+                    null,
+                    Map.of("documentTitle", title),
+                    LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
+            case DOCUMENT_TIMESTAMP -> new StartResult(
+                    VerificationProvider.SANDBOX,
+                    "Upload the original document to the vault to compute its SHA-256 hash and record a simulated timestamp",
                     null,
                     Map.of("documentTitle", title),
                     LocalDateTime.now().plusMinutes(CHALLENGE_TTL_MINUTES));
@@ -94,15 +106,22 @@ public class DocumentAssetVerifier implements AssetVerifier {
         Map<String, String> safePayload = payload == null ? Map.of() : payload;
         return switch (method) {
             case FILE_HASH -> confirmFileHash(asset, safePayload);
+            case DOCUMENT_TIMESTAMP -> confirmDocumentTimestamp(asset, safePayload);
             case SECOND_PERSON_CONFIRM -> confirmSecondPerson(asset, safePayload, challengeHash);
             default -> throw unsupported(method);
         };
     }
 
-    private VerifyResult confirmFileHash(DigitalAsset asset, Map<String, String> payload) {
+    private record DocResolveResult(LegalDocument doc, String sha256, String error) {
+        boolean ok() {
+            return error == null && doc != null && sha256 != null;
+        }
+    }
+
+    private DocResolveResult resolveAndHashDocument(DigitalAsset asset, Map<String, String> payload) {
         UUID vaultId = asset.getVault() != null ? asset.getVault().getId() : null;
         if (vaultId == null) {
-            return fail("Asset is not attached to a vault");
+            return new DocResolveResult(null, null, "Asset is not attached to a vault");
         }
 
         LegalDocument doc;
@@ -112,12 +131,12 @@ public class DocumentAssetVerifier implements AssetVerifier {
             try {
                 docId = UUID.fromString(docIdStr);
             } catch (IllegalArgumentException e) {
-                return fail("Invalid documentId UUID format");
+                return new DocResolveResult(null, null, "Invalid documentId UUID format");
             }
             // Chỉ nhận tài liệu nằm trong đúng vault của tài sản
             Optional<LegalDocument> found = legalDocumentRepository.findByIdAndVaultId(docId, vaultId);
             if (found.isEmpty()) {
-                return fail("Document not found in this vault");
+                return new DocResolveResult(null, null, "Document not found in this vault");
             }
             doc = found.get();
         } else if (asset.getLinkedDocumentGroupId() != null) {
@@ -126,10 +145,10 @@ public class DocumentAssetVerifier implements AssetVerifier {
                     .filter(d -> d.getVault() != null && vaultId.equals(d.getVault().getId()))
                     .orElse(null);
             if (doc == null) {
-                return fail("Linked document not found in this vault");
+                return new DocResolveResult(null, null, "Linked document not found in this vault");
             }
         } else {
-            return fail("Upload the original document to the vault and send its documentId");
+            return new DocResolveResult(null, null, "Upload the original document to the vault and send its documentId");
         }
 
         String sha256;
@@ -138,18 +157,43 @@ public class DocumentAssetVerifier implements AssetVerifier {
             sha256 = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(plain));
         } catch (Exception e) {
             log.warn("Could not read document {} for asset {}: {}", doc.getId(), asset.getId(), e.getMessage());
-            return fail("Could not read the document, please try again later");
+            return new DocResolveResult(null, null, "Could not read the document, please try again later");
+        }
+
+        return new DocResolveResult(doc, sha256, null);
+    }
+
+    private VerifyResult confirmFileHash(DigitalAsset asset, Map<String, String> payload) {
+        DocResolveResult res = resolveAndHashDocument(asset, payload);
+        if (!res.ok()) {
+            return fail(res.error());
         }
 
         Map<String, String> evidence = new LinkedHashMap<>();
-        evidence.put("documentId", doc.getId().toString());
+        evidence.put("documentId", res.doc().getId().toString());
         evidence.put("hashAlgorithm", "SHA-256");
-        evidence.put("sha256", sha256);
-        if (doc.getFileName() != null) {
-            evidence.put("fileName", doc.getFileName());
+        evidence.put("sha256", res.sha256());
+        if (res.doc().getFileName() != null) {
+            evidence.put("fileName", res.doc().getFileName());
         }
         return new VerifyResult(true, VerificationProvider.REAL,
                 "Document fingerprint (SHA-256) stored; this does not prove the document is genuine", evidence);
+    }
+
+    private VerifyResult confirmDocumentTimestamp(DigitalAsset asset, Map<String, String> payload) {
+        DocResolveResult res = resolveAndHashDocument(asset, payload);
+        if (!res.ok()) {
+            return failSandbox(res.error());
+        }
+
+        Map<String, String> evidence = new LinkedHashMap<>();
+        evidence.put("documentId", res.doc().getId().toString());
+        evidence.put("sha256", res.sha256());
+        evidence.put("timestampedAt", Instant.now().toString());
+        evidence.put("mode", "SIMULATED");
+
+        return new VerifyResult(true, VerificationProvider.SANDBOX,
+                "Document timestamp recorded with SHA-256 fingerprint (Simulated)", evidence);
     }
 
     private StartResult startSecondPerson(DigitalAsset asset, UUID ownerId) {
@@ -206,6 +250,10 @@ public class DocumentAssetVerifier implements AssetVerifier {
 
     private static VerifyResult fail(String message) {
         return new VerifyResult(false, VerificationProvider.REAL, message, Map.of());
+    }
+
+    private static VerifyResult failSandbox(String message) {
+        return new VerifyResult(false, VerificationProvider.SANDBOX, message, Map.of());
     }
 
     private static VaultException unsupported(AssetVerificationMethod method) {

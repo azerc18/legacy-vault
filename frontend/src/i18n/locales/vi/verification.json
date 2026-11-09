@@ -9,6 +9,7 @@
   },
   "methods": {
     "FILE_HASH": { "label": "Dấu vân tay tệp (SHA-256)", "desc": "Tải bản gốc lên két, hệ thống lưu dấu vân tay SHA-256 của tệp.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống lưu dấu vân tay SHA-256 của tệp để sau này phát hiện nếu tệp bị thay. Cách này chưa chứng minh tài liệu là thật." },
+    "DOCUMENT_TIMESTAMP": { "label": "Dấu thời gian (Mô phỏng)", "desc": "Ghi nhận tệp đã tồn tại ở thời điểm xác nhận, gắn với mã băm SHA-256 trên hệ thống.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống lưu mã băm SHA-256 và gắn mốc thời gian UTC (mô phỏng) chứng minh tệp đã tồn tại." },
     "SECOND_PERSON_CONFIRM": { "label": "Xác nhận của người thứ hai", "desc": "Gửi mã tới người xác nhận tin cậy (DMS) của bạn; người đã xem bản gốc đọc mã lại cho bạn nhập." },
     "OTP_EMAIL": { "label": "Mã OTP qua email", "desc": "Nhận mã gửi tới email của tài sản và nhập lại." },
     "GOOGLE_LOGIN": { "label": "Đăng nhập Google", "desc": "Đăng nhập đúng tài khoản Google đã khai." },
