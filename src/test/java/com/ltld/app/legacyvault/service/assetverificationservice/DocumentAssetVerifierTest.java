@@ -232,9 +232,9 @@ class DocumentAssetVerifierTest {
         assertThat(start.clientData().get("maskedEmail"))
                 .contains("w***s@x.com", "f***d@x.com")
                 .doesNotContain("witness@x.com", "friend@x.com", "gone");
-        verify(emailSender).sendAssetVerificationOtpEmail("witness@x.com", "482910", 60);
-        verify(emailSender).sendAssetVerificationOtpEmail("friend@x.com", "482910", 60);
-        verify(emailSender, never()).sendAssetVerificationOtpEmail(eq("gone@x.com"), any(), anyInt());
+        verify(emailSender).sendSecondPersonConfirmEmail("witness@x.com", "482910", 60);
+        verify(emailSender).sendSecondPersonConfirmEmail("friend@x.com", "482910", 60);
+        verify(emailSender, never()).sendSecondPersonConfirmEmail(eq("gone@x.com"), any(), anyInt());
     }
 
     @Test

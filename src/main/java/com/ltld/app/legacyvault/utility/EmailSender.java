@@ -50,6 +50,14 @@ public class EmailSender {
     }
 
     @Async
+    public void sendSecondPersonConfirmEmail(String email, String otp, int validMinutes) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        sendCode(email, lang, Style.SECURITY, "mail.secondPerson", otp,
+                List.of(MailMessages.get(lang, "mail.secondPerson.warn")),
+                MailMessages.get(lang, "mail.secondPerson.footer", validMinutes));
+    }
+
+    @Async
     public void sendPasswordResetEmail(String email, String otp) {
         AppLanguage lang = languageResolver.forEmail(email);
         sendCode(email, lang, Style.SECURITY, "mail.reset", otp,

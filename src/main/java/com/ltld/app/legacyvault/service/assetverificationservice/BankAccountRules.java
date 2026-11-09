@@ -56,4 +56,9 @@ public class BankAccountRules {
         String s = Normalizer.normalize(input, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
         return s.replace('đ', 'd').replace('Đ', 'D');
     }
+
+    /** Bảng đã có ít nhất một ngân hàng với danh sách độ dài hợp lệ chưa. */
+    public boolean hasAnyRule() {
+        return accountLengths.values().stream().anyMatch(v -> v != null && !v.isEmpty());
+    }
 }

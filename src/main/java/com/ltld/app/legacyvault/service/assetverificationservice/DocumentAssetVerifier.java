@@ -36,7 +36,7 @@ import java.util.UUID;
  * - FILE_HASH (REAL): Owner tải bản gốc lên kho tài liệu của vault, server tự giải mã và băm SHA-256
  *   (không nhận hash do client gửi). Kết quả chỉ chứng minh "tệp này đã được lưu nguyên vẹn từ thời điểm đó",
  *   KHÔNG chứng minh tài liệu là thật; FE ghi rõ điều này ở bước tải tệp.
- * - SECOND_PERSON_CONFIRM (REAL): mã gửi tới DMS confirmer của Owner, Owner nhập lại mã; chỉ chứng minh có người thứ hai đã nhận mã.
+ * - SECOND_PERSON_CONFIRM (REAL): mã gửi tới DMS confirmer của Owner, Owner nhập lại mã; chỉ chứng minh mã đã tới người thứ hai và được nhập lại đúng; không chứng minh họ đã xem bản gốc
  */
 @Slf4j
 @Component
@@ -166,9 +166,8 @@ public class DocumentAssetVerifier implements AssetVerifier {
 
         String otp = otpGenerator.generate();
         String challengeHash = otpHasher.hash(saltId(asset), otp);
-        // TODO(Duy N17): đổi sang hàm mail riêng cho người xác nhận (mẫu assetOtp hiện nói về "email tài sản")
         for (DmsConfirmer c : confirmers) {
-            emailSender.sendAssetVerificationOtpEmail(c.getEmail(), otp, SECOND_PERSON_TTL_MINUTES);
+            emailSender.sendSecondPersonConfirmEmail(c.getEmail(), otp, SECOND_PERSON_TTL_MINUTES);
         }
 
         String masked = confirmers.stream()
@@ -196,7 +195,8 @@ public class DocumentAssetVerifier implements AssetVerifier {
         Map<String, String> evidence = new LinkedHashMap<>();
         evidence.put("check", "SECOND_PERSON_CODE");
         return new VerifyResult(true, VerificationProvider.REAL,
-                "A second person confirmed they saw the original; this does not prove the document is genuine",
+                "The code sent to your trusted confirmer was entered correctly; this shows the code reached them, "
+                        + "not that they saw the original or that the document is genuine",
                 evidence);
     }
 

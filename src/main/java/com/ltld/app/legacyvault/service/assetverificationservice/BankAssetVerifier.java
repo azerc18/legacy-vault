@@ -12,12 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * C.3.3: Xác thực tài sản BANK_ACCOUNT. Cả ba cách đều là SANDBOX (nhãn "Mô phỏng"):
@@ -43,10 +38,13 @@ public class BankAssetVerifier implements AssetVerifier {
 
     @Override
     public List<AssetVerificationMethod> methods() {
-        return List.of(
-                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK,
-                AssetVerificationMethod.BANK_FORMAT_CHECK,
-                AssetVerificationMethod.STATEMENT_UPLOAD);
+        List<AssetVerificationMethod> methods = new ArrayList<>();
+        methods.add(AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK);
+        if (rules.hasAnyRule()) {   // bảng rỗng thì ẩn, tránh UI hiện cách luôn trả 400
+            methods.add(AssetVerificationMethod.BANK_FORMAT_CHECK);
+        }
+        methods.add(AssetVerificationMethod.STATEMENT_UPLOAD);
+        return List.copyOf(methods);
     }
 
     @Override

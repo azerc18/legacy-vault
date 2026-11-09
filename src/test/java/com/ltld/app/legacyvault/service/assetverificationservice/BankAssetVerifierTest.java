@@ -177,4 +177,12 @@ class BankAssetVerifierTest {
         assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, Map.of(),
                 ownerId, null)).isInstanceOf(VaultException.class);
     }
+
+    @Test
+    @DisplayName("methods(): bảng độ dài rỗng thì ẩn BANK_FORMAT_CHECK")
+    void methods_emptyLengthTable_hidesFormatCheck() {
+        rules.setAccountLengths(Map.of());
+        assertThat(verifier.methods()).containsExactly(
+                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, AssetVerificationMethod.STATEMENT_UPLOAD);
+    }
 }
