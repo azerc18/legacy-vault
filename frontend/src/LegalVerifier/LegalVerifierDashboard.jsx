@@ -33,7 +33,7 @@ export default function LegalVerifierDashboard() {
             <VerifierHeader title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
             <main className={`${PAGE_WIDTH} w-full pt-6 pb-12 flex-1`}>
-                <Link to="/verifier/history" className="inline-flex items-center gap-1.5 mb-8 text-secondary font-semibold hover:text-primary">
+                <Link to="/verifier/history" data-tour="verifier-history-link" className="inline-flex items-center gap-1.5 mb-8 text-secondary font-semibold hover:text-primary">
                     <span className="material-symbols-outlined text-[20px]">history</span>
                     {t('dashboard.viewHistory')}
                 </Link>
@@ -45,8 +45,10 @@ export default function LegalVerifierDashboard() {
                                 text={t('dashboard.emptyText')} />
                 )}
 
-                <RequestGroup title={t('dashboard.awaiting')} items={awaitingSign} />
-                <RequestGroup title={t('dashboard.pending')} items={pending} />
+                <div data-tour="verifier-requests">
+                    <RequestGroup title={t('dashboard.awaiting')} items={awaitingSign} />
+                    <RequestGroup title={t('dashboard.pending')} items={pending} />
+                </div>
             </main>
         </div>
     );

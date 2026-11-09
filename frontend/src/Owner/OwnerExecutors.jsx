@@ -43,7 +43,7 @@ export default function OwnerExecutors() {
         <OwnerLayout title={t('executors.title')} subtitle={t('executors.subtitle')}>
             <Alert>{error}</Alert>
             {loading ? <p className="text-on-surface-variant">{t('executors.loading')}</p> : (
-                <div className="grid md:grid-cols-2 gap-6">
+                <div data-tour="executors-overview" className="grid md:grid-cols-2 gap-6">
                     {POSITIONS.map((p) => (
                         <ExecutorCard key={p.type} position={p} assignment={current(p.type)} onChanged={load} />
                     ))}
@@ -94,74 +94,80 @@ function ExecutorCard({ position, assignment, onChanged }) {
     const st = assignment && STATUS[stKey];
 
     return (
-        <Card>
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)} <InfoTip term="executor" /></h2>
-                    <p className="text-sm text-on-surface-variant mt-1">{t(`executors.positions.${position.type}.text`)}</p>
-                </div>
-                {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}
-            </div>
-
-            <div className="mt-5"><Alert>{error}</Alert></div>
-
-            {assignment && !editing && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-low">
-                    <div className="w-10 h-10 rounded-full bg-primary-fixed text-primary flex items-center justify-center"><Icon name="person" /></div>
-                    <div className="min-w-0">
-                        <p className="font-semibold truncate">{assignment.fullName || assignment.email}</p>
-                        <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
-                        <p className="text-xs text-outline">
-                            {t('executors.since', { date: formatDate(assignment.assignedAt) })}
-                            {assignment.activatedAt && ` · ${t('executors.activated', { date: formatDate(assignment.activatedAt, true) })}`}
-                            {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
-                                ? ` · ${t('executors.acknowledged', { date: formatDate(assignment.acknowledgedAt, true) })}`
-                                : ` · ${t('executors.awaitingAck')}`)}
-                        </p>
+        <div data-tour={position.type === 'PRIMARY' ? 'executors-primary' : 'executors-backup'}>
+            <Card>
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)} <InfoTip term="executor" /></h2>
+                        <p className="text-sm text-on-surface-variant mt-1">{t(`executors.positions.${position.type}.text`)}</p>
                     </div>
+                    {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}
                 </div>
-            )}
 
-            {!assignment && !editing && <p className="text-sm text-on-surface-variant">{t('executors.noneAssigned')}</p>}
+                <div className="mt-5"><Alert>{error}</Alert></div>
 
-            {editing ? (
-                <form onSubmit={(e) => { e.preventDefault(); if (email.trim()) assign(false); }} className="mt-4 space-y-3">
-                    <input type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="executor@example.com" className={inputClass} />
-                    <div className="flex gap-3">
-                        <button type="button" onClick={() => { setEditing(false); setError(''); }} className={btnOutline}>{t('actions.cancel', { ns: 'common' })}</button>
-                        <button type="submit" disabled={busy} className={btnPrimary}>{busy ? t('executors.saving') : t('actions.save', { ns: 'common' })}</button>
+                {assignment && !editing && (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-low">
+                        <div className="w-10 h-10 rounded-full bg-primary-fixed text-primary flex items-center justify-center"><Icon name="person" /></div>
+                        <div className="min-w-0">
+                            <p className="font-semibold truncate">{assignment.fullName || assignment.email}</p>
+                            <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
+                            <p className="text-xs text-outline">
+                                {t('executors.since', { date: formatDate(assignment.assignedAt) })}
+                                {assignment.activatedAt && ` · ${t('executors.activated', { date: formatDate(assignment.activatedAt, true) })}`}
+                                {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
+                                    ? ` · ${t('executors.acknowledged', { date: formatDate(assignment.acknowledgedAt, true) })}`
+                                    : ` · ${t('executors.awaitingAck')}`)}
+                            </p>
+                        </div>
+                        <div className="ml-auto flex items-center gap-2">
+                            <button onClick={() => { setEditing(true); setEmail(assignment.email); }} className={btnOutline}><Icon name="edit" className="text-[18px]" /> {t('ui.change')}</button>
+                            <button onClick={() => setRevokeOpen(true)} className="text-sm text-error font-semibold hover:underline">{t('ui.remove')}</button>
+                        </div>
                     </div>
-                </form>
-            ) : (
-                <div className="mt-4 flex gap-3">
-                    <button onClick={() => setEditing(true)} className={btnPrimary}>
-                        <Icon name={assignment ? 'swap_horiz' : 'person_add'} className="text-[18px]" /> {assignment ? t('executors.replace') : t('executors.assign')}
-                    </button>
-                    {assignment && (
-                        <button onClick={() => setRevokeOpen(true)} className={btnOutline}>{t('executors.revoke')}</button>
-                    )}
-                </div>
-            )}
+                )}
 
-            <ConfirmDialog
-                open={!!confirmMsg}
-                title={t(`executors.replaceTitle.${position.type}`)}
-                message={confirmMsg}
-                confirmLabel={t('executors.replace')}
-                busy={busy}
-                onConfirm={() => assign(true)}
-                onCancel={() => setConfirmMsg(null)}
-            />
-            <ConfirmDialog
-                open={revokeOpen}
-                danger
-                title={t(`executors.revokeTitle.${position.type}`)}
-                message={t('executors.revokeMessage', { email: assignment?.email })}
-                confirmLabel={t('executors.revoke')}
-                busy={busy}
-                onConfirm={revoke}
-                onCancel={() => setRevokeOpen(false)}
-            />
-        </Card>
+                {(!assignment || editing) && (
+                    <form onSubmit={(e) => { e.preventDefault(); assign(false); }} className="space-y-4">
+                        <label className="block">
+                            <span className="text-sm font-semibold text-on-surface-variant">{t('executors.emailLabel')}</span>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder={t('executors.emailPlaceholder')}
+                                required
+                                className={`${inputClass} mt-1`}
+                            />
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <button type="submit" disabled={busy || !email.trim()} className={btnPrimary}>
+                                <Icon name="person_add" className="text-[18px]" /> {busy ? t('ui.saving') : assignment ? t('executors.update') : t('executors.assign')}
+                            </button>
+                            {editing && <button type="button" onClick={() => setEditing(false)} className={btnOutline}>{t('ui.cancel')}</button>}
+                        </div>
+                    </form>
+                )}
+
+                <ConfirmDialog
+                    open={!!confirmMsg}
+                    title={t('executors.replaceTitle')}
+                    message={confirmMsg}
+                    confirmLabel={t('executors.replaceConfirm')}
+                    onConfirm={() => assign(true)}
+                    onClose={() => setConfirmMsg(null)}
+                />
+
+                <ConfirmDialog
+                    open={revokeOpen}
+                    title={t('executors.revokeTitle')}
+                    message={t('executors.revokeText')}
+                    confirmLabel={t('executors.revokeConfirm')}
+                    danger
+                    onConfirm={revoke}
+                    onClose={() => setRevokeOpen(false)}
+                />
+            </Card>
+        </div>
     );
 }

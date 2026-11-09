@@ -89,7 +89,6 @@ export default function DeadMansSwitch() {
             });
             applyConfig(saved);
             loadConfirmers(saved);
-            toast.success(t('dms.saved'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.errors.save')));
         } finally {
@@ -98,12 +97,14 @@ export default function DeadMansSwitch() {
     };
 
     const checkIn = async () => {
-        setError(''); setChecking(true);
+        setError('');
+        setChecking(true);
         try {
-            applyConfig(await ownerApi.checkIn());
-            toast.success(t('dms.checkedIn'));
+            const res = await ownerApi.dmsCheckin();
+            applyConfig(res);
+            toast.success(t('dms.checkinSuccess'));
         } catch (err) {
-            setError(getErrorMessage(err, t('dms.errors.checkIn')));
+            setError(getErrorMessage(err, t('dms.errors.checkin')));
         } finally {
             setChecking(false);
         }
@@ -113,8 +114,7 @@ export default function DeadMansSwitch() {
         e.preventDefault();
         setError('');
         if (!confirmerForm.name.trim() || !confirmerForm.email.trim()) {
-            setError(t('dms.confirmers.missingFields'));
-            return;
+            return setError(t('dms.confirmers.required'));
         }
         setAddingConfirmer(true);
         try {
@@ -170,148 +170,153 @@ export default function DeadMansSwitch() {
                 <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
                     <div className="space-y-6">
                     {/* Trạng thái + check-in */}
-                    <Card>
-                        {!configured ? (
-                            <div className="text-center py-6">
-                                <Icon name="heart_minus" className="text-[40px] text-outline" />
-                                <p className="mt-3 font-semibold">{t('dms.notSetUp')}</p>
-                                <p className="text-sm text-on-surface-variant mt-1">{t('dms.notSetUpHint')}</p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
-                                        <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
-                                    </span>
-                                    {canCheckIn && (
-                                        <button onClick={checkIn} disabled={checking} className={btnPrimary}>
-                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : t('dms.checkIn')}
-                                        </button>
-                                    )}
+                    <div data-tour="dms-status">
+                        <Card>
+                            {!configured ? (
+                                <div className="text-center py-6">
+                                    <Icon name="heart_minus" className="text-[40px] text-outline" />
+                                    <p className="mt-3 font-semibold">{t('dms.notSetUp')}</p>
+                                    <p className="text-sm text-on-surface-variant mt-1">{t('dms.notSetUpHint')}</p>
                                 </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${s.cls}`}>
+                                            <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
+                                        </span>
+                                        {canCheckIn && (
+                                            <button onClick={checkIn} disabled={checking} className={btnPrimary}>
+                                                <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : t('dms.checkIn')}
+                                            </button>
+                                        )}
+                                    </div>
 
-                                {config.status === 'PENDING_CONFIRMATION' && (
-                                    <p className="mt-4 text-sm text-on-surface-variant">
-                                        {t('dms.pending.body', { deadline: formatDate(config.triggerAt, true), button: t('dms.checkIn') })}
-                                    </p>
-                                )}
-                                {config.status === 'TRIGGERED' && (
-                                    <p className="mt-4 text-sm text-on-surface-variant">
-                                        {t('dms.triggeredNote', { date: formatDate(config.triggeredAt, true) })}
-                                    </p>
-                                )}
-                                {config.status === 'SUSPENDED' && (
-                                    <p className="mt-4 text-sm text-on-surface-variant">{t('dms.suspendedNote')}</p>
-                                )}
+                                    {config.status === 'PENDING_CONFIRMATION' && (
+                                        <p className="mt-4 text-sm text-on-surface-variant">
+                                            {t('dms.pending.body', { deadline: formatDate(config.triggerAt, true), button: t('dms.checkIn') })}
+                                        </p>
+                                    )}
+                                    {config.status === 'TRIGGERED' && (
+                                        <p className="mt-4 text-sm text-on-surface-variant">
+                                            {t('dms.triggeredNote', { date: formatDate(config.triggeredAt, true) })}
+                                        </p>
+                                    )}
+                                    {config.status === 'SUSPENDED' && (
+                                        <p className="mt-4 text-sm text-on-surface-variant">{t('dms.suspendedNote')}</p>
+                                    )}
 
-                                <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
-                                    <Info label={t('dms.info.lastCheckin')} value={formatDate(config.lastCheckinAt, true)} />
-                                    <Info label={t('dms.info.nextDue')} value={formatDate(config.checkinDueAt, true)} highlight />
-                                    <Info label={t('dms.info.triggerAt')} value={formatDate(config.triggerAt, true)} />
-                                    <Info label={t('dms.info.nextReminder')} value={formatDate(config.nextReminderAt, true)} />
-                                    <Info label={t('dms.info.remindersSent')} value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
-                                    <Info label={t('dms.info.notifiedBy')} value={channelLabel(t, config.notificationChannel || 'EMAIL')} />
-                                </dl>
-                            </>
-                        )}
-                    </Card>
+                                    <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
+                                        <Info label={t('dms.info.lastCheckin')} value={formatDate(config.lastCheckinAt, true)} />
+                                        <Info label={t('dms.info.nextDue')} value={formatDate(config.checkinDueAt, true)} highlight />
+                                        <Info label={t('dms.info.triggerAt')} value={formatDate(config.triggerAt, true)} />
+                                        <Info label={t('dms.info.nextReminder')} value={formatDate(config.nextReminderAt, true)} />
+                                        <Info label={t('dms.info.remindersSent')} value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
+                                        <Info label={t('dms.info.notifiedBy')} value={channelLabel(t, config.notificationChannel || 'EMAIL')} />
+                                    </dl>
+                                </>
+                            )}
+                        </Card>
+                    </div>
 
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
-                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
-                            {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
-                            <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
-                            {confirmers.length === 0 ? (
-                                <p className="text-sm text-on-surface-variant">{t('dms.confirmers.empty')}</p>
-                            ) : (
-                                <div className="space-y-3 mb-5">
-                                    {confirmers.map((c) => (
-                                        <div
-                                            key={c.id}
-                                            className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between gap-3"
-                                        >
-                                            <div>
-                                                <p className="font-semibold text-sm text-on-surface">
-                                                    {c.name}{' '}
-                                                    {c.relationship && (
-                                                        <span className="text-xs font-normal text-on-surface-variant">
-                                                            ({c.relationship})
-                                                        </span>
-                                                    )}
-                                                </p>
-                                                <p className="text-xs text-on-surface-variant">{c.email}</p>
+                        <div data-tour="dms-confirmers">
+                            <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
+                                {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
+                                <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
+                                {confirmers.length === 0 ? (
+                                    <p className="text-sm text-on-surface-variant">{t('dms.confirmers.empty')}</p>
+                                ) : (
+                                    <div className="space-y-3 mb-5">
+                                        {confirmers.map((c) => (
+                                            <div
+                                                key={c.id}
+                                                className="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/20 flex items-center justify-between gap-3"
+                                            >
+                                                <div>
+                                                    <p className="font-semibold text-sm text-on-surface">
+                                                        {c.name}{' '}
+                                                        {c.relationship && (
+                                                            <span className="text-xs font-normal text-on-surface-variant">
+                                                                ({c.relationship})
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                    <p className="text-xs text-on-surface-variant">{c.email}</p>
+                                                </div>
+                                                {!locked && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveConfirmer(c.id)}
+                                                        disabled={removingId === c.id}
+                                                        className="text-error text-xs font-semibold hover:underline"
+                                                    >
+                                                        {removingId === c.id ? t('dms.confirmers.removing') : t('dms.confirmers.remove')}
+                                                    </button>
+                                                )}
                                             </div>
-                                            {!locked && (
-                                                <button
-                                                    type="button"
-                                                    disabled={removingId === c.id}
-                                                    onClick={() => handleRemoveConfirmer(c.id)}
-                                                    className={btnOutline}
-                                                >
-                                                    <Icon name="delete" className="text-[16px]" />
-                                                    {t('dms.confirmers.remove')}
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                )}
 
-                            {!locked && confirmers.length < 2 && (
-                                <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
-                                    <input
-                                        type="text"
-                                        placeholder={t('dms.confirmers.namePlaceholder')}
-                                        value={confirmerForm.name}
-                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
-                                        className={inputClass}
-                                    />
-                                    <input
-                                        type="email"
-                                        placeholder={t('dms.confirmers.emailPlaceholder')}
-                                        value={confirmerForm.email}
-                                        onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
-                                        className={inputClass}
-                                    />
-                                    <div className="flex gap-2">
+                                {!locked && (
+                                    <form onSubmit={handleAddConfirmer} className="space-y-3 pt-3 border-t border-outline-variant/20">
                                         <input
                                             type="text"
-                                            placeholder={t('dms.confirmers.relationshipPlaceholder')}
-                                            value={confirmerForm.relationship}
-                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
+                                            placeholder={t('dms.confirmers.namePlaceholder')}
+                                            value={confirmerForm.name}
+                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, name: e.target.value }))}
                                             className={inputClass}
                                         />
-                                        <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
-                                            <Icon name="person_add" className="text-[18px]" />
-                                            {t('dms.confirmers.add')}
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-                        </Card>
+                                        <input
+                                            type="email"
+                                            placeholder={t('dms.confirmers.emailPlaceholder')}
+                                            value={confirmerForm.email}
+                                            onChange={(e) => setConfirmerForm((f) => ({ ...f, email: e.target.value }))}
+                                            className={inputClass}
+                                        />
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder={t('dms.confirmers.relationshipPlaceholder')}
+                                                value={confirmerForm.relationship}
+                                                onChange={(e) => setConfirmerForm((f) => ({ ...f, relationship: e.target.value }))}
+                                                className={inputClass}
+                                            />
+                                            <button type="submit" disabled={addingConfirmer} className={`${btnPrimary} shrink-0`}>
+                                                <Icon name="person_add" className="text-[18px]" />
+                                                {t('dms.confirmers.add')}
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </Card>
+                        </div>
                     )}
                     </div>
 
                     {/* Cấu hình */}
-                    <Card title={<>{t('dms.schedule')} <InfoTip term="dms" /></>} icon="tune">
-                        <form onSubmit={save} className="space-y-4">
-                            {Object.entries(LIMITS).map(([k, l]) => (
-                                <label key={k} className="block">
-                                    <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
-                                    <input
-                                        type="number" min={l.min} max={l.max} disabled={locked}
-                                        value={form[k]}
-                                        onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
-                                        className={`${inputClass} mt-1`}
-                                    />
-                                    <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
-                                </label>
-                            ))}
-                            <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
-                                {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
-                            </button>
-                        </form>
-                    </Card>
+                    <div data-tour="dms-interval">
+                        <Card title={<>{t('dms.schedule')} <InfoTip term="dms" /></>} icon="tune">
+                            <form onSubmit={save} className="space-y-4">
+                                {Object.entries(LIMITS).map(([k, l]) => (
+                                    <label key={k} className="block">
+                                        <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
+                                        <input
+                                            type="number" min={l.min} max={l.max} disabled={locked}
+                                            value={form[k]}
+                                            onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+                                            className={`${inputClass} mt-1`}
+                                        />
+                                        <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
+                                    </label>
+                                ))}
+                                <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
+                                    {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
+                                </button>
+                            </form>
+                        </Card>
+                    </div>
                 </div>
             )}
         </OwnerLayout>

@@ -11,7 +11,8 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import BrandMark from './BrandMark.jsx';
 import OnboardingGuideModal, { openOnboardingGuide } from './OnboardingGuideModal.jsx';
-import { startSpotlightTour, openFirstTimePrompt } from './SpotlightTour.jsx';
+import { startSpotlightTour, openFirstTimePrompt, startFeatureTour } from './SpotlightTour.jsx';
+import { getFeatureTourForPath } from './featureToursConfig.js';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -73,6 +74,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
     const { t: tOnboarding } = useTranslation('onboarding');
     const [guideMenuOpen, setGuideMenuOpen] = useState(false);
     const guideMenuRef = useRef(null);
+    const currentFeatureTour = getFeatureTourForPath(pathname);
 
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
@@ -230,6 +232,22 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ext
                             <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-bold tracking-wider uppercase text-amber-300">
                                 {tOnboarding('menuTitle')}
                             </div>
+                            {currentFeatureTour && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setGuideMenuOpen(false);
+                                        startFeatureTour(currentFeatureTour.id);
+                                    }}
+                                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
+                                >
+                                    <span className="material-symbols-outlined text-amber-400 text-[18px]">explore</span>
+                                    <div>
+                                        <div className="font-bold">{tOnboarding('replayCurrentTour')}</div>
+                                        <div className="text-[10px] text-white/60 font-normal">{tOnboarding(currentFeatureTour.badgeKey)}</div>
+                                    </div>
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => {

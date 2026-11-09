@@ -17,6 +17,7 @@
   "openCatalogue": "Cẩm nang tính năng & An toàn số",
   "openCatalogueDesc": "Khám phá 4 trụ cột bảo mật, DMS và Giám định AI OCR",
   "repromptOption": "Trải nghiệm lại câu hỏi tân thủ ban đầu",
+  "replayCurrentTour": "Xem lại hướng dẫn tính năng này",
   "banner": {
     "title": "Bạn là người dùng mới bắt đầu?",
     "subtitle": "Khám phá quy trình trực quan từng bước để nắm vững cách thiết lập két sắt, chỉ định người thừa kế và bảo vệ di sản số trọn vẹn.",
@@ -38,6 +39,7 @@
     "nextBtn": "Tiếp tục",
     "goToCreate": "Bắt đầu tạo két sắt",
     "finishBtn": "Hoàn tất hướng dẫn",
+    "gotIt": "Đã hiểu",
     "congrats": {
       "title": "🎉 Chúc mừng bạn đã hoàn tất hướng dẫn!",
       "subtitle": "Bạn đã nắm vững toàn bộ quy trình gìn giữ và bảo vệ di sản số.",
@@ -74,6 +76,121 @@
         "title": "Ấn \"Tạo két sắt\" để hoàn thành",
         "instruction": "Kiểm tra lại toàn bộ thông tin và nhấn 'Tạo két sắt' để niêm phong an toàn khối tài sản di sản của bạn!",
         "tip": "Sau khi tạo két thành công, bạn có thể thiết lập thêm Công tắc tử thần (DMS) hoặc mời thêm Người thực thi di chúc (Executor)."
+      }
+    }
+  },
+  "featureTours": {
+    "quickBadge": "HƯỚNG DẪN NHANH TÍNH NĂNG",
+    "gotIt": "Đã hiểu",
+    "owner_activity": {
+      "badge": "HƯỚNG DẪN NHANH · NHẬT KÝ HOẠT ĐỘNG",
+      "step1": {
+        "title": "Nhật ký hoạt động bảo mật",
+        "instruction": "Tính năng này giúp bạn theo dõi toàn bộ các lượt truy cập vào tài sản, thao tác bảo mật và sự kiện hệ thống.",
+        "tip": "Bạn có thể chuyển đổi giữa Nhật ký hệ thống và Nhật ký ai đã truy cập xem di sản số."
+      },
+      "step2": {
+        "title": "Bộ lọc thời gian",
+        "instruction": "Cho phép bạn lọc nhanh lịch sử truy cập theo 30 ngày, 90 ngày, 1 năm hoặc toàn bộ thời gian.",
+        "tip": "Giúp bạn nhanh chóng rà soát các mốc thời gian đáng ngờ hoặc kiểm tra lịch sử định kỳ."
+      },
+      "step3": {
+        "title": "Lịch sử truy cập & Kiểm toán",
+        "instruction": "Toàn bộ lịch sử truy cập tài sản, hành động của người thực thi và sự kiện DMS sẽ xuất hiện chi tiết tại đây.",
+        "tip": "Mọi thao tác đều được ghi nhận kèm mã định danh, địa chỉ và thời gian bất biến (Immutable Audit Log)."
+      }
+    },
+    "owner_dms": {
+      "badge": "HƯỚNG DẪN NHANH · CÔNG TẮC TỬ THẦN (DMS)",
+      "step1": {
+        "title": "Trạng thái Công tắc tử thần (DMS)",
+        "instruction": "Theo dõi tình trạng hoạt động và nút Check-in định kỳ để báo hiệu cho hệ thống biết bạn vẫn an toàn.",
+        "tip": "Bạn có thể check-in nhanh bất cứ lúc nào từ trang này hoặc qua liên kết an toàn 1-chạm gửi về Email."
+      },
+      "step2": {
+        "title": "Thiết lập chu kỳ Check-in",
+        "instruction": "Cấu hình khoảng thời gian check-in định kỳ, thời gian ân hạn và số lần gửi email nhắc nhở trước khi kích hoạt.",
+        "tip": "Khoảng thời gian ân hạn giúp bạn không bị kích hoạt nhầm khi đi du lịch hoặc mất kết nối tạm thời."
+      },
+      "step3": {
+        "title": "Người xác nhận an toàn (Confirmers)",
+        "instruction": "Chỉ định người thân tin cậy để xác nhận chéo tình trạng thực tế trước khi mở khóa, tạo hàng rào phòng vệ kép.",
+        "tip": "Hệ thống sẽ gửi yêu cầu xác thực tới người xác nhận trước khi cho phép tiến hành mở két."
+      }
+    },
+    "owner_executors": {
+      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THỰC THI DI CHÚC",
+      "step1": {
+        "title": "Tổng quan Người thực thi (Executors)",
+        "instruction": "Chỉ định người đại diện pháp lý hỗ trợ thủ tục bàn giao tài sản và nộp hồ sơ giám định khi có sự kiện thừa kế.",
+        "tip": "Người thực thi đóng vai trò cầu nối pháp lý, hoàn toàn không được quyền giải mã tài sản của bạn."
+      },
+      "step2": {
+        "title": "Người thực thi chính (Primary Executor)",
+        "instruction": "Đại diện chính chịu trách nhiệm kiểm tra thực địa, nộp trích lục khai tử và làm việc với Giám định viên.",
+        "tip": "Nên chọn luật sư, công chứng viên hoặc bạn thân có uy tín và am hiểu thủ tục."
+      },
+      "step3": {
+        "title": "Người thực thi dự phòng (Backup Executor)",
+        "instruction": "Kế nhiệm quyền đại diện nếu Người thực thi chính không thể liên lạc hoặc từ chối thực hiện nhiệm vụ.",
+        "tip": "Đảm bảo quy trình thừa kế không bao giờ bị đình trệ hay gián đoạn."
+      }
+    },
+    "owner_vault_detail": {
+      "badge": "HƯỚNG DẪN NHANH · CHI TIẾT KÉT SẮT",
+      "step1": {
+        "title": "Thông tin & Niêm phong két",
+        "instruction": "Xem tên két, mô tả và tình trạng niêm phong. Bạn có thể chỉnh sửa lại thông tin khi két ở trạng thái mở.",
+        "tip": "Két sắt được bảo vệ bằng mã hóa cấp quân sự AES-256 độc lập cho từng két."
+      },
+      "step2": {
+        "title": "Kho tài sản số & Giám định AI OCR",
+        "instruction": "Quản lý các tài sản số đã mã hóa. Bấm vào trạng thái để kiểm tra tính năng Giám định AI OCR hoặc ký ví MetaMask.",
+        "tip": "Hỗ trợ 8 danh mục tài sản số chuẩn hóa phục vụ bàn giao chính xác."
+      },
+      "step3": {
+        "title": "Người thụ hưởng & Tỷ lệ thừa kế",
+        "instruction": "Xem và quản lý danh sách người thừa kế được quyền nhận khóa giải mã khi sự kiện bàn giao kích hoạt.",
+        "tip": "Bạn có thể phân chia tỷ lệ tài sản linh hoạt cho từng người thụ hưởng."
+      }
+    },
+    "beneficiary_vaults": {
+      "badge": "HƯỚNG DẪN NHANH · NGƯỜI THỤ HƯỞNG",
+      "step1": {
+        "title": "Két sắt di sản của bạn",
+        "instruction": "Nơi tổng hợp các két sắt mà bạn được chỉ định làm người thừa kế để tiếp quản tài sản di sản số.",
+        "tip": "Bạn chỉ có thể xem được nội dung giải mã khi két sắt hoàn tất đầy đủ quy trình mở khóa hợp pháp."
+      },
+      "step2": {
+        "title": "Danh sách két & Trạng thái mở khóa",
+        "instruction": "Theo dõi tình trạng từng két: Đang niêm phong, Chờ xác minh thực địa, hoặc Đã mở khóa bàn giao toàn quyền.",
+        "tip": "Khi két mở khóa, bấm vào để xem toàn bộ thông tin tài sản và tài liệu tâm thư được ủy thác."
+      }
+    },
+    "executor_home": {
+      "badge": "HƯỚNG DẪN NHANH · BẢNG ĐIỀU KHIỂN THỰC THI",
+      "step1": {
+        "title": "Thống kê nhiệm vụ thực thi",
+        "instruction": "Theo dõi tổng số hồ sơ cần xử lý ngay, hồ sơ đang chờ thẩm định pháp lý và hồ sơ đã bàn giao thành công.",
+        "tip": "Hồ sơ có hạn chót gấp sẽ được đánh dấu cảnh báo để bạn kịp thời xử lý."
+      },
+      "step2": {
+        "title": "Danh sách hồ sơ di sản",
+        "instruction": "Nơi bạn tiếp nhận nhiệm vụ, nộp Giấy chứng tử (AI OCR scan) và phối hợp với Giám định viên pháp lý.",
+        "tip": "Bấm vào từng hồ sơ để thực hiện quy trình xác minh 4 bước theo đúng di nguyện của chủ két."
+      }
+    },
+    "verifier_dashboard": {
+      "badge": "HƯỚNG DẪN NHANH · GIÁM ĐỊNH VIÊN PHÁP LÝ",
+      "step1": {
+        "title": "Lịch sử & Biên bản kiểm chứng",
+        "instruction": "Tra cứu toàn bộ biên bản giám định và các quyết định phê duyệt/từ chối hồ sơ đã thực hiện trước đây.",
+        "tip": "Mọi phán quyết của Giám định viên đều được lưu trữ kiểm toán bất biến."
+      },
+      "step2": {
+        "title": "Hàng đợi yêu cầu thẩm định",
+        "instruction": "Tiếp nhận hồ sơ giấy chứng tử, đối chiếu kết quả bóc tách tự động của AI Gemini và ra quyết định phê duyệt.",
+        "tip": "AI OCR hỗ trợ phát hiện giả mạo, kiểm tra mộc đỏ và đối chiếu chéo thông tin người mất với dữ liệu hệ thống."
       }
     }
   },

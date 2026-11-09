@@ -27,17 +27,19 @@ export default function BeneficiaryVaults() {
 
     return (
         <BeneficiaryLayout title={t('list.title')} subtitle={t('list.subtitle')}>
-            {error && <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
+            <div data-tour="beneficiary-header">
+                {error && <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
+            </div>
 
             {loading ? (
                 <p className="text-on-surface-variant">{t('list.loading')}</p>
             ) : vaults.length === 0 ? (
-                <div className="text-center py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
+                <div data-tour="beneficiary-vault-list" className="text-center py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     <Icon name="inventory_2" className="text-[40px] text-outline" />
                     <p className="mt-3 text-on-surface-variant">{t('list.empty')}</p>
                 </div>
             ) : (
-                <div className="grid sm:grid-cols-2 gap-5">
+                <div data-tour="beneficiary-vault-list" className="grid sm:grid-cols-2 gap-5">
                     {vaults.map((v) => (
                         <Link
                             key={v.vaultId}

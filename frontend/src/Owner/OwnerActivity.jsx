@@ -73,13 +73,15 @@ export default function OwnerActivity() {
             title={t('title')}
             subtitle={isAccess ? tAccess('subtitle') : t('subtitle')}
             actions={
-                <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
-                    {RANGES.map((r) => <option key={r.value} value={r.value}>{t(r.labelKey)}</option>)}
-                </select>
+                <div data-tour="activity-filter">
+                    <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
+                        {RANGES.map((r) => <option key={r.value} value={r.value}>{t(r.labelKey)}</option>)}
+                    </select>
+                </div>
             }
         >
             <ReducedMotionConfig>
-                <div className="mb-6 flex flex-wrap gap-2 bg-surface-container-low p-1 rounded-xl w-fit">
+                <div data-tour="activity-header" className="mb-6 flex flex-wrap gap-2 bg-surface-container-low p-1 rounded-xl w-fit">
                     {tabs.map((tabItem) => {
                         const active = tab === tabItem.id;
                         return (
@@ -108,40 +110,42 @@ export default function OwnerActivity() {
                 </div>
             </ReducedMotionConfig>
             <Alert>{error}</Alert>
-            <Card>
-                {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
-                {data && rows.length === 0 && (
-                    <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
-                                title={days > 0 ? t('empty.periodTitle') : (isAccess ? tAccess('emptyTitle') : t('empty.noneTitle'))}
-                                text={days > 0 ? t('empty.periodText') : (isAccess ? tAccess('emptyText') : t('empty.noneText'))} />
-                )}
-                {rows.length > 0 && (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                            <thead className="text-on-surface-variant">
-                                <tr><th className="py-2 pr-4">{t('columns.time')}</th><th className="py-2 pr-4">{t('columns.action')}</th><th className="py-2 pr-4">{t('columns.by')}</th><th className="py-2">{t('columns.details')}</th></tr>
-                            </thead>
-                            <tbody>
-                                {rows.map((r) => (
-                                    <tr key={r.id} className="border-t border-outline-variant/20">
-                                        <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.createdAt, true)}</td>
-                                        <td className="py-2 pr-4 font-semibold">{actionLabel(t, i18n, r.action)}</td>
-                                        <td className="py-2 pr-4">{actorLabel(t, r.actorName)}</td>
-                                        <td className="py-2 text-on-surface-variant">{r.description || '—'}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-                {totalPages > 1 && (
-                    <div className="flex justify-between items-center mt-4 text-sm">
-                        <button onClick={() => setPage((p) => p - 1)} disabled={page === 0} className="font-semibold text-secondary disabled:text-outline">{t('prev')}</button>
-                        <span className="text-on-surface-variant">{t('page', { page: page + 1, total: totalPages })}</span>
-                        <button onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages} className="font-semibold text-secondary disabled:text-outline">{t('next')}</button>
-                    </div>
-                )}
-            </Card>
+            <div data-tour="activity-list">
+                <Card>
+                    {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+                    {data && rows.length === 0 && (
+                        <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
+                                    title={days > 0 ? t('empty.periodTitle') : (isAccess ? tAccess('emptyTitle') : t('empty.noneTitle'))}
+                                    text={days > 0 ? t('empty.periodText') : (isAccess ? tAccess('emptyText') : t('empty.noneText'))} />
+                    )}
+                    {rows.length > 0 && (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-on-surface-variant">
+                                    <tr><th className="py-2 pr-4">{t('columns.time')}</th><th className="py-2 pr-4">{t('columns.action')}</th><th className="py-2 pr-4">{t('columns.by')}</th><th className="py-2">{t('columns.details')}</th></tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((r) => (
+                                        <tr key={r.id} className="border-t border-outline-variant/20">
+                                            <td className="py-2 pr-4 whitespace-nowrap">{formatDate(r.createdAt, true)}</td>
+                                            <td className="py-2 pr-4 font-semibold">{actionLabel(t, i18n, r.action)}</td>
+                                            <td className="py-2 pr-4">{actorLabel(t, r.actorName)}</td>
+                                            <td className="py-2 text-on-surface-variant">{r.description || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {totalPages > 1 && (
+                        <div className="flex justify-between items-center mt-4 text-sm">
+                            <button onClick={() => setPage((p) => p - 1)} disabled={page === 0} className="font-semibold text-secondary disabled:text-outline">{t('prev')}</button>
+                            <span className="text-on-surface-variant">{t('page', { page: page + 1, total: totalPages })}</span>
+                            <button onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages} className="font-semibold text-secondary disabled:text-outline">{t('next')}</button>
+                        </div>
+                    )}
+                </Card>
+            </div>
         </OwnerLayout>
     );
 }

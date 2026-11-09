@@ -1,15 +1,17 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
+import { FEATURE_TOURS, getFeatureTourForPath } from './featureToursConfig.js';
 
 export const ONBOARDING_STATUS_KEY = 'lv_onboarding_status';
 export const ONBOARDING_STEP_KEY = 'lv_tour_step';
 export const START_SPOTLIGHT_EVENT = 'lv_start_spotlight_tour';
 export const OPEN_PROMPT_EVENT = 'lv_open_first_time_prompt';
+export const START_FEATURE_TOUR_EVENT = 'lv_start_feature_tour';
 
 /**
- * Kích hoạt trực tiếp Tour tương tác 6 bước
+ * Kích hoạt trực tiếp Tour tạo két sắt 6 bước
  */
 export function startSpotlightTour() {
     window.dispatchEvent(new CustomEvent(START_SPOTLIGHT_EVENT));
@@ -23,12 +25,22 @@ export function openFirstTimePrompt() {
 }
 
 /**
- * Đặt lại trạng thái để test hoặc xem lại từ đầu
+ * Kích hoạt hoặc xem lại một feature tour cụ thể (vd: 'owner_activity', 'owner_dms')
  */
-export function resetOnboardingStatus() {
+export function startFeatureTour(featureId) {
+    window.dispatchEvent(new CustomEvent(START_FEATURE_TOUR_EVENT, { detail: { featureId } }));
+}
+
+/**
+ * Đặt lại toàn bộ trạng thái để test hoặc xem lại từ đầu
+ */
+export function resetAllTours() {
     try {
         localStorage.removeItem(ONBOARDING_STATUS_KEY);
         localStorage.removeItem(ONBOARDING_STEP_KEY);
+        FEATURE_TOURS.forEach((ft) => {
+            localStorage.removeItem(`lv_seen_feature_${ft.id}`);
+        });
     } catch {
         // ignore
     }
@@ -40,83 +52,95 @@ export default function SpotlightTour() {
     const navigate = useNavigate();
 
     const [showPrompt, setShowPrompt] = useState(false);
-    const [tourActive, setTourActive] = useState(false);
+    // activeTour: null | { type: 'vault_creation' | 'feature', config: object }
+    const [activeTour, setActiveTour] = useState(null);
     const [currentStep, setCurrentStep] = useState(1);
     const [targetRect, setTargetRect] = useState(null);
     const [showCongrats, setShowCongrats] = useState(false);
     const retryTimerRef = useRef(null);
 
-    const stepsConfig = [
-        {
-            step: 1,
-            route: '/owner/vaults',
-            selector: '[data-tour="new-vault-btn"]',
-            padding: 8,
-            title: t('tour.steps.step1.title'),
-            instruction: t('tour.steps.step1.instruction'),
-            tip: t('tour.steps.step1.tip'),
-            nextLabel: t('tour.goToCreate'),
-        },
-        {
-            step: 2,
-            route: '/owner/vaults/new',
-            selector: '[data-tour="vault-info"]',
-            padding: 10,
-            title: t('tour.steps.step2.title'),
-            instruction: t('tour.steps.step2.instruction'),
-            tip: t('tour.steps.step2.tip'),
-            nextLabel: t('tour.nextBtn'),
-        },
-        {
-            step: 3,
-            route: '/owner/vaults/new',
-            selector: '[data-tour="beneficiary-section"]',
-            padding: 10,
-            title: t('tour.steps.step3.title'),
-            instruction: t('tour.steps.step3.instruction'),
-            tip: t('tour.steps.step3.tip'),
-            nextLabel: t('tour.nextBtn'),
-        },
-        {
-            step: 4,
-            route: '/owner/vaults/new',
-            selector: '[data-tour="asset-type-select"]',
-            padding: 10,
-            title: t('tour.steps.step4.title'),
-            instruction: t('tour.steps.step4.instruction'),
-            tip: t('tour.steps.step4.tip'),
-            nextLabel: t('tour.nextBtn'),
-        },
-        {
-            step: 5,
-            route: '/owner/vaults/new',
-            selector: '[data-tour="asset-fields"]',
-            padding: 10,
-            title: t('tour.steps.step5.title'),
-            instruction: t('tour.steps.step5.instruction'),
-            tip: t('tour.steps.step5.tip'),
-            nextLabel: t('tour.nextBtn'),
-        },
-        {
-            step: 6,
-            route: '/owner/vaults/new',
-            selector: '[data-tour="submit-vault-btn"]',
-            padding: 8,
-            title: t('tour.steps.step6.title'),
-            instruction: t('tour.steps.step6.instruction'),
-            tip: t('tour.steps.step6.tip'),
-            nextLabel: t('tour.finishBtn'),
-            isLast: true,
-        },
-    ];
+    // Cấu hình 6 bước khởi tạo két sắt (Deep Happy Path Tour)
+    const vaultTourConfig = useMemo(() => ({
+        id: 'vault_creation',
+        badge: t('welcomeTitle'),
+        steps: [
+            {
+                step: 1,
+                route: '/owner/vaults',
+                selector: '[data-tour="new-vault-btn"]',
+                padding: 8,
+                title: t('tour.steps.step1.title'),
+                instruction: t('tour.steps.step1.instruction'),
+                tip: t('tour.steps.step1.tip'),
+                nextLabel: t('tour.goToCreate'),
+            },
+            {
+                step: 2,
+                route: '/owner/vaults/new',
+                selector: '[data-tour="vault-info"]',
+                padding: 10,
+                title: t('tour.steps.step2.title'),
+                instruction: t('tour.steps.step2.instruction'),
+                tip: t('tour.steps.step2.tip'),
+                nextLabel: t('tour.nextBtn'),
+            },
+            {
+                step: 3,
+                route: '/owner/vaults/new',
+                selector: '[data-tour="beneficiary-section"]',
+                padding: 10,
+                title: t('tour.steps.step3.title'),
+                instruction: t('tour.steps.step3.instruction'),
+                tip: t('tour.steps.step3.tip'),
+                nextLabel: t('tour.nextBtn'),
+            },
+            {
+                step: 4,
+                route: '/owner/vaults/new',
+                selector: '[data-tour="asset-type-select"]',
+                padding: 10,
+                title: t('tour.steps.step4.title'),
+                instruction: t('tour.steps.step4.instruction'),
+                tip: t('tour.steps.step4.tip'),
+                nextLabel: t('tour.nextBtn'),
+            },
+            {
+                step: 5,
+                route: '/owner/vaults/new',
+                selector: '[data-tour="asset-fields"]',
+                padding: 10,
+                title: t('tour.steps.step5.title'),
+                instruction: t('tour.steps.step5.instruction'),
+                tip: t('tour.steps.step5.tip'),
+                nextLabel: t('tour.nextBtn'),
+            },
+            {
+                step: 6,
+                route: '/owner/vaults/new',
+                selector: '[data-tour="submit-vault-btn"]',
+                padding: 8,
+                title: t('tour.steps.step6.title'),
+                instruction: t('tour.steps.step6.instruction'),
+                tip: t('tour.steps.step6.tip'),
+                nextLabel: t('tour.finishBtn'),
+                isLast: true,
+            },
+        ],
+    }), [t]);
 
-    const totalSteps = stepsConfig.length;
-    const currentConfig = stepsConfig[currentStep - 1] || stepsConfig[0];
+    // Danh sách các bước của tour đang hoạt động
+    const currentStepsList = activeTour?.type === 'vault_creation'
+        ? vaultTourConfig.steps
+        : (activeTour?.config?.steps || []);
+
+    const totalSteps = currentStepsList.length;
+    const currentStepItem = currentStepsList[currentStep - 1] || currentStepsList[0];
 
     // Cập nhật toạ độ bounding box của phần tử mục tiêu
     const updateTargetRect = useCallback(() => {
-        if (!tourActive) return;
-        const cfg = stepsConfig[currentStep - 1];
+        if (!activeTour) return;
+        const steps = activeTour.type === 'vault_creation' ? vaultTourConfig.steps : (activeTour.config?.steps || []);
+        const cfg = steps[currentStep - 1];
         if (!cfg) return;
 
         const el = document.querySelector(cfg.selector);
@@ -132,16 +156,16 @@ export default function SpotlightTour() {
                 height: raw.height + pad * 2,
             });
         }
-    }, [tourActive, currentStep, stepsConfig]);
+    }, [activeTour, currentStep, vaultTourConfig]);
 
-    // Kiểm tra hiển thị câu hỏi lần đầu khi người dùng đăng nhập
+    // 1. Kiểm tra hiển thị câu hỏi lần đầu khi người dùng đăng nhập
     useEffect(() => {
         const user = getUser();
         if (!user) return undefined;
 
-        // Bỏ qua nếu đang ở trang auth công khai
+        // Bỏ qua nếu đang ở trang auth công khai hoặc trang admin
         const publicPaths = ['/', '/login', '/register', '/forgot-password', '/reset-password', '/verify-email'];
-        if (publicPaths.includes(location.pathname)) return undefined;
+        if (publicPaths.includes(location.pathname) || location.pathname.startsWith('/admin')) return undefined;
 
         try {
             const status = localStorage.getItem(ONBOARDING_STATUS_KEY);
@@ -154,22 +178,47 @@ export default function SpotlightTour() {
             }
             if (status === 'tour_active') {
                 const savedStep = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10);
-                setCurrentStep(savedStep >= 1 && savedStep <= totalSteps ? savedStep : 1);
-                setTourActive(true);
+                setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
+                setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
             }
         } catch {
             // ignore
         }
         return undefined;
-    }, [location.pathname, totalSteps]);
+    }, [location.pathname]);
 
-    // Lắng nghe sự kiện toàn cục để khởi động lại tour hoặc mở câu hỏi
+    // 2. Tự động kích hoạt Feature Tour khi người dùng mở một tính năng mới lần đầu
     useEffect(() => {
-        const handleStartTour = () => {
+        const user = getUser();
+        if (!user) return undefined;
+        // Bỏ qua nếu admin hoặc đang chạy prompt / tour khác
+        if (location.pathname.startsWith('/admin') || showPrompt || activeTour || showCongrats) return undefined;
+
+        const feature = getFeatureTourForPath(location.pathname);
+        if (!feature) return undefined;
+
+        try {
+            const seen = localStorage.getItem(`lv_seen_feature_${feature.id}`);
+            if (!seen) {
+                const timer = setTimeout(() => {
+                    setCurrentStep(1);
+                    setActiveTour({ type: 'feature', config: feature });
+                }, 450);
+                return () => clearTimeout(timer);
+            }
+        } catch {
+            // ignore
+        }
+        return undefined;
+    }, [location.pathname, showPrompt, activeTour, showCongrats]);
+
+    // 3. Lắng nghe các sự kiện toàn cục
+    useEffect(() => {
+        const handleStartVaultTour = () => {
             setShowPrompt(false);
             setShowCongrats(false);
             setCurrentStep(1);
-            setTourActive(true);
+            setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
             try {
                 localStorage.setItem(ONBOARDING_STATUS_KEY, 'tour_active');
                 localStorage.setItem(ONBOARDING_STEP_KEY, '1');
@@ -182,69 +231,81 @@ export default function SpotlightTour() {
         };
 
         const handleOpenPrompt = () => {
-            setTourActive(false);
+            setActiveTour(null);
             setShowPrompt(true);
         };
 
-        window.addEventListener(START_SPOTLIGHT_EVENT, handleStartTour);
-        window.addEventListener(OPEN_PROMPT_EVENT, handleOpenPrompt);
-        return () => {
-            window.removeEventListener(START_SPOTLIGHT_EVENT, handleStartTour);
-            window.removeEventListener(OPEN_PROMPT_EVENT, handleOpenPrompt);
+        const handleStartFeatureTour = (e) => {
+            const featureId = e.detail?.featureId;
+            const feature = FEATURE_TOURS.find((f) => f.id === featureId) || getFeatureTourForPath(location.pathname);
+            if (feature) {
+                setShowPrompt(false);
+                setShowCongrats(false);
+                setCurrentStep(1);
+                setActiveTour({ type: 'feature', config: feature });
+            }
         };
-    }, [location.pathname, navigate]);
 
-    // Điều hướng và cuộn tới phần tử khi chuyển bước
+        window.addEventListener(START_SPOTLIGHT_EVENT, handleStartVaultTour);
+        window.addEventListener(OPEN_PROMPT_EVENT, handleOpenPrompt);
+        window.addEventListener(START_FEATURE_TOUR_EVENT, handleStartFeatureTour);
+        return () => {
+            window.removeEventListener(START_SPOTLIGHT_EVENT, handleStartVaultTour);
+            window.removeEventListener(OPEN_PROMPT_EVENT, handleOpenPrompt);
+            window.removeEventListener(START_FEATURE_TOUR_EVENT, handleStartFeatureTour);
+        };
+    }, [location.pathname, navigate, vaultTourConfig]);
+
+    // 4. Cuộn và canh nét phần tử khi chuyển bước
     useEffect(() => {
-        if (!tourActive) return undefined;
-        const cfg = stepsConfig[currentStep - 1];
+        if (!activeTour) return undefined;
+        const steps = activeTour.type === 'vault_creation' ? vaultTourConfig.steps : (activeTour.config?.steps || []);
+        const cfg = steps[currentStep - 1];
         if (!cfg) return undefined;
 
-        // Nếu cần đổi route
+        // Nếu cần đổi route (đối với vault creation tour)
         if (cfg.route && location.pathname !== cfg.route) {
             navigate(cfg.route);
         }
 
-        // Tìm và cuộn mượt tới phần tử mục tiêu (có retry nếu DOM chưa kịp render)
         let retries = 0;
+        let cancelled = false;
         const findAndFocus = () => {
+            if (cancelled) return;
             const el = document.querySelector(cfg.selector);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(updateTargetRect, 250);
-            } else if (retries < 12) {
+                setTimeout(() => {
+                    if (!cancelled) updateTargetRect();
+                }, 100);
+            } else if (retries < 15) {
                 retries += 1;
-                retryTimerRef.current = setTimeout(findAndFocus, 180);
+                retryTimerRef.current = setTimeout(findAndFocus, 150);
             }
         };
 
-        const initialTimer = setTimeout(findAndFocus, 150);
-
+        findAndFocus();
         return () => {
-            clearTimeout(initialTimer);
+            cancelled = true;
             if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         };
-    }, [tourActive, currentStep, location.pathname, navigate, updateTargetRect]);
+    }, [activeTour, currentStep, location.pathname, navigate, updateTargetRect, vaultTourConfig.steps]);
 
-    // Bắt sự kiện scroll / resize để cập nhật toạ độ spotlight
+    // 5. Scroll & resize listener
     useEffect(() => {
-        if (!tourActive) return undefined;
-        const handleScrollOrResize = () => {
-            updateTargetRect();
-        };
-
+        if (!activeTour) return undefined;
+        const handleScrollOrResize = () => updateTargetRect();
         window.addEventListener('resize', handleScrollOrResize);
         window.addEventListener('scroll', handleScrollOrResize, true);
         return () => {
             window.removeEventListener('resize', handleScrollOrResize);
             window.removeEventListener('scroll', handleScrollOrResize, true);
         };
-    }, [tourActive, updateTargetRect]);
+    }, [activeTour, updateTargetRect]);
 
-    // Tự động chuyển bước khi người dùng click vào nút "+ Tạo két mới" ở Bước 1
+    // 6. Click trực tiếp vào nút Tạo két ở Bước 1
     useEffect(() => {
-        if (!tourActive || currentStep !== 1) return undefined;
-
+        if (!activeTour || activeTour.type !== 'vault_creation' || currentStep !== 1) return undefined;
         const btn = document.querySelector('[data-tour="new-vault-btn"]');
         if (!btn) return undefined;
 
@@ -256,30 +317,29 @@ export default function SpotlightTour() {
                 // ignore
             }
         };
-
         btn.addEventListener('click', onTargetClick);
         return () => btn.removeEventListener('click', onTargetClick);
-    }, [tourActive, currentStep, targetRect]);
+    }, [activeTour, currentStep]);
 
-    // Phím tắt ESC để thoát tour
+    // 7. ESC handler
     useEffect(() => {
-        if (!tourActive && !showPrompt && !showCongrats) return undefined;
+        if (!activeTour && !showPrompt && !showCongrats) return undefined;
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
                 if (showPrompt) setShowPrompt(false);
-                if (tourActive) handleSkipTour();
+                if (activeTour) handleDismissActiveTour();
                 if (showCongrats) setShowCongrats(false);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [tourActive, showPrompt, showCongrats]);
+    }, [activeTour, showPrompt, showCongrats]);
 
-    // Xử lý lựa chọn ở câu hỏi lần đầu
+    // Xử lý lựa chọn câu hỏi lần đầu
     const handlePromptNewbie = () => {
         setShowPrompt(false);
         setCurrentStep(1);
-        setTourActive(true);
+        setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
         try {
             localStorage.setItem(ONBOARDING_STATUS_KEY, 'tour_active');
             localStorage.setItem(ONBOARDING_STEP_KEY, '1');
@@ -300,18 +360,39 @@ export default function SpotlightTour() {
         }
     };
 
-    // Tiến bước tiếp theo
-    const handleNextStep = () => {
-        if (currentStep < totalSteps) {
-            const next = currentStep + 1;
-            setCurrentStep(next);
+    // Đóng / Bỏ qua tour đang chạy
+    const handleDismissActiveTour = () => {
+        if (!activeTour) return;
+        if (activeTour.type === 'feature') {
             try {
-                localStorage.setItem(ONBOARDING_STEP_KEY, String(next));
+                localStorage.setItem(`lv_seen_feature_${activeTour.config.id}`, 'true');
             } catch {
                 // ignore
             }
         } else {
-            handleFinishTour();
+            try {
+                localStorage.setItem(ONBOARDING_STATUS_KEY, 'skipped');
+            } catch {
+                // ignore
+            }
+        }
+        setActiveTour(null);
+    };
+
+    // Chuyển bước kế tiếp
+    const handleNextStep = () => {
+        if (currentStep < totalSteps) {
+            const next = currentStep + 1;
+            setCurrentStep(next);
+            if (activeTour?.type === 'vault_creation') {
+                try {
+                    localStorage.setItem(ONBOARDING_STEP_KEY, String(next));
+                } catch {
+                    // ignore
+                }
+            }
+        } else {
+            handleCompleteActiveTour();
         }
     };
 
@@ -320,37 +401,39 @@ export default function SpotlightTour() {
         if (currentStep > 1) {
             const prev = currentStep - 1;
             setCurrentStep(prev);
-            try {
-                localStorage.setItem(ONBOARDING_STEP_KEY, String(prev));
-            } catch {
-                // ignore
+            if (activeTour?.type === 'vault_creation') {
+                try {
+                    localStorage.setItem(ONBOARDING_STEP_KEY, String(prev));
+                } catch {
+                    // ignore
+                }
             }
         }
     };
 
-    // Bỏ qua tour
-    const handleSkipTour = () => {
-        setTourActive(false);
-        try {
-            localStorage.setItem(ONBOARDING_STATUS_KEY, 'skipped');
-        } catch {
-            // ignore
+    // Hoàn thành tour
+    const handleCompleteActiveTour = () => {
+        if (!activeTour) return;
+        if (activeTour.type === 'feature') {
+            try {
+                localStorage.setItem(`lv_seen_feature_${activeTour.config.id}`, 'true');
+            } catch {
+                // ignore
+            }
+            setActiveTour(null);
+        } else {
+            try {
+                localStorage.setItem(ONBOARDING_STATUS_KEY, 'completed');
+                localStorage.removeItem(ONBOARDING_STEP_KEY);
+            } catch {
+                // ignore
+            }
+            setActiveTour(null);
+            setShowCongrats(true);
         }
     };
 
-    // Hoàn tất tour thành công
-    const handleFinishTour = () => {
-        setTourActive(false);
-        try {
-            localStorage.setItem(ONBOARDING_STATUS_KEY, 'completed');
-            localStorage.removeItem(ONBOARDING_STEP_KEY);
-        } catch {
-            // ignore
-        }
-        setShowCongrats(true);
-    };
-
-    // Tính toạ độ hiển thị tooltip popover
+    // Định vị Popover Tooltip
     const getTooltipStyle = () => {
         if (!targetRect) {
             return {
@@ -390,9 +473,22 @@ export default function SpotlightTour() {
         };
     };
 
+    // Trích xuất tiêu đề & diễn giải cho bước hiện tại
+    const isFeatureTour = activeTour?.type === 'feature';
+    const stepTitle = isFeatureTour
+        ? t(currentStepItem?.titleKey, { defaultValue: currentStepItem?.title })
+        : currentStepItem?.title;
+    const stepInstruction = isFeatureTour
+        ? t(currentStepItem?.instructionKey, { defaultValue: currentStepItem?.instruction })
+        : currentStepItem?.instruction;
+    const stepTip = isFeatureTour
+        ? t(currentStepItem?.tipKey, { defaultValue: currentStepItem?.tip })
+        : currentStepItem?.tip;
+    const isLastStep = currentStep === totalSteps;
+
     return (
         <>
-            {/* 1. HỘP THOẠI HỎI NGƯỜI DÙNG LẦN ĐẦU (FIRST-TIME QUESTION DIALOG) */}
+            {/* 1. HỘP THOẠI HỎI NGƯỜI DÙNG LẦN ĐẦU */}
             {showPrompt && (
                 <div
                     className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
@@ -401,7 +497,6 @@ export default function SpotlightTour() {
                     aria-labelledby="first-time-prompt-title"
                 >
                     <div className="relative w-full max-w-lg bg-[#0e1629] border border-white/20 rounded-3xl shadow-2xl overflow-hidden text-white p-6 sm:p-8 animate-in zoom-in-95 duration-200">
-                        {/* Viền hào quang chuyển sắc */}
                         <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-indigo-500" />
 
                         <div className="flex items-start justify-between gap-4">
@@ -430,7 +525,6 @@ export default function SpotlightTour() {
                             </p>
                         </div>
 
-                        {/* 2 Nút bấm lựa chọn rõ ràng */}
                         <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             <button
                                 type="button"
@@ -457,54 +551,30 @@ export default function SpotlightTour() {
                 </div>
             )}
 
-            {/* 2. SPOTLIGHT INTERACTIVE GUIDED TOUR */}
-            {tourActive && (
+            {/* 2. SPOTLIGHT OVERLAY & POPOVER TOOLTIP */}
+            {activeTour && (
                 <>
-                    {/* 4 Mảnh bóng tối bao quanh (Masking overlay with transparent cutout) */}
                     {targetRect ? (
                         <>
-                            {/* Khối phía trên */}
+                            {/* 4 Mảnh bóng tối bao quanh */}
                             <div
                                 className="fixed z-[9990] bg-[#070b14]/85 backdrop-blur-[2px] transition-all duration-300 pointer-events-auto"
-                                style={{
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    height: `${targetRect.top}px`,
-                                }}
+                                style={{ top: 0, left: 0, right: 0, height: `${targetRect.top}px` }}
                             />
-                            {/* Khối phía dưới */}
                             <div
                                 className="fixed z-[9990] bg-[#070b14]/85 backdrop-blur-[2px] transition-all duration-300 pointer-events-auto"
-                                style={{
-                                    top: `${targetRect.bottom}px`,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                }}
+                                style={{ top: `${targetRect.bottom}px`, left: 0, right: 0, bottom: 0 }}
                             />
-                            {/* Khối bên trái */}
                             <div
                                 className="fixed z-[9990] bg-[#070b14]/85 backdrop-blur-[2px] transition-all duration-300 pointer-events-auto"
-                                style={{
-                                    top: `${targetRect.top}px`,
-                                    left: 0,
-                                    width: `${targetRect.left}px`,
-                                    height: `${targetRect.height}px`,
-                                }}
+                                style={{ top: `${targetRect.top}px`, left: 0, width: `${targetRect.left}px`, height: `${targetRect.height}px` }}
                             />
-                            {/* Khối bên phải */}
                             <div
                                 className="fixed z-[9990] bg-[#070b14]/85 backdrop-blur-[2px] transition-all duration-300 pointer-events-auto"
-                                style={{
-                                    top: `${targetRect.top}px`,
-                                    left: `${targetRect.right}px`,
-                                    right: 0,
-                                    height: `${targetRect.height}px`,
-                                }}
+                                style={{ top: `${targetRect.top}px`, left: `${targetRect.right}px`, right: 0, height: `${targetRect.height}px` }}
                             />
 
-                            {/* Vòng viền phát sáng bao quanh nút/khối được highlight */}
+                            {/* Vòng viền phát sáng */}
                             <div
                                 className="fixed z-[9992] pointer-events-none rounded-2xl border-2 border-amber-400 ring-4 ring-amber-400/35 shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all duration-300 animate-pulse"
                                 style={{
@@ -516,25 +586,29 @@ export default function SpotlightTour() {
                             />
                         </>
                     ) : (
-                        /* Đang tải hoặc đang cuộn: phủ mờ toàn màn hình */
                         <div className="fixed inset-0 z-[9990] bg-[#070b14]/85 backdrop-blur-[2px] transition-all pointer-events-auto" />
                     )}
 
-                    {/* Khung Popover Tooltip hướng dẫn tại vị trí mục tiêu */}
+                    {/* Popover Tooltip */}
                     <div
+                        id="spotlight-tour-tooltip"
                         className="fixed z-[9999] w-[360px] sm:w-[380px] bg-[#0e1629] border border-amber-400/50 rounded-2xl p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
                         style={getTooltipStyle()}
                     >
-                        {/* Header của Tooltip */}
                         <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
                             <div className="flex items-center gap-2">
                                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950">
                                     {t('tour.stepBadge', { current: currentStep, total: totalSteps })}
                                 </span>
+                                {isFeatureTour && (
+                                    <span className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider truncate max-w-[170px]">
+                                        {t(activeTour.config.badgeKey, { defaultValue: 'HƯỚNG DẪN NHANH' })}
+                                    </span>
+                                )}
                             </div>
                             <button
                                 type="button"
-                                onClick={handleSkipTour}
+                                onClick={handleDismissActiveTour}
                                 className="text-xs text-white/60 hover:text-white transition-colors"
                                 title={t('tour.skipTour')}
                             >
@@ -542,24 +616,22 @@ export default function SpotlightTour() {
                             </button>
                         </div>
 
-                        {/* Tiêu đề & Nội dung hướng dẫn */}
                         <div className="mt-3 space-y-2">
                             <h4 className="text-base font-bold text-white flex items-center gap-1.5">
                                 <span className="material-symbols-outlined text-[18px] text-amber-400">arrow_forward</span>
-                                <span>{currentConfig.title}</span>
+                                <span>{stepTitle}</span>
                             </h4>
                             <p className="text-xs sm:text-[13px] text-white/85 leading-relaxed">
-                                {currentConfig.instruction}
+                                {stepInstruction}
                             </p>
-                            {currentConfig.tip && (
+                            {stepTip && (
                                 <div className="p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/25 text-[11px] sm:text-xs text-amber-200 flex items-start gap-1.5">
                                     <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0">lightbulb</span>
-                                    <span>{currentConfig.tip}</span>
+                                    <span>{stepTip}</span>
                                 </div>
                             )}
                         </div>
 
-                        {/* Thanh điều khiển bước */}
                         <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between gap-2">
                             {currentStep > 1 ? (
                                 <button
@@ -576,14 +648,18 @@ export default function SpotlightTour() {
                                 type="button"
                                 onClick={handleNextStep}
                                 className={`h-8 px-4 rounded-lg text-xs font-bold flex items-center gap-1 transition-all ${
-                                    currentConfig.isLast
+                                    isLastStep
                                         ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 hover:brightness-110 shadow-md shadow-amber-400/20'
                                         : 'bg-white text-slate-950 hover:bg-white/90 shadow'
                                 }`}
                             >
-                                <span>{currentConfig.nextLabel || t('tour.nextBtn')}</span>
+                                <span>
+                                    {isLastStep
+                                        ? (isFeatureTour ? t('featureTours.gotIt', { defaultValue: 'Đã hiểu' }) : t('tour.finishBtn'))
+                                        : (currentStepItem?.nextLabel || t('tour.nextBtn'))}
+                                </span>
                                 <span className="material-symbols-outlined text-[16px]">
-                                    {currentConfig.isLast ? 'check_circle' : 'arrow_forward'}
+                                    {isLastStep ? 'check_circle' : 'arrow_forward'}
                                 </span>
                             </button>
                         </div>
@@ -591,7 +667,7 @@ export default function SpotlightTour() {
                 </>
             )}
 
-            {/* 3. MODAL CHÚC MỪNG HOÀN TẤT TOUR (CONGRATS MODAL) */}
+            {/* 3. MODAL CHÚC MỪNG HOÀN TẤT (CHO TOUR KHỞI TẠO KÉT) */}
             {showCongrats && (
                 <div
                     className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
