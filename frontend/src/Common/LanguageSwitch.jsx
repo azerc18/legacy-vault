@@ -7,7 +7,7 @@ export default function LanguageSwitch({ className = '', variant = 'light' }) {
     const dark = variant === 'dark';
     return (
         <div role="group" aria-label={t('language.label')}
-             className={`h-10 flex items-center rounded-xl border ${dark ? 'border-white/25' : 'border-outline-variant'} overflow-hidden text-sm font-semibold ${className}`}>
+             className={`h-9 flex items-center rounded-xl border ${dark ? 'border-white/25' : 'border-outline-variant'} overflow-hidden text-sm font-semibold shrink-0 ${className}`}>
             {LANGS.map((lng) => (
                 <button key={lng} type="button" onClick={() => i18n.changeLanguage(lng)}
                         aria-pressed={current === lng}

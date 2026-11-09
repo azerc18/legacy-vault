@@ -8,9 +8,9 @@
     "EXPIRED": { "label": "Re-verify needed", "hint": "Verification has expired" }
   },
   "methods": {
-    "FILE_HASH": { "label": "File fingerprint (SHA-256)", "desc": "Upload the original to the vault; the system stores the file's SHA-256 fingerprint.", "fileIntro": "Upload the original document (PDF, DOC/DOCX, PNG or JPG, up to 10 MB). The system stores its SHA-256 fingerprint so a later change to the file can be detected. This does not prove the document is genuine." },
-    "DOCUMENT_TIMESTAMP": { "label": "Timestamp (Simulated)", "desc": "Record that the file existed at this point in time, bound to its SHA-256 fingerprint on the system.", "fileIntro": "Upload the original document (PDF, DOC/DOCX, PNG or JPG, up to 10 MB). The system computes its SHA-256 hash and records a simulated timestamp proving the file existed (simulated)." },
-    "SECOND_PERSON_CONFIRM": { "label": "Second-person confirmation", "desc": "A code is sent to your trusted (DMS) confirmers; whoever has seen the original reads it back to you to enter." },
+    "FILE_HASH": { "label": "Original file integrity check", "desc": "Upload original to the vault to generate a unique fingerprint (SHA-256), detecting any future alterations.", "fileIntro": "Upload the original document (PDF, Word or image, up to 10 MB). The system creates a secure SHA-256 fingerprint to verify the file remains intact and unaltered." },
+    "DOCUMENT_TIMESTAMP": { "label": "Document timestamp (Simulated)", "desc": "Record the exact time this document was stored as proof it existed from this moment.", "fileIntro": "Upload the original document (PDF, Word or image, up to 10 MB). The system records a standard timestamp (simulated) as verifiable proof that the document existed at this time." },
+    "SECOND_PERSON_CONFIRM": { "label": "Trusted witness confirmation", "desc": "A verification code is sent to your trusted witness who inspected the original document." },
     "OTP_EMAIL": { "label": "Email OTP code", "desc": "Receive a code at the asset's email and enter it." },
     "GOOGLE_LOGIN": { "label": "Google sign-in", "desc": "Sign in with the Google account you declared." },
     "SMS_CODE_MOCK": { "label": "SMS code (simulated)", "desc": "Enter the simulated SMS code sent to the declared phone." },

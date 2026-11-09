@@ -179,9 +179,12 @@ export default function SpotlightTour() {
                 return () => clearTimeout(timer);
             }
             if (status === 'tour_active') {
-                const savedStep = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10);
-                setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
-                setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
+                // Chỉ kích hoạt lại tour tạo két nếu đang ở đúng trang tạo két (/owner/vaults hoặc /owner/vaults/new)
+                if (location.pathname === '/owner/vaults' || location.pathname === '/owner/vaults/new') {
+                    const savedStep = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10);
+                    setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
+                    setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
+                }
             }
         } catch {
             // ignore

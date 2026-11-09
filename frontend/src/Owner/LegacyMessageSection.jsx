@@ -6,7 +6,7 @@ import { Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, b
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 
-const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
+const textareaCls = 'w-full mt-1 px-4 py-2.5 rounded-xl border border-white/15 bg-[#131c31] text-white placeholder:text-white/40 focus:outline-none focus:border-primary';
 
 export default function LegacyMessageSection({ vaultId, beneficiaries = [], editable }) {
     const { t } = useTranslation(['vault', 'common']);
@@ -194,8 +194,8 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal soạn / sửa */}
             {formOpen && (
-                <div className="fixed inset-0 z-50 bg-scrim/40 flex items-center justify-center p-4">
-                    <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-xl max-h-[90vh] overflow-y-auto space-y-4">
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setFormOpen(false)}>
+                    <div className="bg-[#0e1629] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center">
                             <h3 className="font-title-lg text-lg font-bold">
                                 {editing ? t('detail.messages.editTitle') : t('detail.messages.createTitle')}
@@ -209,7 +209,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                         <form onSubmit={handleSave} className="space-y-4 text-sm">
                             <div>
                                 <label className="block font-medium mb-1">{t('detail.messages.titleLabel')}</label>
-                                <input required maxLength={255} className={inputClass} value={title}
+                                <input required maxLength={255} className={`${inputClass} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} value={title}
                                     placeholder={t('detail.messages.titlePlaceholder')}
                                     onChange={(e) => setTitle(e.target.value)} />
                             </div>
@@ -217,7 +217,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block font-medium mb-1">{t('detail.messages.recipientLabel')}</label>
-                                    <select className={inputClass} value={recipientType}
+                                    <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={recipientType}
                                         onChange={(e) => setRecipientType(e.target.value)}>
                                         <option value="ALL_BENEFICIARIES">{t('detail.messages.allFamilyOption')}</option>
                                         <option value="SPECIFIC_BENEFICIARY" disabled={beneficiaries.length === 0}>
@@ -228,7 +228,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 {recipientType === 'SPECIFIC_BENEFICIARY' && (
                                     <div>
                                         <label className="block font-medium mb-1">{t('detail.messages.chooseRecipientLabel')}</label>
-                                        <select className={inputClass} value={recipientBeneficiaryId}
+                                        <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={recipientBeneficiaryId}
                                             onChange={(e) => setRecipientBeneficiaryId(e.target.value)}>
                                             {beneficiaries.map((b) => (
                                                 <option key={b.id} value={b.id}>
@@ -243,7 +243,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block font-medium mb-1">{t('detail.messages.triggerLabel')}</label>
-                                    <select className={inputClass} value={deliveryTrigger}
+                                    <select className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={deliveryTrigger}
                                         onChange={(e) => setDeliveryTrigger(e.target.value)}>
                                         <option value="ON_CLAIM">{t('detail.messages.onClaimOption')}</option>
                                         <option value="SPECIFIC_DATE">{t('detail.messages.specificDateOption')}</option>
@@ -252,7 +252,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 {deliveryTrigger === 'SPECIFIC_DATE' && (
                                     <div>
                                         <label className="block font-medium mb-1">{t('detail.messages.scheduleDateLabel')}</label>
-                                        <input type="date" required className={inputClass} value={deliverDate}
+                                        <input type="date" required className={`${inputClass} bg-[#131c31] border-white/15 text-white`} value={deliverDate}
                                             min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
                                             onChange={(e) => setDeliverDate(e.target.value)} />
                                     </div>
@@ -293,8 +293,8 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal xem chi tiết */}
             {viewing && (
-                <div className="fixed inset-0 z-50 bg-scrim/40 flex items-center justify-center p-4">
-                    <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewing(null)}>
+                    <div className="bg-[#0e1629] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center">
                             <h3 className="font-title-lg text-lg font-bold flex items-center gap-2">
                                 <Icon name="mail" className="text-primary" /> {viewing.title}
@@ -319,11 +319,11 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                 })}
                             </span>
                         </div>
-                        <div className="p-4 rounded-xl bg-background border border-outline-variant/30 text-sm whitespace-pre-wrap font-body max-h-60 overflow-y-auto">
+                        <div className="p-4 rounded-xl bg-[#131c31] border border-white/15 text-sm whitespace-pre-wrap font-body max-h-60 overflow-y-auto text-white/90">
                             {viewing.content}
                         </div>
                         {viewing.hasAttachment && (
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low border border-outline-variant/30 text-xs">
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-[#131c31] border border-white/15 text-xs text-white">
                                 <div className="flex items-center gap-2 truncate">
                                     <Icon name="attachment" className="text-primary" />
                                     <span className="truncate font-medium">{viewing.attachmentName || t('detail.messages.attachmentFallback')}</span>

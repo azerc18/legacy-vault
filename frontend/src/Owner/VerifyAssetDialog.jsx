@@ -138,9 +138,9 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
     return (
         <motion.div
             initial={{ backgroundColor: 'rgba(0, 0, 0, 0)', backdropFilter: 'blur(0px)' }}
-            animate={{ backgroundColor: 'rgba(0, 0, 0, 0.42)', backdropFilter: 'blur(3px)' }}
+            animate={{ backgroundColor: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(8px)' }}
             transition={motionTransition.overlay}
-            className="fixed inset-0 z-40 flex items-center justify-center px-4"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
@@ -157,7 +157,7 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                     transform: 'perspective(500px) rotateX(0deg) scale(1)',
                 }}
                 transition={spring.dialog}
-                className="bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-outline-variant/30 shadow-xl"
+                className="bg-[#0e1629] text-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto border border-white/15 shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex justify-between items-start gap-3">

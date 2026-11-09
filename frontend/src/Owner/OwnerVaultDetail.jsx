@@ -308,8 +308,8 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 
 function Modal({ children, onClose }) {
     return (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
-            <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-[#0e1629] border border-white/15 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl text-white relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
         </div>
@@ -414,17 +414,26 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
 
     return (
         <Modal onClose={onClose}>
-            <h3 className="font-title-lg text-title-lg mb-4">{isEdit ? t('detail.assets.editTitle') : t('detail.assets.addTitle')}</h3>
+            <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/10">
+                <h3 className="font-title-lg text-lg font-bold text-white">{isEdit ? t('detail.assets.editTitle') : t('detail.assets.addTitle')}</h3>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                    <Icon name="close" className="text-[20px]" />
+                </button>
+            </div>
             <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
-                <select value={f.assetType} onChange={changeType} className={inputClass}>
+                <select value={f.assetType} onChange={changeType} className={`${inputClass} bg-[#131c31] border-white/15 text-white`}>
                     {ASSET_TYPES.map((typeItem) => (
                         <option key={typeItem.value} value={typeItem.value}>
                             {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
                         </option>
                     ))}
                 </select>
-                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={inputClass} />
+                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} />
                 {dynamic ? (
                     <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
                 ) : (
@@ -438,7 +447,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                         </button>
                     </div>
                 )}
-                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={textareaCls} />
+                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-[#131c31] border-white/15 text-white placeholder:text-white/40`} />
                 {showAllocation && (
                     <AllocationFields
                         beneficiaries={beneficiaries}
