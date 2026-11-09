@@ -284,7 +284,7 @@ export default function CreateVault() {
                     </div>
                 )}
 
-                <div className="flex justify-end gap-3">
+                <div className="flex justify-end gap-3 pb-28">
                     <button type="button" onClick={() => navigate('/owner/vaults')} className={btnOutline}>
                         {t('common:actions.cancel')}
                     </button>

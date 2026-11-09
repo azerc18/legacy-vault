@@ -58,6 +58,7 @@ export default function SpotlightTour() {
     const [targetRect, setTargetRect] = useState(null);
     const [showCongrats, setShowCongrats] = useState(false);
     const retryTimerRef = useRef(null);
+    const tooltipRef = useRef(null);
 
     // Cấu hình 6 bước khởi tạo két sắt (Deep Happy Path Tour)
     const vaultTourConfig = useMemo(() => ({
@@ -119,6 +120,7 @@ export default function SpotlightTour() {
                 route: '/owner/vaults/new',
                 selector: '[data-tour="submit-vault-btn"]',
                 padding: 8,
+                placement: 'top',
                 title: t('tour.steps.step6.title'),
                 instruction: t('tour.steps.step6.instruction'),
                 tip: t('tour.steps.step6.tip'),
@@ -275,9 +277,15 @@ export default function SpotlightTour() {
             const el = document.querySelector(cfg.selector);
             if (el) {
                 el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                setTimeout(() => {
-                    if (!cancelled) updateTargetRect();
-                }, 100);
+                const start = performance.now();
+                const pollScroll = () => {
+                    if (cancelled) return;
+                    updateTargetRect();
+                    if (performance.now() - start < 800) {
+                        requestAnimationFrame(pollScroll);
+                    }
+                };
+                requestAnimationFrame(pollScroll);
             } else if (retries < 15) {
                 retries += 1;
                 retryTimerRef.current = setTimeout(findAndFocus, 150);
@@ -433,7 +441,7 @@ export default function SpotlightTour() {
         }
     };
 
-    // Định vị Popover Tooltip
+    // Định vị Popover Tooltip (không bao giờ che phần tử mục tiêu)
     const getTooltipStyle = () => {
         if (!targetRect) {
             return {
@@ -443,29 +451,76 @@ export default function SpotlightTour() {
             };
         }
 
-        const tooltipWidth = 380;
-        const tooltipHeight = 240;
-        const gap = 14;
-
-        let left = targetRect.left;
-        if (left + tooltipWidth > window.innerWidth - 20) {
-            left = window.innerWidth - tooltipWidth - 20;
-        }
-        if (left < 20) left = 20;
+        const tooltipWidth = tooltipRef.current?.offsetWidth || 380;
+        const tooltipHeight = tooltipRef.current?.offsetHeight || 320;
+        const gap = 16;
+        const margin = 20;
 
         const spaceBelow = window.innerHeight - targetRect.bottom;
         const spaceAbove = targetRect.top;
+        const spaceLeft = targetRect.left;
+        const spaceRight = window.innerWidth - targetRect.right;
+
+        const placement = currentStepItem?.placement;
+        const preferTop = placement === 'top' || (!placement && targetRect.bottom > window.innerHeight * 0.6);
 
         let top;
-        if (spaceBelow >= tooltipHeight + gap) {
+        let left;
+
+        if (preferTop && spaceAbove >= tooltipHeight + gap) {
+            top = targetRect.top - tooltipHeight - gap;
+            if (targetRect.right > window.innerWidth / 2) {
+                left = targetRect.right - tooltipWidth;
+            } else {
+                left = targetRect.left;
+            }
+        } else if (spaceBelow >= tooltipHeight + gap) {
             top = targetRect.bottom + gap;
+            if (targetRect.right > window.innerWidth / 2) {
+                left = targetRect.right - tooltipWidth;
+            } else {
+                left = targetRect.left;
+            }
         } else if (spaceAbove >= tooltipHeight + gap) {
             top = targetRect.top - tooltipHeight - gap;
+            left = targetRect.right > window.innerWidth / 2 ? targetRect.right - tooltipWidth : targetRect.left;
+        } else if (spaceLeft >= tooltipWidth + gap) {
+            left = targetRect.left - tooltipWidth - gap;
+            top = targetRect.top + (targetRect.height - tooltipHeight) / 2;
+        } else if (spaceRight >= tooltipWidth + gap) {
+            left = targetRect.right + gap;
+            top = targetRect.top + (targetRect.height - tooltipHeight) / 2;
         } else {
-            top = window.innerHeight - tooltipHeight - 20;
+            if (spaceAbove >= spaceBelow) {
+                top = Math.max(margin, targetRect.top - tooltipHeight - gap);
+            } else {
+                top = Math.min(window.innerHeight - tooltipHeight - margin, targetRect.bottom + gap);
+            }
+            left = targetRect.left;
         }
 
-        top = Math.max(20, Math.min(window.innerHeight - tooltipHeight - 20, top));
+        left = Math.max(margin, Math.min(window.innerWidth - tooltipWidth - margin, left));
+        top = Math.max(margin, Math.min(window.innerHeight - tooltipHeight - margin, top));
+
+        // Kiểm tra an toàn: Tuyệt đối không để tooltip đè lên targetRect
+        const tooltipBottom = top + tooltipHeight;
+        const tooltipRight = left + tooltipWidth;
+        const hasOverlap = !(
+            tooltipRight < targetRect.left ||
+            left > targetRect.right ||
+            tooltipBottom < targetRect.top ||
+            top > targetRect.bottom
+        );
+
+        if (hasOverlap) {
+            if (targetRect.left >= tooltipWidth + gap + margin) {
+                left = targetRect.left - tooltipWidth - gap;
+            } else if (spaceAbove > spaceBelow) {
+                top = Math.max(10, targetRect.top - tooltipHeight - gap);
+            } else {
+                top = Math.min(window.innerHeight - tooltipHeight - 10, targetRect.bottom + gap);
+            }
+        }
 
         return {
             top: `${top}px`,
@@ -591,6 +646,7 @@ export default function SpotlightTour() {
 
                     {/* Popover Tooltip */}
                     <div
+                        ref={tooltipRef}
                         id="spotlight-tour-tooltip"
                         className="fixed z-[9999] w-[360px] sm:w-[380px] bg-[#0e1629] border border-amber-400/50 rounded-2xl p-5 shadow-2xl text-white pointer-events-auto animate-in zoom-in-95 duration-200"
                         style={getTooltipStyle()}
