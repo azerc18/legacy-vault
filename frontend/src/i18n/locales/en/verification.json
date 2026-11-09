@@ -41,6 +41,7 @@
     "codePlaceholder": "Enter code",
     "sandboxNotice": "Simulation mode: the result is labelled \"Simulated\" and is not a real verification.",
     "sandboxCode": "Your simulated code: {{code}}",
+    "microDeposit": "Simulated deposit of {{amount}}, transfer reference: {{reference}}",
     "challengeLabel": "Message to sign",
     "copy": "Copy",
     "signatureLabel": "Signature",

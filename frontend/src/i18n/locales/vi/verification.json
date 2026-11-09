@@ -41,6 +41,7 @@
     "codePlaceholder": "Nhập mã",
     "sandboxNotice": "Chế độ mô phỏng: kết quả sẽ hiện nhãn \"Mô phỏng\", chưa phải xác thực thật.",
     "sandboxCode": "Mã mô phỏng của bạn: {{code}}",
+    "microDeposit": "Khoản tiền mô phỏng {{amount}}, nội dung chuyển khoản: {{reference}}",
     "challengeLabel": "Thông điệp cần ký",
     "copy": "Sao chép",
     "signatureLabel": "Chữ ký",

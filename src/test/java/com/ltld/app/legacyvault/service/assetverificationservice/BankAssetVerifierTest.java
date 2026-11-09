@@ -7,6 +7,8 @@ import com.ltld.app.legacyvault.enums.AssetType;
 import com.ltld.app.legacyvault.enums.AssetVerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationProvider;
 import com.ltld.app.legacyvault.exception.VaultException;
+import com.ltld.app.legacyvault.utility.OtpGenerator;
+import com.ltld.app.legacyvault.utility.OtpHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,7 @@ class BankAssetVerifierTest {
 
     private BankAccountRules rules;
     private BankAssetVerifier verifier;
+    private final OtpHasher otpHasher = new OtpHasher();
     private UUID ownerId;
     private UUID vaultId;
     private Vault vault;
@@ -39,7 +42,7 @@ class BankAssetVerifierTest {
     void setUp() {
         rules = new BankAccountRules();
         rules.setAccountLengths(Map.of("TestBank", List.of(10, 12)));
-        verifier = new BankAssetVerifier(rules, fileHasher);
+        verifier = new BankAssetVerifier(rules, fileHasher, new OtpGenerator(), otpHasher);
         ownerId = UUID.randomUUID();
         vaultId = UUID.randomUUID();
         User owner = User.builder().id(ownerId).fullName("Nguyễn Văn An").build();
@@ -54,11 +57,12 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("type() là BANK_ACCOUNT, methods() có đúng 3 cách")
+    @DisplayName("type() là BANK_ACCOUNT, methods() có đúng 4 cách")
     void typeAndMethods() {
         assertThat(verifier.type()).isEqualTo(AssetType.BANK_ACCOUNT);
         assertThat(verifier.methods()).containsExactly(AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK,
-                AssetVerificationMethod.BANK_FORMAT_CHECK, AssetVerificationMethod.STATEMENT_UPLOAD);
+                AssetVerificationMethod.BANK_FORMAT_CHECK, AssetVerificationMethod.STATEMENT_UPLOAD,
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK);
     }
 
     @Test
@@ -169,12 +173,12 @@ class BankAssetVerifierTest {
     }
 
     @Test
-    @DisplayName("Cách chưa hỗ trợ (MICRO_DEPOSIT_MOCK) bị từ chối ở start và confirm")
+    @DisplayName("Cách chưa hỗ trợ (OTP_EMAIL) bị từ chối ở start và confirm")
     void unsupportedMethod_throws() {
         DigitalAsset asset = bank("TestBank", "1234567890", null);
-        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId))
+        assertThatThrownBy(() -> verifier.start(asset, AssetVerificationMethod.OTP_EMAIL, ownerId))
                 .isInstanceOf(VaultException.class);
-        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, Map.of(),
+        assertThatThrownBy(() -> verifier.confirm(asset, AssetVerificationMethod.OTP_EMAIL, Map.of(),
                 ownerId, null)).isInstanceOf(VaultException.class);
     }
 
@@ -183,6 +187,53 @@ class BankAssetVerifierTest {
     void methods_emptyLengthTable_hidesFormatCheck() {
         rules.setAccountLengths(Map.of());
         assertThat(verifier.methods()).containsExactly(
-                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, AssetVerificationMethod.STATEMENT_UPLOAD);
+                AssetVerificationMethod.BANK_NAME_LOOKUP_MOCK, AssetVerificationMethod.STATEMENT_UPLOAD,
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK);
+    }
+
+    private AssetVerifier.VerifyResult confirmMicro(DigitalAsset asset, Map<String, String> payload, String hash) {
+        return verifier.confirm(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, payload, ownerId, hash);
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK start: SANDBOX, có số tiền giả, mã LV-6 số và challengeHash không phải mã thô")
+    void microDeposit_start() {
+        AssetVerifier.StartResult start = verifier.start(bank("TestBank", "1234567890", null),
+                AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
+
+        assertThat(start.provider()).isEqualTo(VerificationProvider.SANDBOX);
+        assertThat(start.clientData()).containsEntry("mode", "SANDBOX").containsKey("amount");
+        assertThat(start.clientData().get("reference")).matches("LV-\\d{6}");
+        assertThat(start.challengeHash()).isNotBlank()
+                .doesNotContain(start.clientData().get("reference").substring(3));
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: đúng mã (có hoặc không tiền tố LV-) thì thành công, evidence không có số tài khoản")
+    void microDeposit_correctCode() {
+        DigitalAsset asset = bank("TestBank", "1234567890", null);
+        AssetVerifier.StartResult start = verifier.start(asset, AssetVerificationMethod.MICRO_DEPOSIT_MOCK, ownerId);
+        String reference = start.clientData().get("reference");
+
+        for (String typed : List.of(reference, reference.substring(3), " " + reference.toLowerCase() + " ")) {
+            AssetVerifier.VerifyResult result = confirmMicro(asset, Map.of("code", typed), start.challengeHash());
+            assertThat(result.success()).isTrue();
+            assertThat(result.provider()).isEqualTo(VerificationProvider.SANDBOX);
+            assertThat(result.evidence()).containsOnly(Map.entry("check", "MICRO_DEPOSIT"), Map.entry("mode", "SIMULATED"));
+        }
+    }
+
+    @Test
+    @DisplayName("MICRO_DEPOSIT_MOCK confirm: sai mã, thiếu mã, payload null hoặc chưa start đều thất bại")
+    void microDeposit_failures() {
+        DigitalAsset asset = bank("TestBank", "1234567890", null);
+        String hash = otpHasher.hash(asset.getId(), "123456");
+
+        assertThat(confirmMicro(asset, Map.of("code", "123456"), hash).success()).isTrue();
+        assertThat(confirmMicro(asset, Map.of("code", "654321"), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "  "), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of(), hash).success()).isFalse();
+        assertThat(confirmMicro(asset, null, hash).success()).isFalse();
+        assertThat(confirmMicro(asset, Map.of("code", "123456"), null).success()).isFalse();
     }
 }

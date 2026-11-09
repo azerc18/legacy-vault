@@ -256,6 +256,7 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                                         <p className="text-sm text-on-surface-variant">
                                             {codeTarget ? t('dialog.codeSent', { target: codeTarget }) : t('dialog.codeEnter')}
                                         </p>
+                                        {cd.reference && <p className="text-sm font-mono p-2 rounded-lg bg-surface-container-low">{t('dialog.microDeposit', { amount: cd.amount, reference: cd.reference })}</p>}
                                         {cd.sandboxCode && <p className="text-sm font-mono p-2 rounded-lg bg-surface-container-low">{t('dialog.sandboxCode', { code: cd.sandboxCode })}</p>}
                                         <label className="block">
                                             <span className="text-sm font-semibold text-on-surface-variant">{t('dialog.codeLabel')}</span>
