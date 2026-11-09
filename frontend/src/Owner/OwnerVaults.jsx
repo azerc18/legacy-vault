@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate } from 'react-router-dom';
-import { Tilt, TiltContent } from '@animate-ui/react/primitives/effects/tilt';
-import { Effects } from '@animate-ui/react/primitives/effects/effect';
-import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
@@ -48,48 +45,41 @@ export default function OwnerVaults() {
                     text={t('list.emptyText')}
                     action={{ to: '/owner/vaults/new', label: t('list.emptyAction'), icon: 'add' }} />
             ) : (
-                <ReducedMotionConfig remount>
-                    <div className="grid sm:grid-cols-2 gap-5">
-                        <Effects fade slide={{ direction: 'up', offset: 14 }} blur={{ initialBlur: 4 }} holdDelay={65}>
-                            {vaults.map((v) => (
-                                <Tilt key={v.id} maxTilt={3.5} perspective={1000}>
-                                    <TiltContent className="h-full">
-                                        <Link
-                                            to={`/owner/vaults/${v.id}`}
-                                            className="block h-full bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 hover:border-secondary transition-colors"
+                <div className="lv-feature-grid grid sm:grid-cols-2 gap-5">
+                    {vaults.map((v) => (
+                        <Link
+                            key={v.id}
+                            to={`/owner/vaults/${v.id}`}
+                            className="lv-feature lv-feature-link lv-glass-regular block h-full bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 hover:border-secondary transition-all"
+                        >
+                            <div className="flex justify-between items-start gap-3">
+                                <h3 className="font-title-lg text-title-lg">{v.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    {!v.modifiable && (
+                                        <span
+                                            title={v.lockReason}
+                                            className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
                                         >
-                                            <div className="flex justify-between items-start gap-3">
-                                                <h3 className="font-title-lg text-title-lg">{v.name}</h3>
-                                                <div className="flex items-center gap-2">
-                                                    {!v.modifiable && (
-                                                        <span
-                                                            title={v.lockReason}
-                                                            className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container flex items-center gap-1 cursor-help"
-                                                        >
-                                                            <Icon name="lock" className="text-[14px]" /> {t('list.locked')}
-                                                        </span>
-                                                    )}
-                                                    <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
-                                                        {t(`status.${v.status}`, { defaultValue: v.status })}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {v.description && <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">{v.description}</p>}
-                                            <div className="mt-4 flex flex-wrap gap-4 text-xs text-on-surface-variant">
-                                                <span>{t('list.beneficiary')} <strong className="text-on-surface">{v.beneficiaryEmail || t('list.none')}</strong></span>
-                                                <span>·</span>
-                                                <span>{t('list.assetsCount', { count: v.totalAssets ?? 0 })}</span>
-                                                <span>·</span>
-                                                <span>{t('list.docsCount', { count: v.totalDocuments ?? 0 })}</span>
-                                            </div>
-                                            <p className="mt-2 text-xs text-outline">{t('list.createdOn', { date: formatDate(v.createdAt) })}</p>
-                                        </Link>
-                                    </TiltContent>
-                                </Tilt>
-                            ))}
-                        </Effects>
-                    </div>
-                </ReducedMotionConfig>
+                                            <Icon name="lock" className="text-[14px]" /> {t('list.locked')}
+                                        </span>
+                                    )}
+                                    <span className="shrink-0 text-xs font-semibold px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                                        {t(`status.${v.status}`, { defaultValue: v.status })}
+                                    </span>
+                                </div>
+                            </div>
+                            {v.description && <p className="mt-2 text-sm text-on-surface-variant line-clamp-2">{v.description}</p>}
+                            <div className="mt-4 flex flex-wrap gap-4 text-xs text-on-surface-variant">
+                                <span>{t('list.beneficiary')} <strong className="text-on-surface">{v.beneficiaryEmail || t('list.none')}</strong></span>
+                                <span>·</span>
+                                <span>{t('list.assetsCount', { count: v.totalAssets ?? 0 })}</span>
+                                <span>·</span>
+                                <span>{t('list.docsCount', { count: v.totalDocuments ?? 0 })}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-outline">{t('list.createdOn', { date: formatDate(v.createdAt) })}</p>
+                        </Link>
+                    ))}
+                </div>
             )}
         </OwnerLayout>
     );
