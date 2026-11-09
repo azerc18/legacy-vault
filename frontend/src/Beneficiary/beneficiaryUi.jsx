@@ -49,26 +49,26 @@ export function StatusBadge({ vaultStatus, claimStatus, myStatus }) {
     } else if (claimStatus === 'PENDING') {
         key = 'inProgress'; cls = 'bg-warning-container text-on-warning-container';
     }
-    return <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${cls}`}>{t(`status.${key}`)}</span>;
+    return <span className={`lv-glass-badge shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${cls}`}>{t(`status.${key}`)}</span>;
 }
 
 export function Alert({ type = 'error', children }) {
     if (!children) return null;
     const cls = {
-        error: 'bg-error-container text-on-error-container',
-        info: 'bg-secondary-fixed text-on-secondary-fixed',
-        success: 'bg-success-container text-on-success-container',
-        warning: 'bg-warning-container text-on-warning-container',
+        error: 'bg-error-container/85 text-on-error-container border border-error/25',
+        info: 'bg-secondary-fixed/85 text-on-secondary-fixed border border-secondary/25',
+        success: 'bg-success-container/85 text-on-success-container border border-success/25',
+        warning: 'bg-warning-container/85 text-on-warning-container border border-warning/25',
     }[type];
-    return <div className={`mb-4 p-3 rounded-lg text-sm ${cls}`}>{children}</div>;
+    return <div className={`mb-4 p-3.5 rounded-xl text-sm backdrop-blur-md shadow-sm ${cls}`}>{children}</div>;
 }
 
 export const inputClass =
-    'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
+    'lv-glass-inline w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 export const btnPrimary =
-    'h-11 px-5 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
+    'lv-btn-primary h-11 px-5 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 hover:bg-primary-container disabled:opacity-60 disabled:cursor-not-allowed lv-pill';
 export const btnOutline =
-    'h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
+    'lv-btn-secondary h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 
 // backLabel bỏ trống thì PageTitle tự dùng common:actions.back
 export function BeneficiaryLayout({ title, subtitle, back, backLabel, children }) {

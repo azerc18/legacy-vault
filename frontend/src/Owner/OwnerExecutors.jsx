@@ -100,14 +100,14 @@ function ExecutorCard({ position, assignment, onChanged }) {
                     <h2 className="font-title-lg text-title-lg">{t(`executors.positions.${position.type}.title`)} <InfoTip term="executor" /></h2>
                     <p className="text-sm text-on-surface-variant mt-1">{t(`executors.positions.${position.type}.text`)}</p>
                 </div>
-                {st && <span className={`shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}
+                {st && <span className={`lv-glass-badge shrink-0 text-xs font-semibold px-3 py-1 rounded-full ${st.cls}`}>{t(`executors.status.${stKey}`)}</span>}
             </div>
 
             <div className="mt-5"><Alert>{error}</Alert></div>
 
             {assignment && !editing && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-surface-container-low">
-                    <div className="w-10 h-10 rounded-full bg-primary-fixed text-primary flex items-center justify-center"><Icon name="person" /></div>
+                <div className="lv-glass-inline flex items-center gap-3 p-4 rounded-xl">
+                    <div className="w-10 h-10 rounded-full bg-primary-fixed text-primary flex items-center justify-center shadow-sm"><Icon name="person" /></div>
                     <div className="min-w-0">
                         <p className="font-semibold truncate">{assignment.fullName || assignment.email}</p>
                         <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
