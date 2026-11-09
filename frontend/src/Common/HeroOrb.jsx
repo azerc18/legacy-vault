@@ -270,6 +270,7 @@ export default function HeroOrb() {
                     onFocus={() => setFocus(true)}
                     onBlur={() => setFocus(false)}
                     aria-label={t('orb.aria')}
+                    title={t('orb.tip')}
                     style={hitStyle}
                     className="absolute rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ffe2a3] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
                 />

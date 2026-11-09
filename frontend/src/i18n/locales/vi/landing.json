@@ -202,6 +202,7 @@
   },
   "orb": {
     "alt": "Hai bàn tay, một già một trẻ, cùng nâng quả cầu vàng chứa biểu tượng cú giữ khoá của LegacyVault",
-    "aria": "Mở khoá để đăng nhập vào LegacyVault"
+    "aria": "Mở khoá để đăng nhập vào LegacyVault",
+    "tip": "Bấm để đăng nhập"
   }
 }

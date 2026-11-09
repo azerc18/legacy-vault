@@ -202,6 +202,7 @@
   },
   "orb": {
     "alt": "An elderly hand and a young hand cradling a golden sphere that holds LegacyVault's owl-padlock emblem",
-    "aria": "Unlock to sign in to LegacyVault"
+    "aria": "Unlock to sign in to LegacyVault",
+    "tip": "Click to sign in"
   }
 }
