@@ -512,6 +512,109 @@ public class EmailSender {
         sendKeyed(to, lang, Style.URGENT, "mail.subExpiry", paras);
     }
 
+    // N6: đăng nhập từ thiết bị chưa từng dùng
+    @Async
+    public void sendNewDeviceLoginNotice(String to, String fullName, String device) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.newDevice.body", formatDeadline(LocalDateTime.now()), device));
+        paras.add(MailMessages.get(lang, "mail.newDevice.warn"));
+        sendKeyed(to, lang, Style.SECURITY, "mail.newDevice", paras);
+    }
+
+    // N16: thư di chúc đã lưu; không đưa tiêu đề hay nội dung riêng tư vào mail
+    @Async
+    public void sendLegacyMessageSavedNotice(String to, String fullName, String vaultName, boolean updated) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, updated ? "mail.messageSaved.updated" : "mail.messageSaved.created", vaultName));
+        paras.add(MailMessages.get(lang, "mail.messageSaved.note"));
+        sendKeyed(to, lang, Style.LEGACY, "mail.messageSaved", paras);
+    }
+
+    // N18: tài sản vừa xác thực xong
+    @Async
+    public void sendAssetVerifiedNotice(String to, String fullName, String assetName) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.assetVerified.body", assetName));
+        sendKeyed(to, lang, Style.SUCCESS, "mail.assetVerified", paras);
+    }
+
+    // N18: xác thực của tài sản sắp hết hạn hoặc đã hết hạn
+    @Async
+    public void sendAssetReverificationNotice(String to, String fullName, String assetName, LocalDateTime expiresAt,
+                                              boolean expired, UUID vaultId) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, expired ? "mail.assetReverify.expired" : "mail.assetReverify.soon",
+                assetName, formatDeadline(expiresAt)));
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
+        }
+        sendKeyed(to, lang, Style.URGENT, "mail.assetReverify", paras);
+    }
+
+    // N25: hạn nhận tài sản sắp đến (hệ thống tự nhắc, khác mail nhắc do Executor bấm)
+    @Async
+    public void sendClaimDeadlineReminder(String to, String fullName, String ownerName, String vaultName,
+                                          LocalDateTime claimDeadlineAt, int daysLeft, UUID vaultId) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.claimDeadline.body", vaultName, ownerName, daysLeft,
+                formatDeadline(claimDeadlineAt)));
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
+        }
+        paras.add(MailMessages.get(lang, "mail.noShare"));
+        sendKeyed(to, lang, Style.URGENT, "mail.claimDeadline", paras);
+    }
+
+    // N27: két đã chuyển lưu trữ vì quá hạn nhận
+    @Async
+    public void sendVaultArchivedNotice(String to, String fullName, String vaultName) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.vaultArchived.body", vaultName));
+        sendKeyed(to, lang, Style.NOTICE, "mail.vaultArchived", paras);
+    }
+
+    // N29: Executor báo xong một việc; người thụ hưởng vào xác nhận hoặc phản đối
+    @Async
+    public void sendExecutorTaskCompletedNotice(String to, String fullName, String vaultName, String platform,
+                                                boolean hasEvidenceFile, UUID vaultId) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
+        paras.add(MailMessages.get(lang, "mail.taskDone.body", platform, vaultName));
+        if (hasEvidenceFile) {
+            paras.add(MailMessages.get(lang, "mail.taskDone.evidence"));
+        }
+        paras.add(MailMessages.get(lang, "mail.taskDone.action"));
+        String link = vaultLink(vaultId);
+        if (link != null) {
+            paras.add(MailMessages.get(lang, "mail.openVault") + ": " + link);
+        }
+        sendKeyed(to, lang, Style.CASE, "mail.taskDone", paras);
+    }
+
+    // N30: hồ sơ đã duyệt nhưng quá hạn chưa ký nên được mở lại (duyệt / từ chối đã có mail riêng)
+    @Async
+    public void sendVerificationReopenedNotice(String to, String ownerLabel) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.requestReopened.body", ownerLabel));
+        sendKeyed(to, lang, Style.NOTICE, "mail.requestReopened", paras);
+    }
+
     private static String roleLabel(AppLanguage lang, ExecutorType type) {
         return MailMessages.get(lang, type == ExecutorType.PRIMARY ? "mail.role.PRIMARY" : "mail.role.BACKUP");
     }

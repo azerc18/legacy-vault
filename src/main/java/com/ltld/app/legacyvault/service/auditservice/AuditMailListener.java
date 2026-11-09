@@ -2,6 +2,8 @@ package com.ltld.app.legacyvault.service.auditservice;
 
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.event.AssetReverificationNeededEvent;
+import com.ltld.app.legacyvault.event.ExecutorTaskCompletedEvent;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
@@ -46,6 +48,7 @@ public class AuditMailListener {
     private final EmailSender emailSender;
     private final UserRepository userRepository;
     private final VaultRepository vaultRepository;
+    private final MailDataReader mailData;
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
@@ -54,6 +57,31 @@ public class AuditMailListener {
             handle(event);
         } catch (RuntimeException e) {
             log.warn("Event mail for {} failed: {}", event.action(), e.getMessage());
+        }
+    }
+
+    // N18: xác thực tài sản sắp hết hạn / đã hết hạn
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onAssetReverificationNeeded(AssetReverificationNeededEvent e) {
+        try {
+            userRepository.findById(e.ownerId()).ifPresent(u -> emailSender.sendAssetReverificationNotice(
+                    u.getEmail(), u.getFullName(), e.assetName(), e.expiresAt(), e.expired(), e.vaultId()));
+        } catch (RuntimeException ex) {
+            log.warn("N18: mail for asset {} failed: {}", e.assetId(), ex.getMessage());
+        }
+    }
+
+    // N29: Executor báo xong một việc
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onExecutorTaskCompleted(ExecutorTaskCompletedEvent e) {
+        try {
+            mailData.completedTask(e.taskId()).ifPresent(task -> task.recipients().forEach(r ->
+                    emailSender.sendExecutorTaskCompletedNotice(r.email(), r.fullName(), task.vaultName(),
+                            task.platform(), e.hasEvidenceFile(), e.vaultId())));
+        } catch (RuntimeException ex) {
+            log.warn("N29: mail for task {} failed: {}", e.taskId(), ex.getMessage());
         }
     }
 
@@ -127,6 +155,45 @@ public class AuditMailListener {
             case RBAC_CHANGE -> {
                 if (isSuccess(e) && "User".equals(e.entityType()) && e.entityId() != null) {
                     handleUserAdminChange(e);
+                }
+            }
+            // N6: đăng nhập từ thiết bị chưa từng dùng
+            case LOGIN -> {
+                if (isSuccess(e) && e.actorId() != null) {
+                    mailData.newDeviceOf(e.actorId()).ifPresent(device -> actor(e).ifPresent(u ->
+                            emailSender.sendNewDeviceLoginNotice(u.getEmail(), u.getFullName(), device)));
+                }
+            }
+            // N16: audit ghi chung VAULT_UPDATED, chỉ phân biệt thư di chúc qua detail
+            case VAULT_UPDATED -> {
+                String detail = detail(e);
+                boolean created = detail != null && detail.startsWith("Created legacy message:");
+                boolean updated = detail != null && detail.startsWith("Updated legacy message:");
+                if (isSuccess(e) && (created || updated) && e.vaultId() != null) {
+                    String vaultName = vaultRepository.findById(e.vaultId()).map(v -> v.getName()).orElse("");
+                    actor(e).ifPresent(u -> emailSender.sendLegacyMessageSavedNotice(
+                            u.getEmail(), u.getFullName(), vaultName, updated));
+                }
+            }
+            // N18: tài sản vừa xác thực xong
+            case ASSET_VERIFICATION_VERIFIED -> {
+                if (isSuccess(e) && e.entityId() != null) {
+                    mailData.assetName(e.entityId()).ifPresent(name -> actor(e).ifPresent(u ->
+                            emailSender.sendAssetVerifiedNotice(u.getEmail(), u.getFullName(), name)));
+                }
+            }
+            // N27: két lưu trữ vì quá hạn nhận
+            case VAULT_ARCHIVED -> {
+                if (isSuccess(e) && e.vaultId() != null) {
+                    mailData.vaultRecipients(e.vaultId()).ifPresent(v -> v.recipients().forEach(r ->
+                            emailSender.sendVaultArchivedNotice(r.email(), r.fullName(), v.vaultName())));
+                }
+            }
+            // N30: hồ sơ được mở lại
+            case LEGAL_REQUEST_REOPENED -> {
+                if (isSuccess(e) && e.entityId() != null) {
+                    mailData.reopenedRequest(e.entityId()).ifPresent(r ->
+                            emailSender.sendVerificationReopenedNotice(r.executorEmail(), r.ownerLabel()));
                 }
             }
             default -> {
