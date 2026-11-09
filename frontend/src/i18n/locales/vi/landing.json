@@ -9,6 +9,7 @@
   "getStarted": "Bắt đầu",
   "hero": {
     "title": "Cuộc sống số của bạn cũng cần một kế hoạch.",
+    "titleLines": ["Cuộc sống số của bạn", "cũng cần một kế hoạch."],
     "text": "Lưu mật khẩu, tài khoản và giấy tờ trong một kho được mã hoá, và đảm bảo chúng đến đúng người vào đúng lúc.",
     "cta": "Tạo kho di sản",
     "how": "Cách hoạt động"
@@ -92,7 +93,16 @@
       "legal": "Giấy tờ pháp lý",
       "notes": "Ghi chú riêng tư",
       "files": "Tệp & hình ảnh"
-    }
+    },
+    "desc": {
+      "passwords": "Đăng nhập email, mạng xã hội, công việc, chỉ trao cho người bạn chọn.",
+      "banks": "Số tài khoản và nơi bạn gửi tiền, để gia đình không phải dò tìm.",
+      "crypto": "Địa chỉ ví và cụm từ khôi phục, mất đi là mất vĩnh viễn.",
+      "legal": "Di chúc, giấy tờ nhà đất, hợp đồng bảo hiểm, kèm những gì cần để nhận.",
+      "notes": "Thư riêng và lời dặn bạn muốn người thân đọc đúng lúc.",
+      "files": "Ảnh và tài liệu quan trọng, được mã hoá trước khi lưu."
+    },
+    "hint": "Rê chuột hoặc chạm vào ô để mở"
   },
   "rolesSection": {
     "eyebrow": "Những ai tham gia",
@@ -137,7 +147,39 @@
     "terms": "Điều khoản sử dụng",
     "support": "Hỗ trợ"
   },
-  "preview": {"eyebrow": "Xem trước", "title": "Mọi thứ về di sản số, trong một màn hình", "text": "Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập."},
+  "preview": {
+    "eyebrow": "Xem trước",
+    "title": "Mọi thứ về di sản số, trong một màn hình",
+    "text": "Biết rõ mức sẵn sàng, việc cần làm và tiến độ bàn giao ngay khi đăng nhập.",
+    "hint": "Bản demo bấm thử được: chuyển trang ở cột trái và thử các nút.",
+    "demo": {
+      "name": "An",
+      "vaults": [
+        {
+          "name": "Két gia đình",
+          "desc": "Tài khoản ngân hàng, bảo hiểm và giấy tờ nhà.",
+          "beneficiary": "lan.nguyen@gmail.com",
+          "assets": 5,
+          "docs": 2
+        },
+        {
+          "name": "Ví tiền mã hoá",
+          "desc": "Ví Ledger và cụm từ khôi phục.",
+          "beneficiary": "minh.tran@gmail.com",
+          "assets": 2,
+          "docs": 1
+        }
+      ],
+      "primary": {
+        "name": "Phạm Huy",
+        "email": "huy.pham@gmail.com"
+      },
+      "backup": {
+        "name": "Trần Minh",
+        "email": "minh.tran@gmail.com"
+      }
+    }
+  },
   "footerNav": {
     "tagline": "Giữ trọn di sản số, trao đúng người, đúng lúc.",
     "product": "SẢN PHẨM",

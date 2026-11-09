@@ -22,7 +22,7 @@ function Icon({name, className = ''}) {
 function StatCard({icon, label, value}) {
     return (
         <div
-            className="bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 flex items-center gap-4">
+            className="lv-feature lv-feature-link bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/30 flex items-center gap-4">
             <div
                 className="w-11 h-11 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
                 <Icon name={icon}/>
@@ -177,7 +177,7 @@ export default function ExecutorHome() {
                 {error && <div
                     className="mb-6 p-4 rounded-xl bg-error-container text-on-error-container text-sm">{error}</div>}
 
-                <section data-tour="executor-stats" className="mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <section data-tour="executor-stats" className="lv-feature-grid mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard icon="assignment_late" label={t('home.stats.needAction')} value={cases && needAction}/>
                     <StatCard icon="hourglass_top" label={t('home.stats.waiting')} value={cases && waiting}/>
                     <StatCard icon="lock_open" label={t('home.stats.unlocked')} value={cases && unlocked}/>

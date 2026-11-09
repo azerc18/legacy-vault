@@ -39,12 +39,12 @@ export default function BeneficiaryVaults() {
                     <p className="mt-3 text-on-surface-variant">{t('list.empty')}</p>
                 </div>
             ) : (
-                <div data-tour="beneficiary-vault-list" className="grid sm:grid-cols-2 gap-5">
+                <div data-tour="beneficiary-vault-list" className="lv-feature-grid grid sm:grid-cols-2 gap-5">
                     {vaults.map((v) => (
                         <Link
                             key={v.vaultId}
                             to={`/beneficiary/vaults/${v.vaultId}`}
-                            className="block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 hover:border-primary transition-all"
+                            className="lv-feature lv-feature-link block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30 hover:border-primary"
                         >
                             <div className="flex justify-between items-start gap-3">
                                 <div>

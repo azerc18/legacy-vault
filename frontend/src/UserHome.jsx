@@ -43,9 +43,9 @@ function FeatureCard({ f }) {
         </>
     );
 
-    const base = 'block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30';
+    const base = 'lv-feature block bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/30';
     return f.to ? (
-        <Link to={f.to} className={`${base} hover:border-primary hover:shadow-sm transition-all`}>{body}</Link>
+        <Link to={f.to} className={`${base} lv-feature-link hover:border-primary`}>{body}</Link>
     ) : (
         <div className={`${base} opacity-60 cursor-not-allowed`}>{body}</div>
     );
@@ -88,7 +88,7 @@ export default function UserHome() {
                 {groups.map((g) => (
                     <section key={g.role} className="mb-10">
                         <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{roleLabel(g.role)}</h2>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <div className="lv-feature-grid grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
                             {g.items.map((f) => <FeatureCard key={f.key} f={f} />)}
                         </div>
                     </section>

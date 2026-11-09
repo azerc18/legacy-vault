@@ -1,0 +1,307 @@
+/* Thẻ có màu nhấn riêng (--ac: bộ số rgb) — dựa trên .lv-cy-card trong cyber.css */
+.lv-acc {
+  --mx: 50%;
+  --my: 0%;
+  transform-style: preserve-3d;
+  border-color: rgb(var(--ac) / 0.22);
+  background:
+    radial-gradient(120% 70% at 0% 0%, rgb(var(--ac) / 0.1), transparent 60%),
+    linear-gradient(160deg, rgb(255 255 255 / 0.07), rgb(255 255 255 / 0.015)),
+    rgb(11 16 32 / 0.55);
+}
+.lv-acc::before,
+.lv-acc::after { border-color: rgb(var(--ac) / 0.75); }
+.lv-acc:hover {
+  border-color: rgb(var(--ac) / 0.5);
+  box-shadow: 0 24px 50px -30px rgb(0 0 0 / 0.9), 0 0 36px -12px rgb(var(--ac) / 0.55);
+}
+.lv-acc:hover::before,
+.lv-acc:hover::after { border-color: rgb(var(--ac)); }
+
+/* Lớp cắt riêng cho hiệu ứng ánh sáng (thẻ không overflow:hidden để giữ được chiều sâu 3D) */
+.lv-acc-clip {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* Quầng sáng đi theo con trỏ */
+.lv-acc-glare {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(240px circle at var(--mx) var(--my), rgb(var(--ac) / 0.18), transparent 70%);
+  transition: opacity 0.35s ease;
+}
+.lv-acc:hover .lv-acc-glare { opacity: 1; }
+
+/* Vạch màu ở mép trên */
+.lv-acc-bar {
+  position: absolute;
+  top: -1px;
+  left: 22px;
+  width: 42px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(var(--ac));
+  box-shadow: 0 0 12px rgb(var(--ac) / 0.9);
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.lv-acc:hover .lv-acc-bar { width: calc(100% - 44px); }
+
+.lv-acc-title {
+  position: relative;
+  margin-top: 18px;
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: #fff;
+  transform: translateZ(20px);
+}
+.lv-acc-text {
+  position: relative;
+  margin-top: 8px;
+  color: rgb(255 255 255 / 0.7);
+  line-height: 1.55;
+  transform: translateZ(12px);
+}
+
+/* Icon nổi khỏi mặt thẻ (3D) */
+.lv-acc-icon,
+.lv-role-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  color: rgb(var(--ac));
+  background: rgb(var(--ac) / 0.12);
+  border: 1px solid rgb(var(--ac) / 0.35);
+  box-shadow: 0 0 22px -6px rgb(var(--ac) / 0.6);
+  transform: translateZ(36px);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s ease;
+}
+.lv-acc-icon .material-symbols-outlined,
+.lv-role-icon .material-symbols-outlined { font-size: 28px; }
+.lv-acc:hover .lv-acc-icon,
+.lv-acc:hover .lv-role-icon {
+  transform: translateZ(56px) scale(1.06);
+  box-shadow: 0 0 30px -4px rgb(var(--ac) / 0.85);
+}
+
+/* ---------- Bảo mật: đèn trạng thái + tia quét ---------- */
+.lv-sec-led {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(var(--ac));
+  box-shadow: 0 0 10px rgb(var(--ac));
+  animation: lv-led 2.4s ease-in-out infinite;
+}
+@keyframes lv-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.lv-sec-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 70px;
+  opacity: 0;
+  background: linear-gradient(180deg, transparent, rgb(var(--ac) / 0.16) 70%, rgb(var(--ac) / 0.7) 98%, transparent);
+  transform: translateY(-80px);
+}
+.lv-sec:hover .lv-sec-scan {
+  animation: lv-scan 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes lv-scan {
+  0% { transform: translateY(-80px); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translateY(320px); opacity: 0; }
+}
+
+/* ---------- Lưu trữ: hộp ký gửi, cửa mở kiểu 3D ---------- */
+.lv-box {
+  position: relative;
+  z-index: 0;
+  height: 200px;
+  cursor: pointer;
+  perspective: 1100px;
+  border-radius: 14px;
+}
+/* Lòng hộp: tối hơn, có quầng màu nhấn, chứa mô tả */
+.lv-box-inner {
+  position: absolute;
+  inset: 0;
+  padding: 20px 22px 20px 26px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--ac) / 0.35);
+  background:
+    radial-gradient(90% 80% at 85% 20%, rgb(var(--ac) / 0.2), transparent 70%),
+    linear-gradient(180deg, rgb(4 7 16 / 0.95), rgb(9 13 28 / 0.95));
+  box-shadow: inset 0 10px 30px rgb(0 0 0 / 0.6);
+}
+.lv-box-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: rgb(var(--ac));
+  background: rgb(var(--ac) / 0.14);
+  border: 1px solid rgb(var(--ac) / 0.4);
+  box-shadow: 0 0 22px -4px rgb(var(--ac) / 0.7);
+  transform: scale(0.85);
+  opacity: 0.4;
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.25s, opacity 0.4s ease 0.2s;
+}
+.lv-box-label {
+  margin-top: 12px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #fff;
+}
+.lv-box-desc {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgb(255 255 255 / 0.72);
+}
+
+/* Cửa ô: bản lề bên trái */
+.lv-box-door {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.12s;
+  border-radius: 14px;
+}
+.lv-box-door:focus-visible { outline: 2px solid rgb(var(--ac)); outline-offset: 3px; }
+.lv-box-front,
+.lv-box-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.lv-box-front {
+  display: block;
+  text-align: left;
+  border: 1px solid rgb(var(--ac) / 0.28);
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.018) 0 2px, transparent 2px 6px),
+    linear-gradient(160deg, rgb(38 46 74), rgb(20 26 46));
+  box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.9), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+/* Mặt trong cánh cửa (thấy khi cửa mở) */
+.lv-box-back {
+  transform: rotateY(180deg);
+  border: 1px solid rgb(var(--ac) / 0.2);
+  background: linear-gradient(200deg, rgb(26 32 56), rgb(12 16 32));
+}
+/* Đèn khoá: đỏ khi đóng, đổi sang màu nhấn khi mở */
+.lv-box-led {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(255 92 120);
+  box-shadow: 0 0 10px rgb(255 92 120 / 0.9);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+/* Núm xoay */
+.lv-box-dial {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin-top: -23px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--ac) / 0.55);
+  background: radial-gradient(circle, rgb(255 255 255 / 0.12), rgb(0 0 0 / 0.3) 70%);
+  box-shadow: 0 0 16px -4px rgb(var(--ac) / 0.7);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lv-box-dial i {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: rgb(var(--ac));
+}
+.lv-box-name {
+  position: absolute;
+  left: 18px;
+  right: 80px;
+  bottom: 18px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #fff;
+}
+
+/* Mở: núm xoay 1/4 vòng, đèn đổi màu, rồi cửa mở ra */
+.lv-box.is-open { z-index: 2; }
+.lv-box.is-open .lv-box-dial { transform: rotate(90deg); }
+.lv-box.is-open .lv-box-led { background: rgb(var(--ac)); box-shadow: 0 0 12px rgb(var(--ac)); }
+.lv-box.is-open .lv-box-door { transform: rotateY(-108deg); }
+.lv-box.is-open .lv-box-icon { transform: scale(1); opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .lv-box:hover { z-index: 2; }
+  .lv-box:hover .lv-box-dial { transform: rotate(90deg); }
+  .lv-box:hover .lv-box-led { background: rgb(var(--ac)); box-shadow: 0 0 12px rgb(var(--ac)); }
+  .lv-box:hover .lv-box-door { transform: rotateY(-108deg); }
+  .lv-box:hover .lv-box-icon { transform: scale(1); opacity: 1; }
+}
+.lv-box-hint {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13px;
+  color: rgb(255 255 255 / 0.5);
+}
+
+/* ---------- Vai trò: lớp ánh kim kiểu thẻ định danh ---------- */
+.lv-role-icon { border-radius: 50%; }
+.lv-role-holo {
+  position: absolute;
+  inset: -40%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(260px circle at var(--mx) var(--my), rgb(var(--ac) / 0.22), transparent 65%),
+    linear-gradient(115deg, transparent 35%, rgb(92 225 255 / 0.12) 43%, rgb(170 140 255 / 0.14) 50%, rgb(255 128 184 / 0.12) 57%, transparent 65%);
+  background-size: 100% 100%, 220% 220%;
+  background-position: 0 0, calc(var(--mx) * 0.6) calc(var(--my) * 0.6);
+  transition: opacity 0.4s ease;
+}
+.lv-role:hover .lv-role-holo { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lv-sec-led,
+  .lv-sec:hover .lv-sec-scan { animation: none; }
+  .lv-box-door,
+  .lv-box-dial,
+  .lv-box-icon { transition: none; }
+  .lv-acc:hover .lv-acc-icon,
+  .lv-acc:hover .lv-role-icon { transform: none; }
+}

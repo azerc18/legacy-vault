@@ -19,6 +19,7 @@ public class PaymentTransactionResponse {
     private String planName;
     private long amountVnd;
     private String status;
+    private String provider;
     private String vnpTransactionNo;
     private String vnpResponseCode;
     private LocalDateTime createdAt;
@@ -31,6 +32,7 @@ public class PaymentTransactionResponse {
                 .planName(tx.getPlan() != null ? tx.getPlan().getName() : null)
                 .amountVnd(tx.getAmountVnd())
                 .status(tx.getStatus() != null ? tx.getStatus().name() : null)
+                .provider(tx.getProvider() != null ? tx.getProvider().name() : null)
                 .vnpTransactionNo(tx.getVnpTransactionNo())
                 .vnpResponseCode(tx.getVnpResponseCode())
                 .createdAt(tx.getCreatedAt())
