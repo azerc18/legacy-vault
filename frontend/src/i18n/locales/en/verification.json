@@ -20,7 +20,7 @@
     "STATEMENT_UPLOAD": { "label": "Bank statement upload", "desc": "Upload a bank statement to the vault for verification.", "fileIntro": "Upload a bank statement (PDF, PNG or JPG, up to 10 MB) to store in the vault's documents." },
     "MICRO_DEPOSIT_MOCK": { "label": "Micro-deposit amount (simulated)", "desc": "Enter the amount of the simulated test deposit." },
     "EXCHANGE_EMAIL_CODE": { "label": "Exchange email code", "desc": "Enter the verification code sent to the exchange account email." },
-    "API_READONLY_MOCK": { "label": "Read-only API key (simulated)", "desc": "Only checks the API key format; no exchange is contacted. Do not paste a key that can trade or withdraw. Pasting a real key just to check its format proves nothing, so use the minimum permissions." },
+    "API_READONLY_MOCK": { "label": "Read-only API key (simulated)", "desc": "Only checks the API key format; no exchange is contacted. Do not paste a key that can trade or withdraw." },
     "ADDRESS_CHECKSUM": { "label": "Wallet address check", "desc": "Check the format and checksum of the wallet address." },
     "BIP39_CHECK": { "label": "Recovery phrase check", "desc": "Check that the stored recovery phrase is a valid BIP-39 phrase." },
     "PUBLIC_BALANCE": { "label": "Public balance lookup", "desc": "Look up the public balance of the address on the blockchain." },

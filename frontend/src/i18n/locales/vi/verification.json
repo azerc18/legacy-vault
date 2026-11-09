@@ -20,7 +20,7 @@
     "STATEMENT_UPLOAD": { "label": "Sao kê ngân hàng", "desc": "Tải tệp sao kê ngân hàng lên két để đối chiếu.", "fileIntro": "Tải bản sao kê ngân hàng (PDF, PNG hoặc JPG, tối đa 10 MB) để lưu vào tài liệu của két." },
     "MICRO_DEPOSIT_MOCK": { "label": "Giao dịch nhỏ (mô phỏng)", "desc": "Nhập lại số tiền của khoản giao dịch thử nghiệm." },
     "EXCHANGE_EMAIL_CODE": { "label": "Mã xác thực email sàn giao dịch", "desc": "Nhận mã xác thực gửi tới email đăng ký sàn giao dịch." },
-    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (mô phỏng)", "desc": "Chỉ kiểm định dạng khóa API, không gọi sàn. Đừng dán khóa có quyền giao dịch hay rút tiền. Dán khóa thật vào để kiểm định dạng cũng không chứng minh được gì, nên chỉ dùng khóa có quyền tối thiểu." },
+    "API_READONLY_MOCK": { "label": "Khóa API chỉ đọc (mô phỏng)", "desc": "Chỉ kiểm định dạng khóa API, không gọi sàn. Đừng dán khóa có quyền giao dịch hay rút tiền." },
     "ADDRESS_CHECKSUM": { "label": "Kiểm tra địa chỉ ví", "desc": "Kiểm tra định dạng và checksum của địa chỉ ví." },
     "BIP39_CHECK": { "label": "Kiểm tra cụm từ khôi phục", "desc": "Kiểm tra cụm từ khôi phục đã lưu có hợp lệ theo BIP-39." },
     "PUBLIC_BALANCE": { "label": "Tra số dư công khai", "desc": "Tra số dư công khai của địa chỉ ví trên blockchain." },
