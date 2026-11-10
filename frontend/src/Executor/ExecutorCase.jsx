@@ -5,7 +5,6 @@ import { getUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
 import { executorApi, caseStep, HANDOVER_CLASS, CLAIM_PROGRESS_CLASS } from '../api/executorApi.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
-import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
@@ -75,7 +74,7 @@ export default function ExecutorCase() {
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader workspace={t('workspace')} home="/executor/home" userHome extra={<NotificationBell source="executor" />}/>
+            <AppHeader workspace={t('workspace')} home="/executor/home" userHome/>
 
             <main className={`${PAGE_WIDTH} py-10 space-y-6`}>
                 <PageTitle

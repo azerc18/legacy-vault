@@ -1,7 +1,6 @@
 // Thành phần giao diện dùng chung cho các trang Beneficiary
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import NotificationBell from './NotificationBell.jsx';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import { humanize } from '../i18n/format.js';
 
@@ -74,7 +73,7 @@ export const btnOutline =
 export function BeneficiaryLayout({ title, subtitle, back, backLabel, children }) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader extra={<NotificationBell />} />
+            <AppHeader />
             <main className={`${PAGE_WIDTH} py-10`}>
                 <PageTitle back={{ to: back || '/home', label: backLabel }} title={title} subtitle={subtitle} />
                 {children}

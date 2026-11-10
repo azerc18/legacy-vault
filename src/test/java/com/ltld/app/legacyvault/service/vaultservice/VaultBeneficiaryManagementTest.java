@@ -65,6 +65,8 @@ class VaultBeneficiaryManagementTest {
     @Mock private FileStorageService fileStorageService;
     @Mock private AuditLogService auditLogService;
     @Mock private EmailSender emailSender;
+    // Chuông thông báo: service ghi thêm thông báo trong app
+    @Mock private com.ltld.app.legacyvault.service.notificationservice.InAppNotifier inAppNotifier;
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private VaultModificationGuard vaultModificationGuard;
     @Mock private DmsConfigService dmsConfigService;

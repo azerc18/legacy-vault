@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
@@ -27,10 +28,19 @@ public class InAppNotificationServiceImpl implements InAppNotificationService {
     @Override
     @Transactional(readOnly = true)
     public Page<NotificationResponse> listMine(UUID userId, int page, int size) {
-        return notificationRepository.findByRecipientIdAndChannel(userId, NotificationChannel.IN_APP,
-                        PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
-                                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))))
-                .map(InAppNotificationServiceImpl::toResponse);
+        return listMine(userId, page, size, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<NotificationResponse> listMine(UUID userId, int page, int size, boolean unreadOnly) {
+        PageRequest pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
+        Page<Notification> result = unreadOnly
+                ? notificationRepository.findByRecipientIdAndChannelAndStatusNot(userId, NotificationChannel.IN_APP,
+                        NotificationStatus.READ, pageable)
+                : notificationRepository.findByRecipientIdAndChannel(userId, NotificationChannel.IN_APP, pageable);
+        return result.map(InAppNotificationServiceImpl::toResponse);
     }
 
     @Override
@@ -53,15 +63,23 @@ public class InAppNotificationServiceImpl implements InAppNotificationService {
         }
     }
 
+    @Override
+    @Transactional
+    public int markAllRead(UUID userId) {
+        return notificationRepository.markAllRead(userId, NotificationChannel.IN_APP, NotificationStatus.READ);
+    }
+
     private static NotificationResponse toResponse(Notification n) {
         return NotificationResponse.builder()
                 .id(n.getId())
                 .type(n.getType())
                 .content(n.getContent())
+                .params(NotificationParams.parse(n.getParams()))
                 .referenceType(n.getReferenceType())
                 .referenceId(n.getReferenceId())
                 .read(n.getStatus() == NotificationStatus.READ)
-                .createdAt(n.getCreatedAt())
+                .createdAt(n.getCreatedAt() == null ? null
+                        : n.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant())
                 .build();
     }
 }

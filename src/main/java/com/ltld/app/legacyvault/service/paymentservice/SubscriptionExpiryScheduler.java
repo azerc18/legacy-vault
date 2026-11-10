@@ -5,6 +5,8 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.SubscriptionStatus;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,6 +34,7 @@ public class SubscriptionExpiryScheduler {
 
     private final SubscriptionRepository subscriptionRepository;
     private final EmailSender emailSender;
+    private final InAppNotifier inAppNotifier;
     private final TransactionOperations transactionOperations;
 
     @Scheduled(cron = "${app.subscription.expiry-cron:0 0 8 * * *}")
@@ -92,6 +95,8 @@ public class SubscriptionExpiryScheduler {
 
     // N12: EXPIRED đã commit nên gửi lỗi không thử lại được; chỉ log, gói vẫn hết hạn đúng
     private void sendExpiredNotice(Reminder notice) {
+        inAppNotifier.toEmail(notice.email(), InAppNotifier.draft(NotificationType.SUBSCRIPTION_EXPIRED, null, null,
+                "Your " + notice.planName() + " plan has expired.", "plan", notice.planName()));
         try {
             emailSender.sendSubscriptionExpiredNotice(notice.email(), notice.fullName(), notice.planName());
         } catch (RuntimeException ex) {
@@ -100,6 +105,10 @@ public class SubscriptionExpiryScheduler {
     }
 
     private void sendReminder(Reminder reminder) {
+        // toEmailOnce: SMTP lỗi thì reminderSent được trả lại và lượt sau chạy lại hàm này
+        inAppNotifier.toEmailOnce(reminder.email(), InAppNotifier.draft(NotificationType.SUBSCRIPTION_EXPIRING, null, null,
+                "Your " + reminder.planName() + " plan is about to expire.",
+                "plan", reminder.planName(), "expiresAt", reminder.expiresAt()));
         try {
             emailSender.sendSubscriptionExpiryReminder(
                     reminder.email(), reminder.fullName(), reminder.planName(), reminder.expiresAt());

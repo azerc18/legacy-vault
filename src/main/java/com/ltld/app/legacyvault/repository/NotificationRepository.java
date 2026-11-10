@@ -7,6 +7,9 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -28,7 +31,18 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     // FR-11 / FR-12 / FR-14 / FR-16: thông báo trong app của người dùng, phân trang
     Page<Notification> findByRecipientIdAndChannel(UUID recipientId, NotificationChannel channel, Pageable pageable);
 
+    // Chuông thông báo: tab "Chưa đọc"
+    Page<Notification> findByRecipientIdAndChannelAndStatusNot(UUID recipientId, NotificationChannel channel,
+                                                               NotificationStatus status, Pageable pageable);
+
     // FR-11 / FR-12 / FR-14 / FR-16: số thông báo trong app chưa đọc
     long countByRecipientIdAndChannelAndStatusNot(UUID recipientId, NotificationChannel channel,
                                                   NotificationStatus status);
+
+    // Chuông thông báo: "Đánh dấu đã đọc tất cả"
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Notification n SET n.status = :read "
+            + "WHERE n.recipient.id = :recipientId AND n.channel = :channel AND n.status <> :read")
+    int markAllRead(@Param("recipientId") UUID recipientId, @Param("channel") NotificationChannel channel,
+                    @Param("read") NotificationStatus read);
 }

@@ -38,6 +38,8 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoServiceImpl;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotificationEventListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -72,6 +74,7 @@ public class VaultServiceImpl implements VaultService {
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
     private final EmailSender emailSender;
+    private final InAppNotifier inAppNotifier;
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final VaultModificationGuard vaultModificationGuard;
     private final DmsConfigService dmsConfigService;
@@ -456,6 +459,9 @@ public class VaultServiceImpl implements VaultService {
         String ownerName = vault.getOwner().getFullName();
         String vaultName = vault.getName();
         runAfterCommit(() -> emailSender.sendBeneficiaryRemovedNotice(removedEmail, ownerName, vaultName));
+        // Chuông thông báo: người bị gỡ (nếu có tài khoản) thấy ngay trong app
+        runAfterCommit(() -> inAppNotifier.toEmail(removedEmail,
+                InAppNotificationEventListener.beneficiaryRemoved(vaultId, vaultName, ownerName)));
     }
 
     // Owner sửa tên / mối quan hệ của một người thụ hưởng. Cùng điều kiện khóa như thêm/xóa

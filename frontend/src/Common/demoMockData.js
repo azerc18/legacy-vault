@@ -199,3 +199,18 @@ export const DEMO_VERIFIER_REQUESTS = [
         submittedAt: '2026-11-08T10:00:00'
     }
 ];
+
+// Chuông thông báo ở chế độ demo: thời gian tính lùi từ lúc mở trang để luôn trông "mới"
+const minutesAgo = (m) => new Date(Date.now() - m * 60000).toISOString();
+export const demoNotifications = () => [
+    { id: 'n-demo-1', type: 'DMS_CHECKIN_REMINDER', read: false, createdAt: minutesAgo(12), referenceType: 'DmsConfig',
+        content: 'Check-in reminder 1/3: please check in to confirm you are safe.',
+        params: { number: '1', count: '3', triggerAt: new Date(Date.now() + 5 * 86400000).toISOString() } },
+    { id: 'n-demo-2', type: 'ASSET_VERIFIED', read: false, createdAt: minutesAgo(95), referenceType: 'Vault', referenceId: 'v-demo-1',
+        content: 'Your asset has been verified.', params: { asset: 'Ví lạnh Ledger', vault: 'Két gia đình' } },
+    { id: 'n-demo-3', type: 'DMS_OWNER_CONFIRMED_SAFE', read: true, createdAt: minutesAgo(60 * 26), referenceType: 'DmsConfig',
+        content: 'A trusted confirmer confirmed you are safe.',
+        params: { confirmer: 'Trần Minh Anh', untilAt: new Date(Date.now() + 7 * 86400000).toISOString() } },
+    { id: 'n-demo-4', type: 'PAYMENT_SUCCEEDED', read: true, createdAt: minutesAgo(60 * 24 * 3),
+        content: 'Payment successful. Your VIP plan is active.', params: {} },
+];

@@ -58,7 +58,7 @@ class NotificationControllerSecurityTest {
         when(inAppNotificationService.listMine(userId, 1, 5)).thenReturn(new PageImpl<>(List.of(
                 NotificationResponse.builder().id(notificationId).type(NotificationType.VERIFIER_REPLY)
                         .content("The Legal Verifier replied").read(false)
-                        .createdAt(LocalDateTime.of(2026, 10, 28, 9, 0)).build())));
+                        .createdAt(LocalDateTime.of(2026, 10, 28, 9, 0).toInstant(java.time.ZoneOffset.UTC)).build())));
 
         mockMvc.perform(get("/api/notifications/me").param("page", "1").param("size", "5")
                         .with(token(userId.toString())))
@@ -79,6 +79,35 @@ class NotificationControllerSecurityTest {
     @Test
     void unreadCount_noToken_returns401() throws Exception {
         mockMvc.perform(get("/api/notifications/me/unread-count")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void listMine_unreadOnly_passesTheFlagAndReturnsParams() throws Exception {
+        when(inAppNotificationService.listMine(userId, 0, 20, true)).thenReturn(new PageImpl<>(List.of(
+                NotificationResponse.builder().id(notificationId).type(NotificationType.BENEFICIARY_ASSIGNED)
+                        .content("An named you as a beneficiary").params(java.util.Map.of("owner", "An"))
+                        .read(false).createdAt(LocalDateTime.of(2026, 11, 10, 9, 0).toInstant(java.time.ZoneOffset.UTC)).build())));
+
+        mockMvc.perform(get("/api/notifications/me").param("unreadOnly", "true").with(token(userId.toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].type").value("BENEFICIARY_ASSIGNED"))
+                .andExpect(jsonPath("$.data.content[0].params.owner").value("An"));
+    }
+
+    @Test
+    void markAllRead_marksOnlyTheCallersNotifications() throws Exception {
+        when(inAppNotificationService.markAllRead(userId)).thenReturn(3);
+
+        mockMvc.perform(patch("/api/notifications/me/read-all").with(token(userId.toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(3));
+        verify(inAppNotificationService).markAllRead(userId);
+    }
+
+    @Test
+    void markAllRead_noToken_returns401() throws Exception {
+        mockMvc.perform(patch("/api/notifications/me/read-all")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(inAppNotificationService);
     }
 
     @Test

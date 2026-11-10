@@ -4,7 +4,8 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -16,6 +17,9 @@ import java.util.UUID;
  *       danh sách hồ sơ của từng assignment.</li>
  * </ul>
  * Cùng type VAULT_UNLOCKED có thể gửi cho cả hai vai trò, phân biệt bằng referenceType.
+ *
+ * <p>params: tham số để FE dịch câu thông báo theo type (khóa i18n notifications.types.TYPE); rỗng với thông báo
+ * cũ, khi đó FE hiện content (câu tiếng Anh lưu sẵn).
  */
 @Getter
 @Builder
@@ -23,8 +27,10 @@ public class NotificationResponse {
     private final UUID id;
     private final NotificationType type;
     private final String content;
+    private final Map<String, String> params;
     private final String referenceType;
     private final UUID referenceId;
     private final boolean read;
-    private final LocalDateTime createdAt;
+    // Instant (có múi giờ) thay vì LocalDateTime theo giờ JVM, để trình duyệt tính "x phút trước" đúng
+    private final Instant createdAt;
 }

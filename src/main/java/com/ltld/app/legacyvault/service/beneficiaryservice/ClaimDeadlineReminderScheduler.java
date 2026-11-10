@@ -5,6 +5,8 @@ import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.entity.VaultBeneficiary;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotificationEventListener;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,6 +31,7 @@ public class ClaimDeadlineReminderScheduler {
 
     private final VaultBeneficiaryRepository vaultBeneficiaryRepository;
     private final EmailSender emailSender;
+    private final InAppNotifier inAppNotifier;
 
     @Scheduled(cron = "${app.beneficiary.claim-deadline-reminder-cron:0 0 9 * * *}")
     public void runDaily() {
@@ -49,6 +52,8 @@ public class ClaimDeadlineReminderScheduler {
         User owner = vault.getOwner();
         String ownerName = owner.getFullName() == null || owner.getFullName().isBlank()
                 ? owner.getEmail() : owner.getFullName();
+        inAppNotifier.toEmail(b.getUser() != null ? b.getUser().getEmail() : b.getEmail(),
+                InAppNotificationEventListener.claimReminder(vault));
         try {
             emailSender.sendClaimDeadlineReminder(b.getEmail(), b.getFullName(), ownerName, vault.getName(),
                     vault.getClaimDeadlineAt(), days, vault.getId());

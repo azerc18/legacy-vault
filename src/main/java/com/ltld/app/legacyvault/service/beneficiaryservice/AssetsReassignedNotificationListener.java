@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.event.AssetsReassignedEvent;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.service.notificationservice.NotificationParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -68,6 +69,9 @@ public class AssetsReassignedNotificationListener {
                         .referenceId(event.vaultId())
                         .content(String.format(messageFor(event),
                                 receiver.assetCount(), event.vaultName(), event.ownerName()))
+                        .params(NotificationParams.json("count", receiver.assetCount(), "vault", event.vaultName(),
+                                "owner", event.ownerName(), "variant", event.reason() == AssetsReassignedEvent.Reason.NO_RESPONSE
+                                        ? "NO_RESPONSE" : "DECLINED"))
                         .status(NotificationStatus.SENT)
                         .sentAt(LocalDateTime.now())
                         .build()));

@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -24,8 +26,10 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // ON DELETE CASCADE: thông báo chỉ có nghĩa với người nhận, xóa tài khoản thì xóa theo (không chặn việc xóa User)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recipient_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private User recipient;
 
     @Enumerated(EnumType.STRING)
@@ -45,6 +49,11 @@ public class Notification {
 
     @Column(columnDefinition = "TEXT")
     private String content;
+
+    // Chuông thông báo: tham số của câu thông báo dạng JSON phẳng {"khóa": "giá trị"} để FE dịch theo type
+    // (EN/VI); content vẫn là câu tiếng Anh dự phòng. Null với thông báo cũ và thông báo EMAIL.
+    @Column(columnDefinition = "TEXT")
+    private String params;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

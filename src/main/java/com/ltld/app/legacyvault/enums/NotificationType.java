@@ -12,5 +12,25 @@ public enum NotificationType {
     LEGACY_MESSAGE_DELIVERED,
     // PR 2: Beneficiary phản đối kết quả của Executor; Owner cần xác thực lại tài sản
     EXECUTOR_TASK_DISPUTED,
-    ASSET_REVERIFY_NEEDED
+    ASSET_REVERIFY_NEEDED,
+    // Chuông thông báo: các sự kiện trước đây chỉ gửi email. Thêm loại mới thì thêm vào ENUM của cột
+    // notifications.type (migration) và khóa notifications.types.<TYPE> trong i18n của FE.
+    BENEFICIARY_ASSIGNED,
+    BENEFICIARY_REMOVED,
+    EXECUTOR_ASSIGNED,
+    EXECUTOR_REVOKED,
+    DMS_CHECKIN_REMINDER,
+    DMS_CONFIRMATION_PENDING,
+    DMS_CONFIRMATION_REQUESTED,
+    DMS_OWNER_CONFIRMED_SAFE,
+    DMS_PAUSED,
+    DMS_RESUMED,
+    ASSET_VERIFIED,
+    PAYMENT_SUCCEEDED,
+    SUBSCRIPTION_EXPIRING,
+    SUBSCRIPTION_EXPIRED,
+    CLAIM_DEADLINE_REMINDER,
+    EXECUTOR_TASK_COMPLETED,
+    VAULT_ARCHIVED,
+    VERIFICATION_REOPENED
 }
