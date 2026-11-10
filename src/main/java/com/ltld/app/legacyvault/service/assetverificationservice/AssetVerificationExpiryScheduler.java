@@ -17,6 +17,7 @@ import com.ltld.app.legacyvault.event.AssetReverificationNeededEvent;
 import com.ltld.app.legacyvault.repository.AssetVerificationRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.notificationservice.NotificationParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -137,6 +138,8 @@ public class AssetVerificationExpiryScheduler {
                 .referenceType(ENTITY_ASSET)
                 .referenceId(asset.getId())
                 .content(content)
+                .params(NotificationParams.json("asset", asset.getAssetName(), "vault", vault.getName(),
+                        "vaultId", vault.getId(), "expiresAt", v.getExpiresAt(), "variant", expired ? "EXPIRED" : "SOON"))
                 .status(NotificationStatus.SENT)
                 .sentAt(now)
                 .build());

@@ -25,6 +25,7 @@ import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.notificationservice.NotificationParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Async;
@@ -397,6 +398,8 @@ public class BeneficiaryNotificationListener {
                 .referenceId(mail.vaultId())
                 .content(String.format(MSG_IN_APP, mail.vaultName(), mail.ownerName(),
                         EmailSender.formatDeadline(mail.claimDeadlineAt())))
+                .params(NotificationParams.json("vault", mail.vaultName(), "owner", mail.ownerName(),
+                        "deadlineAt", mail.claimDeadlineAt()))
                 .status(NotificationStatus.SENT)
                 .sentAt(LocalDateTime.now())
                 .build());

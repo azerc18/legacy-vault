@@ -108,4 +108,35 @@ class InAppNotificationServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(e -> assertThat(((BusinessException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND));
     }
+
+    @Test
+    void listMine_unreadOnly_queriesEverythingButRead() {
+        when(notificationRepository.findByRecipientIdAndChannelAndStatusNot(eq(userId), eq(NotificationChannel.IN_APP),
+                eq(NotificationStatus.READ), any()))
+                .thenReturn(new PageImpl<>(List.of(notification(NotificationStatus.SENT))));
+
+        assertThat(service.listMine(userId, 0, 20, true).getContent()).hasSize(1);
+        verify(notificationRepository, never()).findByRecipientIdAndChannel(any(), any(), any());
+    }
+
+    @Test
+    void listMine_exposesParamsForTranslation_andEmptyMapForOldRows() {
+        Notification withParams = notification(NotificationStatus.SENT);
+        withParams.setParams(NotificationParams.json("owner", "An", "vault", "Két gia đình"));
+        when(notificationRepository.findByRecipientIdAndChannel(eq(userId), eq(NotificationChannel.IN_APP), any()))
+                .thenReturn(new PageImpl<>(List.of(withParams, notification(NotificationStatus.SENT))));
+
+        List<NotificationResponse> list = service.listMine(userId, 0, 20).getContent();
+
+        assertThat(list.get(0).getParams()).containsEntry("owner", "An").containsEntry("vault", "Két gia đình");
+        assertThat(list.get(1).getParams()).isEmpty();
+    }
+
+    @Test
+    void markAllRead_onlyTouchesInAppNotificationsOfCaller() {
+        when(notificationRepository.markAllRead(userId, NotificationChannel.IN_APP, NotificationStatus.READ))
+                .thenReturn(3);
+
+        assertThat(service.markAllRead(userId)).isEqualTo(3);
+    }
 }

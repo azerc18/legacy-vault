@@ -11,6 +11,7 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import BrandMark from './BrandMark.jsx';
 import OnboardingGuideModal from './OnboardingGuideModal.jsx';
+import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -112,7 +113,7 @@ const Icon = ({ name, className = '' }) => <span className={`material-symbols-ou
  * @param home        logo dẫn về đâu
  * @param nav         (tuỳ chọn) ghi đè danh sách phẳng nếu trang đặc biệt cần
  * @param alertBadge  số cảnh báo mở của Admin (đồng bộ sang sessionStorage để giữ nguyên khi chuyển trang)
- * @param extra       phần tử thêm bên phải, trước avatar (vd. NotificationBell)
+ * @param extra       phần tử thay cho chuông thông báo mặc định (bên phải, trước avatar)
  * @param userHome    true = hiện link "User home" (cho người có nhiều vai trò)
  */
 export default function AppHeader({ workspace, home = '/home', nav: navProp, alertBadge, extra, userHome = false }) {
@@ -338,7 +339,8 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                     <LanguageSwitch variant="dark" className="lv-lang shrink-0" />
                     <div className="lv-side-tools-actions flex items-center gap-2 shrink-0">
                         <ThemeToggle variant="dark" />
-                        {extra}
+                        {/* Chuông có ở mọi trang đã đăng nhập; trang nào truyền extra riêng thì dùng extra */}
+                        {extra ?? <NotificationBell />}
                     </div>
                 </div>
                 <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/15 min-w-0">

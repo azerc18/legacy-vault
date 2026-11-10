@@ -30,6 +30,8 @@ class ClaimDeadlineReminderSchedulerTest {
 
     @Mock private VaultBeneficiaryRepository repository;
     @Mock private EmailSender emailSender;
+    // Chuông thông báo: service ghi thêm thông báo trong app
+    @Mock private com.ltld.app.legacyvault.service.notificationservice.InAppNotifier inAppNotifier;
     @InjectMocks private ClaimDeadlineReminderScheduler scheduler;
 
     private VaultBeneficiary beneficiary(String email, String ownerName, LocalDateTime deadline) {

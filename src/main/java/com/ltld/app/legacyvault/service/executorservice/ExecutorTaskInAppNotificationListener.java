@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.event.ExecutorTaskDisputedEvent;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.service.notificationservice.NotificationParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -62,6 +63,8 @@ public class ExecutorTaskInAppNotificationListener {
                             .referenceType(ENTITY_TASK)
                             .referenceId(event.taskId())
                             .content(String.format(MSG_DISPUTED, event.vaultName(), platform, event.reason()))
+                            .params(NotificationParams.json("vault", event.vaultName(), "platform", platform,
+                                    "reason", event.reason()))
                             .status(NotificationStatus.SENT)
                             .sentAt(LocalDateTime.now())
                             .build());

@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.event.VerifierReplyPostedEvent;
 import com.ltld.app.legacyvault.repository.LegalVerificationRequestRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
+import com.ltld.app.legacyvault.service.notificationservice.NotificationParams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -97,6 +98,9 @@ public class ExecutorInAppNotificationListener {
                         .referenceType(ENTITY_REQUEST)
                         .referenceId(requestId)
                         .content(reason == null ? String.format(template, owner) : String.format(template, owner, reason))
+                        .params(NotificationParams.json("owner", owner, "reason", reason, "variant",
+                                MSG_UNLOCKED.equals(template) ? "EXECUTOR" : MSG_APPROVED.equals(template) ? "APPROVED"
+                                        : MSG_REJECTED.equals(template) ? "REJECTED" : null))
                         .status(NotificationStatus.SENT)
                         .sentAt(LocalDateTime.now())
                         .build());

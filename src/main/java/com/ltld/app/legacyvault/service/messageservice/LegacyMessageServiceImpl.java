@@ -481,6 +481,8 @@ public class LegacyMessageServiceImpl implements LegacyMessageService {
                                     .referenceType("Vault")
                                     .referenceId(vault.getId())
                                     .content(content)
+                                    .params(com.ltld.app.legacyvault.service.notificationservice.NotificationParams
+                                            .json("owner", ownerName, "vault", vault.getName()))
                                     .status(NotificationStatus.SENT)
                                     .sentAt(now)
                                     .build());

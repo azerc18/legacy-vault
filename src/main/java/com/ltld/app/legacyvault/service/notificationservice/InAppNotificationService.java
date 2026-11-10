@@ -10,8 +10,14 @@ public interface InAppNotificationService {
 
     Page<NotificationResponse> listMine(UUID userId, int page, int size);
 
+    /** unreadOnly = true: chỉ thông báo chưa đọc (tab "Chưa đọc" của chuông). */
+    Page<NotificationResponse> listMine(UUID userId, int page, int size, boolean unreadOnly);
+
     long countUnread(UUID userId);
 
     /** Thông báo của người khác hoặc không tồn tại -> 404. Đánh dấu lần 2 không đổi gì. */
     void markRead(UUID notificationId, UUID userId);
+
+    /** Đánh dấu đã đọc mọi thông báo trong app của người dùng; trả về số thông báo vừa đổi. */
+    int markAllRead(UUID userId);
 }

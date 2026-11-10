@@ -86,6 +86,8 @@ class VaultServiceImplTest {
     private com.ltld.app.legacyvault.service.auditservice.AuditLogService auditLogService;
     @Mock
     private EmailSender emailSender;
+    // Chuông thông báo: service ghi thêm thông báo trong app
+    @Mock private com.ltld.app.legacyvault.service.notificationservice.InAppNotifier inAppNotifier;
     @Mock
     private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock

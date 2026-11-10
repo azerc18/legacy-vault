@@ -62,6 +62,7 @@ class EntitlementServiceImplTest {
         expiryScheduler = new SubscriptionExpiryScheduler(
                 subscriptionRepository,
                 emailSender,
+                mock(com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.class),
                 TransactionOperations.withoutTransaction()
         );
 

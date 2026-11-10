@@ -38,6 +38,8 @@ class DmsReminderServiceImplTest {
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private DmsReminderProcessor processor;
     @Mock private EmailSender emailSender;
+    // Chuông thông báo: service ghi thêm thông báo trong app
+    @Mock private com.ltld.app.legacyvault.service.notificationservice.InAppNotifier inAppNotifier;
     // F2: chưa stub -> token null, mail không kèm link
     @Mock private DmsOneClickCheckinService oneClickCheckinService;
 

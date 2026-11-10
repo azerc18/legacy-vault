@@ -3,6 +3,8 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
+import com.ltld.app.legacyvault.enums.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ public class DmsReminderServiceImpl implements DmsReminderService {
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsReminderProcessor processor;
     private final EmailSender emailSender;
+    private final InAppNotifier inAppNotifier;
     // F2: token cho link check-in một chạm trong mail nhắc
     private final DmsOneClickCheckinService oneClickCheckinService;
 
@@ -42,6 +45,13 @@ public class DmsReminderServiceImpl implements DmsReminderService {
     // Nhắc nhở gửi ít nhất một lần: nhắc trùng thì vô hại, nhắc thiếu có thể kích hoạt bàn giao khi Owner còn sống.
     // Gửi lỗi thì trả lại lần nhắc để lượt quét sau gửi lại; gửi được thì mới ghi DmsCheckin REMINDER_SENT.
     private void send(UUID configId, DmsReminderProcessor.ReminderMail mail, LocalDateTime now) {
+        // Chuông thông báo: ghi trước khi gửi mail để SMTP lỗi thì Owner vẫn thấy trong app; lượt gửi lại không ghi trùng
+        inAppNotifier.toEmailOnce(mail.ownerEmail(), InAppNotifier.draft(NotificationType.DMS_CHECKIN_REMINDER,
+                InAppNotifier.REF_DMS_CONFIG, configId,
+                "Check-in reminder " + mail.reminderNumber() + "/" + mail.reminderCount()
+                        + ": please check in to confirm you are safe.",
+                "number", mail.reminderNumber(), "count", mail.reminderCount(),
+                "dueAt", mail.checkinDueAt(), "triggerAt", mail.triggerAt()));
         try {
             // Sinh token trong try: lỗi sinh token cũng tính như gửi lỗi, lần nhắc được trả lại.
             String checkinToken = oneClickCheckinService.generateCheckinTokenForConfig(configId);

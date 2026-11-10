@@ -15,7 +15,10 @@ One account can have several roles. If you were just given a new role, sign out 
 
 - The left sidebar has "Home" and "Profile", then one group per role (for example Vault Owner: "My vaults", "Dead Man's Switch", "Executors", "Activity", "Billing & VIP"). Click a group name to open or close it. "Collapse sidebar" / "Expand sidebar" makes the sidebar narrow or wide.
 - The bottom of the sidebar has: the "Upgrade" / "VIP" button (Vault Owner), the EN / VI language switch, the light / dark mode button, your avatar (opens "My profile") and "Log out".
-- The bell icon shows "Notifications" (on Vault Owner, Beneficiary and Executor pages).
+- The bell icon at the bottom of the sidebar opens "Notifications" on every page after you sign in. A red number shows how many are unread; it refreshes about every minute.
+  - What appears there: being named or removed as a beneficiary, being appointed or removed as an executor, DMS check-in reminders, a missed check-in (the owner and the trusted confirmers who have an account), a confirmer confirming you are safe, an administrator pausing or resuming your DMS, asset verified or needing re-verification, payment and VIP expiry, vault unlocked, legacy messages, claim deadline reminders, executor task results and verification results.
+  - Click a notification to mark it as read and open the related page. "Unread" shows only unread ones, "Mark all as read" clears the number, "Show older" loads earlier notifications.
+  - Notifications follow the language chosen with the EN / VI switch. Security emails (OTP codes, password reset, new device, account lock) and the confirmer's confirmation link are sent by email only.
 - Vaulty (this assistant) is the owl button. Click it to chat, drag it to move it.
 
 ### Guide and tours

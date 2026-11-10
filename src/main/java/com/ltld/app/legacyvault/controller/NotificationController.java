@@ -31,11 +31,14 @@ public class NotificationController {
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> listMine(
             Principal principal,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean unreadOnly) {
+        UUID userId = currentUserId(principal);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(ApiResponse.success("Notifications retrieved",
-                        inAppNotificationService.listMine(currentUserId(principal), page, size)));
+                .body(ApiResponse.success("Notifications retrieved", unreadOnly
+                        ? inAppNotificationService.listMine(userId, page, size, true)
+                        : inAppNotificationService.listMine(userId, page, size)));
     }
 
     @GetMapping("/me/unread-count")
@@ -44,6 +47,12 @@ public class NotificationController {
                 .cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success("Unread count retrieved",
                         inAppNotificationService.countUnread(currentUserId(principal))));
+    }
+
+    @PatchMapping("/me/read-all")
+    public ResponseEntity<ApiResponse<Integer>> markAllRead(Principal principal) {
+        return ResponseEntity.ok(ApiResponse.success("All notifications marked as read.",
+                inAppNotificationService.markAllRead(currentUserId(principal))));
     }
 
     @PatchMapping("/{notificationId}/read")

@@ -13,7 +13,8 @@ import {
     DEMO_READINESS,
     DEMO_BENEFICIARY_VAULTS,
     DEMO_EXECUTOR_CASES,
-    DEMO_VERIFIER_REQUESTS
+    DEMO_VERIFIER_REQUESTS,
+    demoNotifications
 } from '../Common/demoMockData.js';
 
 const http = axios.create({ baseURL: '/api', withCredentials: true });
@@ -27,6 +28,11 @@ function handleDemoMock(config) {
         data = { success: true, data: DEMO_DMS };
     } else if (url.includes('/dms/confirmers') && method === 'post') {
         data = { success: true, data: { id: 'c-' + Date.now(), name: 'Người xác nhận mới', email: 'confirmer@example.com', relationship: 'Bạn bè', status: 'CONFIRMED' } };
+    } else if (url.includes('/notifications/me/unread-count')) {
+        data = { success: true, data: demoNotifications().filter((n) => !n.read).length };
+    } else if (url.endsWith('/notifications/me')) {
+        const all = demoNotifications();
+        data = { success: true, data: { content: config.params?.unreadOnly ? all.filter((n) => !n.read) : all, last: true } };
     } else if (method === 'post' || method === 'put' || method === 'patch') {
         data = { success: true, data: { id: 'demo-' + Date.now(), success: true, status: 'SUCCESS' } };
     } else if (url.includes('/users/me')) {
