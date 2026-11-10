@@ -5,6 +5,7 @@ import { paymentApi } from '../api/paymentApi.js';
 import { getToken } from '../auth/auth.js';
 import { formatStorage } from '../i18n/format.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import { publishSubscription } from '../Common/useVipStatus.js';
 import { btnOutline, btnPrimary, Icon } from './ownerUi.jsx';
 
 const MAX_ATTEMPTS = 5;
@@ -65,8 +66,13 @@ export default function PaymentResultPage() {
                 .then((data) => {
                     if (!mounted) return;
                     setSub(data);
-                    if (data?.vip) setState('success');
-                    else retryOrGiveUp(count);
+                    if (data?.vip) {
+                        // Lần đọc đầu có thể còn gói cũ (cổng chưa báo về) và đã nằm trong cache
+                        publishSubscription(data);
+                        setState('success');
+                    } else {
+                        retryOrGiveUp(count);
+                    }
                 })
                 .catch((err) => {
                     if (!mounted) return;

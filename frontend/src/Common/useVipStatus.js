@@ -15,18 +15,21 @@ function cachedVip() {
     }
 }
 
+// Ghi cache và báo cho mọi nơi đang hiện trạng thái gói (widget cú sống suốt phiên, không tự đọc lại)
+export function publishSubscription(data) {
+    try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
+    } catch {
+        // sessionStorage có thể bị chặn
+    }
+    window.dispatchEvent(new CustomEvent(SUB_EVENT, { detail: Boolean(data.vip) }));
+}
+
 let pending = null;   // Header và widget cú cùng hỏi một lúc thì chỉ gọi API một lần
 function refreshVip() {
     pending ??= paymentApi.getMySubscription()
-        .then((data) => {
-            if (!data) return;
-            try {
-                sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }));
-            } catch {
-                // sessionStorage có thể bị chặn
-            }
-            window.dispatchEvent(new CustomEvent(SUB_EVENT, { detail: Boolean(data.vip) }));
-        })
+        .then((data) => { if (data) publishSubscription(data); })
+        // Lỗi API: giữ null để không khóa nhầm đồ của VIP; trang kế tiếp mở header sẽ hỏi lại
         .catch(() => {})
         .finally(() => { pending = null; });
 }

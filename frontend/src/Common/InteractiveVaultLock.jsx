@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { paymentApi } from '../api/paymentApi.js';
+import { publishSubscription } from './useVipStatus.js';
 
 const PUBLIC_ROUTES = [
     '/',
@@ -183,17 +184,8 @@ export default function InteractiveVaultLock({
             .getMySubscription()
             .then((data) => {
                 if (!alive || !data) return;
-                const vip = Boolean(data.vip);
-                setIsVip(vip);
-                try {
-                    sessionStorage.setItem(
-                        'lv_sub_cache',
-                        JSON.stringify({ data, timestamp: Date.now() })
-                    );
-                } catch {
-                    // ignore
-                }
-                window.dispatchEvent(new CustomEvent(SUB_EVENT, { detail: vip }));
+                setIsVip(Boolean(data.vip));
+                publishSubscription(data);
             })
             .catch(() => {});
         return () => {

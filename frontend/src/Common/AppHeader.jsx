@@ -188,11 +188,15 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
     const navRef = useRef(null);
     useEffect(() => {
         const nav = navRef.current;
-        const active = nav?.querySelector('.lv-nav-capsule');
-        if (!active || nav.scrollWidth <= nav.clientWidth) return;
-        const n = nav.getBoundingClientRect();
-        const a = active.getBoundingClientRect();
-        nav.scrollLeft += a.left - n.left - (n.width - a.width) / 2;
+        const center = () => {
+            const active = nav?.querySelector('.lv-nav-capsule');
+            if (!active || nav.scrollWidth <= nav.clientWidth) return;
+            const n = nav.getBoundingClientRect();
+            const a = active.getBoundingClientRect();
+            nav.scrollLeft += a.left - n.left - (n.width - a.width) / 2;
+        };
+        center();
+        document.fonts?.ready.then(center);   // font tải xong làm độ rộng các mục thay đổi
     }, [pathname]);
 
     // Thanh bên trái (desktop) / thanh trên cùng (điện thoại). Nội dung trang được đẩy sang phải nhờ class lv-has-side (xem index.css).
