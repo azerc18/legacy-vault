@@ -10,6 +10,15 @@ export const START_SPOTLIGHT_EVENT = 'lv_start_spotlight_tour';
 export const OPEN_PROMPT_EVENT = 'lv_open_first_time_prompt';
 export const START_FEATURE_TOUR_EVENT = 'lv_start_feature_tour';
 
+// Trạng thái hướng dẫn gắn theo TỪNG TÀI KHOẢN (không phải theo trình duyệt): đổi tài khoản trên cùng máy
+// thì tài khoản mới vẫn được tự bật hướng dẫn lần đầu vào mỗi tính năng.
+function scoped(key) {
+    const u = getUser();
+    const id = u?.id ?? u?.userId ?? u?.email;
+    return id ? `${key}:${id}` : key;
+}
+
+
 /**
  * Kích hoạt trực tiếp Tour tạo két sắt 6 bước
  */
@@ -36,10 +45,10 @@ export function startFeatureTour(featureId) {
  */
 export function resetAllTours() {
     try {
-        localStorage.removeItem(ONBOARDING_STATUS_KEY);
-        localStorage.removeItem(ONBOARDING_STEP_KEY);
+        localStorage.removeItem(scoped(ONBOARDING_STATUS_KEY));
+        localStorage.removeItem(scoped(ONBOARDING_STEP_KEY));
         FEATURE_TOURS.forEach((ft) => {
-            localStorage.removeItem(`lv_seen_feature_${ft.id}`);
+            localStorage.removeItem(scoped(`lv_seen_feature_${ft.id}`));
         });
     } catch {
         // ignore
@@ -170,7 +179,7 @@ export default function SpotlightTour() {
         if (publicPaths.includes(location.pathname) || location.pathname.startsWith('/admin')) return undefined;
 
         try {
-            const status = localStorage.getItem(ONBOARDING_STATUS_KEY);
+            const status = localStorage.getItem(scoped(ONBOARDING_STATUS_KEY));
             if (!status) {
                 // Lần đầu đăng nhập: hiển thị câu hỏi sau 600ms
                 const timer = setTimeout(() => {
@@ -181,7 +190,7 @@ export default function SpotlightTour() {
             if (status === 'tour_active') {
                 // Chỉ kích hoạt lại tour tạo két nếu đang ở đúng trang tạo két (/owner/vaults hoặc /owner/vaults/new)
                 if (location.pathname === '/owner/vaults' || location.pathname === '/owner/vaults/new') {
-                    const savedStep = parseInt(localStorage.getItem(ONBOARDING_STEP_KEY) || '1', 10);
+                    const savedStep = parseInt(localStorage.getItem(scoped(ONBOARDING_STEP_KEY)) || '1', 10);
                     setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
                     setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
                 }
@@ -203,7 +212,7 @@ export default function SpotlightTour() {
         if (!feature) return undefined;
 
         try {
-            const seen = localStorage.getItem(`lv_seen_feature_${feature.id}`);
+            const seen = localStorage.getItem(scoped(`lv_seen_feature_${feature.id}`));
             if (!seen) {
                 const timer = setTimeout(() => {
                     setCurrentStep(1);
@@ -225,8 +234,8 @@ export default function SpotlightTour() {
             setCurrentStep(1);
             setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
             try {
-                localStorage.setItem(ONBOARDING_STATUS_KEY, 'tour_active');
-                localStorage.setItem(ONBOARDING_STEP_KEY, '1');
+                localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'tour_active');
+                localStorage.setItem(scoped(ONBOARDING_STEP_KEY), '1');
             } catch {
                 // ignore
             }
@@ -358,7 +367,7 @@ export default function SpotlightTour() {
         const onTargetClick = () => {
             setCurrentStep(2);
             try {
-                localStorage.setItem(ONBOARDING_STEP_KEY, '2');
+                localStorage.setItem(scoped(ONBOARDING_STEP_KEY), '2');
             } catch {
                 // ignore
             }
@@ -387,8 +396,8 @@ export default function SpotlightTour() {
         setCurrentStep(1);
         setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
         try {
-            localStorage.setItem(ONBOARDING_STATUS_KEY, 'tour_active');
-            localStorage.setItem(ONBOARDING_STEP_KEY, '1');
+            localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'tour_active');
+            localStorage.setItem(scoped(ONBOARDING_STEP_KEY), '1');
         } catch {
             // ignore
         }
@@ -400,7 +409,7 @@ export default function SpotlightTour() {
     const handlePromptExperienced = () => {
         setShowPrompt(false);
         try {
-            localStorage.setItem(ONBOARDING_STATUS_KEY, 'experienced');
+            localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'experienced');
         } catch {
             // ignore
         }
@@ -411,13 +420,13 @@ export default function SpotlightTour() {
         if (!activeTour) return;
         if (activeTour.type === 'feature') {
             try {
-                localStorage.setItem(`lv_seen_feature_${activeTour.config.id}`, 'true');
+                localStorage.setItem(scoped(`lv_seen_feature_${activeTour.config.id}`), 'true');
             } catch {
                 // ignore
             }
         } else {
             try {
-                localStorage.setItem(ONBOARDING_STATUS_KEY, 'skipped');
+                localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'skipped');
             } catch {
                 // ignore
             }
@@ -432,7 +441,7 @@ export default function SpotlightTour() {
             setCurrentStep(next);
             if (activeTour?.type === 'vault_creation') {
                 try {
-                    localStorage.setItem(ONBOARDING_STEP_KEY, String(next));
+                    localStorage.setItem(scoped(ONBOARDING_STEP_KEY), String(next));
                 } catch {
                     // ignore
                 }
@@ -449,7 +458,7 @@ export default function SpotlightTour() {
             setCurrentStep(prev);
             if (activeTour?.type === 'vault_creation') {
                 try {
-                    localStorage.setItem(ONBOARDING_STEP_KEY, String(prev));
+                    localStorage.setItem(scoped(ONBOARDING_STEP_KEY), String(prev));
                 } catch {
                     // ignore
                 }
@@ -462,15 +471,15 @@ export default function SpotlightTour() {
         if (!activeTour) return;
         if (activeTour.type === 'feature') {
             try {
-                localStorage.setItem(`lv_seen_feature_${activeTour.config.id}`, 'true');
+                localStorage.setItem(scoped(`lv_seen_feature_${activeTour.config.id}`), 'true');
             } catch {
                 // ignore
             }
             setActiveTour(null);
         } else {
             try {
-                localStorage.setItem(ONBOARDING_STATUS_KEY, 'completed');
-                localStorage.removeItem(ONBOARDING_STEP_KEY);
+                localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'completed');
+                localStorage.removeItem(scoped(ONBOARDING_STEP_KEY));
             } catch {
                 // ignore
             }

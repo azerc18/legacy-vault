@@ -7,6 +7,10 @@
     justify-content: center;
     padding: 4px 8px 2px;
     border-radius: 26px;
+    /* Không có khung kính quanh con cú, ở cả chế độ sáng và tối */
+    background: transparent;
+    border: 0;
+    box-shadow: none;
     transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease;
 }
 .lv-assistant-launcher:hover {
