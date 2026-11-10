@@ -8,6 +8,7 @@ import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 const RESEND_SECONDS = 60;
 
@@ -156,17 +157,7 @@ export default function ResetPassword() {
                                         {cooldown > 0 ? t('reset.resendIn', { seconds: cooldown }) : t('reset.resend')}
                                     </button>
                                 </div>
-                                <input
-                                    id="reset-otp"
-                                    type="text"
-                                    inputMode="numeric"
-                                    autoComplete="one-time-code"
-                                    maxLength={6}
-                                    placeholder="______"
-                                    value={otp}
-                                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                    className={`${inputClass} text-center text-lg tracking-[0.5em]`}
-                                />
+                                <OtpInput id="reset-otp" value={otp} onChange={setOtp} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">

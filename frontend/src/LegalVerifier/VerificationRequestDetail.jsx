@@ -15,6 +15,7 @@ import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
@@ -494,16 +495,7 @@ export default function VerificationRequestDetail() {
                                 ) : (
                                     <form onSubmit={askSign} className="space-y-4">
                                         <label htmlFor="sign-code" className="text-sm text-on-surface-variant block">{t('detail.codeLabel')}</label>
-                                        <input
-                                            id="sign-code"
-                                            inputMode="numeric"
-                                            autoComplete="one-time-code"
-                                            maxLength={6}
-                                            placeholder="• • • • • •"
-                                            value={code}
-                                            onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                                            className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-lg text-center tracking-[0.5em] focus:outline-none focus:border-primary"
-                                        />
+                                        <OtpInput id="sign-code" value={code} onChange={setCode} />
                                         <button
                                             type="button"
                                             onClick={handleSendCode}

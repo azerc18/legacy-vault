@@ -13,6 +13,7 @@ import {
     ASSET_ICON, useEnumLabels, inputClass, btnPrimary, btnOutline,
 } from './beneficiaryUi.jsx';
 import BeneficiaryLegacyMessages from './BeneficiaryLegacyMessages.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 const OTP_RESEND_SECONDS = 60; // khớp BeneficiaryServiceImpl.OTP_RESEND_SECONDS
 
@@ -285,11 +286,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
                 <form onSubmit={submit} className="flex flex-col gap-4">
                     {method === 'OTP' ? (
                         <>
-                            <input
-                                inputMode="numeric" maxLength={6} placeholder={t('verify.otpPlaceholder')} value={otp}
-                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                                className={`${inputClass} tracking-[0.5em] text-center`}
-                            />
+                            <OtpInput label={t('verify.otpPlaceholder')} value={otp} onChange={setOtp} />
                             <button type="button" onClick={resend} disabled={cooldown > 0} className="text-sm font-semibold text-secondary disabled:text-outline self-start">
                                 {cooldown > 0 ? t('verify.resendIn', { seconds: cooldown }) : t('verify.resend')}
                             </button>

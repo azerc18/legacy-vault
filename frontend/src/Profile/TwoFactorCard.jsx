@@ -4,6 +4,7 @@ import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import { userApi } from '../api/userApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, inputClass, btnPrimary, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 // H4: bật/tắt xác thực 2 lớp (TOTP) + mã dự phòng
 export default function TwoFactorCard({ profile, onChanged }) {
@@ -114,7 +115,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                                 <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
                             </div>
                         </div>
-                        {codeInput()}
+                        <OtpInput value={code} onChange={setCode} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
                                 {t('common:actions.cancel')}

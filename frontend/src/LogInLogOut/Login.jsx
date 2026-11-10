@@ -10,6 +10,7 @@ import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
 import BrandMark from '../Common/BrandMark.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 const inputCls =
     'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all';
@@ -230,18 +231,19 @@ export default function Login() {
                             <span className="material-symbols-outlined">phonelink_lock</span>
                             {useBackup ? t('mfa.hintBackup') : t('mfa.hintApp')}
                         </div>
-                        <input
-                            autoFocus
-                            aria-label={useBackup ? t('mfa.hintBackup') : t('mfa.hintApp')}
-                            value={code}
-                            onChange={(e) => setCode(useBackup
-                                ? e.target.value.toUpperCase()
-                                : e.target.value.replace(/\D/g, ''))}
-                            inputMode={useBackup ? 'text' : 'numeric'}
-                            autoComplete="one-time-code"
-                            maxLength={useBackup ? 9 : 6}
-                            className={`${inputCls} text-center text-xl tracking-[0.3em] font-semibold`}
-                        />
+                        {useBackup ? (
+                            <input
+                                autoFocus
+                                aria-label={t('mfa.hintBackup')}
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                                autoComplete="one-time-code"
+                                maxLength={9}
+                                className={`${inputCls} text-center text-xl tracking-[0.3em] font-semibold`}
+                            />
+                        ) : (
+                            <OtpInput autoFocus label={t('mfa.hintApp')} value={code} onChange={setCode} />
+                        )}
                         <button
                             type="submit"
                             disabled={loading}
