@@ -5,6 +5,7 @@ import { userApi } from '../api/userApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, inputClass, btnPrimary, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
+import TwoFactorCodeInput from '../Common/TwoFactorCodeInput.jsx';
 
 // H4: bật/tắt xác thực 2 lớp (TOTP) + mã dự phòng
 export default function TwoFactorCard({ profile, onChanged }) {
@@ -50,11 +51,6 @@ export default function TwoFactorCard({ profile, onChanged }) {
         a.click();
         URL.revokeObjectURL(url);
     };
-
-    const codeInput = () => (
-        <input value={code} onChange={(e) => setCode(e.target.value)}
-               autoComplete="one-time-code" maxLength={9} className={`${inputClass} text-center tracking-[0.2em]`} />
-    );
 
     // --- Vừa bật: hiện mã dự phòng đúng 1 lần ---
     if (backupCodes) {
@@ -115,7 +111,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                                 <code className="block mt-1 p-2 rounded-lg bg-surface-container-low break-all select-all">{setup.secret}</code>
                             </div>
                         </div>
-                        <OtpInput value={code} onChange={setCode} />
+                        <OtpInput label={t('mfa.codeLabel')} value={code} onChange={setCode} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setSetup(null); setCode(''); setError(''); }} className={btnOutline}>
                                 {t('common:actions.cancel')}
@@ -138,7 +134,7 @@ export default function TwoFactorCard({ profile, onChanged }) {
                 {profile.mfaEnabled && disabling && (
                     <form onSubmit={confirmDisable} className="space-y-4">
                         <p className="text-sm">{t('mfa.disableHint')}</p>
-                        {codeInput()}
+                        <TwoFactorCodeInput label={t('mfa.codeLabel')} value={code} onChange={setCode} inputClass={inputClass} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => setDisabling(false)} className={btnOutline}>
                                 {t('common:actions.cancel')}

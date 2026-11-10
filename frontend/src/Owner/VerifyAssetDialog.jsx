@@ -15,9 +15,13 @@ import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
 import { Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
 import { schemaOf } from './AssetFields.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 // Cách xác thực mà FE biết vẽ. kind quyết định ô nhập ở bước hoàn tất.
 // Bao phủ toàn bộ 18 giá trị trong enum AssetVerificationMethod của BE.
+// Các phương thức nhập mã 6 số (hiện thành 6 ô). MICRO_DEPOSIT_MOCK (số tiền) và API_READONLY_MOCK (API key) giữ ô thường.
+const SIX_DIGIT_METHODS = ['OTP_EMAIL', 'SMS_CODE_MOCK', 'PAYPAL_LOGIN', 'EXCHANGE_EMAIL_CODE', 'SECOND_PERSON_CONFIRM'];
+
 const METHOD_KIND = {
     OTP_EMAIL: 'code',
     SMS_CODE_MOCK: 'code',
@@ -123,7 +127,7 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
 
     const canSubmit = !busy && (
         kind === 'auto'
-        || (kind === 'code' && input.code.trim())
+        || (kind === 'code' && (SIX_DIGIT_METHODS.includes(method) ? /^\d{6}$/.test(input.code) : input.code.trim()))
         || (kind === 'signature' && input.signature.trim())
         || (kind === 'bio' && input.bio.trim())
         || (kind === 'file' && input.file)
@@ -259,11 +263,18 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                                             {codeTarget ? t('dialog.codeSent', { target: codeTarget }) : cd.amount ? t('dialog.microDeposit', { amount: new Intl.NumberFormat(i18n.language).format(Number(cd.amount)) }) : t('dialog.codeEnter')}
                                         </p>
                                         {cd.sandboxCode && <p className="text-sm font-mono p-2 rounded-lg bg-surface-container-low">{t('dialog.sandboxCode', { code: cd.sandboxCode })}</p>}
+                                        {SIX_DIGIT_METHODS.includes(method) ? (
+                                            <div className="block">
+                                                <span className="text-sm font-semibold text-on-surface-variant block mb-2">{t('dialog.codeLabel')}</span>
+                                                <OtpInput label={t('dialog.codeLabel')} value={input.code} onChange={(v) => setIn('code', v)} />
+                                            </div>
+                                        ) : (
                                         <label className="block">
                                             <span className="text-sm font-semibold text-on-surface-variant">{t(method === 'API_READONLY_MOCK' ? 'dialog.apiKeyLabel' : cd.amount ? 'dialog.amountLabel' : 'dialog.codeLabel')}</span>
                                             <input value={input.code} maxLength={128} type={method === 'API_READONLY_MOCK' ? 'password' : 'text'} onChange={(e) => setIn('code', e.target.value)}
                                                 placeholder={t(method === 'API_READONLY_MOCK' ? 'dialog.apiKeyPlaceholder' : cd.amount ? 'dialog.amountPlaceholder' : 'dialog.codePlaceholder')} className={`${inputClass} mt-1`} autoComplete={method === 'API_READONLY_MOCK' ? 'off' : 'one-time-code'} />
                                         </label>
+                                        )}
                                     </>
                                 )}
 

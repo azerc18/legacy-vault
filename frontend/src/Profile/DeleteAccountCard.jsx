@@ -9,6 +9,7 @@ import { getErrorMessage } from '../api/http.js';
 import { logout } from '../auth/auth.js';
 import { Alert, Icon, inputClass, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
 import SharedPasswordInput from '../Common/PasswordInput.jsx';
+import TwoFactorCodeInput from '../Common/TwoFactorCodeInput.jsx';
 
 // Mỗi lý do chặn -> chỗ để xử lý (null = không có trang tự xử lý)
 const BLOCKER_LINK = { VAULTS_OWNED: '/owner/vaults', EXECUTOR: '/executor/home', BENEFICIARY: '/beneficiary', STAFF_ROLE: null };
@@ -110,11 +111,10 @@ export default function DeleteAccountCard({ profile }) {
                                     <span className="block text-xs text-on-surface-variant mt-1">{t('deleteAccount.passwordHint')}</span>
                                 </label>
                                 {check.mfaRequired && (
-                                    <label className="block">
+                                    <div className="block">
                                         <span className="block text-sm font-semibold mb-1.5">{t('deleteAccount.code')}</span>
-                                        <input value={code} onChange={(e) => setCode(e.target.value)} className={inputClass}
-                                               inputMode="text" autoComplete="one-time-code" />
-                                    </label>
+                                        <TwoFactorCodeInput label={t('deleteAccount.code')} value={code} onChange={setCode} inputClass={inputClass} />
+                                    </div>
                                 )}
                                 <label className="block">
                                     <span className="block text-sm font-semibold mb-1.5">

@@ -495,7 +495,7 @@ export default function VerificationRequestDetail() {
                                 ) : (
                                     <form onSubmit={askSign} className="space-y-4">
                                         <label htmlFor="sign-code" className="text-sm text-on-surface-variant block">{t('detail.codeLabel')}</label>
-                                        <OtpInput id="sign-code" value={code} onChange={setCode} />
+                                        <OtpInput id="sign-code" label={t('detail.codeLabel')} value={code} onChange={setCode} />
                                         <button
                                             type="button"
                                             onClick={handleSendCode}

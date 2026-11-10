@@ -20,13 +20,20 @@ export default function OtpInput({ value, onChange, length = 6, autoFocus = fals
     const handleChange = (i, e) => {
         const typed = e.target.value.replace(/\D/g, '');
         if (!typed) { setAt(i, ''); return; }
-        if (typed.length > 1) {                        // trình duyệt tự điền / dán nhiều số vào 1 ô
-            const merged = (value.slice(0, i) + typed).slice(0, length);
-            onChange(merged);
-            focusAt(Math.min(merged.length, length - 1));
+        // "Dán / tự điền" chỉ chạy khi nhận đủ cả mã; còn lại là gõ tay từng số.
+        if (typed.length >= length) {
+            const full = typed.slice(0, length);
+            onChange(full);
+            focusAt(full.length - 1);
             return;
         }
-        setAt(i, typed);
+        // Ô đang có số mà gõ tiếp: ô chứa 2 ký tự (số cũ + số mới) -> chỉ lấy số vừa gõ, bỏ số cũ.
+        let ch = typed[typed.length - 1];
+        if (typed.length > 1 && digits[i]) {
+            const rest = typed.replace(digits[i], '');
+            ch = rest ? rest[0] : typed[typed.length - 1];
+        }
+        setAt(i, ch);
         if (i < length - 1) focusAt(i + 1);
     };
 
@@ -39,16 +46,27 @@ export default function OtpInput({ value, onChange, length = 6, autoFocus = fals
         else if (e.key === 'ArrowRight') { e.preventDefault(); focusAt(i + 1); }
     };
 
-    const handlePaste = (e) => {
-        const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+    const handlePaste = (i, e) => {
+        const pasted = e.clipboardData.getData('text').replace(/\D/g, '');
         if (!pasted) return;
         e.preventDefault();
-        onChange(pasted);
-        focusAt(Math.min(pasted.length, length - 1));
+        // Dán đủ mã -> thay hết; dán một phần -> đặt vào từ ô đang đứng, giữ nguyên các số còn lại.
+        const from = Math.min(i, value.length);
+        const next = pasted.length >= length
+            ? pasted.slice(0, length)
+            : (value.slice(0, from) + pasted + value.slice(from + pasted.length)).slice(0, length);
+        onChange(next);
+        focusAt(Math.min(from + pasted.length, length - 1));
+    };
+
+    // Bấm vào ô trống phía sau: đưa con trỏ về ô trống đầu tiên để số hiện đúng chỗ con trỏ đứng.
+    const handleFocus = (i, e) => {
+        if (i > value.length) { focusAt(value.length); return; }
+        e.target.select();
     };
 
     return (
-        <div role="group" aria-label={label} className="flex justify-center gap-2 sm:gap-3">
+        <div role="group" aria-label={label} className="flex w-full justify-center gap-2 sm:gap-3">
             {digits.map((d, i) => (
                 <input
                     key={i}
@@ -61,13 +79,12 @@ export default function OtpInput({ value, onChange, length = 6, autoFocus = fals
                     autoComplete={i === 0 ? 'one-time-code' : 'off'}
                     autoFocus={autoFocus && i === 0}
                     disabled={disabled}
-                    maxLength={length}
                     aria-label={label ? `${label} ${i + 1}/${length}` : `${i + 1}/${length}`}
                     onChange={(e) => handleChange(i, e)}
                     onKeyDown={(e) => handleKeyDown(i, e)}
-                    onPaste={handlePaste}
-                    onFocus={(e) => e.target.select()}
-                    className="w-11 h-14 sm:w-12 sm:h-14 rounded-xl border border-outline-variant bg-background text-center text-2xl font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+                    onPaste={(e) => handlePaste(i, e)}
+                    onFocus={(e) => handleFocus(i, e)}
+                    className="min-w-0 flex-1 max-w-12 h-14 rounded-xl border border-outline-variant bg-background text-center text-2xl font-semibold text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
                 />
             ))}
         </div>

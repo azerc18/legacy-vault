@@ -157,7 +157,7 @@ export default function ResetPassword() {
                                         {cooldown > 0 ? t('reset.resendIn', { seconds: cooldown }) : t('reset.resend')}
                                     </button>
                                 </div>
-                                <OtpInput id="reset-otp" value={otp} onChange={setOtp} />
+                                <OtpInput id="reset-otp" label={t('reset.otp')} value={otp} onChange={setOtp} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">
