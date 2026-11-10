@@ -69,7 +69,7 @@ function MessageContent({ text, animate = false }) {
     );
 }
 
-export default function ChatPanel({ messages, setMessages, onClose, onReply, onThinking, costume = 'none', onCostumeChange, dragHandlers }) {
+export default function ChatPanel({ messages, setMessages, onClose, onReply, onThinking, costume = 'none', vip = null, onCostumeChange, dragHandlers }) {
     const { t } = useTranslation();
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
@@ -124,7 +124,9 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
             <div {...dragHandlers} title={t('assistant.dragHint')}
                  className="lv-assistant-handle flex items-center justify-between px-4 py-3 bg-brand/85 backdrop-blur-md border-b border-white/15 text-white">
                 <div>
-                    <p className="font-semibold leading-tight">Vaulty</p>
+                    <p className="font-semibold leading-tight">
+                        Vaulty{vip && <span className="lv-owl-vip-tag ml-1.5">VIP</span>}
+                    </p>
                     <p className="text-xs text-white/75">{picking ? 'Choose an outfit' : 'LegacyVault guide'}</p>
                 </div>
                 <div className="flex items-center gap-1" data-no-drag>
@@ -147,13 +149,21 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                     <div className="grid grid-cols-4 gap-2">
                         {COSTUMES.map((c) => {
                             const on = c.id === costume;
+                            const locked = vip === false && c.vip;
                             return (
                                 <button key={c.id} type="button" onClick={() => onCostumeChange?.(c.id)} aria-pressed={on}
-                                        className={`flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] leading-tight transition-all ${
+                                        title={locked ? t('assistant.vipOutfit') : undefined}
+                                        aria-label={locked ? `${c.label}: ${t('assistant.vipOutfit')}` : c.label}
+                                        className={`relative flex flex-col items-center gap-1 py-2 rounded-xl border text-[11px] leading-tight transition-all ${
                                             on ? 'lv-glass-tinted text-on-surface font-semibold'
                                                 : 'lv-glass-inline text-on-surface-variant hover:text-on-surface'}`}>
-                                    <span className="text-2xl leading-none" aria-hidden="true">{c.emoji}</span>
+                                    <span className={`text-2xl leading-none${locked ? ' opacity-45 grayscale' : ''}`} aria-hidden="true">{c.emoji}</span>
                                     {c.label}
+                                    {c.vip && vip !== null && (
+                                        <span className="lv-owl-vip-tag absolute top-0.5 right-0.5" aria-hidden="true">
+                                            {locked ? <Icon name="lock" className="text-[10px]" /> : 'VIP'}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import UserAvatar from '../Common/UserAvatar.jsx';
+import { useVipStatus } from '../Common/useVipStatus.js';
 import { getErrorMessage } from '../api/http.js';
 import { updateStoredUser, logout } from '../auth/auth.js';
 import { useToast } from '../Common/Toast.jsx';
@@ -53,6 +54,7 @@ const PasswordInput = (props) => <SharedPasswordInput className={inputClass} {..
 function AvatarEditor({ profile, onChanged }) {
     const { t } = useTranslation('profile');
     const inputRef = useRef(null);
+    const isVip = useVipStatus() === true;
     const [preview, setPreview] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -100,6 +102,7 @@ function AvatarEditor({ profile, onChanged }) {
                     hasAvatar={profile.hasAvatar}
                     version={profile.avatarUpdatedAt}
                     previewUrl={preview}
+                    vip={isVip}
                 />
                 {/* !absolute: liquid glass (materials.css) đặt button.bg-primary { position: relative },
                     mạnh hơn .absolute nên nút camera rơi xuống dưới ảnh thay vì nằm ở góc */}

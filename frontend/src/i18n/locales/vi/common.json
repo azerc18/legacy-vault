@@ -54,7 +54,7 @@
   },
   "language": { "label": "Ngôn ngữ", "en": "EN", "vi": "VI" },
   "theme": { "toLight": "Chuyển sang nền sáng", "toDark": "Chuyển sang nền tối" },
-  "assistant": { "open": "Mở trợ lý", "close": "Đóng trợ lý", "launcherHint": "Bấm để trò chuyện, kéo để di chuyển", "dragHint": "Kéo để di chuyển" },
+  "assistant": { "open": "Mở trợ lý", "close": "Đóng trợ lý", "launcherHint": "Bấm để trò chuyện, kéo để di chuyển", "dragHint": "Kéo để di chuyển", "vipOutfit": "Trang phục VIP. Nâng cấp để sử dụng" },
   "toast": { "close": "Đóng" },
   "claim": {
     "progress": "Tiến độ nhận tài sản",

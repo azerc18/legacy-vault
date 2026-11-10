@@ -1,10 +1,10 @@
 // Header dùng chung cho mọi trang sau đăng nhập (Owner, Admin, Beneficiary, Executor, Verifier, /me, /home).
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
-import { paymentApi } from '../api/paymentApi.js';
+import { useVipStatus } from './useVipStatus.js';
 import UserAvatar from './UserAvatar.jsx';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
@@ -180,53 +180,20 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
 
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
-    const [vipStatus, setVipStatus] = useState(() => {
-        if (!isOwner) return null;
-        try {
-            const cached = sessionStorage.getItem('lv_sub_cache');
-            if (cached) {
-                const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < 5 * 60 * 1000) return data;
-            }
-        } catch {
-            // ignore sessionStorage error
-        }
-        return null;
-    });
-
-    useEffect(() => {
-        if (!isOwner) return;
-        let mounted = true;
-
-        try {
-            const cached = sessionStorage.getItem('lv_sub_cache');
-            if (cached) {
-                const { timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < 5 * 60 * 1000) return undefined;
-            }
-        } catch {
-            // ignore sessionStorage error
-        }
-
-        paymentApi
-            .getMySubscription()
-            .then((data) => {
-                if (mounted && data) {
-                    setVipStatus(data);
-                    try {
-                        sessionStorage.setItem('lv_sub_cache', JSON.stringify({ data, timestamp: Date.now() }));
-                    } catch {
-                        // ignore
-                    }
-                }
-            })
-            .catch(() => {});
-        return () => {
-            mounted = false;
-        };
-    }, [isOwner]);
+    const isVip = useVipStatus() === true;
 
     const handleLogout = () => { logout(); navigate('/login'); };
+
+    // Menu cuộn ngang (dưới 1024px): đưa mục đang mở vào giữa để không bị khuất
+    const navRef = useRef(null);
+    useEffect(() => {
+        const nav = navRef.current;
+        const active = nav?.querySelector('.lv-nav-capsule');
+        if (!active || nav.scrollWidth <= nav.clientWidth) return;
+        const n = nav.getBoundingClientRect();
+        const a = active.getBoundingClientRect();
+        nav.scrollLeft += a.left - n.left - (n.width - a.width) / 2;
+    }, [pathname]);
 
     // Thanh bên trái (desktop) / thanh trên cùng (điện thoại). Nội dung trang được đẩy sang phải nhờ class lv-has-side (xem index.css).
     useEffect(() => {
@@ -281,11 +248,11 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
             </div>
 
             {navProp?.length > 0 ? (
-                <nav className="lv-side-nav">
+                <nav ref={navRef} className="lv-side-nav">
                     {navProp.map(renderNavLink)}
                 </nav>
             ) : (
-                <nav className="lv-side-nav">
+                <nav ref={navRef} className="lv-side-nav">
                     {generalItems.map(renderNavLink)}
 
                     {roleSections.map((sec) => {
@@ -317,16 +284,16 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
             <div className="lv-side-bottom">
                 {isOwner && (
                     <Link
-                        to={vipStatus?.vip ? '/billing' : '/pricing'}
-                        title={vipStatus?.vip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
+                        to={isVip ? '/billing' : '/pricing'}
+                        title={isVip ? tPayment('header.vipActive') : tPayment('header.upgradeToVip')}
                         className={`h-9 px-3.5 rounded-full text-xs font-bold inline-flex items-center gap-1.5 border transition-all ${
-                            vipStatus?.vip
-                                ? 'bg-white/90 text-brand border-white shadow-sm'
+                            isVip
+                                ? 'lv-vip-chip'
                                 : 'bg-white/10 text-white border-white/20 hover:bg-white hover:text-brand'
                         }`}
                     >
                         <Icon name="workspace_premium" className="text-[16px]" />
-                        <span className="lv-label">{vipStatus?.vip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
+                        <span className="lv-label">{isVip ? tPayment('header.vip') : tPayment('header.upgrade')}</span>
                     </Link>
                 )}
                 {userHome && (
@@ -345,8 +312,8 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                 </div>
                 <div className="lv-side-user flex items-center gap-3 pt-3 border-t border-white/15 min-w-0">
                     <Link to="/me" title={user?.email} className="flex items-center gap-3 min-w-0 flex-1 group">
-                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} />
-                        <span className="lv-label text-sm font-semibold text-white/90 group-hover:text-white truncate transition-colors">{user?.name}</span>
+                        <UserAvatar name={user?.name} hasAvatar={user?.hasAvatar} version={user?.avatarVersion} vip={isVip} />
+                        <span className={`lv-label text-sm font-semibold text-white/90 group-hover:text-white truncate transition-colors${isVip ? ' lv-vip-name' : ''}`}>{user?.name}</span>
                     </Link>
                     <button type="button" onClick={handleLogout} title={t('header.logout')} aria-label={t('header.logout')}
                             className="h-9 w-9 rounded-full flex items-center justify-center text-white/75 hover:text-white bg-white/[0.06] hover:bg-white/[0.15] border border-white/10 transition-all">
@@ -375,7 +342,8 @@ export function PageTitle({ back, kicker, title, subtitle, right, className = 'm
             )}
             {kicker && <p className="lv-page-hero-kicker text-[11px] font-bold uppercase tracking-[0.12em] text-[#b9c9ff] mb-1.5">{kicker}</p>}
             <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="min-w-0 flex-1">
+                {/* basis 16rem: màn hẹp thì nút bên phải xuống dòng thay vì bóp tiêu đề thành từng chữ */}
+                <div className="min-w-0 flex-[1_1_16rem]">
                     <h1 className="font-headline-md text-[28px] md:text-[32px] leading-tight font-bold tracking-tight text-white break-words">{title}</h1>
                     {subtitle && <p className="lv-page-hero-sub mt-1.5 text-sm md:text-[15px] max-w-3xl">{subtitle}</p>}
                 </div>

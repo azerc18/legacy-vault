@@ -54,7 +54,7 @@
   },
   "language": { "label": "Language", "en": "EN", "vi": "VI" },
   "theme": { "toLight": "Switch to light mode", "toDark": "Switch to dark mode" },
-  "assistant": { "open": "Open assistant", "close": "Close assistant", "launcherHint": "Click to chat, drag to move", "dragHint": "Drag to move" },
+  "assistant": { "open": "Open assistant", "close": "Close assistant", "launcherHint": "Click to chat, drag to move", "dragHint": "Drag to move", "vipOutfit": "VIP outfit. Upgrade to use it" },
   "toast": { "close": "Close" },
   "claim": {
     "progress": "Claim progress",
