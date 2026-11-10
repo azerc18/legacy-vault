@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
@@ -33,9 +34,11 @@ export default function UpgradeDialog({ open, message, feature, onClose }) {
     const maxBeneficiaries = vipPlan?.maxBeneficiariesPerVault || 10;
     const storageStr = formatStorage(vipPlan?.maxStorageBytes || 5368709120);
 
-    return (
+    // Portal + z-[70]: hộp thoại này phải nằm TRƯỚC mọi hộp thoại khác đang mở (vd. form thêm asset, z-50 cũng gắn vào body).
+    // Bấm "Để sau" chỉ đóng hộp này, form bên dưới vẫn còn nguyên dữ liệu đã nhập.
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200"
+            className="fixed inset-0 z-[70] bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div
@@ -86,6 +89,7 @@ export default function UpgradeDialog({ open, message, feature, onClose }) {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
