@@ -7,6 +7,7 @@ export default function InfoTip({ term, className = '' }) {
     const { t } = useTranslation('glossary');
     const id = useId();
     const [open, setOpen] = useState(false);
+    const [shift, setShift] = useState(0);
 
     const title = t(`terms.${term}.title`, { defaultValue: '' });
     const text = t(`terms.${term}.text`, { defaultValue: '' });
@@ -18,14 +19,20 @@ export default function InfoTip({ term, className = '' }) {
                     aria-label={t('aboutTerm', { term: title })}
                     aria-describedby={id}
                     aria-expanded={open}
-                    onClick={() => setOpen((v) => !v)}
+                    onClick={(e) => {
+                        // Nút sát mép phải thì đẩy khung sang trái để không tràn màn hình
+                        const screen = document.documentElement.clientWidth;
+                        const width = Math.min(256, window.innerWidth * 0.8);
+                        setShift(Math.max(0, e.currentTarget.getBoundingClientRect().left + width + 12 - screen));
+                        setOpen((v) => !v);
+                    }}
                     onBlur={() => setOpen(false)}
                     onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false); }}
                     className="inline-flex items-center justify-center rounded-full text-outline hover:text-primary focus:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 <span className="material-symbols-outlined text-[18px]" aria-hidden="true">help</span>
             </button>
-            <span id={id} role="tooltip"
-                  className={`pointer-events-none absolute left-0 top-full mt-2 w-64 max-w-[80vw] rounded-xl lv-glass-frosted bg-surface-container-lowest/95 text-on-surface border border-outline-variant/50 text-xs font-normal leading-relaxed px-3.5 py-2.5 shadow-xl z-30 origin-top-left transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
+            <span id={id} role="tooltip" style={{ left: -shift }}
+                  className={`lv-infotip${open ? ' is-open' : ''} pointer-events-none !absolute left-0 top-full mt-2 w-64 max-w-[80vw] rounded-xl lv-glass-frosted bg-surface-container-lowest/95 text-on-surface border border-outline-variant/50 text-xs font-normal leading-relaxed px-3.5 py-2.5 shadow-xl z-30 origin-top-left transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100 ${open ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                 {title && <strong className="block mb-1 text-on-surface font-semibold">{title}</strong>}
                 <span className="text-on-surface-variant">{text}</span>
             </span>

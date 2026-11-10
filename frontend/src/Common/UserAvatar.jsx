@@ -2,6 +2,7 @@
 // Chưa có ảnh -> hiện chữ cái đầu của tên. Có ảnh -> tải 1 lần, các header dùng lại cache.
 import React, { useEffect, useState } from 'react';
 import { userApi } from '../api/userApi.js';
+import './vip.css';
 
 // Cache theo phiên bản ảnh (avatarUpdatedAt) để chuyển trang không phải tải lại
 let cache = { version: null, url: null, promise: null };
@@ -33,7 +34,7 @@ const SIZES = {
 const initials = (name = '') =>
     name.trim().split(/\s+/).filter(Boolean).slice(-2).map((w) => w[0].toUpperCase()).join('') || '?';
 
-export default function UserAvatar({ name, hasAvatar, version, size = 'sm', previewUrl }) {
+export default function UserAvatar({ name, hasAvatar, version, size = 'sm', previewUrl, vip = false }) {
     const [url, setUrl] = useState(hasAvatar && cache.version === version ? cache.url : null);
 
     useEffect(() => {
@@ -48,11 +49,21 @@ export default function UserAvatar({ name, hasAvatar, version, size = 'sm', prev
     const src = previewUrl || url;
     const cls = `${SIZES[size] || SIZES.sm} rounded-full shrink-0 overflow-hidden`;
 
-    return src ? (
+    const avatar = src ? (
         <img src={src} alt={name || 'Avatar'} className={`${cls} object-cover`} />
     ) : (
         <span className={`${cls} bg-primary-fixed text-primary flex items-center justify-center font-bold`}>
             {initials(name)}
+        </span>
+    );
+    if (!vip) return avatar;
+
+    return (
+        <span className={`lv-vip-avatar lv-vip-avatar--${size}`}>
+            {avatar}
+            <span className="lv-vip-avatar__crown" aria-hidden="true">
+                <span className="material-symbols-outlined">workspace_premium</span>
+            </span>
         </span>
     );
 }

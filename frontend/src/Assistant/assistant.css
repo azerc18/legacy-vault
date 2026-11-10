@@ -24,6 +24,52 @@
 .lv-assistant--dragging .lv-assistant-handle { cursor: grabbing; }
 .lv-assistant--dragging .lv-assistant-launcher { transform: scale(1.06); }
 
+/* Cú của tài khoản VIP: hào quang vàng phía sau và một đốm sáng bay quanh */
+.lv-assistant-launcher--vip { position: relative; isolation: isolate; }
+.lv-assistant-launcher--vip::before {
+    content: '';
+    position: absolute;
+    inset: 4% 2% 0;
+    z-index: -1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 205, 100, 0.62) 0%, rgba(255, 150, 70, 0.28) 45%, transparent 70%);
+    animation: lv-owl-halo 2.8s ease-in-out infinite;
+}
+.lv-assistant-launcher--vip::after {
+    content: '✦';
+    position: absolute;
+    top: 8%;
+    right: 12%;
+    color: #ffc247;
+    font-size: 15px;
+    line-height: 1;
+    text-shadow: 0 0 8px rgba(255, 190, 80, 0.9);
+    animation: lv-owl-twinkle 1.9s ease-in-out infinite;
+}
+@keyframes lv-owl-halo { 50% { transform: scale(1.12); opacity: 0.72; } }
+@keyframes lv-owl-twinkle { 50% { transform: scale(0.55) rotate(45deg); opacity: 0.45; } }
+
+.lv-owl-vip-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 4px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #4a2b00;
+    background: linear-gradient(135deg, #ffe29a, #ffa94d);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lv-assistant-launcher--vip::before, .lv-assistant-launcher--vip::after { animation: none; }
+}
+
+/* Điện thoại: cú nhỏ lại để không che nội dung (zoom thu cả vùng bấm, transform thì không) */
+@media (max-width: 639px) {
+    .lv-assistant-launcher { zoom: 0.62; }
+}
+
 .chibi-body   { animation: chibi-bob 3s ease-in-out infinite; }
 .chibi-eyes   { transform-origin: center; animation: chibi-blink 4s infinite; }
 .chibi-arm-r  { transform-origin: 20% 5%; }

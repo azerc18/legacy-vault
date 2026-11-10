@@ -167,7 +167,7 @@ export default function DeadMansSwitch() {
             )}
 
             {loading ? <p className="text-on-surface-variant">{t('dms.loading')}</p> : (
-                <div className="grid lg:grid-cols-[1fr_360px] gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
                     <div className="space-y-6">
                     {/* Trạng thái + check-in */}
                     <div data-tour="dms-status">

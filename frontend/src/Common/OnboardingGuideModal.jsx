@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { startSpotlightTour } from './SpotlightTour.jsx';
+import LanguageSwitch from './LanguageSwitch.jsx';
 
 export const ONBOARDING_STORAGE_KEY = 'lv_onboarding_seen_v1';
 export const OPEN_ONBOARDING_EVENT = 'lv_open_onboarding';
@@ -99,27 +100,30 @@ export default function OnboardingGuideModal({ defaultOpen = false, onDismiss })
                 <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-blue-500 via-indigo-400 to-amber-400" />
 
                 {/* Header Modal */}
-                <div className="px-6 sm:px-8 pt-7 pb-4 flex items-start justify-between border-b border-white/10 shrink-0">
-                    <div>
-                        <div className="flex items-center gap-2">
+                <div className="px-6 sm:px-8 pt-7 pb-4 border-b border-white/10 shrink-0">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
                             <span className="material-symbols-outlined text-amber-400 text-[20px]">school</span>
                             <span className="text-[11px] font-bold tracking-[0.2em] uppercase text-amber-300">
                                 {t('welcomeTitle')}
                             </span>
                         </div>
-                        <h2 id="onboarding-title" className="text-xl sm:text-2xl font-bold mt-1 tracking-tight text-white">
-                            {step.title}
-                        </h2>
+                    <div className="flex items-center gap-2 shrink-0 -mr-2">
+                        <LanguageSwitch variant="dark" />
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            title={t('skip')}
+                            aria-label={t('skip')}
+                            className="h-8 w-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">close</span>
+                        </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleClose}
-                        title={t('skip')}
-                        aria-label={t('skip')}
-                        className="h-8 w-8 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0 -mr-2"
-                    >
-                        <span className="material-symbols-outlined text-[20px]">close</span>
-                    </button>
+                    </div>
+                    <h2 id="onboarding-title" className="text-xl sm:text-2xl font-bold mt-1 tracking-tight text-white">
+                        {step.title}
+                    </h2>
                 </div>
 
                 {/* Stepper Dots Navigation */}

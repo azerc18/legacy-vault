@@ -1,7 +1,9 @@
 import React, { Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
+import { useVipStatus } from '../Common/useVipStatus.js';
+import { isVipCostume } from './costumes.js';
 import ChatPanel, { WELCOME } from './ChatPanel.jsx';
 import { pickGreeting, pickTip } from './assistantLines.js';
 import ChibiAvatar from './ChibiAvatar.jsx';
@@ -59,6 +61,10 @@ export default function AssistantWidget() {
     const [messages, setMessages] = useState([WELCOME]);
     const [thinking, setThinking] = useState(false);   // đang chờ Vaulty trả lời
     const [costume, setCostume] = useState('none');
+    const vip = useVipStatus();
+    const navigate = useNavigate();
+    // Hết VIP thì tạm mặc đồ gốc nhưng vẫn giữ lựa chọn đã lưu, nâng cấp lại là có ngay
+    const shownCostume = vip === false && isVipCostume(costume) ? 'none' : costume;
 
     const bubbleTimer = useRef(null);
     const actionTimer = useRef(null);
@@ -125,6 +131,10 @@ export default function AssistantWidget() {
     }, [userId]);
 
     const changeCostume = (id) => {
+        if (vip === false && isVipCostume(id)) {
+            navigate('/pricing');
+            return;
+        }
         if (id === costume) return;
         setCostume(id);
         writeCostume(userId, id);
@@ -204,7 +214,8 @@ export default function AssistantWidget() {
                         onClose={() => setOpen(false)}
                         onReply={(ms) => play('talk', ms || 1500)}
                         onThinking={setThinking}
-                        costume={costume}
+                        costume={shownCostume}
+                        vip={vip}
                         onCostumeChange={changeCostume}
                         dragHandlers={dragHandlers}
                     />
@@ -221,9 +232,9 @@ export default function AssistantWidget() {
 
             <button type="button" onClick={toggle} aria-label={t(open ? 'assistant.close' : 'assistant.open')}
                     title={t('assistant.launcherHint')} {...dragHandlers}
-                    className="lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    className={`lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary${vip ? ' lv-assistant-launcher--vip' : ''}`}>
                 <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
-                    <Owl3D action={thinking ? 'think' : action} costume={costume} />
+                    <Owl3D action={thinking ? 'think' : action} costume={shownCostume} />
                 </Suspense>
             </button>
         </div>

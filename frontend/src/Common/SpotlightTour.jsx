@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { FEATURE_TOURS, getFeatureTourForPath } from './featureToursConfig.js';
+import LanguageSwitch from './LanguageSwitch.jsx';
 
 export const ONBOARDING_STATUS_KEY = 'lv_onboarding_status';
 export const ONBOARDING_STEP_KEY = 'lv_tour_step';
@@ -601,14 +602,17 @@ export default function SpotlightTour() {
                             <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-400/20 shrink-0">
                                 <span className="material-symbols-outlined text-[28px] font-bold">help_outline</span>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handlePromptExperienced}
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-                                title={t('common:actions.close', { defaultValue: 'Đóng' })}
-                            >
-                                <span className="material-symbols-outlined text-[20px]">close</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <LanguageSwitch variant="dark" />
+                                <button
+                                    type="button"
+                                    onClick={handlePromptExperienced}
+                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                                    title={t('common:actions.close', { defaultValue: 'Đóng' })}
+                                >
+                                    <span className="material-symbols-outlined text-[20px]">close</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="mt-4">
@@ -695,24 +699,27 @@ export default function SpotlightTour() {
                         style={getTooltipStyle()}
                     >
                         <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-3">
-                            <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950 shrink-0 whitespace-nowrap">
                                     {t('tour.stepBadge', { current: currentStep, total: totalSteps })}
                                 </span>
                                 {isFeatureTour && (
-                                    <span className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider truncate max-w-[170px]">
+                                    <span className="text-[10px] font-bold text-amber-300/80 uppercase tracking-wider truncate min-w-0">
                                         {t(activeTour.config.badgeKey, { defaultValue: 'HƯỚNG DẪN NHANH' })}
                                     </span>
                                 )}
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleDismissActiveTour}
-                                className="text-xs text-white/60 hover:text-white transition-colors"
-                                title={t('tour.skipTour')}
-                            >
-                                {t('tour.skipTour')}
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <LanguageSwitch variant="dark" className="!h-7 !text-xs" />
+                                <button
+                                    type="button"
+                                    onClick={handleDismissActiveTour}
+                                    className="text-xs text-white/60 hover:text-white transition-colors whitespace-nowrap"
+                                    title={t('tour.skipTour')}
+                                >
+                                    {t('tour.skipTour')}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="mt-3 space-y-2">

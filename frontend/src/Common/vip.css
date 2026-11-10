@@ -1,0 +1,70 @@
+/* Dấu hiệu tài khoản VIP: viền avatar, vương miện, tên và nhãn gói */
+.lv-vip-avatar {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: 2.5px;
+    border-radius: 9999px;
+    isolation: isolate;
+    filter: drop-shadow(0 0 5px rgba(255, 190, 90, 0.55));
+}
+.lv-vip-avatar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: conic-gradient(#ffd56b, #ff8a3d, #f0449b, #7b5cff, #4da3ff, #ffd56b);
+    animation: lv-vip-spin 5s linear infinite;
+}
+.lv-vip-avatar--lg { padding: 4px; }
+
+.lv-vip-avatar__crown {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #ffe29a, #ffa94d);
+    box-shadow: 0 0 0 1.5px rgba(11, 16, 32, 0.55);
+}
+.lv-vip-avatar__crown .material-symbols-outlined {
+    font-size: 12px;
+    line-height: 1;
+    color: #4a2b00;
+}
+.lv-vip-avatar--lg .lv-vip-avatar__crown {
+    top: 0;
+    right: 0;
+    width: 28px;
+    height: 28px;
+}
+.lv-vip-avatar--lg .lv-vip-avatar__crown .material-symbols-outlined { font-size: 19px; }
+
+.lv-vip-name {
+    background: linear-gradient(90deg, #ffe29a, #ffb36b);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.lv-vip-chip {
+    color: #4a2b00;
+    border-color: rgba(255, 226, 154, 0.8);
+    background: linear-gradient(110deg, #ffd56b 20%, #fff1c4 45%, #ffa94d 70%, #ffd56b);
+    background-size: 220% 100%;
+    box-shadow: 0 2px 12px -2px rgba(255, 180, 80, 0.6);
+    animation: lv-vip-shine 4s linear infinite;
+}
+.lv-side-bottom .lv-vip-chip .material-symbols-outlined { color: #4a2b00; }
+
+@keyframes lv-vip-spin { to { transform: rotate(360deg); } }
+@keyframes lv-vip-shine { to { background-position: -220% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+    .lv-vip-avatar::before, .lv-vip-chip { animation: none; }
+}

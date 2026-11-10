@@ -328,11 +328,83 @@ body.lv-has-side #root {
   }
 }
 @media (max-width: 639px) {
-  .lv-side-user .lv-label {
+  /* Điện thoại: một hàng logo + công cụ (chỉ còn icon), một hàng menu cuộn ngang */
+  .lv-side {
+    padding: 8px 12px 6px;
+    gap: 6px;
+  }
+  .lv-side-top {
+    flex: 0 0 auto;
+  }
+  .lv-side-top .lv-label,
+  .lv-side-bottom .lv-label {
     display: none;
   }
-  .lv-side-user {
+  .lv-side-bottom {
+    flex: 1 1 0;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .lv-side-bottom a.h-9 {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+  .lv-side-tools.w-full {
+    width: auto;
     flex: 0 0 auto;
+    gap: 6px;
+  }
+  .lv-side-tools-actions.gap-2 {
+    gap: 6px;
+  }
+  .lv-side-tools .lv-lang button {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .lv-side-user.gap-3 {
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+  .lv-side-user > a {
+    flex: 0 0 auto;
+  }
+  .lv-side-nav {
+    scrollbar-width: none;
+  }
+  .lv-side-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Nội dung trang: bớt khoảng trống và chừa chỗ cuối trang để con cú không che nội dung */
+  main.max-w-6xl {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  main.py-10,
+  main.py-8 {
+    padding-top: 16px;
+    padding-bottom: 96px;
+  }
+  main .lv-page-hero {
+    padding: 1rem 1.15rem;
+  }
+  main .lv-page-hero.mb-8 {
+    margin-bottom: 16px;
+  }
+  main .lv-page-hero h1 {
+    font-size: 24px;
+  }
+
+  /* Khung giải thích đang đóng vẫn chiếm chỗ và làm trang cuộn ngang */
+  .lv-infotip:not(.is-open) {
+    display: none;
+  }
+
+  /* iOS tự phóng to trang khi ô nhập có chữ nhỏ hơn 16px */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
 
