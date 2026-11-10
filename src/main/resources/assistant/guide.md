@@ -14,14 +14,15 @@ One account can have several roles. If you were just given a new role, sign out 
 ## Getting around
 
 - The left sidebar has "Home" and "Profile", then one group per role (for example Vault Owner: "My vaults", "Dead Man's Switch", "Executors", "Activity", "Billing & VIP"). Click a group name to open or close it. "Collapse sidebar" / "Expand sidebar" makes the sidebar narrow or wide.
-- The bottom of the sidebar has: the "Upgrade" / "VIP" button (Vault Owner), "Guide", the EN / VI language switch, the light / dark mode button, your avatar (opens "My profile") and "Log out".
-- The bell icon shows "Notifications" (on Vault Owner and Beneficiary pages).
+- The bottom of the sidebar has: the "Upgrade" / "VIP" button (Vault Owner), the EN / VI language switch, the light / dark mode button, your avatar (opens "My profile") and "Log out".
+- The bell icon shows "Notifications" (on Vault Owner, Beneficiary and Executor pages).
 - Vaulty (this assistant) is the owl button. Click it to chat, drag it to move it.
 
 ### Guide and tours
 - On first sign-in you may see "Are you new to Legacy Vault?". Choose "I'm a new user (Start Guide)" for an on-screen tour, or "I've used it before".
-- Any time later, click "Guide" in the sidebar: "Replay guide for this feature" (tour for the current page), "Interactive Step-by-Step Tour" (create your first vault), "Security & Feature Guidebook" (overview of the main features) or "Experience initial new user prompt again".
-- Beneficiaries also have "Guide" in their menu ("Guide for beneficiaries").
+- A short tour also starts by itself the first time you open each feature (for example "Dead Man's Switch" or "Executors") in this browser. Click "Got it" or "Skip tour" to close it.
+- To see the create-vault tour again, click the "Guide" button on the "My vaults" page.
+- Beneficiaries: on an inherited vault, click "Not sure what to do next? Read the guide" to open "Guide for beneficiaries".
 
 ### Demo mode
 - On the sign-in page, "Try Demo Mode (No Account Needed)" opens the app with sample data. Nothing is saved. Click "Exit Demo" to leave.
@@ -137,7 +138,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ### Executors
 1. Sidebar → "Executors".
-2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond within 14 days.
+2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond in time (by default 14 days).
 3. Click "Assign", enter the person's email, then "Save". They must have a verified LegacyVault account.
 4. "Replace" changes the person, "Revoke" removes them.
 
@@ -170,7 +171,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 ### Acknowledge the notice
 1. When an owner's Dead Man's Switch is triggered you get an email and the case shows "You have been activated".
 2. Click "Acknowledge" on the case card or inside the case ("Open case"). The card shows the deadline ("Acknowledge before …").
-3. If the primary executor does not acknowledge within 14 days, the backup executor is activated.
+3. If the primary executor does not acknowledge in time (by default 14 days), the backup executor is activated.
 
 ### Submit the death certificate
 1. Open the case → "Submit death certificate".
@@ -197,12 +198,12 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ### Review a request
 1. The request page shows "Case information", the vaults to unlock and the "Death certificate".
-2. Step 1 "Check document" (mark Valid or Invalid), step 2 "View document", step 3 approve.
+2. Step 1 "Check document": the system checks the file content automatically (real PDF, JPG or PNG) and shows Valid or Invalid; you only click the button. Step 2 "View document". Step 3 approve or reject.
 3. Optional: "✨ Analyze & Cross-Check with AI (OCR)" gives an AI advisory report (name match, seal, image quality). It is a suggestion only; the decision is yours.
 4. "Messages with the Executor": ask for more information or files, then "Send reply". "Refresh" loads new messages.
 
 ### Approve or reject
-- Approve: after checking and viewing, click "Approve request" and confirm. You still need to sign.
+- Approve: after checking and viewing, click "Approve request" and confirm. You still need to sign. An approved request that is not signed within 7 days goes back to "Pending review".
 - Reject: needs steps 1–2. Choose a "Rejection reason" (blurry or unreadable, not a valid death certificate, information does not match, suspected forgery, missing pages or stamp, or other with a note up to 500 characters), then "Reject request". The executor sees the reason.
 
 ### Sign with OTP
