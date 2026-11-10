@@ -6,8 +6,8 @@ import * as THREE from 'three';
 import ChibiAvatar from './ChibiAvatar.jsx';
 
 // Kích thước hiển thị (px) - chỉnh ở đây nếu muốn to/nhỏ hơn
-const W = 88;
-const H = 108;
+const W = 120;   // to hơn (trước 88x108) cho dễ thấy, vẫn cùng tỉ lệ
+const H = 148;
 
 const FEET_Y = -1.17;   // mặt đất của mô hình
 const HEAD_Y = 0.95;    // trục xoay của đầu (cổ)

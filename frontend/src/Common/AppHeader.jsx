@@ -1,7 +1,7 @@
 // Header dùng chung cho mọi trang sau đăng nhập (Owner, Admin, Beneficiary, Executor, Verifier, /me, /home).
 // Luôn có: logo (+ tên khu vực) bên trái, avatar + đăng xuất bên phải. Thanh tab (nav) là tuỳ chọn.
 // Tiêu đề trang + nút quay lại KHÔNG nằm trong header nữa mà dùng <PageTitle> trong nội dung.
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { getUser, logout } from '../auth/auth.js';
 import { paymentApi } from '../api/paymentApi.js';
@@ -10,9 +10,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSwitch from './LanguageSwitch.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import BrandMark from './BrandMark.jsx';
-import OnboardingGuideModal, { openOnboardingGuide } from './OnboardingGuideModal.jsx';
-import { startSpotlightTour, openFirstTimePrompt, startFeatureTour } from './SpotlightTour.jsx';
-import { getFeatureTourForPath } from './featureToursConfig.js';
+import OnboardingGuideModal from './OnboardingGuideModal.jsx';
 
 
 // Cùng một độ rộng cho header và nội dung mọi trang
@@ -178,10 +176,6 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
 
     const effectiveWorkspace = workspace || (mainRole ? t(`roles.${mainRole}`) : '');
     const { t: tPayment } = useTranslation('payment');
-    const { t: tOnboarding } = useTranslation('onboarding');
-    const [guideMenuOpen, setGuideMenuOpen] = useState(false);
-    const guideMenuRef = useRef(null);
-    const currentFeatureTour = getFeatureTourForPath(pathname);
 
     const navigate = useNavigate();
     const isOwner = Array.isArray(user?.roles) && user.roles.includes('OWNER');
@@ -230,18 +224,6 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
             mounted = false;
         };
     }, [isOwner]);
-
-    // Đóng dropdown hướng dẫn khi click ra ngoài
-    useEffect(() => {
-        if (!guideMenuOpen) return undefined;
-        const handleOutsideClick = (e) => {
-            if (guideMenuRef.current && !guideMenuRef.current.contains(e.target)) {
-                setGuideMenuOpen(false);
-            }
-        };
-        window.addEventListener('mousedown', handleOutsideClick);
-        return () => window.removeEventListener('mousedown', handleOutsideClick);
-    }, [guideMenuOpen]);
 
     const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -352,106 +334,6 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
                         <Icon name="swap_horiz" className="text-[16px]" /><span className="lv-label">{t('header.userHome')}</span>
                     </Link>
                 )}
-                <div className="relative mb-2 w-full" ref={guideMenuRef}>
-                    <button
-                        type="button"
-                        onClick={() => setGuideMenuOpen((o) => !o)}
-                        title={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
-                        aria-label={tOnboarding('openGuide', 'Hướng dẫn sử dụng & Khám phá tính năng')}
-                        aria-expanded={guideMenuOpen}
-                        className="lv-guide-btn w-full h-8 px-2.5 rounded-full inline-flex items-center justify-between gap-1.5 whitespace-nowrap text-xs font-semibold bg-white/10 text-white hover:bg-white/20 transition-colors"
-                    >
-                        <div className="flex items-center gap-1.5">
-                            <Icon name="school" className="text-[17px] text-amber-300" />
-                            <span className="lv-label">{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
-                        </div>
-                        <Icon name="expand_more" className="text-[14px] text-white/60" />
-                    </button>
-
-                    {/* Dropdown Menu lựa chọn chế độ hướng dẫn */}
-                    {guideMenuOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 w-68 bg-[#0e1629] border border-white/15 rounded-2xl p-2 shadow-2xl z-50 text-white animate-in zoom-in-95 duration-150">
-                            <div className="px-3 py-1.5 border-b border-white/10 text-[10px] font-bold tracking-wider uppercase text-amber-300">
-                                {tOnboarding('menuTitle')}
-                            </div>
-                            {currentFeatureTour ? (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setGuideMenuOpen(false);
-                                            startFeatureTour(currentFeatureTour.id);
-                                        }}
-                                        className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
-                                    >
-                                        <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
-                                        <div>
-                                            <div className="font-bold">{tOnboarding('replayCurrentTour')}</div>
-                                            <div className="text-[10px] text-white/60 font-normal">{tOnboarding(currentFeatureTour.badgeKey)}</div>
-                                        </div>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setGuideMenuOpen(false);
-                                            startSpotlightTour();
-                                        }}
-                                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white/80 hover:text-white"
-                                    >
-                                        <span className="material-symbols-outlined text-amber-300/80 text-[18px]">inventory_2</span>
-                                        <div>
-                                            <div className="font-semibold">{tOnboarding('startInteractiveTour')}</div>
-                                            <div className="text-[10px] text-white/50 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
-                                        </div>
-                                    </button>
-                                </>
-                            ) : (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setGuideMenuOpen(false);
-                                        startSpotlightTour();
-                                    }}
-                                    className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
-                                >
-                                    <span className="material-symbols-outlined text-amber-400 text-[18px]">rocket_launch</span>
-                                    <div>
-                                        <div className="font-bold">{tOnboarding('startInteractiveTour')}</div>
-                                        <div className="text-[10px] text-white/60 font-normal">{tOnboarding('startInteractiveTourDesc')}</div>
-                                    </div>
-                                </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setGuideMenuOpen(false);
-                                    openOnboardingGuide();
-                                }}
-                                className="w-full text-left px-3 py-2 rounded-xl hover:bg-white/10 text-xs font-semibold flex items-center gap-2.5 transition-colors text-white"
-                            >
-                                <span className="material-symbols-outlined text-teal-400 text-[18px]">menu_book</span>
-                                <div>
-                                    <div className="font-bold">{tOnboarding('openCatalogue')}</div>
-                                    <div className="text-[10px] text-white/60 font-normal">{tOnboarding('openCatalogueDesc')}</div>
-                                </div>
-                            </button>
-                            <div className="border-t border-white/10 mt-1 pt-1">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setGuideMenuOpen(false);
-                                        openFirstTimePrompt();
-                                    }}
-                                    className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-white/5 text-[11px] text-white/60 flex items-center gap-2 transition-colors"
-                                >
-                                    <span className="material-symbols-outlined text-[15px]">refresh</span>
-                                    <span>{tOnboarding('repromptOption')}</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 <div className="lv-side-tools flex items-center justify-between gap-2 w-full">
                     <LanguageSwitch variant="dark" className="lv-lang shrink-0" />
                     <div className="lv-side-tools-actions flex items-center gap-2 shrink-0">
