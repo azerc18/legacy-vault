@@ -309,10 +309,12 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 
 // Render ra document.body: nếu một thẻ cha có transform/filter (hiệu ứng vào trang) thì "fixed" bị tính theo
 // thẻ đó, hộp thoại lệch giữa trang dài và bị cắt ở đáy thay vì nằm giữa màn hình.
-function Modal({ children, onClose }) {
+// dismissOnBackdrop=false cho hộp thoại có form: bấm ra ngoài không được làm mất dữ liệu đang nhập,
+// chỉ đóng bằng Cancel, nút X hoặc Save.
+function Modal({ children, onClose, dismissOnBackdrop = true }) {
     return createPortal(
-        <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-start sm:items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={dismissOnBackdrop ? onClose : undefined}>
+            <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain my-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
         </div>,
@@ -449,7 +451,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     };
 
     return (
-        <Modal onClose={onClose}>
+        <Modal onClose={onClose} dismissOnBackdrop={false}>
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/10">
                 <h3 className="font-title-lg text-lg font-bold text-white">{isEdit ? t('detail.assets.editTitle') : t('detail.assets.addTitle')}</h3>
                 <button

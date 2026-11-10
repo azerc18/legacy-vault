@@ -442,3 +442,8 @@ html.lv-snap .lv-landing footer[data-mode] {
 .lv-field-invalid {
   box-shadow: 0 0 0 2px rgb(239 68 68 / 0.8) !important;
 }
+
+/* Có hộp thoại đang mở (gắn class lv-modal-backdrop cho lớp nền của hộp thoại): ẩn trợ lý cú để không đè lên hộp */
+body:has(.lv-modal-backdrop) .lv-assistant {
+  display: none !important;
+}
