@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import OtpInput from '../Common/OtpInput.jsx';
 
 const RESEND_SECONDS = 60;
 const input = 'w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
@@ -81,10 +82,7 @@ export default function VerifyEmail() {
                     <input type="email" autoComplete="email" aria-label={t('login.email')}
                            placeholder="name@example.com" value={email}
                            onChange={(e) => setEmail(e.target.value)} className={input} />
-                    <input inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-                           aria-label={t('verify.codePlaceholder')} placeholder={t('verify.codePlaceholder')} value={otp}
-                           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                           className={`${input} tracking-[0.5em] text-center`} />
+                    <OtpInput label={t('verify.codePlaceholder')} value={otp} onChange={setOtp} />
                     <button type="submit" disabled={loading}
                             className="w-full h-12 rounded-xl bg-primary text-on-primary font-bold disabled:opacity-60 lv-pill">
                         {loading ? t('verify.submitting') : t('verify.submit')}
