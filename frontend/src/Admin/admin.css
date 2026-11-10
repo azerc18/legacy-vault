@@ -138,7 +138,7 @@ html.dark .lv-admin { --adm-seal: 255 138 128; }
 .lv-todo li + li { border-top: 1px dashed rgb(var(--adm-rule)); }
 
 /* Ngăn kéo chi tiết (A3) */
-.lv-drawer-backdrop { position: fixed; inset: 0; z-index: 38; background: rgb(0 0 0 / .4); }
+.lv-drawer-backdrop { position: fixed; inset: 0; z-index: 38; background: rgb(0 0 0 / .4); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .lv-drawer {
   position: fixed; z-index: 39; top: 0; right: 0; bottom: 0; width: min(560px, 100vw);
   background: rgb(var(--adm-paper)); border-left: 1px solid rgb(var(--adm-rule));
