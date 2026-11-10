@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
@@ -135,12 +136,12 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
     };
     const codeTarget = cd.maskedEmail || cd.maskedPhone || cd.expectedEmail;
 
-    return (
+    return createPortal(
         <motion.div
             initial={{ backgroundColor: 'rgba(0, 0, 0, 0)', backdropFilter: 'blur(0px)' }}
             animate={{ backgroundColor: 'rgba(0, 0, 0, 0.42)', backdropFilter: 'blur(8px)' }}
             transition={motionTransition.overlay}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="lv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <motion.div
@@ -328,7 +329,8 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                     </div>
                 </AutoHeight>
             </motion.div>
-        </motion.div>
+        </motion.div>,
+        document.body
     );
 }
 

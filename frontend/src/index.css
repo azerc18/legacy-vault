@@ -447,3 +447,8 @@ html.lv-snap .lv-landing footer[data-mode] {
 body:has(.lv-modal-backdrop) .lv-assistant {
   display: none !important;
 }
+
+/* Chừa chỗ cuối trang (cú cao ~150px) để nút ở đáy trang cuộn lên được, không nằm dưới cú */
+body:has(.lv-assistant) main {
+  padding-bottom: 176px;
+}

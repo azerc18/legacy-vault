@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { startSpotlightTour } from './SpotlightTour.jsx';
 
@@ -82,9 +83,9 @@ export default function OnboardingGuideModal({ defaultOpen = false, onDismiss })
     const iconMeta = STEP_ICONS[currentStep] || STEP_ICONS[0];
     const isLast = currentStep === totalSteps - 1;
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+            className="lv-modal-backdrop fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="onboarding-title"
@@ -250,6 +251,7 @@ export default function OnboardingGuideModal({ defaultOpen = false, onDismiss })
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
