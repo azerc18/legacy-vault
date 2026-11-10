@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import InfoTip from '../Common/InfoTip.jsx';
-import { inputClass } from './ownerUi.jsx';
+import { Icon, inputClass } from './ownerUi.jsx';
 
 // N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
 export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL', 'JOINT_CONSENSUS'];
@@ -139,6 +139,11 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
         const s = (value.shares[id] || '').trim();
         return sum + (SHARE_RE.test(s) ? cents(s) : 0);
     }, 0);
+    // Ô tỷ lệ đỏ khi chính nó sai, hoặc khi tổng đã vượt 100% (để thấy cần giảm ô nào)
+    const shareBad = (id) => {
+        const sv = (value.shares[id] || '').trim();
+        return (sv !== '' && (!SHARE_RE.test(sv) || cents(sv) <= 0 || cents(sv) > 10000)) || total > 10000;
+    };
     const needsVip = value.mode === 'PROPORTIONAL' || value.mode === 'JOINT_CONSENSUS'
         || (value.mode === 'EXCLUSIVE' && !!value.contingentId);
 
@@ -188,7 +193,8 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                                 {value.mode === 'PROPORTIONAL' && on && (
                                     <input
                                         inputMode="decimal" value={value.shares[b.id] || ''} placeholder="%" style={{ width: '6rem' }}
-                                        aria-label={tt('share')} className={inputClass}
+                                        aria-label={tt('share')} aria-invalid={shareBad(b.id) || undefined}
+                                        className={`${inputClass}${shareBad(b.id) ? ' lv-field-invalid' : ''}`}
                                         onChange={(e) => set({ shares: { ...value.shares, [b.id]: e.target.value } })}
                                     />
                                 )}
@@ -198,11 +204,17 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 </ul>
             )}
 
-            {value.mode === 'PROPORTIONAL' && (
-                <p className={`text-xs font-semibold ${total === 10000 ? 'text-primary' : 'text-outline'}`}>
-                    {tt('total', { total: (total / 100).toFixed(2) })}
-                </p>
-            )}
+            {value.mode === 'PROPORTIONAL' && n > 0 && (() => {
+                if (total === 0) return <p className="text-xs text-on-surface-variant">{tt('totalHint')}</p>;
+                const diff = total - 10000;
+                const pct = (c) => String(+(Math.abs(c) / 100).toFixed(2));
+                return (
+                    <p role="status" className={`flex items-start gap-1.5 text-sm font-semibold ${diff === 0 ? 'text-success' : 'text-error'}`}>
+                        <Icon name={diff === 0 ? 'check_circle' : 'error'} className="text-[18px] shrink-0" />
+                        <span>{diff === 0 ? tt('totalOk') : tt(diff > 0 ? 'totalOver' : 'totalUnder', { total: pct(total), diff: pct(diff) })}</span>
+                    </p>
+                );
+            })()}
 
             {value.mode === 'JOINT_CONSENSUS' && (
                 <div className="flex items-center gap-2">

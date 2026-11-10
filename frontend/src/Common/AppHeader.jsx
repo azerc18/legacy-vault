@@ -335,10 +335,10 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
  * @param back { to, label }  vd. { to: '/executor/home', label: 'All estates' }
  * @param kicker dòng nhãn nhỏ phía trên tiêu đề (vd. "HỒ SƠ QUẢN TRỊ · LEGACYVAULT")
  */
-export function PageTitle({ back, kicker, title, subtitle, right, className = 'mb-8' }) {
+export function PageTitle({ back, kicker, title, subtitle, right, className = 'mb-8', loading = false }) {
     const { t } = useTranslation();
     return (
-        <div className={`lv-page-hero lv-rise ${className}`.trim()}>
+        <div className={`lv-page-hero lv-rise${loading ? ' lv-page-hero--loading' : ''} ${className}`.trim()} aria-busy={loading || undefined}>
             {back && (
                 <Link to={back.to} className="lv-page-hero-back inline-flex items-center gap-1.5 text-sm font-semibold text-[#b9c9ff] hover:text-white mb-3 transition-colors">
                     <Icon name="arrow_back" className="text-[18px]" /> {back.label || t('actions.back')}

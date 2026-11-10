@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -311,10 +311,10 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 // thẻ đó, hộp thoại lệch giữa trang dài và bị cắt ở đáy thay vì nằm giữa màn hình.
 // dismissOnBackdrop=false cho hộp thoại có form: bấm ra ngoài không được làm mất dữ liệu đang nhập,
 // chỉ đóng bằng Cancel, nút X hoặc Save.
-function Modal({ children, onClose, dismissOnBackdrop = true }) {
+function Modal({ children, onClose, dismissOnBackdrop = true, wide = false }) {
     return createPortal(
         <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-start sm:items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200" onClick={dismissOnBackdrop ? onClose : undefined}>
-            <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain my-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className={`lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6${wide ? ' lg:p-5' : ''} w-full max-w-lg${wide ? ' lg:max-w-5xl' : ''} max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain my-auto shadow-2xl relative animate-in zoom-in-95 duration-200`} onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
         </div>,
@@ -397,6 +397,9 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const [show, setShow] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const footRef = useRef(null);
+    // Lỗi hiện sát nút Lưu; nếu hộp thoại đang cuộn thì kéo cả lỗi lẫn nút Lưu vào tầm nhìn
+    useEffect(() => { if (error) footRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [error]);
     const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
     const schema = schemaOf(schemas, f.assetType);
     // Tài sản cũ (không có fields) giữ form kiểu cũ khi sửa; tài sản mới / đã theo schema dùng form động
@@ -451,7 +454,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     };
 
     return (
-        <Modal onClose={onClose} dismissOnBackdrop={false}>
+        <Modal onClose={onClose} dismissOnBackdrop={false} wide>
             <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/10">
                 <h3 className="font-title-lg text-lg font-bold text-white">{isEdit ? t('detail.assets.editTitle') : t('detail.assets.addTitle')}</h3>
                 <button
@@ -462,41 +465,52 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                     <Icon name="close" className="text-[20px]" />
                 </button>
             </div>
-            <Alert>{error}</Alert>
             <form onSubmit={submit} className="space-y-3">
-                <select value={f.assetType} onChange={changeType} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`}>
-                    {ASSET_TYPES.map((typeItem) => (
-                        <option key={typeItem.value} value={typeItem.value}>
-                            {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
-                        </option>
-                    ))}
-                </select>
-                <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
-                {dynamic ? (
-                    <AssetFieldsForm schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
-                ) : (
-                    <div className="relative">
-                        <input
-                            type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
-                            placeholder={isEdit ? t('detail.assets.newSecretPlaceholder') : t('detail.assets.secretPlaceholder')} className={`${inputClass} pr-12`}
-                        />
-                        <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
-                            <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
-                        </button>
+                {/* Màn rộng: cột trái là thông tin tài sản, cột phải là phần niêm phong, ghi chú và phân bổ, để vừa một màn hình */}
+                <div className="grid lg:grid-cols-2 gap-x-6 gap-y-3 items-start">
+                    <div className="space-y-3">
+                        <select value={f.assetType} onChange={changeType} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`}>
+                            {ASSET_TYPES.map((typeItem) => (
+                                <option key={typeItem.value} value={typeItem.value}>
+                                    {t(`enums:assetType.${typeItem.value}`, { defaultValue: typeItem.label })}
+                                </option>
+                            ))}
+                        </select>
+                        <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
+                        {dynamic ? (
+                            <AssetFieldsForm part="main" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
+                        ) : (
+                            <div className="relative">
+                                <input
+                                    type={show ? 'text' : 'password'} value={f.secret} maxLength={5000} onChange={set('secret')} autoComplete="new-password"
+                                    placeholder={isEdit ? t('detail.assets.newSecretPlaceholder') : t('detail.assets.secretPlaceholder')} className={`${inputClass} pr-12`}
+                                />
+                                <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline">
+                                    <Icon name={show ? 'visibility_off' : 'visibility'} className="text-[20px]" />
+                                </button>
+                            </div>
+                        )}
                     </div>
-                )}
-                <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
-                {showAllocation && (
-                    <AllocationFields
-                        beneficiaries={beneficiaries}
-                        value={f.allocation}
-                        onChange={(allocation) => setF((x) => ({ ...x, allocation }))}
-                        allowProportional={allowProportional}
-                    />
-                )}
-                <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={onClose} className={btnOutline}>{t('common:actions.cancel')}</button>
-                    <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.saving') : t('common:actions.save')}</button>
+                    <div className="space-y-3">
+                        {dynamic && <AssetFieldsForm part="sealed" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />}
+                        <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
+                        {showAllocation && (
+                            <AllocationFields
+                                beneficiaries={beneficiaries}
+                                value={f.allocation}
+                                onChange={(allocation) => setF((x) => ({ ...x, allocation }))}
+                                allowProportional={allowProportional}
+                            />
+                        )}
+                    </div>
+                </div>
+                {/* Lỗi nằm sát nút Lưu để người dùng thấy ngay khi bấm */}
+                <div ref={footRef}>
+                    {error && <div role="alert"><Alert>{error}</Alert></div>}
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button type="button" onClick={onClose} className={btnOutline}>{t('common:actions.cancel')}</button>
+                        <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.saving') : t('common:actions.save')}</button>
+                    </div>
                 </div>
             </form>
         </Modal>
