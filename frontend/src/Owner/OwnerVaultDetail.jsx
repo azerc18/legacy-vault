@@ -313,7 +313,7 @@ function AssetSection({ vaultId, beneficiaries, editable, onChanged }) {
 // chỉ đóng bằng Cancel, nút X hoặc Save.
 function Modal({ children, onClose, dismissOnBackdrop = true }) {
     return createPortal(
-        <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={dismissOnBackdrop ? onClose : undefined}>
+        <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={dismissOnBackdrop ? onClose : undefined}>
             <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                 {children}
             </div>
