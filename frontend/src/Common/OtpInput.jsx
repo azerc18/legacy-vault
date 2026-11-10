@@ -89,6 +89,9 @@ export default function OtpInput({ value, onChange, length = 6, autoFocus = fals
                     autoFocus={autoFocus && i === 0}
                     disabled={disabled}
                     aria-label={label ? `${label} ${i + 1}/${length}` : `${i + 1}/${length}`}
+                    // Gõ đúng số đang có trong ô: giá trị input không đổi nên React không gọi onChange,
+                    // con trỏ đứng yên và số kế tiếp ghi đè vào ô này. onInput vẫn chạy nên nhảy ô ở đây.
+                    onInput={(e) => { if (e.target.value === latest.current[i] && i < length - 1) focusAt(i + 1); }}
                     onChange={(e) => handleChange(i, e)}
                     onKeyDown={(e) => handleKeyDown(i, e)}
                     onPaste={(e) => handlePaste(i, e)}
