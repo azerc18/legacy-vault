@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Icon, Alert, formatDate, btnPrimary, btnOutline } from './beneficiaryUi.jsx';
 
@@ -135,8 +136,8 @@ export default function BeneficiaryLegacyMessages({ vaultId }) {
                 ))}
             </ul>
 
-            {viewing && (
-                <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setViewing(null)}>
+            {viewing && createPortal(
+                <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setViewing(null)}>
                     <div
                         className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}
@@ -186,7 +187,8 @@ export default function BeneficiaryLegacyMessages({ vaultId }) {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </section>
     );

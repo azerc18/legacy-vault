@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
@@ -435,8 +436,8 @@ function AssetDetailModal({ detail, onClose }) {
         setTimeout(() => setCopied(false), 1500);
     };
 
-    return (
-        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
+    return createPortal(
+        <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4" onClick={onClose}>
             <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>
@@ -461,7 +462,8 @@ function AssetDetailModal({ detail, onClose }) {
                 )}
                 <p className="mt-5 text-xs text-outline">{t('assets.sessionNote')}</p>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

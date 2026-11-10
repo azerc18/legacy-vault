@@ -145,6 +145,8 @@ html.dark .lv-admin { --adm-seal: 255 138 128; }
   overflow-y: auto; box-shadow: -30px 0 60px -40px rgb(0 0 0 / .6);
   animation: lv-drawer-in .22s ease-out;
 }
+/* materials.css gom .lv-drawer vao nhom kinh voi position: relative, se keo ngan keo vao giua trang */
+.lv-admin.lv-drawer { position: fixed; }
 @keyframes lv-drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .lv-drawer { animation: none; } .lv-stamp { transform: none; } }
 

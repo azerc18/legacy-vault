@@ -1,5 +1,6 @@
 // Thành phần giao diện dùng chung cho các trang Vault Owner
 import React from 'react';
+import {createPortal} from 'react-dom';
 import {useTranslation} from 'react-i18next';
 import ProtectionBanner from './ProtectionBanner.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
@@ -80,8 +81,8 @@ export function Card({title, icon, children, className = ''}) {
 export function ConfirmDialog({open, title, message, confirmLabel, danger, busy, onConfirm, onCancel}) {
     const {t} = useTranslation(['vault', 'common']);
     if (!open) return null;
-    return (
-        <div className="fixed inset-0 z-40 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200" onClick={onCancel}>
+    return createPortal(
+        <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200" onClick={onCancel}>
             <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{title}</h3>
@@ -93,7 +94,8 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

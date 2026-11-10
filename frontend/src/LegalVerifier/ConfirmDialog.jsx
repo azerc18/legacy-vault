@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 // Hộp xác nhận cho các thao tác không hoàn tác được (Approve / Reject / Sign).
@@ -14,9 +15,9 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
 
     if (!open) return null;
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
+            className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-5"
             onClick={() => { if (!busy) onCancel(); }}
         >
             <div
@@ -50,6 +51,7 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
