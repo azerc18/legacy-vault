@@ -194,7 +194,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal soạn / sửa */}
             {formOpen && (
-                <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl max-w-lg w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto space-y-4 relative animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center pb-3 border-b border-outline-variant/20 dark:border-white/10">
                             <h3 className="font-title-lg text-lg font-bold text-on-surface dark:text-white">
@@ -297,7 +297,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
 
             {/* Modal xem chi tiết */}
             {viewing && (
-                <div className="fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewing(null)}>
+                <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewing(null)}>
                     <div className="lv-surface-secure bg-surface-container-lowest text-on-surface border border-outline-variant/30 dark:border-white/15 rounded-2xl sm:rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4 relative animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-center pb-3 border-b border-outline-variant/20 dark:border-white/10">
                             <h3 className="font-title-lg text-lg font-bold flex items-center gap-2 text-on-surface dark:text-white">

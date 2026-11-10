@@ -126,7 +126,7 @@ export default function AdminVaults() {
             <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} />
 
             {detail && (
-                <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={() => setDetail(null)}>
+                <div className="lv-modal-backdrop fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4" onClick={() => setDetail(null)}>
                     <div className="lv-dossier p-6 pt-8 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-between items-start">
                             <div>

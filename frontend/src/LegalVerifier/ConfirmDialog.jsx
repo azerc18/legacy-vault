@@ -16,7 +16,7 @@ export default function ConfirmDialog({ open, title, message, confirmText, dange
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
+            className="lv-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5"
             onClick={() => { if (!busy) onCancel(); }}
         >
             <div

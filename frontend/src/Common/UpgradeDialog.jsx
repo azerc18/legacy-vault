@@ -38,7 +38,7 @@ export default function UpgradeDialog({ open, message, feature, onClose }) {
     // Bấm "Để sau" chỉ đóng hộp này, form bên dưới vẫn còn nguyên dữ liệu đã nhập.
     return createPortal(
         <div
-            className="fixed inset-0 z-[70] bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200"
+            className="lv-modal-backdrop fixed inset-0 z-[70] bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4 animate-in fade-in duration-200"
             onClick={onClose}
         >
             <div

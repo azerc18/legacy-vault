@@ -436,7 +436,7 @@ function AssetDetailModal({ detail, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
+        <div className="lv-modal-backdrop fixed inset-0 z-30 bg-black/40 flex items-center justify-center px-4" onClick={onClose}>
             <div className="lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-start">
                     <div>

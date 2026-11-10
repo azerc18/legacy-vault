@@ -136,7 +136,7 @@ export default function BeneficiaryLegacyMessages({ vaultId }) {
             </ul>
 
             {viewing && (
-                <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setViewing(null)}>
+                <div className="lv-modal-backdrop fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setViewing(null)}>
                     <div
                         className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto"
                         onClick={(e) => e.stopPropagation()}

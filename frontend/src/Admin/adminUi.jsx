@@ -52,7 +52,7 @@ export function ReasonDialog({
     const [reason, setReason] = useState('');
     if (!open) return null;
     return (
-        <div className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center px-4" onClick={onCancel}>
+        <div className="lv-modal-backdrop fixed inset-0 z-40 bg-black/45 backdrop-blur-sm flex items-center justify-center px-4" onClick={onCancel}>
             <div className="lv-glass-secure lv-surface-secure bg-surface-container-lowest rounded-2xl p-6 w-full max-w-md"
                  onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-title-lg text-title-lg">{title}</h3>
