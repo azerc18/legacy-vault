@@ -79,6 +79,7 @@
     "secretHint": "Encrypted before it is stored. Beneficiaries can only see it after the vault is released.",
     "assetsPartial": "The vault was created, but {{count}} asset(s) could not be saved. Open the vault to add them again.",
     "allocationNeedTwo": "Add at least 2 beneficiaries to choose how this asset is shared between them.",
+    "assetsDowngraded": "{{count}} asset(s) were saved as \"All beneficiaries\" because your plan does not include the allocation you chose. Upgrade to VIP, then change it in the vault.",
     "openVault": "Open vault",
     "assetNamePlaceholder": "Asset name (e.g. Vietcombank)",
     "secretPlaceholder": "Secret (password, seed phrase, account number...)",

@@ -79,6 +79,7 @@
     "secretHint": "Được mã hoá trước khi lưu. Người thụ hưởng chỉ xem được sau khi két được mở.",
     "assetsPartial": "Đã tạo két, nhưng {{count}} tài sản chưa lưu được. Mở két để thêm lại.",
     "allocationNeedTwo": "Thêm từ 2 người thụ hưởng trở lên để chọn cách chia tài sản này giữa họ.",
+    "assetsDowngraded": "{{count}} tài sản đã được lưu ở chế độ \"Tất cả người thụ hưởng\" vì gói của bạn không có kiểu phân bổ đã chọn. Nâng cấp VIP rồi đổi lại trong két.",
     "openVault": "Mở két",
     "assetNamePlaceholder": "Tên tài sản (VD: Ngân hàng Vietcombank)",
     "secretPlaceholder": "Thông tin bí mật (mật khẩu, cụm từ khôi phục, số tài khoản...)",
