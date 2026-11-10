@@ -137,13 +137,14 @@ function timeAgo(value, lng, justNow) {
 }
 
 // Câu thông báo theo ngôn ngữ đang chọn. Khóa: types.TYPE hoặc types.TYPE_VARIANT (params.variant);
-// tham số kết thúc bằng "At" là ngày giờ ISO. Thông báo cũ không có params: câu dịch còn sót {{...}}
+// tham số kết thúc bằng "At" là thời điểm ISO có múi giờ. Thông báo cũ không có params: câu dịch còn sót {{...}}
 // thì dùng content (câu tiếng Anh lưu sẵn ở BE).
 function messageOf(n, t, lng) {
     const params = n.params || {};
     const values = {};
     for (const [k, v] of Object.entries(params)) {
-        values[k] = /At$/.test(k) && v ? (/T00:00(:00)?$/.test(v) || !v.includes('T') ? fmtDate(v, lng) : fmtDateTime(v, lng)) : v;
+        // BE gửi thời điểm có múi giờ (…Z); chuỗi không có 'T' là ngày thuần
+        values[k] = /At$/.test(k) && v ? (v.includes('T') ? fmtDateTime(v, lng) : fmtDate(v, lng)) : v;
     }
     if (params.role) values.role = t(`notifications.executorRole.${params.role}`, { defaultValue: params.role });
     const fallback = n.content || t('notifications.generic');
@@ -154,7 +155,6 @@ function messageOf(n, t, lng) {
     return text.includes('{{') ? fallback : text;
 }
 
-// Các trang cũ còn truyền prop source; chuông giờ dùng chung một API nên không cần nữa
 export default function NotificationBell() {
     const { t, i18n } = useTranslation('common');
     const navigate = useNavigate();
@@ -276,8 +276,6 @@ export default function NotificationBell() {
         }
     };
 
-    // Tab "Chưa đọc" lấy từ BE; thông báo vừa bấm vẫn nằm lại trong danh sách cho tới lần tải sau
-    const shown = items;
     const tab = (active) => `h-7 px-3 rounded-full text-xs font-semibold transition-colors ${active
         ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant hover:bg-surface-container-low'}`;
 
@@ -314,7 +312,7 @@ export default function NotificationBell() {
                         </div>
                     </div>
                     <div className="overflow-y-auto min-h-0">
-                        {shown.length === 0 && !loading && (
+                        {items.length === 0 && !loading && (
                             <div className="px-4 py-8 text-center">
                                 <span className="material-symbols-outlined text-[32px] text-outline">notifications_off</span>
                                 <p className="mt-1 text-sm text-on-surface-variant">
@@ -322,7 +320,7 @@ export default function NotificationBell() {
                                 </p>
                             </div>
                         )}
-                        {shown.map((n) => {
+                        {items.map((n) => {
                             const [icon, tone] = TYPE_META[n.type] || ['notifications', 'info'];
                             return (
                                 <button key={n.id} onClick={() => openItem(n)}

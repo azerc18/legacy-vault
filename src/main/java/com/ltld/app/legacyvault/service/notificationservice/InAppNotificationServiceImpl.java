@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
@@ -77,7 +78,8 @@ public class InAppNotificationServiceImpl implements InAppNotificationService {
                 .referenceType(n.getReferenceType())
                 .referenceId(n.getReferenceId())
                 .read(n.getStatus() == NotificationStatus.READ)
-                .createdAt(n.getCreatedAt())
+                .createdAt(n.getCreatedAt() == null ? null
+                        : n.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant())
                 .build();
     }
 }

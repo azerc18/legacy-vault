@@ -4,7 +4,6 @@ import {createPortal} from 'react-dom';
 import {useTranslation} from 'react-i18next';
 import ProtectionBanner from './ProtectionBanner.jsx';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
-import NotificationBell from '../Beneficiary/NotificationBell.jsx';
 
 
 export function Icon({name, className = ''}) {
@@ -102,7 +101,7 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
 export function OwnerLayout({title, subtitle, back, actions, children}) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
-            <AppHeader extra={<NotificationBell source="owner" />}/>
+            <AppHeader />
             <main className={`${PAGE_WIDTH} py-10`}>
                 <ProtectionBanner/>
                 <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>

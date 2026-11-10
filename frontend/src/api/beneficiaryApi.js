@@ -73,10 +73,6 @@ export const beneficiaryApi = {
     downloadLegacyMessageAttachment: (vaultId, messageId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/messages/${messageId}/attachment`, name || 'attachment'),
 
-    // FR-16: thông báo trong app -> [{ id, type, content, vaultId, read, createdAt }]
-    listNotifications: () => http.get('/beneficiaries/notifications').then((r) => r.data?.data ?? []),
-    markNotificationRead: (id) => http.patch(`/beneficiaries/notifications/${id}/read`),
-
     // FR-19: đóng hồ sơ
     closePreview: (vaultId) => http.get(`/beneficiaries/vaults/${vaultId}/close-preview`).then(unwrap),
     closeVault: (vaultId, acknowledgeUnviewed) =>

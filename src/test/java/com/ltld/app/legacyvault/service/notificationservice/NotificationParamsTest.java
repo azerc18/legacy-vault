@@ -2,7 +2,10 @@ package com.ltld.app.legacyvault.service.notificationservice;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,7 +23,22 @@ class NotificationParamsTest {
         assertThat(parsed).containsExactly(
                 Map.entry("vault", "Két \"gia đình\""),
                 Map.entry("count", "2"),
-                Map.entry("deadlineAt", "2026-11-20T09:30"));
+                Map.entry("deadlineAt", NotificationParams.toInstantText(LocalDateTime.of(2026, 11, 20, 9, 30))));
+    }
+
+    @Test
+    void localDateTime_isSentAsInstantWithZone_soBrowsersDoNotReadItAsLocalTime() {
+        LocalDateTime local = LocalDateTime.of(2026, 11, 10, 6, 30);
+
+        String text = NotificationParams.of("deadlineAt", local).get("deadlineAt");
+
+        assertThat(text).endsWith("Z");
+        assertThat(Instant.parse(text)).isEqualTo(local.atZone(ZoneId.systemDefault()).toInstant());
+    }
+
+    @Test
+    void localDate_staysADateWithoutTime() {
+        assertThat(NotificationParams.of("expiresAt", LocalDate.of(2026, 11, 20))).containsEntry("expiresAt", "2026-11-20");
     }
 
     @Test

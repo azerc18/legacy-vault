@@ -206,14 +206,15 @@ public class InAppNotificationEventListener {
                             String.format("%s appointed you as their executor.", owner),
                             "owner", owner, "role", role));
                 } else {
-                    String reason = switch (mail.type()) {
+                    // variant: FE chọn câu notifications.types.EXECUTOR_REVOKED_<variant>
+                    String variant = switch (mail.type()) {
                         case REVOKED_TIMEOUT -> "TIMEOUT";
                         case REPLACED_BY_ADMIN -> "ADMIN";
                         default -> "OWNER";
                     };
                     notifier.addForEmail(mail.recipientEmail(), draft(NotificationType.EXECUTOR_REVOKED, null, null,
                             String.format("You are no longer an executor for %s.", owner),
-                            "owner", owner, "role", role, "reason", reason));
+                            "owner", owner, "role", role, "variant", variant));
                 }
             }
         });

@@ -97,6 +97,10 @@ class InAppNotificationEventListenerTest {
         return new AuditEvent(action, actorId, vaultId, "Vault", entityId, null, meta);
     }
 
+    private static String instant(int year, int month, int day, int hour) {
+        return NotificationParams.toInstantText(LocalDateTime.of(year, month, day, hour, 0));
+    }
+
     private List<Notification> saved(int count) {
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(count)).save(captor.capture());
@@ -184,7 +188,8 @@ class InAppNotificationEventListenerTest {
         // Link xác nhận (token) chỉ nằm trong email: thông báo không được chứa tham chiếu nào tới nó
         assertThat(toConfirmer.getReferenceId()).isNull();
         assertThat(NotificationParams.parse(toConfirmer.getParams()))
-                .containsEntry("owner", "Nguyen Van An").containsEntry("deadlineAt", "2026-11-13T09:00");
+                .containsEntry("owner", "Nguyen Van An")
+                .containsEntry("deadlineAt", instant(2026, 11, 13, 9));
         Notification toOwner = all.get(1);
         assertThat(toOwner.getRecipient()).isSameAs(owner);
         assertThat(toOwner.getType()).isEqualTo(NotificationType.DMS_CONFIRMATION_PENDING);
@@ -204,7 +209,7 @@ class InAppNotificationEventListenerTest {
         assertThat(n.getRecipient()).isSameAs(owner);
         assertThat(n.getType()).isEqualTo(NotificationType.DMS_OWNER_CONFIRMED_SAFE);
         assertThat(NotificationParams.parse(n.getParams()))
-                .containsEntry("confirmer", "Friend").containsEntry("untilAt", "2026-11-17T08:00");
+                .containsEntry("confirmer", "Friend").containsEntry("untilAt", instant(2026, 11, 17, 8));
     }
 
     @Test
@@ -246,7 +251,9 @@ class InAppNotificationEventListenerTest {
         assertThat(all.get(0).getType()).isEqualTo(NotificationType.EXECUTOR_ASSIGNED);
         assertThat(NotificationParams.parse(all.get(0).getParams())).containsEntry("role", "PRIMARY");
         assertThat(all.get(1).getType()).isEqualTo(NotificationType.EXECUTOR_REVOKED);
-        assertThat(NotificationParams.parse(all.get(1).getParams())).containsEntry("reason", "TIMEOUT");
+        // FE chọn câu theo variant (notifications.types.EXECUTOR_REVOKED_TIMEOUT)
+        assertThat(NotificationParams.parse(all.get(1).getParams()))
+                .containsEntry("variant", "TIMEOUT").containsEntry("owner", "Nguyen Van An").doesNotContainKey("reason");
     }
 
     @Test
@@ -261,7 +268,7 @@ class InAppNotificationEventListenerTest {
         Notification n = saved(1).get(0);
         assertThat(n.getRecipient()).isSameAs(beneficiary);
         assertThat(n.getType()).isEqualTo(NotificationType.CLAIM_DEADLINE_REMINDER);
-        assertThat(NotificationParams.parse(n.getParams())).containsEntry("deadlineAt", "2026-12-01T00:00");
+        assertThat(NotificationParams.parse(n.getParams())).containsEntry("deadlineAt", instant(2026, 12, 1, 0));
     }
 
     @Test

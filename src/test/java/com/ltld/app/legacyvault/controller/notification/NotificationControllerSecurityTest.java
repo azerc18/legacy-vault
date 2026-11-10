@@ -58,7 +58,7 @@ class NotificationControllerSecurityTest {
         when(inAppNotificationService.listMine(userId, 1, 5)).thenReturn(new PageImpl<>(List.of(
                 NotificationResponse.builder().id(notificationId).type(NotificationType.VERIFIER_REPLY)
                         .content("The Legal Verifier replied").read(false)
-                        .createdAt(LocalDateTime.of(2026, 10, 28, 9, 0)).build())));
+                        .createdAt(LocalDateTime.of(2026, 10, 28, 9, 0).toInstant(java.time.ZoneOffset.UTC)).build())));
 
         mockMvc.perform(get("/api/notifications/me").param("page", "1").param("size", "5")
                         .with(token(userId.toString())))
@@ -86,7 +86,7 @@ class NotificationControllerSecurityTest {
         when(inAppNotificationService.listMine(userId, 0, 20, true)).thenReturn(new PageImpl<>(List.of(
                 NotificationResponse.builder().id(notificationId).type(NotificationType.BENEFICIARY_ASSIGNED)
                         .content("An named you as a beneficiary").params(java.util.Map.of("owner", "An"))
-                        .read(false).createdAt(LocalDateTime.of(2026, 11, 10, 9, 0)).build())));
+                        .read(false).createdAt(LocalDateTime.of(2026, 11, 10, 9, 0).toInstant(java.time.ZoneOffset.UTC)).build())));
 
         mockMvc.perform(get("/api/notifications/me").param("unreadOnly", "true").with(token(userId.toString())))
                 .andExpect(status().isOk())

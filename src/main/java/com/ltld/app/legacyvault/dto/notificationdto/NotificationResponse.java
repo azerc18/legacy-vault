@@ -4,7 +4,7 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
@@ -31,5 +31,6 @@ public class NotificationResponse {
     private final String referenceType;
     private final UUID referenceId;
     private final boolean read;
-    private final LocalDateTime createdAt;
+    // Instant (có múi giờ) thay vì LocalDateTime theo giờ JVM, để trình duyệt tính "x phút trước" đúng
+    private final Instant createdAt;
 }
