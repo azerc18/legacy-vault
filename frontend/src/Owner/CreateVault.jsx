@@ -309,14 +309,21 @@ export default function CreateVault() {
                                     )}
 
                                     </div>
-                                    {showAllocation && (
-                                        <AllocationFields
-                                            beneficiaries={allocBeneficiaries}
-                                            value={a.allocation}
-                                            onChange={(al) => setAssetAllocation(i, al)}
-                                            allowProportional={canSplitPercent(schemaOf(schemas, a.assetType))}
-                                        />
-                                    )}
+                                    {/* Dưới 2 người thụ hưởng: giữ khung nhưng làm mờ và khoá, kèm lời nhắc (không ẩn đi) */}
+                                    <div className={showAllocation ? '' : 'space-y-1.5'}>
+                                        <div {...(showAllocation ? {} : {inert: true, 'aria-disabled': true})}
+                                             className={showAllocation ? '' : 'opacity-50 select-none'}>
+                                            <AllocationFields
+                                                beneficiaries={allocBeneficiaries}
+                                                value={showAllocation ? a.allocation : emptyAllocation()}
+                                                onChange={(al) => setAssetAllocation(i, al)}
+                                                allowProportional={canSplitPercent(schemaOf(schemas, a.assetType))}
+                                            />
+                                        </div>
+                                        {!showAllocation && (
+                                            <p className="text-xs text-on-surface-variant">{t('create.allocationNeedTwo')}</p>
+                                        )}
+                                    </div>
                                     <div>
                                         <label htmlFor={`asset-notes-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
                                             {t('detail.assets.notesLabel')}
