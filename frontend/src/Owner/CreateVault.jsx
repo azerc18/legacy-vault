@@ -7,10 +7,16 @@ import {getErrorMessage} from '../api/http.js';
 import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline} from './ownerUi.jsx';
 import {AssetTypeIcon} from './assetArt.jsx';
 import {AssetFieldsForm, cleanFields, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
+import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
 
-const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}});
+const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation()});
+// Khi tạo két, người thụ hưởng chưa có id: dùng uid của dòng làm khoá tạm, sau khi két có id sẽ đổi sang id thật (khớp theo email)
+const emailKey = (b) => b.email.trim().toLowerCase();
+const canSplitPercent = (schema) => schema?.mechanism === 'LEGAL_CLAIM_DOSSIER';   // BE chỉ cho chia % với tài sản cần hồ sơ pháp lý
 const hasFieldValues = (fields) => Object.values(fields || {}).some((v) => v && String(v).trim());
-const emptyBeneficiary = () => ({email: '', fullName: '', relationship: ''});
+// uid: khoá ổn định của từng dòng người thụ hưởng, để sửa email không làm mất lựa chọn phân bổ đã chọn
+let beneficiaryUid = 0;
+const emptyBeneficiary = () => ({uid: `b${++beneficiaryUid}`, email: '', fullName: '', relationship: ''});
 
 export default function CreateVault() {
     const {t} = useTranslation(['vault', 'enums', 'common']);
@@ -33,12 +39,30 @@ export default function CreateVault() {
         setAssets((list) => list.map((a, idx) => (idx === i ? {...a, [field]: value} : a)));
     const removeAsset = (i) => setAssets((list) => list.filter((_, idx) => idx !== i));
     const changeAssetType = (i, assetType) =>
-        setAssets((list) => list.map((a, idx) => (idx === i ? {...a, assetType, fields: {}} : a)));
+        setAssets((list) => list.map((a, idx) => {
+            if (idx !== i) return a;
+            // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh tuỳ chọn bị khoá mà vẫn đang chọn
+            const keep = canSplitPercent(schemaOf(schemas, assetType));
+            const allocation = a.allocation.mode === 'PROPORTIONAL' && !keep ? emptyAllocation() : a.allocation;
+            return {...a, assetType, fields: {}, allocation};
+        }));
+    const setAssetAllocation = (i, allocation) =>
+        setAssets((list) => list.map((a, idx) => (idx === i ? {...a, allocation} : a)));
     const setAssetField = (i, key, value) =>
         setAssets((list) => list.map((a, idx) => (idx === i ? {...a, fields: {...a.fields, [key]: value}} : a)));
     const updateBeneficiary = (i, field, value) =>
         setBeneficiaries((list) => list.map((b, idx) => (idx === i ? {...b, [field]: value} : b)));
     const removeBeneficiaryRow = (i) => setBeneficiaries((list) => list.filter((_, idx) => idx !== i));
+
+    // Người thụ hưởng đã nhập email (không trùng), dùng cho phần chọn cách phân bổ từng tài sản
+    const allocBeneficiaries = [];
+    for (const b of beneficiaries) {
+        const key = emailKey(b);
+        if (key && !allocBeneficiaries.some((x) => x.emailKey === key)) {
+            allocBeneficiaries.push({id: b.uid, emailKey: key, email: b.email.trim(), fullName: b.fullName.trim()});
+        }
+    }
+    const showAllocation = allocBeneficiaries.length >= 2;   // 1 người thì không cần phân bổ
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -56,13 +80,29 @@ export default function CreateVault() {
                 if (msg) return setError(`${t('create.assetItem', {index: a.index})}: ${msg}`);
             } else if (!a.secret.trim()) return setError(t('create.errors.assetIncomplete'));
         }
-        const typed = filled.filter((a) => a.schema);
-        const legacy = filled.filter((a) => !a.schema);
         // N1: người thụ hưởng bắt buộc, không trùng nhau, không trùng chính Owner
         const emails = beneficiaries.map((b) => b.email.trim().toLowerCase()).filter(Boolean);
         if (emails.length === 0) return setError(t('create.errors.beneficiaryRequired'));
         if (new Set(emails).size !== emails.length) return setError(t('create.errors.duplicateEmail'));
         if (emails.includes((user.email || '').toLowerCase())) return setError(t('create.errors.selfBeneficiary'));
+
+        // Phân bổ từng tài sản: bỏ người đã bị xoá/đổi email khỏi lựa chọn rồi kiểm tra như form thêm tài sản
+        const keys = new Set(allocBeneficiaries.map((b) => b.id));
+        const cleanAllocation = (al) => (!showAllocation ? emptyAllocation() : {
+            ...al,
+            selected: al.selected.filter((k) => keys.has(k)),
+            contingentId: keys.has(al.contingentId) ? al.contingentId : '',
+            shares: Object.fromEntries(Object.entries(al.shares).filter(([k]) => keys.has(k))),
+        });
+        for (const a of filled) {
+            a.allocation = cleanAllocation(a.allocation);
+            const msg = validateAllocation(a.allocation, canSplitPercent(a.schema), t);
+            if (msg) return setError(`${t('create.assetItem', {index: a.index})}: ${msg}`);
+        }
+        // Tài sản có phân bổ riêng cũng phải thêm sau khi két có id người thụ hưởng
+        const hasAlloc = (a) => a.allocation.mode !== 'ALL';
+        const typed = filled.filter((a) => a.schema || hasAlloc(a));
+        const legacy = filled.filter((a) => !a.schema && !hasAlloc(a));
 
         setLoading(true);
         try {
@@ -84,21 +124,51 @@ export default function CreateVault() {
                 })),
             });
             // API tạo két chỉ nhận secret thô, nên tài sản theo schema được thêm ngay sau khi két có id
+            // Id người thụ hưởng thật chỉ có sau khi tạo két: đổi khoá email sang id để gửi phân bổ
+            let idByUid = new Map();
+            if (typed.some(hasAlloc)) {
+                const created = await ownerApi.getVault(vault.id).catch(() => vault);
+                const idByEmail = new Map((created.beneficiaries || []).map((b) => [b.email.trim().toLowerCase(), b.id]));
+                idByUid = new Map(allocBeneficiaries.map((b) => [b.id, idByEmail.get(b.emailKey)]));
+            }
+            const realAllocation = (al) => ({
+                ...al,
+                selected: al.selected.map((k) => idByUid.get(k)).filter(Boolean),
+                contingentId: idByUid.get(al.contingentId) || '',
+                shares: Object.fromEntries(Object.entries(al.shares).map(([k, v]) => [idByUid.get(k), v]).filter(([k]) => k)),
+            });
             let failed = 0;
+            let downgraded = 0;   // lưu được nhưng phải về "Tất cả người thụ hưởng" vì gói không có kiểu phân bổ đã chọn
             for (const a of typed) {
                 try {
-                    await ownerApi.addAsset(vault.id, {
+                    const body = {
                         assetType: a.assetType,
                         assetName: a.assetName.trim(),
-                        fields: cleanFields(a.fields, schemaOf(schemas, a.assetType)),
                         notes: a.notes.trim() || null,
-                    });
+                    };
+                    if (a.schema) body.fields = cleanFields(a.fields, a.schema);
+                    else body.secret = a.secret;
+                    const allocation = hasAlloc(a) ? allocationBody(realAllocation(a.allocation), undefined, false) : undefined;
+                    if (allocation) body.allocation = allocation;
+                    try {
+                        await ownerApi.addAsset(vault.id, body);
+                    } catch (err) {
+                        // Gói Free chọn chia %, K-of-N hoặc người dự phòng: BE chặn và rollback tài sản.
+                        // Thêm lại không kèm phân bổ để giữ tài sản (mặc định thuộc tất cả người thụ hưởng) và báo rõ cho người dùng.
+                        if (allocation && err?.response?.data?.errorCode === 'PLAN_LIMIT_REACHED') {
+                            delete body.allocation;
+                            await ownerApi.addAsset(vault.id, body);
+                            downgraded += 1;
+                        } else {
+                            throw err;
+                        }
+                    }
                 } catch {
                     failed += 1;
                 }
             }
-            if (failed > 0) {
-                setPartial({vaultId: vault.id, failed});
+            if (failed > 0 || downgraded > 0) {
+                setPartial({vaultId: vault.id, failed, downgraded});
                 return;
             }
             navigate(`/owner/vaults/${vault.id}`, {state: {created: true}});
@@ -136,7 +206,7 @@ export default function CreateVault() {
                 <Card title={t('create.beneficiariesTitle', {count: beneficiaries.length})} icon="family_restroom">
                     <div className="space-y-4">
                         {beneficiaries.map((b, i) => (
-                            <div key={i} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
+                            <div key={b.uid} className="p-4 rounded-xl border border-outline-variant/50 space-y-3">
                                 <div className="flex justify-between items-center">
                                     <span className="text-sm font-semibold text-outline">{t('create.beneficiaryItem', {index: i + 1})}</span>
                                     {beneficiaries.length > 1 && (
@@ -255,6 +325,21 @@ export default function CreateVault() {
                                     )}
 
                                     </div>
+                                    {/* Dưới 2 người thụ hưởng: giữ khung nhưng làm mờ và khoá, kèm lời nhắc (không ẩn đi) */}
+                                    <div className={showAllocation ? '' : 'space-y-1.5'}>
+                                        <div {...(showAllocation ? {} : {inert: true, 'aria-disabled': true})}
+                                             className={showAllocation ? '' : 'opacity-50 select-none'}>
+                                            <AllocationFields
+                                                beneficiaries={allocBeneficiaries}
+                                                value={showAllocation ? a.allocation : emptyAllocation()}
+                                                onChange={(al) => setAssetAllocation(i, al)}
+                                                allowProportional={canSplitPercent(schemaOf(schemas, a.assetType))}
+                                            />
+                                        </div>
+                                        {!showAllocation && (
+                                            <p className="text-xs text-on-surface-variant">{t('create.allocationNeedTwo')}</p>
+                                        )}
+                                    </div>
                                     <div>
                                         <label htmlFor={`asset-notes-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
                                             {t('detail.assets.notesLabel')}
@@ -277,7 +362,10 @@ export default function CreateVault() {
 
                 {partial && (
                     <div className="p-4 rounded-xl bg-warning-container text-on-warning-container flex flex-wrap items-center justify-between gap-3" role="alert">
-                        <span className="text-sm">{t('create.assetsPartial', {count: partial.failed})}</span>
+                        <span className="text-sm space-y-1">
+                            {partial.failed > 0 && <span className="block">{t('create.assetsPartial', {count: partial.failed})}</span>}
+                            {partial.downgraded > 0 && <span className="block">{t('create.assetsDowngraded', {count: partial.downgraded})}</span>}
+                        </span>
                         <button type="button" onClick={() => navigate(`/owner/vaults/${partial.vaultId}`, {state: {created: true}})} className={btnPrimary}>
                             {t('create.openVault')}
                         </button>

@@ -80,7 +80,7 @@ Open "Profile" in the sidebar (or click your avatar). The page has these cards:
 1. "My vaults" → "New vault" (or "Create your first vault").
 2. "Vault details": enter a name (required) and a description / hand-over instructions.
 3. "Beneficiaries": at least one. Enter email (required), full name and relationship. "Add beneficiary" adds more. You cannot add yourself or the same email twice.
-4. "Assets" (optional): click "Add asset", choose the asset type, then fill the form for that type. Fields in the "Sealed section" (passwords, seed phrase, PIN...) are encrypted and only shown to beneficiaries after hand-over.
+4. "Assets" (optional): click "Add asset", choose the asset type, then fill the form for that type. Fields in the "Sealed section" (passwords, seed phrase, PIN...) are encrypted and only shown to beneficiaries after hand-over. With two or more beneficiaries, each asset also has "Allocation among beneficiaries" (see "Choose who receives each asset" below); the default is "All beneficiaries".
 5. Click "Create vault".
 
 ### Asset types
