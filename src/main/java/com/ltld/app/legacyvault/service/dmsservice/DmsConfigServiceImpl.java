@@ -47,7 +47,6 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "The Dead Man's Switch has been suspended by an administrator. Please contact an admin.";
-    static final String NO_VAULT_MESSAGE = "You have no vault, so the check-in could not be completed. Create a vault first.";
     static final String TOO_SOON_MESSAGE = "You checked in a moment ago. Please try again later.";
     static final String HANDOVER_STARTED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be changed.";
     static final String INCOMPLETE_CONFIG_MESSAGE = "The Dead Man's Switch configuration is incomplete. Please save the configuration again.";
@@ -185,10 +184,6 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         if (checkinCooldownMinutes > 0 && config.getLastCheckinAt() != null
                 && LocalDateTime.now().isBefore(config.getLastCheckinAt().plusMinutes(checkinCooldownMinutes))) {
             throw new DmsException(ErrorCode.DMS_CHECKIN_TOO_SOON, TOO_SOON_MESSAGE);
-        }
-        // Đã xoá hết vault thì không còn gì để bảo vệ: check-in không thành công và không reset chu kỳ
-        if (!vaultRepository.existsByOwnerId(ownerId)) {
-            throw new DmsException(ErrorCode.DMS_NO_VAULT, NO_VAULT_MESSAGE);
         }
 
         LocalDateTime now = LocalDateTime.now();

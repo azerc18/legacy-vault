@@ -388,7 +388,7 @@
       "fieldRequired": "{{label}} is required.",
       "fieldInvalid": "{{label}} has an invalid format.",
       "numberInvalid": "{{label}} must be a whole number (digits only, e.g. 10000000).",
-      "numberRange": "{{label}} must be greater than 0, must not start with 0 and can have at most 15 digits (e.g. 10000000)."
+      "numberRange": "{{label}} must not have extra leading zeros and can have at most 15 digits (e.g. 10000000)."
     }
   }
 }

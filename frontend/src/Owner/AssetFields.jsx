@@ -40,8 +40,9 @@ export const OPTION_LABEL = {
 // ("10.000.000", "10,000,000", "10 000 000"). Dạng khác giữ nguyên để báo lỗi rõ thay vì đổi số im lặng:
 // "1.5" / "0.5" / "12,5" bị báo lỗi, không biến thành 15 / 5 / 125. FE và BE (AssetFieldsValidator) cùng một luật số nguyên.
 const INT_RE = /^\d+$/;
-// Giá trị tiền hợp lệ: số nguyên dương, không bắt đầu bằng 0 (chặn "0000000"), tối đa 15 chữ số. BE (AssetFieldsValidator) cùng luật.
-const VALUE_RE = /^[1-9]\d{0,14}$/;
+// Giá trị tiền hợp lệ: số nguyên không có số 0 thừa ở đầu (chặn "0000000", "0123"; nhận "0" để tài sản cũ có giá trị 0 vẫn sửa được),
+// tối đa 15 chữ số. BE (AssetFieldsValidator) cùng luật.
+const VALUE_RE = /^(0|[1-9]\d{0,14})$/;
 const GROUPED_RE = /^\d{1,3}([.,\s]\d{3})+$/;
 export const normalizeNumber = (raw) => {
     const v = (raw || '').trim();

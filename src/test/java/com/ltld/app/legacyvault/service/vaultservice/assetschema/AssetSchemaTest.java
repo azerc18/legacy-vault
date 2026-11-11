@@ -50,6 +50,14 @@ class AssetSchemaTest {
     }
 
     @Test
+    @DisplayName("số tiền đúng bằng 0 vẫn hợp lệ (tài sản cũ có giá trị 0 sửa được)")
+    void zeroValueAllowed() {
+        Map<String, String> zero = bank();
+        zero.put("estimatedValue", "0");
+        assertThatCode(() -> AssetFieldsValidator.validate(AssetType.BANK_ACCOUNT, zero)).doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("thiếu trường bắt buộc -> ASSET_FIELD_INVALID")
     void missingRequired() {
         Map<String, String> m = bank();
