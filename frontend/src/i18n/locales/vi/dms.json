@@ -98,12 +98,14 @@
     },
     "status": {
       "INACTIVE": "Đã chỉ định",
-      "ACTIVE": "Đã kích hoạt"
+      "ACTIVE": "Đã kích hoạt",
+      "PENDING": "Chờ phản hồi"
     },
     "since": "Từ {{date}}",
     "activated": "kích hoạt lúc {{date}}",
     "acknowledged": "đã xác nhận lúc {{date}}",
     "awaitingAck": "đang chờ xác nhận",
+    "awaitingResponse": "đang chờ người này đồng ý lời mời",
     "noneAssigned": "Chưa chỉ định ai.",
     "saving": "Đang lưu...",
     "assign": "Chỉ định",

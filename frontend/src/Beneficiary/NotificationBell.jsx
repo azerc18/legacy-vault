@@ -28,6 +28,8 @@ const TYPE_META = {
     BENEFICIARY_ASSIGNED: ['volunteer_activism', 'success'],
     BENEFICIARY_REMOVED: ['person_remove', 'warning'],
     EXECUTOR_ASSIGNED: ['assignment_ind', 'success'],
+    EXECUTOR_INVITATION_ACCEPTED: ['task_alt', 'success'],
+    EXECUTOR_INVITATION_DECLINED: ['person_off', 'warning'],
     EXECUTOR_REVOKED: ['person_off', 'warning'],
     DMS_CHECKIN_REMINDER: ['alarm', 'warning'],
     DMS_CONFIRMATION_PENDING: ['crisis_alert', 'danger'],
@@ -97,8 +99,15 @@ async function targetOf(n) {
         case 'EXECUTOR_TASK_DISPUTED':
             return hasRole('EXECUTOR') ? executorCaseOfTask(id) : null;
         case 'EXECUTOR_ASSIGNED':
+            // Lời mời (referenceType = ExecutorAssignment): mở thẳng trang đồng ý / từ chối.
+            // Không bắt buộc role EXECUTOR như các mục khác: JWT của phiên cũ chưa mang role vừa được cấp.
+            if (ref === 'ExecutorAssignment' && id) return `/executor/invitations/${id}`;
+            return ifRole('EXECUTOR', '/executor/home');
         case 'EXECUTOR_ACTIVATED':
             return ifRole('EXECUTOR', '/executor/home');
+        case 'EXECUTOR_INVITATION_ACCEPTED':
+        case 'EXECUTOR_INVITATION_DECLINED':
+            return ifRole('OWNER', '/owner/executors');
         // Owner
         case 'DMS_CHECKIN_REMINDER':
         case 'DMS_CONFIRMATION_PENDING':

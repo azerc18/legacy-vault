@@ -39,6 +39,14 @@ export const executorApi = {
     //      vaultCount, latestRequestStatus, unreadMessageCount, acknowledgeDeadlineAt (chỉ khi ACTIVE và chưa xác nhận) }]
     listMine: () => http.get(`${BASE}/me`).then((r) => unwrap(r) ?? []),
 
+    // Lời mời làm Executor: xem / đồng ý / từ chối (không cần assignment đã ACTIVE)
+    // -> { assignmentId, ownerFullName, ownerEmail, executorType, status, responseStatus, assignedAt,
+    //      respondedAt, backupActivationWaitDays, canRespond }
+    getInvitation: (assignmentId) => http.get(`${BASE}/${assignmentId}/invitation`).then(unwrap),
+    acceptInvitation: (assignmentId) => http.post(`${BASE}/${assignmentId}/invitation/accept`).then(unwrap),
+    declineInvitation: (assignmentId, reason) =>
+        http.post(`${BASE}/${assignmentId}/invitation/decline`, { reason: reason || null }).then(unwrap),
+
     // FR-07: xác nhận đã nhận thông báo kích hoạt -> { id, executorType, status, activatedAt, acknowledgedAt }
     acknowledge: (assignmentId) => http.post(`${BASE}/${assignmentId}/acknowledge`).then(unwrap),
 

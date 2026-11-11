@@ -39,6 +39,8 @@
     "EXECUTOR_ASSIGNED": "Executor assigned",
     "EXECUTOR_REPLACED": "Executor replaced",
     "EXECUTOR_REVOKE": "Executor revoked",
+    "EXECUTOR_ACCEPTED": "Executor accepted the invitation",
+    "EXECUTOR_DECLINED": "Executor declined the invitation",
     "EXECUTOR_ACTIVATED": "Executor activated",
     "EXECUTOR_ACKNOWLEDGED": "Executor acknowledged",
     "VAULT_DELETED": "Vault deleted"

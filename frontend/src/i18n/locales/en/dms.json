@@ -98,12 +98,14 @@
     },
     "status": {
       "INACTIVE": "Assigned",
-      "ACTIVE": "Activated"
+      "ACTIVE": "Activated",
+      "PENDING": "Awaiting answer"
     },
     "since": "Since {{date}}",
     "activated": "activated {{date}}",
     "acknowledged": "acknowledged {{date}}",
     "awaitingAck": "awaiting acknowledgement",
+    "awaitingResponse": "waiting for them to accept the invitation",
     "noneAssigned": "No one assigned.",
     "saving": "Saving...",
     "assign": "Assign",

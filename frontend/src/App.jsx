@@ -26,6 +26,7 @@ const VerificationHistory = lazy(() => import('./LegalVerifier/VerificationHisto
 const VerifierHome = lazy(() => import('./LegalVerifier/VerifierHome.jsx'));
 const ExecutorHome = lazy(() => import('./Executor/ExecutorHome.jsx'));
 const ExecutorCase = lazy(() => import('./Executor/ExecutorCase.jsx'));
+const ExecutorInvitation = lazy(() => import('./Executor/ExecutorInvitation.jsx'));
 const BeneficiaryVaults = lazy(() => import('./Beneficiary/BeneficiaryVaults.jsx'));
 const BeneficiaryVaultDetail = lazy(() => import('./Beneficiary/BeneficiaryVaultDetail.jsx'));
 const BeneficiaryGuide = lazy(() => import('./Beneficiary/BeneficiaryGuide.jsx'));
@@ -111,6 +112,8 @@ function App() {
                 {/* Executor */}
                 <Route path="/executor/home" element={guard(EXECUTOR, <ExecutorHome />)} />
                 <Route path="/executor/cases/:assignmentId" element={guard(EXECUTOR, <ExecutorCase />)} />
+                {/* Lời mời: chỉ cần đăng nhập — JWT của phiên cũ có thể chưa mang role EXECUTOR vừa được cấp */}
+                <Route path="/executor/invitations/:assignmentId" element={<ExecutorInvitation />} />
 
                 {/* Legal Verifier */}
                 <Route path="/verifier/home" element={guard(VERIFIER, <VerifierHome />)} />

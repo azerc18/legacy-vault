@@ -17,6 +17,8 @@ const POSITIONS = [
 const STATUS = {
     INACTIVE: { cls: 'bg-secondary-fixed text-on-secondary-fixed' },
     ACTIVE: { cls: 'bg-success-container text-on-success-container' },
+    // Không phải ExecutorStatus: người được chỉ định chưa trả lời lời mời (responseStatus = PENDING)
+    PENDING: { cls: 'bg-warning-container text-on-warning-container' },
 };
 
 export default function OwnerExecutors() {
@@ -90,7 +92,9 @@ function ExecutorCard({ position, assignment, onChanged }) {
         }
     };
 
-    const stKey = assignment && (STATUS[assignment.status] ? assignment.status : 'INACTIVE');
+    const invitationPending = assignment?.responseStatus === 'PENDING';
+    const stKey = assignment && (invitationPending ? 'PENDING'
+        : STATUS[assignment.status] ? assignment.status : 'INACTIVE');
     const st = assignment && STATUS[stKey];
 
     return (
@@ -114,6 +118,7 @@ function ExecutorCard({ position, assignment, onChanged }) {
                         <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
                         <p className="text-xs text-outline">
                             {t('executors.since', { date: formatDate(assignment.assignedAt) })}
+                            {invitationPending && ` · ${t('executors.awaitingResponse')}`}
                             {assignment.activatedAt && ` · ${t('executors.activated', { date: formatDate(assignment.activatedAt, true) })}`}
                             {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
                                 ? ` · ${t('executors.acknowledged', { date: formatDate(assignment.acknowledgedAt, true) })}`
