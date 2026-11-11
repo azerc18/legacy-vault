@@ -134,7 +134,8 @@ export default function AdminDashboard() {
 
                     {charts && (
                         <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                            <Dossier title={t('overview.charts.revenue')} tab={t('overview.charts.last30')}>
+                            <Dossier title={t('overview.charts.revenue')} tab={t('overview.charts.last30')}
+                                     right={<Link to="/admin/revenue" className="text-xs font-semibold text-secondary">{t('overview.charts.openRevenue')}</Link>}>
                                 <BarChart points={charts.revenueByDay} format={formatVnd} labelOf={shortDate} empty={t('overview.charts.noData')} />
                             </Dossier>
                             <Dossier title={t('overview.charts.users')} tab={t('overview.charts.last12w')}>

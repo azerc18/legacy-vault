@@ -175,6 +175,8 @@ export const adminApi = {
     updatePlan: (code, body) => http.patch(`/admin/plans/${encodeURIComponent(code)}`, body).then(unwrap),
 
     // Việc 4: mã giảm giá
+    // Việc 5: báo cáo doanh thu, range = '30d' | '12m'
+    revenue: (range = '30d') => http.get('/admin/revenue', { params: { range } }).then(unwrap),
     listCoupons: () => http.get('/admin/coupons').then(unwrap),
     createCoupon: (body) => http.post('/admin/coupons', body).then(unwrap),
     setCouponActive: (id, active) => http.patch(`/admin/coupons/${id}`, { active }).then(unwrap),

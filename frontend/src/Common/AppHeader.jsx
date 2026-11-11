@@ -30,6 +30,7 @@ const ADMIN_NAV_ITEMS = [
     { to: '/admin/audit-logs', key: 'auditLogs', icon: 'history' },
     { to: '/admin/alerts', key: 'alerts', icon: 'notifications_active' },
     { to: '/admin/payments', key: 'payments', icon: 'receipt_long' },
+    { to: '/admin/revenue', key: 'revenue', icon: 'monitoring' },
     { to: '/admin/plans', key: 'plans', icon: 'sell' },
     { to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe' },
     { to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open' },

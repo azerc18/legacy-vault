@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -50,7 +50,8 @@
       "last30": "30 days",
       "last12w": "12 weeks",
       "max": "Peak: {{value}}",
-      "noData": "No data in this period yet."
+      "noData": "No data in this period yet.",
+      "openRevenue": "Open revenue report"
     }
   },
 
@@ -328,5 +329,43 @@
     "confirmText": "{{email}} can try again right away for vault \"{{vault}}\" (5 fresh attempts). This is recorded in the audit log.",
     "unlocked": "Unlocked {{email}}.",
     "unlockError": "Could not unlock."
+  },
+
+  "revenue": {
+    "title": "Revenue",
+    "subtitle": "Money collected, refunded and checkout conversion, compared with the previous period.",
+    "rangeLabel": "Time range",
+    "ranges": { "30d": "30 days", "12m": "12 months" },
+    "vsPrevious": { "30d": "the previous 30 days", "12m": "the previous 12 months" },
+    "kpi": {
+      "net": "Net revenue",
+      "up": "Up {{value}}% vs {{period}}",
+      "down": "Down {{value}}% vs {{period}}",
+      "noPrevious": "No revenue in {{period}} to compare",
+      "collected": "Collected",
+      "refundedFoot_one": "Refunded {{amount}} ({{count}} order)",
+      "refundedFoot_other": "Refunded {{amount}} ({{count}} orders)",
+      "orders": "Paid orders",
+      "ordersFoot": "Avg {{avg}}/order · {{discount}} discounted",
+      "conversion": "Checkout conversion",
+      "conversionFoot_one": "Of {{count}} order created in this period",
+      "conversionFoot_other": "Of {{count}} orders created in this period"
+    },
+    "chart": {
+      "title": { "30d": "Collected per day", "12m": "Collected per month" },
+      "aria": "Column chart of money collected over time",
+      "orders_one": "{{count}} order",
+      "orders_other": "{{count}} orders",
+      "refunded": "Refunded in this period: {{amount}}",
+      "empty": "Nothing collected in this period yet.",
+      "note": "Includes orders refunded later; refunds are subtracted on the refund date. Net revenue = collected − refunded."
+    },
+    "table": { "period": "Period", "collected": "Collected", "orders": "Orders", "refunded": "Refunded" },
+    "showTable": "Show as table",
+    "showChart": "Show chart",
+    "byPlan": "By plan",
+    "byProvider": "By payment gateway",
+    "providers": { "VNPAY": "VNPay", "PAYPAL": "PayPal" },
+    "loadError": "Could not load the revenue report."
   }
 }

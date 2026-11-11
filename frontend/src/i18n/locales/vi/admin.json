@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -48,7 +48,8 @@
       "last30": "30 ngày",
       "last12w": "12 tuần",
       "max": "Cao nhất: {{value}}",
-      "noData": "Chưa có dữ liệu trong khoảng này."
+      "noData": "Chưa có dữ liệu trong khoảng này.",
+      "openRevenue": "Xem báo cáo doanh thu"
     }
   },
 
@@ -317,5 +318,40 @@
     "confirmText": "{{email}} sẽ được thử lại ngay với két \"{{vault}}\" (đủ 5 lượt). Hành động được ghi vào nhật ký.",
     "unlocked": "Đã mở khóa cho {{email}}.",
     "unlockError": "Không mở khóa được."
+  },
+
+  "revenue": {
+    "title": "Doanh thu",
+    "subtitle": "Tiền đã thu, đã hoàn và tỉ lệ thanh toán, so với kỳ liền trước.",
+    "rangeLabel": "Khoảng thời gian",
+    "ranges": { "30d": "30 ngày", "12m": "12 tháng" },
+    "vsPrevious": { "30d": "30 ngày trước đó", "12m": "12 tháng trước đó" },
+    "kpi": {
+      "net": "Doanh thu ròng",
+      "up": "Tăng {{value}}% so với {{period}}",
+      "down": "Giảm {{value}}% so với {{period}}",
+      "noPrevious": "{{period}} chưa có doanh thu để so sánh",
+      "collected": "Đã thu",
+      "refundedFoot_other": "Đã hoàn {{amount}} ({{count}} đơn)",
+      "orders": "Đơn đã thanh toán",
+      "ordersFoot": "TB {{avg}}/đơn · đã giảm {{discount}}",
+      "conversion": "Tỉ lệ thanh toán",
+      "conversionFoot_other": "Trên {{count}} đơn tạo trong kỳ"
+    },
+    "chart": {
+      "title": { "30d": "Đã thu theo ngày", "12m": "Đã thu theo tháng" },
+      "aria": "Biểu đồ cột tiền đã thu theo thời gian",
+      "orders_other": "{{count}} đơn",
+      "refunded": "Đã hoàn trong kỳ này: {{amount}}",
+      "empty": "Chưa có khoản thu nào trong khoảng này.",
+      "note": "Tính cả đơn sau đó bị hoàn; tiền hoàn trừ ở ngày hoàn. Doanh thu ròng = đã thu − đã hoàn."
+    },
+    "table": { "period": "Thời gian", "collected": "Đã thu", "orders": "Số đơn", "refunded": "Đã hoàn" },
+    "showTable": "Xem dạng bảng",
+    "showChart": "Xem biểu đồ",
+    "byPlan": "Theo gói",
+    "byProvider": "Theo cổng thanh toán",
+    "providers": { "VNPAY": "VNPay", "PAYPAL": "PayPal" },
+    "loadError": "Không tải được báo cáo doanh thu."
   }
 }
