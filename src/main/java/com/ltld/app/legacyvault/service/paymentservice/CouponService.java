@@ -151,21 +151,26 @@ public class CouponService {
 
     /**
      * Review #256 n1: chặn đoán mã. Tối đa {@value #MAX_FAILED_GUESSES} lần nhập mã không tồn tại/hết hạn trong
-     * {@value #GUESS_WINDOW_MINUTES} phút cho mỗi tài khoản. Lưu trong bộ nhớ (mất khi restart), giống giới hạn của
-     * trợ lý Vaulty.
+     * {@value #GUESS_WINDOW_MINUTES} phút cho mỗi tài khoản.
+     *
+     * <p>Lưu trong bộ nhớ giống giới hạn của trợ lý Vaulty: mất khi restart và chỉ đúng khi chạy một instance (Azure
+     * hiện chạy một instance). Nhiều instance thì cần chuyển sang bảng DB hoặc Redis. {@code compute} của
+     * ConcurrentHashMap chạy nguyên khối cho từng key, và tài khoản hết lần sai trong cửa sổ thì bị xóa khỏi map nên
+     * map không phình theo thời gian (review #256 nit).
      */
     private void checkGuessRate(UUID userId) {
-        Deque<Instant> q = userId == null ? null : failedGuesses.get(userId);
-        if (q == null) {
+        if (userId == null) {
             return;
         }
-        synchronized (q) {
-            Instant cutoff = Instant.now().minus(Duration.ofMinutes(GUESS_WINDOW_MINUTES));
-            while (!q.isEmpty() && q.peekFirst().isBefore(cutoff)) q.pollFirst();
-            if (q.size() >= MAX_FAILED_GUESSES) {
-                throw new BusinessException(ErrorCode.TOO_MANY_ATTEMPTS,
-                        "Too many invalid codes. Please wait a few minutes.");
-            }
+        boolean[] blocked = {false};
+        failedGuesses.computeIfPresent(userId, (k, q) -> {
+            prune(q);
+            blocked[0] = q.size() >= MAX_FAILED_GUESSES;
+            return q.isEmpty() ? null : q;
+        });
+        if (blocked[0]) {
+            throw new BusinessException(ErrorCode.TOO_MANY_ATTEMPTS,
+                    "Too many invalid codes. Please wait a few minutes.");
         }
     }
 
@@ -173,10 +178,22 @@ public class CouponService {
         if (userId == null) {
             return;
         }
-        Deque<Instant> q = failedGuesses.computeIfAbsent(userId, k -> new ArrayDeque<>());
-        synchronized (q) {
-            q.addLast(Instant.now());
-        }
+        failedGuesses.compute(userId, (k, q) -> {
+            Deque<Instant> queue = q != null ? q : new ArrayDeque<>();
+            prune(queue);
+            queue.addLast(Instant.now());
+            return queue;
+        });
+    }
+
+    private static void prune(Deque<Instant> q) {
+        Instant cutoff = Instant.now().minus(Duration.ofMinutes(GUESS_WINDOW_MINUTES));
+        while (!q.isEmpty() && q.peekFirst().isBefore(cutoff)) q.pollFirst();
+    }
+
+    /** Số tài khoản đang bị theo dõi lần nhập sai, để test kiểm map được dọn. */
+    int trackedGuessAccounts() {
+        return failedGuesses.size();
     }
 
     /** Ngày cuối cùng mã còn dùng được (giờ VN), tính từ mốc hết hạn đã lưu theo giờ server. */
