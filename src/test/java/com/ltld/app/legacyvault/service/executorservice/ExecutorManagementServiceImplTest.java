@@ -450,6 +450,58 @@ class ExecutorManagementServiceImplTest {
         verifyNoInteractions(auditLogService, eventPublisher);
     }
 
+    // ---------- Thay Executor đã đồng ý khi DMS đang chạy ----------
+
+    @Test
+    @DisplayName("DMS ACTIVE, thay Executor cuối cùng đã đồng ý: 409 (người mới mới chỉ là lời mời), giữ nguyên dòng và role")
+    void assign_replaceLastAcceptedExecutorWhileDmsActive_conflict() {
+        User previous = user(UUID.randomUUID(), "old@example.test", UserStatus.ACTIVE);
+        previous.getRoles().add(executorRole);
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, previous, ExecutorStatus.INACTIVE);
+        lockedExecutors(current);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        assertThatThrownBy(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true)))
+                .isInstanceOf(ExecutorManagementException.class)
+                .hasMessage(ExecutorManagementServiceImpl.REPLACE_LAST_EXECUTOR_MESSAGE)
+                .satisfies(e -> assertThat(((ExecutorManagementException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT));
+
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("DMS ACTIVE, còn Backup đã đồng ý: vẫn thay được Primary")
+    void assign_replacePrimaryWhileAcceptedBackupLeft_allowed() {
+        User previous = user(UUID.randomUUID(), "old@example.test", UserStatus.ACTIVE);
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, previous, ExecutorStatus.INACTIVE);
+        ExecutorAssignment backup = ExecutorAssignment.builder()
+                .id(UUID.randomUUID()).owner(owner)
+                .executorUser(user(UUID.randomUUID(), "backup@example.test", UserStatus.ACTIVE))
+                .executorType(ExecutorType.BACKUP).status(ExecutorStatus.INACTIVE).version(0L).build();
+        lockedExecutors(current, backup);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true));
+
+        verify(executorAssignmentRepository).saveAndFlush(current);
+        assertThat(current.getExecutorUser()).isSameAs(candidate);
+    }
+
+    @Test
+    @DisplayName("DMS ACTIVE, người đang giữ vị trí mới chỉ là lời mời chờ phản hồi: thay được, không chặn")
+    void assign_replacePendingExecutorWhileDmsActive_allowed() {
+        User previous = user(UUID.randomUUID(), "old@example.test", UserStatus.ACTIVE);
+        ExecutorAssignment current = assignment(ExecutorType.PRIMARY, previous, ExecutorStatus.INACTIVE);
+        current.setResponseStatus(ExecutorResponseStatus.PENDING);
+        lockedExecutors(current);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true));
+
+        verify(executorAssignmentRepository).saveAndFlush(current);
+    }
+
     // ---------- FR-06: không thu hồi Executor cuối cùng khi DMS ACTIVE ----------
 
     @Test

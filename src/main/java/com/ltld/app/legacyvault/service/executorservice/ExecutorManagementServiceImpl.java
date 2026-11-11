@@ -59,6 +59,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
 
     static final String LAST_EXECUTOR_MESSAGE =
             "You cannot revoke your last executor while the Dead Man's Switch is active. Assign a replacement executor first.";
+    static final String REPLACE_LAST_EXECUTOR_MESSAGE =
+            "You cannot replace your last executor while the Dead Man's Switch is active: the new executor has not accepted "
+                    + "the invitation yet. Assign a backup executor and wait for them to accept, then replace this one.";
 
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
@@ -76,7 +79,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     @Override
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public ExecutorAssignmentResponse assignExecutor(UUID ownerId, ExecutorType type, AssignExecutorRequest request) {
-        ensureDmsNotTriggered(ownerId);
+        Optional<DmsConfig> lockedDms = ensureDmsNotTriggered(ownerId);
         User owner = loadOwner(ownerId);
 
         // 422 cho cả "chưa đăng ký" lẫn "chưa xác minh": request hợp lệ về cú pháp nhưng không xử lý được,
@@ -133,6 +136,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                     HttpStatus.CONFLICT);
         }
 
+        // Phải đọc trước khi gán lại entity bên dưới: sau đó current chính là assignment đã mang người mới.
+        boolean replacingAcceptedExecutor = occupied && ExecutorActivationRule.isAccepted(current);
+
         User previous = occupied ? current.getExecutorUser() : null;
         ExecutorAssignment assignment = current != null
                 ? current
@@ -151,6 +157,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         // Không đọc user.getRoles() trước dòng này: roles (LAZY) phải được nạp SAU khi giữ khóa User,
         // nếu không grant/revokeIfUnused sẽ quyết định trên dữ liệu cũ (findByIdForUpdate không làm mới entity đã nạp).
         lockUsersInOrder(candidate.getId(), previous != null ? previous.getId() : null);
+        if (replacingAcceptedExecutor && isLastHandoverTargetWhileDmsActive(ownerId, assignment, lockedDms)) {
+            throw new ExecutorManagementException(REPLACE_LAST_EXECUTOR_MESSAGE, HttpStatus.CONFLICT);
+        }
         executorRoleManager.grant(candidate);
         if (previous != null) {
             executorRoleManager.revokeIfUnused(previous, assignment.getId());
@@ -262,19 +271,29 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
      */
     private void ensureNotLastExecutorWhileDmsActive(UUID ownerId, ExecutorAssignment target,
                                                      Optional<DmsConfig> lockedDms) {
+        // Chỉ chặn khi người bị thu hồi đang là Executor đã đồng ý và không còn ai khác đã đồng ý;
+        // thu hồi một lời mời còn chờ phản hồi không làm DMS mất người nhận bàn giao.
+        if (ExecutorActivationRule.isAccepted(target)
+                && isLastHandoverTargetWhileDmsActive(ownerId, target, lockedDms)) {
+            throw new ExecutorManagementException(LAST_EXECUTOR_MESSAGE, HttpStatus.CONFLICT);
+        }
+    }
+
+    /**
+     * DMS đang chạy mà ngoài {@code target} không còn Executor nào đã đồng ý? Dùng chung cho thu hồi và thay người:
+     * cả hai đều làm vị trí đó không còn người nhận bàn giao (người mới chỉ là lời mời PENDING), nên phải chặn như nhau.
+     * Gọi SAU lockUsersInOrder để giữ thứ tự khóa DmsConfig -> User -> ExecutorAssignment.
+     */
+    private boolean isLastHandoverTargetWhileDmsActive(UUID ownerId, ExecutorAssignment target,
+                                                       Optional<DmsConfig> lockedDms) {
         List<ExecutorAssignment> executors = executorAssignmentRepository.findAllByOwnerIdForUpdate(ownerId);
         boolean dmsActive = lockedDms.or(() -> dmsConfigRepository.findByOwnerId(ownerId))
                 .filter(c -> c.getStatus() == DmsStatus.ACTIVE || c.getStatus() == DmsStatus.PENDING_CONFIRMATION)
                 .isPresent();
-        // Chỉ chặn khi người bị thu hồi đang là Executor đã đồng ý và không còn ai khác đã đồng ý;
-        // thu hồi một lời mời còn chờ phản hồi không làm DMS mất người nhận bàn giao.
-        boolean targetAccepted = ExecutorActivationRule.isAccepted(target);
         boolean othersLeft = executors.stream()
                 .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED
                         && ExecutorActivationRule.isAccepted(a));
-        if (dmsActive && targetAccepted && !othersLeft) {
-            throw new ExecutorManagementException(LAST_EXECUTOR_MESSAGE, HttpStatus.CONFLICT);
-        }
+        return dmsActive && !othersLeft;
     }
 
     private User loadOwner(UUID ownerId) {
