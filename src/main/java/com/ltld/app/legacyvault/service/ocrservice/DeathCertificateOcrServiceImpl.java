@@ -87,6 +87,9 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     @Value("${app.ai.gemini.model:gemini-3.6-flash}")
     private String model;
 
+    @Value("${app.ai.gemini.backup-model:gemini-3.5-flash}")
+    private String backupModel;
+
     /**
      * Mặc định false trên môi trường thật để tên file không bao giờ điều khiển được kết quả
      * và không trả dữ liệu bịa khi AI tắt/lỗi. Chỉ bật khi cần trình diễn kịch bản mô phỏng.
@@ -243,9 +246,20 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
         if ("gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank()) {
             try {
-                return callGeminiVisionOcr(plainBytes, expectedOwnerName);
-            } catch (Exception ex) {
-                log.warn("Gemini Vision OCR failed or timed out for document '{}': {}", fileName, ex.getMessage());
+                return callGeminiVisionOcr(plainBytes, expectedOwnerName, model);
+            } catch (Exception primaryEx) {
+                log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Attempting fallback to backup model...",
+                        model, fileName, primaryEx.getMessage());
+                if (backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
+                    try {
+                        DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName, backupModel);
+                        log.info("Backup Gemini Vision OCR model '{}' succeeded for document '{}'", backupModel, fileName);
+                        return backupResult;
+                    } catch (Exception backupEx) {
+                        log.warn("Backup Gemini Vision OCR model '{}' also failed for document '{}': {}",
+                                backupModel, fileName, backupEx.getMessage());
+                    }
+                }
                 return buildUnavailableResult(expectedOwnerName, DEFAULT_UNAVAILABLE_MESSAGE);
             }
         }
@@ -289,7 +303,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                 .build();
     }
 
-    private DeathCertificateOcrResponseDto callGeminiVisionOcr(byte[] plainBytes, String expectedOwnerName) throws Exception {
+    private DeathCertificateOcrResponseDto callGeminiVisionOcr(byte[] plainBytes, String expectedOwnerName, String targetModel) throws Exception {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
         factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT_MS));
@@ -343,7 +357,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         );
 
         GeminiResponse res = restClient.post()
-                .uri("/models/{model}:generateContent", model)
+                .uri("/models/{model}:generateContent", targetModel)
                 .body(body)
                 .retrieve()
                 .body(GeminiResponse.class);

@@ -65,6 +65,7 @@ class DeathCertificateOcrServiceImplTest {
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");
         ReflectionTestUtils.setField(ocrService, "model", "gemini-3.6-flash");
+        ReflectionTestUtils.setField(ocrService, "backupModel", "gemini-3.5-flash");
         ReflectionTestUtils.setField(ocrService, "demoScenariosEnabled", false);
     }
 
@@ -241,5 +242,19 @@ class DeathCertificateOcrServiceImplTest {
                 eq(requestId.toString()),
                 eq("engine=UNAVAILABLE")
         );
+    }
+    @Test
+    void analyzeBytes_fallsBackToBackupModel_whenPrimaryFails() {
+        ReflectionTestUtils.setField(ocrService, "aiProvider", "gemini");
+        ReflectionTestUtils.setField(ocrService, "apiKey", "dummy-key");
+        ReflectionTestUtils.setField(ocrService, "model", "failing-primary-model");
+        ReflectionTestUtils.setField(ocrService, "backupModel", "failing-backup-model");
+
+        byte[] pdfBytes = "%PDF-1.4 test".getBytes(StandardCharsets.UTF_8);
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(pdfBytes, "cert.pdf", "Trần Long Vân");
+
+        assertThat(result).isNotNull();
+        assertThat(result.getEngineSource()).isEqualTo("UNAVAILABLE");
+        assertThat(result.getUnavailableMessage()).contains("Chưa phân tích được bằng AI");
     }
 }
