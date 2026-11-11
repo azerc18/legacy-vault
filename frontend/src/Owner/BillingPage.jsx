@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
 import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
+import RenewalPanel from './RenewalPanel.jsx';
 
 const formatVnd = (n) =>
     typeof n === 'number'
@@ -18,6 +19,10 @@ export default function BillingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [downloadingId, setDownloadingId] = useState(null);
+    // Việc 6: mail nhắc mở /billing?renew=VIP_MONTH -> cuộn tới và làm nổi khối gia hạn
+    const [params] = useSearchParams();
+    const renewCode = params.get('renew');
+    const renewRef = useRef(null);
 
     const handleDownloadReceipt = async (txId) => {
         setError('');
@@ -40,6 +45,12 @@ export default function BillingPage() {
             .catch((e) => setError(getErrorMessage(e, t('billing.errors.loadFailed'))))
             .finally(() => setLoading(false));
     }, [t]);
+
+    useEffect(() => {
+        if (!loading && renewCode && renewRef.current) {
+            renewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [loading, renewCode]);
 
     return (
         <OwnerLayout
@@ -127,6 +138,9 @@ export default function BillingPage() {
                                         })}
                                     </div>
                                 </div>
+                            </div>
+                            <div className="mt-4">
+                                <RenewalPanel ref={renewRef} sub={sub} renewCode={renewCode} highlight={!!renewCode} onChange={setSub} />
                             </div>
                         </Card>
                     )}

@@ -45,6 +45,9 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     List<PaymentTransaction> findByUserIdAndStatus(UUID userId, PaymentStatus status);
 
+    // Việc 6: cổng của lần thanh toán thành công gần nhất, để "Gia hạn 1 chạm" chọn sẵn
+    Optional<PaymentTransaction> findFirstByUserIdAndStatusOrderByPaidAtDesc(UUID userId, PaymentStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {"user", "plan"})
     @Query("SELECT p FROM PaymentTransaction p WHERE p.gatewayTxnRef = :ref")
