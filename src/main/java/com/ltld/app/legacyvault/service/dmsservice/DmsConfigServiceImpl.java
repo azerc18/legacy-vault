@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsCheckinLinkException;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -21,6 +22,7 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -46,6 +48,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "The Dead Man's Switch has been suspended by an administrator. Please contact an admin.";
+    static final String TOO_SOON_MESSAGE = "You checked in a moment ago. Please try again later.";
     static final String HANDOVER_STARTED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be changed.";
     static final String INCOMPLETE_CONFIG_MESSAGE = "The Dead Man's Switch configuration is incomplete. Please save the configuration again.";
     static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
@@ -54,6 +57,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Assign a primary executor before enabling the Dead Man's Switch.";
     static final String NO_ACTIVATION_TARGET_MESSAGE = "No executor is available to receive the handover. "
             + "Assign an executor before saving the Dead Man's Switch configuration.";
+    static final String NO_VAULT_MESSAGE =
+            "You have no vault yet, so the check-in was not successful. Create a vault first.";
     static final String RESUME_NO_ACTIVATION_TARGET_MESSAGE =
             "The owner has no executor available to receive the handover; the Dead Man's Switch cannot be resumed.";
 
@@ -64,6 +69,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
+
+    // Chống bấm check-in liên tục: lần check-in TRONG ỨNG DỤNG cách lần check-in trong ứng dụng trước chưa đủ số phút này
+    // thì từ chối. Chỉ tính các dòng DmsCheckin OWNER_RESPONDED kênh IN_APP (do checkIn ghi), nên lưu cấu hình / mở lại DMS
+    // (cũng đặt lastCheckinAt = now) hay check-in bằng link trong mail không làm khoá nút. 0 = tắt (integration test).
+    @Value("${app.dms.checkin-cooldown-minutes:60}")
+    private long checkinCooldownMinutes;
 
     @Override
     @Transactional(readOnly = true)
@@ -174,13 +185,21 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 default -> "The Dead Man's Switch is not active.";
             }, HttpStatus.CONFLICT);
         }
+        // Owner đã xoá hết vault: DMS tạm dừng (không còn gì để bàn giao), check-in không reset chu kỳ.
+        assertHasVault(ownerId);
         assertScheduleComplete(config);
 
         LocalDateTime now = LocalDateTime.now();
+        if (checkinCooldownMinutes > 0 && dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                config.getId(), DmsCheckinType.OWNER_RESPONDED, NotificationChannel.IN_APP,
+                now.minusMinutes(checkinCooldownMinutes))) {
+            throw new DmsException(ErrorCode.DMS_CHECKIN_TOO_SOON, TOO_SOON_MESSAGE);
+        }
+
         config.setStatus(DmsStatus.ACTIVE);
         startNewCycle(config, now);
         config = dmsConfigRepository.saveAndFlush(config);
-        recordOwnerResponded(config, now);
+        recordOwnerResponded(config, now, NotificationChannel.IN_APP);
 
         audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
                 "nextCheckinDueAt=" + config.getNextCheckinDueAt());
@@ -214,6 +233,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             case SUSPENDED -> throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.SUSPENDED,
                     SUSPENDED_MESSAGE);
             default -> throw new DmsException("The Dead Man's Switch is not active.", HttpStatus.CONFLICT);
+        }
+        // Cùng luật với checkIn(): đã xoá hết vault thì link trong mail nhắc cũng không check-in được.
+        if (!vaultRepository.existsByOwnerId(ownerId)) {
+            throw new DmsCheckinLinkException(DmsCheckinLinkException.Reason.NO_VAULT, NO_VAULT_MESSAGE);
         }
         if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
                 || config.getReminderCount() == null) {
@@ -249,6 +272,31 @@ public class DmsConfigServiceImpl implements DmsConfigService {
      */
     public static Long checkinCycleOf(DmsConfig config) {
         return config.getLastCheckinAt() == null ? null : config.getLastCheckinAt().toEpochSecond(ZoneOffset.UTC);
+    }
+
+    /**
+     * Owner vừa tạo vault ĐẦU TIÊN sau khi đã xoá hết vault: DMS đang tạm dừng (hạn cũ có thể đã qua),
+     * nên bắt đầu chu kỳ mới từ lúc này, như một lần check-in, để job không kích hoạt ngay theo hạn cũ.
+     * Chưa cấu hình DMS, đã TRIGGERED hoặc SUSPENDED thì không làm gì. Gọi trong transaction tạo vault.
+     */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void restartCycleAfterFirstVaultCreated(UUID ownerId) {
+        DmsConfig config = dmsConfigRepository.findByOwnerIdForUpdate(ownerId).orElse(null);
+        if (config == null
+                || (config.getStatus() != DmsStatus.ACTIVE && config.getStatus() != DmsStatus.PENDING_CONFIRMATION)
+                || config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
+                || config.getReminderCount() == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        config.setStatus(DmsStatus.ACTIVE);
+        startNewCycle(config, now);
+        config = dmsConfigRepository.saveAndFlush(config);
+        recordOwnerResponded(config, now);
+
+        audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
+                "reason=FIRST_VAULT_CREATED, nextCheckinDueAt=" + config.getNextCheckinDueAt());
     }
 
     @Override
@@ -343,6 +391,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         return executors;
     }
 
+    private void assertHasVault(UUID ownerId) {
+        if (!vaultRepository.existsByOwnerId(ownerId)) {
+            throw new DmsException(ErrorCode.DMS_NO_VAULT, NO_VAULT_MESSAGE);
+        }
+    }
+
     // Dòng tạo trước FR-03 chưa có thời gian chờ: không tính được lịch, yêu cầu lưu lại cấu hình.
     private void assertScheduleComplete(DmsConfig config) {
         if (config.getCheckinIntervalDays() == null || config.getGracePeriodDays() == null
@@ -366,9 +420,15 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
     // occurredAt = mốc vừa truyền vào startNewCycle (= lastCheckinAt). Gọi sau khi đã lưu DmsConfig.
     private void recordOwnerResponded(DmsConfig config, LocalDateTime now) {
+        recordOwnerResponded(config, now, null);
+    }
+
+    // channel IN_APP = Owner bấm Check-in trong ứng dụng (dùng cho cooldown); null = lưu cấu hình / mở lại DMS.
+    private void recordOwnerResponded(DmsConfig config, LocalDateTime now, NotificationChannel channel) {
         dmsCheckinRepository.saveAndFlush(DmsCheckin.builder()
                 .dmsConfig(config)
                 .checkinType(DmsCheckinType.OWNER_RESPONDED)
+                .channel(channel)
                 .occurredAt(now)
                 .build());
     }
@@ -413,6 +473,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .hasUsableExecutor(config.getStatus() == DmsStatus.TRIGGERED
                         ? null
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
+                .hasVault(vaultRepository.existsByOwnerId(config.getOwner().getId()))
                 .build();
     }
 

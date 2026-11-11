@@ -7,6 +7,7 @@ import {executorApi, caseStep} from '../api/executorApi.js';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 import {formatDate} from '../i18n/format.js';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 const EXECUTOR = 'EXECUTOR';
 // FR-07/FR-14: Owner chưa có tên thì hiện email
@@ -185,7 +186,7 @@ export default function ExecutorHome() {
 
                 <section data-tour="executor-cases-list" className="mb-10">
                     <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('home.activeTitle')}</h2>
-                    {cases === null && <p className="text-on-surface-variant">{t('loading')}</p>}
+                    {cases === null && <LoadingSkeleton label={t('loading')}/>}
                     {cases !== null && active.length === 0 &&
                         <EmptyState bordered icon="badge" title={t('home.emptyTitle')}
                                     text={t('home.emptyText')} />}

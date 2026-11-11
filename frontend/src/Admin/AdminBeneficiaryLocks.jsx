@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, ReasonDialog } from './adminUi.jsx';
 
@@ -45,7 +45,7 @@ export default function AdminBeneficiaryLocks() {
         <AdminLayout title={t('beneficiaryLocks.title')} subtitle={t('beneficiaryLocks.subtitle')}>
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
-            {!rows && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!rows && !error && <LoadingSkeleton label={t('loading')}/>}
             {rows && rows.length === 0 && (
                 <EmptyState bordered icon="lock_open" title={t('beneficiaryLocks.emptyTitle')} text={t('beneficiaryLocks.emptyText')} />
             )}

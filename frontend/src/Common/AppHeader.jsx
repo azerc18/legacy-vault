@@ -30,17 +30,15 @@ const ADMIN_NAV_ITEMS = [
     { to: '/admin/audit-logs', key: 'auditLogs', icon: 'history' },
     { to: '/admin/alerts', key: 'alerts', icon: 'notifications_active' },
     { to: '/admin/payments', key: 'payments', icon: 'receipt_long' },
+    { to: '/admin/revenue', key: 'revenue', icon: 'monitoring' },
     { to: '/admin/plans', key: 'plans', icon: 'sell' },
     { to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe' },
     { to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open' },
 ];
 
-function buildRoleSections(roles, pathname, tCommon, tAdmin, openAlerts = 0) {
-    const activeRoles = ROLE_ORDER.filter((r) => roles.includes(r));
-    // Chỉ hiện nhóm Beneficiary khi user đang ở trang /beneficiary hoặc chỉ có đúng 1 role BENEFICIARY
-    const filteredRoles = activeRoles.filter(
-        (r) => r !== 'BENEFICIARY' || pathname.startsWith('/beneficiary') || activeRoles.length === 1
-    );
+function buildRoleSections(roles, tCommon, tAdmin, openAlerts = 0) {
+    // Hiện nhóm điều hướng của MỌI vai trò user có, trên mọi trang (kể cả Trang chủ)
+    const filteredRoles = ROLE_ORDER.filter((r) => roles.includes(r));
 
     return filteredRoles.map((role) => {
         switch (role) {
@@ -62,8 +60,8 @@ function buildRoleSections(roles, pathname, tCommon, tAdmin, openAlerts = 0) {
                     matchPrefix: '/owner',
                     items: [
                         { to: '/owner/vaults', label: tCommon('nav.myVaults'), icon: 'inventory_2' },
-                        { to: '/owner/dms', label: tCommon('nav.dms'), icon: 'favorite' },
                         { to: '/owner/executors', label: tCommon('nav.executors'), icon: 'badge' },
+                        { to: '/owner/dms', label: tCommon('nav.dms'), icon: 'favorite' },
                         { to: '/owner/activity', label: tCommon('nav.activity'), icon: 'history' },
                         { to: '/billing', label: tCommon('nav.billing'), icon: 'workspace_premium' },
                     ],
@@ -145,7 +143,7 @@ export default function AppHeader({ workspace, home = '/home', nav: navProp, ale
         { to: '/home', label: t('nav.home'), icon: 'home', end: true },
         { to: '/me', label: t('nav.profile'), icon: 'person' },
     ];
-    const roleSections = buildRoleSections(roles, pathname, t, tAdmin, effectiveAlerts);
+    const roleSections = buildRoleSections(roles, t, tAdmin, effectiveAlerts);
 
     // Cho phép đóng/mở từng nhóm vai trò. Chưa chọn gì (null) thì chỉ mở nhóm của trang đang xem
     // (ở /home, /me thì mở nhóm đầu tiên) để menu nhiều vai trò không dài quá màn hình.

@@ -18,7 +18,9 @@ public class DmsCheckinLinkException extends DmsException {
         // Admin đang tạm dừng (Q28)
         SUSPENDED(ErrorCode.CONFLICT),
         // Chưa cấu hình, đã xoá cấu hình hoặc cấu hình thiếu lịch
-        NOT_CONFIGURED(ErrorCode.CONFLICT);
+        NOT_CONFIGURED(ErrorCode.CONFLICT),
+        // Owner đã xoá hết vault: DMS tạm dừng, không check-in được cho tới khi tạo vault mới
+        NO_VAULT(ErrorCode.DMS_NO_VAULT);
 
         private final ErrorCode errorCode;
 

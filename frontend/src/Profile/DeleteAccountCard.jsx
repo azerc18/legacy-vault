@@ -7,7 +7,7 @@ import { AutoHeight } from '@animate-ui/react/primitives/effects/auto-height';
 import { accountApi } from '../api/accountApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { logout } from '../auth/auth.js';
-import { Alert, Icon, inputClass, btnOutline, btnDanger } from '../Owner/ownerUi.jsx';
+import { Alert, Icon, inputClass, btnOutline, btnDanger, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import SharedPasswordInput from '../Common/PasswordInput.jsx';
 import TwoFactorCodeInput from '../Common/TwoFactorCodeInput.jsx';
 
@@ -74,7 +74,7 @@ export default function DeleteAccountCard({ profile }) {
                 {open && (
                     <div className="pt-4">
                         <Alert>{error}</Alert>
-                        {!check && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+                        {!check && !error && <LoadingSkeleton label={t('loading')} />}
 
                         {check && !check.deletable && (
                             <div className="p-4 rounded-xl bg-warning-container text-on-warning-container text-sm">

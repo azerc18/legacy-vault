@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import InfoTip from '../Common/InfoTip.jsx';
+import UpgradeDialog from '../Common/UpgradeDialog.jsx';
+import { VipChip, VipLocked } from '../Common/VipLock.jsx';
+import { useVipStatus } from '../Common/useVipStatus.js';
 import { Icon, inputClass } from './ownerUi.jsx';
 
 // N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
 export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL', 'JOINT_CONSENSUS'];
+// Chế độ thuộc gói VIP (PlanFeature.ADVANCED_ALLOCATION ở BE), cùng với người dự phòng của EXCLUSIVE
+const VIP_MODES = ['PROPORTIONAL', 'JOINT_CONSENSUS'];
 
 // Chế độ hợp lệ cho loại tài sản đang chọn. BE chỉ cho chia % (PROPORTIONAL) với tài sản cần hồ sơ pháp lý
 // (transfer mechanism LEGAL_CLAIM_DOSSIER); các chế độ còn lại dùng được cho mọi loại. Loại không hợp lệ thì ẩn
@@ -120,6 +125,9 @@ export function allocationSummary(asset, beneficiaries, t) {
 export function AllocationFields({ beneficiaries, value, onChange, allowProportional }) {
     const { t } = useTranslation(['vault']);
     const tt = (key, opts) => t(`detail.assets.allocation.${key}`, opts);
+    const vip = useVipStatus();
+    const freePlan = vip === false;          // chỉ khoá khi chắc chắn là FREE; chưa biết gói thì để mở
+    const [upgradeOpen, setUpgradeOpen] = useState(false);
     const set = (patch) => onChange({ ...value, ...patch });
     const nameOf = (b) => b.fullName || b.email;
     const n = value.selected.length;
@@ -144,17 +152,37 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
         const sv = (value.shares[id] || '').trim();
         return (sv !== '' && (!SHARE_RE.test(sv) || cents(sv) <= 0 || cents(sv) > 10000)) || total > 10000;
     };
-    const needsVip = value.mode === 'PROPORTIONAL' || value.mode === 'JOINT_CONSENSUS'
-        || (value.mode === 'EXCLUSIVE' && !!value.contingentId);
-
     return (
-        <fieldset className="rounded-xl border border-outline-variant/50 p-4 space-y-3">
-            <legend className="px-2 text-sm font-semibold">{tt('title')}</legend>
-            <select value={value.mode} onChange={(e) => setMode(e.target.value)} className={inputClass}>
-                {availableModes(allowProportional, value.mode).map((m) => (
-                    <option key={m} value={m} disabled={m === 'PROPORTIONAL' && !allowProportional}>{tt(`mode.${m}`)}</option>
-                ))}
-            </select>
+        <div role="group" aria-label={tt('title')} className="rounded-xl border border-outline-variant/40 bg-surface-container-low p-4 space-y-3">
+            <div className="flex items-start gap-3">
+                <span className="w-9 h-9 shrink-0 rounded-full border-2 border-primary text-primary flex items-center justify-center">
+                    <Icon name="call_split" className="text-[18px]" />
+                </span>
+                <div>
+                    <p className="font-semibold text-on-surface">{tt('title')}</p>
+                    <p className="text-xs text-on-surface-variant">{tt('subtitle')}</p>
+                </div>
+            </div>
+            <div role="radiogroup" aria-label={tt('title')} className="grid sm:grid-cols-2 gap-2">
+                {availableModes(allowProportional, value.mode).map((m, i, modes) => {
+                    const locked = freePlan && VIP_MODES.includes(m);
+                    const active = value.mode === m;
+                    const wide = modes.length % 2 === 1 && i === modes.length - 1;   // số ô lẻ: ô cuối chiếm cả hàng, không lệch, không xuống dòng
+                    return (
+                        <button key={m} type="button" role="radio" aria-checked={active}
+                                disabled={m === 'PROPORTIONAL' && !allowProportional}
+                                onClick={() => (locked ? setUpgradeOpen(true) : setMode(m))}
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors ${wide ? 'sm:col-span-2 ' : ''}${
+                                    active ? 'border-primary bg-primary/10 text-on-surface' : 'border-outline-variant/50 text-on-surface hover:bg-surface-container'
+                                } ${locked ? 'opacity-55' : ''}`}>
+                            <Icon name={locked ? 'lock' : active ? 'radio_button_checked' : 'radio_button_unchecked'} className="text-[18px] shrink-0" />
+                            <span className="flex-1">{tt(`mode.${m}`)}</span>
+                            {VIP_MODES.includes(m) && <VipChip />}
+                        </button>
+                    );
+                })}
+            </div>
+            <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} message={t('vip.upgradeMessage', { ns: 'common' })} />
             <p className="text-xs text-on-surface-variant">{tt(`modeHint.${value.mode}`)}</p>
             {!allowProportional && <p className="text-xs text-outline">{tt('proportionalUnavailable')}</p>}
 
@@ -170,13 +198,19 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                         <option value="">{tt('recipientPlaceholder')}</option>
                         {beneficiaries.map((b) => <option key={b.id} value={b.id}>{nameOf(b)}</option>)}
                     </select>
-                    <label className="block text-xs font-semibold">{tt('contingent')}</label>
-                    <select value={value.contingentId} onChange={(e) => set({ contingentId: e.target.value })} className={inputClass}>
-                        <option value="">{tt('contingentNone')}</option>
-                        {beneficiaries.filter((b) => b.id !== value.selected[0]).map((b) => (
-                            <option key={b.id} value={b.id}>{nameOf(b)}</option>
-                        ))}
-                    </select>
+                    {/* Gói FREE: khoá chọn người dự phòng. Tài sản cũ đã có người dự phòng (lúc còn VIP) thì vẫn mở ô để bỏ chọn,
+                        chỉ còn "Không có" và người đang chọn; nếu không Owner FREE không lưu lại được tài sản đó. */}
+                    <VipLocked locked={freePlan && !value.contingentId} className="space-y-1.5">
+                        <label className="flex items-center gap-2 text-xs font-semibold">{tt('contingent')} <VipChip /></label>
+                        <select value={value.contingentId} onChange={(e) => set({ contingentId: e.target.value })} className={inputClass}>
+                            <option value="">{tt('contingentNone')}</option>
+                            {beneficiaries
+                                .filter((b) => b.id !== value.selected[0] && (!freePlan || b.id === value.contingentId))
+                                .map((b) => (
+                                    <option key={b.id} value={b.id}>{nameOf(b)}</option>
+                                ))}
+                        </select>
+                    </VipLocked>
                 </>
             )}
 
@@ -234,7 +268,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                     placeholder={tt('notePlaceholder')} className={textareaCls}
                 />
             )}
-            {needsVip && <p className="text-xs text-outline">{tt('vipNote')}</p>}
-        </fieldset>
+            {freePlan && <p className="text-xs text-outline">{tt('vipNote')}</p>}
+        </div>
     );
 }

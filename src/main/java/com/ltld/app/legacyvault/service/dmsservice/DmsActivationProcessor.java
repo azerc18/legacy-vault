@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
@@ -90,6 +91,7 @@ public class DmsActivationProcessor {
     // [X2 / Sửa #5] (m6): inject qua constructor; @Lazy cắt vòng phụ thuộc với DmsConfirmerServiceImpl
     // (service đó gọi activateConfirmedDms). Thiếu bean thì app báo lỗi khi khởi động, không tắt X2 im lặng.
     private final DmsConfirmerService dmsConfirmerService;
+    private final VaultRepository vaultRepository;
 
     public DmsActivationProcessor(DmsConfigRepository dmsConfigRepository,
                                   DmsCheckinRepository dmsCheckinRepository,
@@ -100,7 +102,8 @@ public class DmsActivationProcessor {
                                   ExecutorNotificationService executorNotificationService,
                                   UserRepository userRepository,
                                   ApplicationEventPublisher eventPublisher,
-                                  @Lazy DmsConfirmerService dmsConfirmerService) {
+                                  @Lazy DmsConfirmerService dmsConfirmerService,
+                                  VaultRepository vaultRepository) {
         this.dmsConfigRepository = dmsConfigRepository;
         this.dmsCheckinRepository = dmsCheckinRepository;
         this.executorAssignmentRepository = executorAssignmentRepository;
@@ -111,6 +114,17 @@ public class DmsActivationProcessor {
         this.userRepository = userRepository;
         this.eventPublisher = eventPublisher;
         this.dmsConfirmerService = dmsConfirmerService;
+        this.vaultRepository = vaultRepository;
+    }
+
+    // Owner đã xoá hết vault: DMS tạm dừng, không kích hoạt bàn giao (không còn gì để bàn giao).
+    // Tạo vault mới sẽ bắt đầu chu kỳ mới (DmsConfigService.restartCycleAfterFirstVaultCreated).
+    private boolean pausedForNoVault(DmsConfig config) {
+        if (vaultRepository.existsByOwnerId(config.getOwner().getId())) {
+            return false;
+        }
+        log.debug("dmsConfig {} skipped: owner has no vault", config.getId());
+        return true;
     }
 
     /** Bước 1-3 của FR-07: DMS quá hạn -> (nếu có X2 confirmer thì chuyển PENDING_CONFIRMATION 72h) -> TRIGGERED -> kích hoạt Executor. */
@@ -120,6 +134,9 @@ public class DmsActivationProcessor {
         // Kiểm tra lại trong transaction: Owner có thể vừa check-in hoặc job khác đã xử lý.
         if (config == null || config.getStatus() != DmsStatus.ACTIVE
                 || config.getNextCheckinDueAt() == null || !config.getNextCheckinDueAt().isBefore(now)) {
+            return;
+        }
+        if (pausedForNoVault(config)) {
             return;
         }
 
@@ -152,6 +169,9 @@ public class DmsActivationProcessor {
                 || config.getNextCheckinDueAt() == null || !config.getNextCheckinDueAt().isBefore(now)) {
             return;
         }
+        if (pausedForNoVault(config)) {
+            return;
+        }
         UUID ownerId = config.getOwner().getId();
         audit(AuditAction.DMS_CONFIRMATION_TIMEOUT, ENTITY_DMS_CONFIG, config.getId(), ownerDetail(ownerId));
         activateConfirmedDms(config, now);
@@ -170,6 +190,9 @@ public class DmsActivationProcessor {
                 || config.getNextCheckinDueAt() == null || requestedDeadlineAt == null
                 || !config.getNextCheckinDueAt().truncatedTo(ChronoUnit.SECONDS)
                         .equals(requestedDeadlineAt.truncatedTo(ChronoUnit.SECONDS))) {
+            return;
+        }
+        if (pausedForNoVault(config)) {
             return;
         }
         audit(AuditAction.DMS_CONFIRMATION_UNDELIVERED, ENTITY_DMS_CONFIG, config.getId(),

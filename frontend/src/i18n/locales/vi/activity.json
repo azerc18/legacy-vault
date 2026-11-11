@@ -1,6 +1,8 @@
 {
   "title": "Nhật ký hoạt động",
-  "subtitle": "Sự kiện về Dead Man's Switch và người thi hành. Sự kiện riêng của từng két nằm ở trang của két đó.",
+  "subtitle": "Tất cả sự kiện về Dead Man's Switch, người thi hành và những lần có người xem di sản của bạn, mới nhất trước. Sự kiện riêng của từng két nằm ở trang của két đó.",
+  "allTruncated": "Tab này hiện {{count}} sự kiện gần nhất của mỗi loại. Mở tab \"Sự kiện DMS & Người thi hành\" hoặc \"Ai đã xem di sản\" để xem các sự kiện cũ hơn.",
+  "filterAll": "Tất cả",
   "loading": "Đang tải...",
   "range": {
     "all": "Toàn bộ thời gian",

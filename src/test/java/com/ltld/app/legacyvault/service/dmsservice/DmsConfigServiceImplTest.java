@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -43,6 +44,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -453,7 +455,64 @@ class DmsConfigServiceImplTest {
         assertThat(checkin.getValue().getDmsConfig()).isSameAs(existing);
         assertThat(checkin.getValue().getCheckinType()).isEqualTo(DmsCheckinType.OWNER_RESPONDED);
         assertThat(checkin.getValue().getOccurredAt()).isEqualTo(now);
-        assertThat(checkin.getValue().getChannel()).isNull();
+        // Check-in trong ứng dụng ghi kênh IN_APP để cooldown phân biệt với lưu cấu hình / mở lại DMS
+        assertThat(checkin.getValue().getChannel()).isEqualTo(NotificationChannel.IN_APP);
+    }
+
+    @Test
+    @DisplayName("Cooldown: vừa check-in trong ứng dụng chưa đủ số phút -> 429 DMS_CHECKIN_TOO_SOON, không ghi gì")
+    void checkIn_withinCooldownAfterAppCheckin_returns429() {
+        ReflectionTestUtils.setField(service, "checkinCooldownMinutes", 60L);
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+        when(dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), any()))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+        verify(dmsCheckinRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("Cooldown: chỉ hỏi các lần check-in trong ứng dụng của 60 phút gần nhất; vừa lưu cấu hình (không có dòng IN_APP) vẫn check-in được")
+    void checkIn_rightAfterSavingConfig_isNotBlocked() {
+        ReflectionTestUtils.setField(service, "checkinCooldownMinutes", 60L);
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        existing.setLastCheckinAt(LocalDateTime.now().minusMinutes(1));   // lưu cấu hình 1 phút trước cũng đặt lastCheckinAt
+        LocalDateTime before = LocalDateTime.now();
+
+        service.checkIn(ownerId);
+        LocalDateTime after = LocalDateTime.now();
+
+        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(dmsCheckinRepository).existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), since.capture());
+        // Mốc hỏi = thời điểm check-in - 60 phút, không phụ thuộc lastCheckinAt
+        assertThat(since.getValue()).isBetween(before.minusMinutes(60), after.minusMinutes(60));
+        verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
+    }
+
+    @Test
+    @DisplayName("Cooldown: vừa check-in bằng link một chạm trong mail (kênh EMAIL) thì nút check-in trong ứng dụng vẫn dùng được")
+    void checkIn_afterEmailLinkCheckin_isNotBlocked() {
+        ReflectionTestUtils.setField(service, "checkinCooldownMinutes", 60L);
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        // Có dòng OWNER_RESPONDED kênh EMAIL trong 60 phút, không có dòng IN_APP
+        when(dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.EMAIL), any()))
+                .thenReturn(true);
+        when(dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), any()))
+                .thenReturn(false);
+
+        assertThatCode(() -> service.checkIn(ownerId)).doesNotThrowAnyException();
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
     }
 
     @Test
@@ -502,6 +561,98 @@ class DmsConfigServiceImplTest {
         assertThatThrownBy(() -> service.checkIn(ownerId))
                 .isInstanceOf(DmsException.class)
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> check-in 409 DMS_NO_VAULT, không reset chu kỳ, không audit")
+    void checkIn_withoutVault_returns409NoVault() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+        LocalDateTime lastCheckin = existing.getLastCheckinAt();
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getErrorCode()).isEqualTo(ErrorCode.DMS_NO_VAULT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        assertThat(existing.getLastCheckinAt()).isEqualTo(lastCheckin);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> DMS TRIGGERED vẫn báo lỗi TRIGGERED như cũ (kiểm trạng thái trước)")
+    void checkIn_withoutVault_whenTriggered_keepsTriggeredError() {
+        existingConfig(DmsStatus.TRIGGERED);
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .hasMessageContaining("triggered");
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("getConfig trả hasVault theo việc Owner còn vault hay không")
+    void getConfig_reportsHasVault() {
+        existingConfig(DmsStatus.ACTIVE);
+        assertThat(service.getConfig(ownerId).getHasVault()).isTrue();
+
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+        assertThat(service.getConfig(ownerId).getHasVault()).isFalse();
+    }
+
+    // ---------- restartCycleAfterFirstVaultCreated ----------
+
+    @Test
+    @DisplayName("Tạo lại vault đầu tiên -> DMS ACTIVE bắt đầu chu kỳ mới từ lúc này, ghi OWNER_RESPONDED, audit DMS_CHECKIN")
+    void restartAfterFirstVault_activeConfig_startsNewCycle() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime before = LocalDateTime.now();
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        LocalDateTime now = existing.getLastCheckinAt();
+        assertThat(now).isAfterOrEqualTo(before);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(now.plusDays(37));
+        assertThat(existing.getRemindersSent()).isZero();
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        verify(dmsConfigRepository).saveAndFlush(existing);
+        verifyOwnerRespondedRecorded(existing);
+        verify(auditLogService).log(eq(AuditAction.DMS_CHECKIN), eq(AuditResult.SUCCESS), eq(ownerId),
+                any(), isNull(), any(), any(), contains("FIRST_VAULT_CREATED"));
+    }
+
+    @Test
+    @DisplayName("Tạo lại vault khi DMS đang chờ xác nhận chéo -> về ACTIVE với chu kỳ mới")
+    void restartAfterFirstVault_pendingConfirmation_backToActive() {
+        DmsConfig existing = existingConfig(DmsStatus.PENDING_CONFIRMATION);
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        verify(dmsConfigRepository).saveAndFlush(existing);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = {"TRIGGERED", "SUSPENDED"})
+    @DisplayName("Tạo vault khi DMS TRIGGERED / SUSPENDED -> không đổi gì")
+    void restartAfterFirstVault_triggeredOrSuspended_doesNothing(DmsStatus status) {
+        DmsConfig existing = existingConfig(status);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        assertThat(existing.getStatus()).isEqualTo(status);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Tạo vault khi chưa cấu hình DMS -> không làm gì")
+    void restartAfterFirstVault_notConfigured_doesNothing() {
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
         verifyNothingWritten();
     }
 

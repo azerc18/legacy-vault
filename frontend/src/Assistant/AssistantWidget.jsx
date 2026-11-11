@@ -232,7 +232,7 @@ export default function AssistantWidget() {
 
             <button type="button" onClick={toggle} aria-label={t(open ? 'assistant.close' : 'assistant.open')}
                     title={t('assistant.launcherHint')} {...dragHandlers}
-                    className={`lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary${vip ? ' lv-assistant-launcher--vip' : ''}`}>
+                    className={`lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
                 <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
                     <Owl3D action={thinking ? 'think' : action} costume={shownCostume} />
                 </Suspense>

@@ -8,7 +8,7 @@
   "pricing": {
     "title": "Gói dịch vụ & Bảng giá",
     "subtitle": "Bảo vệ di sản số của bạn với nhiều két chuyên biệt, người thụ hưởng dự phòng, phân chia theo tỷ lệ (%) và 5 GB lưu trữ mã hoá.",
-    "back": "Gói thuê bao & Thanh toán",
+    "back": "Gói thuê bao & VIP",
     "currentPlan": "Gói hiện tại:",
     "expires": "Hết hạn ngày {{date}}",
     "viewBilling": "Xem lịch sử thanh toán",
@@ -38,10 +38,27 @@
       "loadFailed": "Không thể tải danh sách gói thuê bao.",
       "noPlans": "Hiện chưa có gói thuê bao nào.",
       "checkoutFailed": "Không thể khởi tạo thanh toán."
+    },
+    "coupon": {
+      "label": "Có mã giảm giá?",
+      "placeholder": "Nhập mã, vd. TET2027",
+      "apply": "Áp dụng",
+      "checking": "Đang kiểm tra...",
+      "applied": "Đã áp dụng mã {{code}}: giảm {{percent}}%",
+      "until": "hạn tới {{date}}",
+      "remove": "Bỏ mã",
+      "error": "Không áp dụng được mã này."
+    },
+    "trial": {
+      "title": "Dùng thử VIP {{days}} ngày miễn phí",
+      "text": "Mở đủ tính năng VIP trong {{days}} ngày, không cần thanh toán. Hết hạn thì tài khoản về gói miễn phí, dữ liệu vẫn giữ nguyên. Mỗi tài khoản dùng thử một lần.",
+      "start": "Dùng thử {{days}} ngày",
+      "starting": "Đang kích hoạt...",
+      "error": "Không bắt đầu được bản dùng thử."
     }
   },
   "billing": {
-    "title": "Gói thuê bao & Thanh toán",
+    "title": "Gói thuê bao & VIP",
     "subtitle": "Quản lý gói LegacyVault, quyền lợi và lịch sử thanh toán của bạn.",
     "extendVip": "Gia hạn VIP",
     "upgradeToVip": "Nâng cấp lên VIP",
@@ -58,7 +75,8 @@
       "storage": "Lưu trữ mã hoá & Tin nhắn di nguyện",
       "storageDetail": "{{storage}} · {{media}}",
       "mediaEnabled": "Hỗ trợ tin nhắn đa phương tiện",
-      "noMedia": "Chưa hỗ trợ tin nhắn đa phương tiện"
+      "noMedia": "Chưa hỗ trợ tin nhắn đa phương tiện",
+      "trial": "Dùng thử"
     },
     "history": {
       "title": "Lịch sử giao dịch",
@@ -71,8 +89,15 @@
       "receipt": "Hóa đơn",
       "downloadReceipt": "Tải hóa đơn",
       "downloading": "Đang tải...",
-      "statusLabel": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn", "REFUNDED": "Đã hoàn tiền" },
-      "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về."
+      "statusLabel": {
+        "SUCCESS": "Thành công",
+        "PENDING": "Đang chờ",
+        "FAILED": "Thất bại",
+        "EXPIRED": "Đã hết hạn",
+        "REFUNDED": "Đã hoàn tiền"
+      },
+      "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về.",
+      "coupon": "Mã {{code}}: -{{discount}}"
     },
     "usage": {
       "title": "Mức sử dụng",
@@ -98,6 +123,37 @@
     "errors": {
       "loadFailed": "Không thể tải thông tin thanh toán.",
       "receiptFailed": "Không thể tải hóa đơn."
+    },
+    "renewal": {
+      "active": {
+        "title": "Gói còn hạn tới {{date}}",
+        "text": "LegacyVault không tự trừ tiền. Gần hạn bạn sẽ nhận mail nhắc có nút gia hạn 1 chạm; bạn cũng có thể gia hạn sớm ngay bây giờ."
+      },
+      "cancelled": {
+        "title": "Đã hủy gia hạn: VIP kết thúc ngày {{date}}",
+        "text": "Bạn vẫn dùng đủ quyền VIP tới {{date}}, sau đó tài khoản về gói miễn phí. Dữ liệu được giữ nguyên. Không hoàn tiền cho phần thời gian còn lại."
+      },
+      "lapsed": {
+        "title": "Gói VIP đã hết hạn ngày {{date}}",
+        "text": "Tài khoản đang ở gói miễn phí, dữ liệu vẫn còn nguyên. Gia hạn để mở lại hạn mức VIP."
+      },
+      "renew": "Gia hạn 1 chạm · {{plan}} {{price}}",
+      "redirecting": "Đang chuyển tới cổng thanh toán...",
+      "resume": "Tiếp tục gia hạn",
+      "wait": "Vui lòng chờ...",
+      "cancel": "Hủy gia hạn",
+      "provider": "Cổng thanh toán",
+      "stackHint": "Gia hạn sớm không mất ngày nào: thời gian mới được cộng nối tiếp sau {{date}}.",
+      "confirm": {
+        "title": "Hủy gia hạn gói VIP?",
+        "message": "Bạn vẫn dùng {{plan}} tới {{date}}, sau đó tài khoản về gói miễn phí. Phần thời gian còn lại không được hoàn tiền. Trước hạn 7 ngày bạn vẫn nhận một mail nhắc phòng khi đổi ý, và có thể bật lại bất cứ lúc nào trước ngày đó.",
+        "ok": "Hủy gia hạn",
+        "keep": "Giữ gói"
+      },
+      "errors": {
+        "renew": "Không tạo được giao dịch gia hạn. Vui lòng thử lại.",
+        "toggle": "Không cập nhật được gia hạn. Vui lòng thử lại."
+      }
     }
   },
   "result": {

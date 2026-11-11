@@ -105,6 +105,30 @@ export const DEMO_LOGS = {
     size: 20
 };
 
+// Nhật ký "Ai đã xem di sản" (GET /owner/activity-logs/access): khác DEMO_LOGS để tab "Tất cả" không lặp dòng
+export const DEMO_ACCESS_LOGS = {
+    content: [
+        { id: 'access-1', createdAt: '2026-11-07T09:20:00Z', action: 'ADMIN_VAULT_VIEWED', actorName: 'System administrator', description: 'Quản trị viên mở két "Tài sản gia đình" để xử lý yêu cầu hỗ trợ' }
+    ],
+    items: [],
+    totalElements: 1,
+    totalPages: 1,
+    number: 0,
+    size: 20
+};
+
+// Gói của tài khoản demo (GET /subscriptions/me): VIP, khớp /plans/my-subscription, để các phần VIP không bị khoá khi demo
+export const DEMO_SUBSCRIPTION = {
+    vip: true,
+    planCode: 'VIP_UNLIMITED',
+    planName: 'VIP',
+    status: 'ACTIVE',
+    expiresAt: '2027-11-01T00:00:00',
+    maxVaults: null,
+    maxBeneficiariesPerVault: null,
+    legacyMessageEnabled: true
+};
+
 export const DEMO_DMS = {
     configured: true,
     status: 'ACTIVE',

@@ -19,7 +19,8 @@
       "TOKEN_INVALID": "Liên kết check-in không hợp lệ, đã hết hạn, đã được dùng hoặc thuộc chu kỳ nhắc trước.",
       "TRIGGERED": "Dead Man's Switch đã bắt đầu quy trình bàn giao nên không thể check-in nữa.",
       "SUSPENDED": "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ quản trị viên.",
-      "NOT_CONFIGURED": "Dead Man's Switch chưa được thiết lập nên không có gì để check-in. Vui lòng đăng nhập và lưu cấu hình."
+      "NOT_CONFIGURED": "Dead Man's Switch chưa được thiết lập nên không có gì để check-in. Vui lòng đăng nhập và lưu cấu hình.",
+      "NO_VAULT": "Bạn chưa có két nào nên check-in không thành công. Vui lòng đăng nhập và tạo két trước."
     },
     "autoClose_one": "Trang sẽ tự đóng sau {{count}} giây.",
     "autoClose_other": "Trang sẽ tự đóng sau {{count}} giây.",

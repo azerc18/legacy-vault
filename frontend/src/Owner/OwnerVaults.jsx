@@ -4,7 +4,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Icon, Alert, formatDate, btnPrimary } from './ownerUi.jsx';
+import { OwnerLayout, Icon, Alert, formatDate, btnPrimary, LoadingSkeleton } from './ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
 import { startSpotlightTour } from '../Common/SpotlightTour.jsx';
@@ -52,7 +52,7 @@ export default function OwnerVaults() {
             <EstateReadinessCard />
 
             {loading ? (
-                <p className="text-on-surface-variant">{t('ui.loading')}</p>
+                <LoadingSkeleton label={t('ui.loading')} />
             ) : vaults.length === 0 ? (
                 <EmptyState bordered icon="inventory_2" title={t('list.emptyTitle')}
                     text={t('list.emptyText')}

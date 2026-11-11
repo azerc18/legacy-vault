@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { sessionApi, parseUserAgent } from '../api/sessionApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { useToast } from '../Common/Toast.jsx';
-import { Card, Alert, Icon, ConfirmDialog, formatDate, btnOutline } from '../Owner/ownerUi.jsx';
+import { Card, Alert, Icon, ConfirmDialog, formatDate, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 function deviceIcon({ mobile, browser }) {
     if (browser === 'API') return 'terminal';
@@ -50,7 +50,7 @@ export default function SessionsCard() {
             <Alert>{error || actionError}</Alert>
             <Alert type="success">{success}</Alert>
 
-            {sessions == null && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+            {sessions == null && !error && <LoadingSkeleton label={t('loading')} />}
 
             {sessions && (
                 <ul className="divide-y divide-outline-variant/30">

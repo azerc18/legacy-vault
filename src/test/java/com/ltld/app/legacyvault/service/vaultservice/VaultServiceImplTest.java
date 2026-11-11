@@ -157,6 +157,46 @@ class VaultServiceImplTest {
     }
 
     @Test
+    @DisplayName("createVault: vault đầu tiên (Owner đã xoá hết vault) -> DMS bắt đầu chu kỳ mới")
+    void createVault_firstVault_restartsDmsCycle() throws Exception {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault");
+        request.setBeneficiaries(List.of(beneficiaryReq("ben@test.com")));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> {
+            Vault v = inv.getArgument(0);
+            if (v.getId() == null) v.setId(UUID.randomUUID());
+            return v;
+        });
+        when(vaultBeneficiaryRepository.save(any(VaultBeneficiary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        vaultService.createVault(ownerId, request);
+
+        verify(dmsConfigService).restartCycleAfterFirstVaultCreated(ownerId);
+    }
+
+    @Test
+    @DisplayName("createVault: Owner đã có vault khác -> không đụng tới chu kỳ DMS")
+    void createVault_notFirstVault_keepsDmsCycle() throws Exception {
+        CreateVaultRequest request = new CreateVaultRequest();
+        request.setName("Vault 2");
+        request.setBeneficiaries(List.of(beneficiaryReq("ben@test.com")));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(mockOwner));
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(true);
+        when(vaultRepository.save(any(Vault.class))).thenAnswer(inv -> {
+            Vault v = inv.getArgument(0);
+            if (v.getId() == null) v.setId(UUID.randomUUID());
+            return v;
+        });
+        when(vaultBeneficiaryRepository.save(any(VaultBeneficiary.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        vaultService.createVault(ownerId, request);
+
+        verify(dmsConfigService, never()).restartCycleAfterFirstVaultCreated(any());
+    }
+
+    @Test
     @DisplayName("createVault (FR-01): DMS đã bắt đầu bàn giao -> ném DmsException 409")
     void createVault_dmsTriggered_throwsDmsException() {
         CreateVaultRequest request = new CreateVaultRequest();

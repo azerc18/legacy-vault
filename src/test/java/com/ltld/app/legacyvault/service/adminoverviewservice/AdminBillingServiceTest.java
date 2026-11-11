@@ -110,11 +110,14 @@ class AdminBillingServiceTest {
     void grant_activeVip_addsToCurrentExpiry() {
         LocalDateTime expiry = LocalDateTime.now().plusDays(20);
         Subscription sub = activeSub(expiry);
+        sub.setTrial(true);
 
         service.grantVip(adminId, owner.getId(), new GrantVipRequest(10, "Quà"));
 
         assertThat(sub.getExpiresAt()).isEqualTo(expiry.plusDays(10));
         assertThat(sub.isReminderSent()).isFalse();
+        // review #256 m2: ngày được tặng không còn tính là dùng thử
+        assertThat(sub.isTrial()).isFalse();
     }
 
     @Test

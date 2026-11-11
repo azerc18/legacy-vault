@@ -7,6 +7,7 @@ import { statusLabel, STATUS_CLASS, formatDate } from './verifierUi.js';
 import VerifierHeader from './VerifierHeader.jsx';
 import {PAGE_WIDTH} from "../Common/AppHeader.jsx";
 import EmptyState from '../Common/EmptyState.jsx';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 const PAGE_SIZE = 20;
 
@@ -75,7 +76,7 @@ export default function VerificationHistory() {
                     )}
                 </div>
 
-                {loading && items.length === 0 && <p>{t('loading')}</p>}
+                {loading && items.length === 0 && <LoadingSkeleton label={t('loading')}/>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
                 {!loading && !error && items.length === 0 && ((status || from || to) ? (
                     <EmptyState bordered icon="filter_alt_off" title={t('history.noResultsTitle')}

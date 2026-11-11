@@ -23,9 +23,11 @@
   "MFA_REQUIRED": "Enter your two-factor authentication code.",
   "MFA_INVALID_CODE": "The two-factor code is incorrect.",
   "DMS_NOT_TRIGGERED": "The Dead Man's Switch has not been triggered yet.",
+  "DMS_NO_VAULT": "You have no vault yet, so the check-in was not successful. Create a vault first.",
   "EXECUTOR_NOT_ACTIVE": "Your executor role is not active for this estate.",
   "CHECKIN_TOKEN_INVALID": "This check-in link is invalid or has expired.",
   "CONFIRMER_TOKEN_INVALID": "This confirmation link is invalid or has expired.",
+  "DMS_CHECKIN_TOO_SOON": "You just checked in. Please try again in a few minutes.",
   "REMINDER_TOO_SOON": "You can send only one reminder every 24 hours.",
   "EMERGENCY_REQUEST_EXISTS": "An emergency access request is already pending.",
   "INVALID_SIGN_CODE": "The signing code is incorrect.",
@@ -61,5 +63,10 @@
   "MFA_CHALLENGE_EXPIRED": "Your sign-in session expired. Please sign in again.",
   "GOOGLE_LOGIN_DISABLED": "Google sign-in is not enabled.",
   "GOOGLE_TOKEN_INVALID": "Google could not confirm your sign-in. Please try again.",
-  "GOOGLE_EMAIL_NOT_VERIFIED": "Your Google account email is not verified."
+  "GOOGLE_EMAIL_NOT_VERIFIED": "Your Google account email is not verified.",
+  "COUPON_INVALID": "This discount code is wrong or has expired.",
+  "COUPON_NOT_APPLICABLE": "This code does not apply to the plan you chose.",
+  "COUPON_USED_UP": "This code has been fully used.",
+  "COUPON_ALREADY_USED": "You have already used this code.",
+  "TRIAL_NOT_ELIGIBLE": "The free trial is only for accounts that never had VIP."
 }
