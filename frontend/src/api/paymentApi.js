@@ -21,6 +21,10 @@ export const paymentApi = {
     resumeRenewal: () =>
         http.post('/subscriptions/me/resume').then((r) => r.data.data),
 
+    // Việc 2: đã dùng / hạn mức và mục đang vượt hạn mức (sau khi VIP hết hạn)
+    getMyUsage: () =>
+        http.get('/subscriptions/me/usage').then((r) => r.data.data),
+
     getMyPayments: () =>
         http.get('/payments/me').then((r) => r.data.data),
 

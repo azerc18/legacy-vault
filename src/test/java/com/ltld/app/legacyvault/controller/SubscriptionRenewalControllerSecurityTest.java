@@ -31,6 +31,7 @@ class SubscriptionRenewalControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private PaymentService paymentService;
     @MockitoBean private SubscriptionRenewalService renewalService;
+    @MockitoBean private com.ltld.app.legacyvault.service.paymentservice.PlanUsageService planUsageService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     @Test
