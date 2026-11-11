@@ -172,6 +172,37 @@ public class PaypalClient {
         }
     }
 
+    private record RefundResponse(String id, String status) {}
+
+    /** Kết quả hoàn tiền PayPal; {@code ok} khi PayPal nhận yêu cầu (COMPLETED hoặc PENDING). */
+    public record Refund(boolean ok, String status, String refundId) {}
+
+    /**
+     * Việc 3: hoàn toàn bộ một capture (body rỗng = hoàn đủ). PayPal-Request-Id theo capture nên gọi lại không hoàn
+     * hai lần. Lỗi 4xx (đã hoàn, quá hạn hoàn...) trả {@code ok=false}; lỗi mạng ném RuntimeException.
+     */
+    public Refund refundCapture(String captureId) {
+        ensureConfigured();
+        String token = accessToken();
+        try {
+            RefundResponse response = client.post().uri("/v2/payments/captures/{id}/refund", captureId)
+                    .headers(h -> {
+                        h.setBearerAuth(token);
+                        h.set("PayPal-Request-Id", "refund-" + captureId);
+                    })
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{}")
+                    .retrieve()
+                    .body(RefundResponse.class);
+            String status = response == null ? "EMPTY" : response.status();
+            boolean ok = "COMPLETED".equals(status) || "PENDING".equals(status);
+            return new Refund(ok, status, response == null ? null : response.id());
+        } catch (HttpClientErrorException ex) {
+            log.warn("PayPal: refund of capture {} rejected with HTTP {}", captureId, ex.getStatusCode().value());
+            return new Refund(false, "HTTP_" + ex.getStatusCode().value(), null);
+        }
+    }
+
     private static Capture toCapture(CaptureResponse response) {
         CaptureItem item = response == null || response.purchase_units() == null ? null
                 : response.purchase_units().stream()

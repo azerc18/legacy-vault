@@ -54,7 +54,7 @@
 
   "payments": {
     "title": "Thanh toán",
-    "subtitle": "Lịch sử giao dịch của mọi người dùng. Trang chỉ để xem, không thay đổi giao dịch hay gói.",
+    "subtitle": "Lịch sử giao dịch của mọi người dùng. Có thể hoàn tiền giao dịch thành công; thời hạn VIP của giao dịch đó sẽ bị trừ lại.",
     "emailPlaceholder": "Email người dùng",
     "loadError": "Không tải được danh sách giao dịch.",
     "receiptError": "Không tải được biên lai.",
@@ -63,7 +63,8 @@
     "paidAt": "Thanh toán {{date}}",
     "currentPlan": "Gói hiện tại: {{plan}}",
     "receipt": "Biên lai",
-    "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn" },
+    "refund": {"action": "Hoàn tiền", "title": "Hoàn tiền giao dịch", "message": "Hoàn {{amount}} cho {{email}} (gói {{plan}}). Thời hạn VIP của giao dịch này sẽ bị trừ khỏi hạn hiện tại; nếu hết thì tài khoản về gói Free ngay.", "viaGateway": "Hoàn qua cổng {{provider}}", "viaGatewayHint": "Hệ thống gọi API hoàn tiền của cổng. Nếu cổng từ chối thì không có gì thay đổi.", "manualHint": "Chỉ ghi nhận là đã hoàn tay (bạn đã chuyển khoản trả lại ngoài hệ thống). Không gọi cổng thanh toán.", "reasonPlaceholder": "Lý do hoàn tiền (bắt buộc, tối đa 255 ký tự)", "confirm": "Hoàn tiền", "success": "Đã hoàn tiền giao dịch của {{email}}.", "error": "Không hoàn tiền được.", "on": "Hoàn tiền {{date}}"},
+    "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn", "REFUNDED": "Đã hoàn tiền" },
     "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay" },
     "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
     "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
@@ -149,8 +150,9 @@
       "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",
       "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản",
       "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành",
-      "rolesMenu": "Vai trò…"
+      "rolesMenu": "Vai trò…", "grantVip": "Tặng VIP"
     },
+    "grantVip": {"title": "Tặng VIP", "message": "Cộng thêm ngày VIP cho {{email}}. Nếu đang có VIP thì cộng vào hạn hiện tại, nếu không thì tính từ bây giờ.", "days": "Số ngày (1–365)", "preset_one": "{{count}} ngày", "preset_other": "{{count}} ngày", "reasonPlaceholder": "Lý do (bắt buộc, ví dụ: bù sự cố thanh toán)", "confirm": "Tặng VIP", "success": "Đã tặng {{count}} ngày VIP cho {{email}}, hạn mới {{date}}."},
     "success": {
       "lock": "Đã khoá {{email}}.",
       "unlock": "Đã mở khoá {{email}}.",

@@ -71,7 +71,7 @@
       "receipt": "Invoice",
       "downloadReceipt": "Download invoice",
       "downloading": "Downloading...",
-      "statusLabel": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired" },
+      "statusLabel": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired", "REFUNDED": "Refunded" },
       "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back."
     },
     "errors": {

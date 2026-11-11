@@ -71,6 +71,16 @@ public class PaymentTransaction {
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 
+    /** Việc 3: lúc admin hoàn tiền, lý do và mã hoàn tiền của cổng (null khi ghi nhận hoàn tay). */
+    @Column(name = "refunded_at")
+    private LocalDateTime refundedAt;
+
+    @Column(name = "refund_reason", length = 255)
+    private String refundReason;
+
+    @Column(name = "refund_ref", length = 100)
+    private String refundRef;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

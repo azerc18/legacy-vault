@@ -1,4 +1,5 @@
-// A2: Trang Thanh toán của Admin — danh sách giao dịch, tổng doanh thu, tải biên lai, xuất CSV. Chỉ đọc.
+// A2: Trang Thanh toán của Admin — danh sách giao dịch, tổng doanh thu, tải biên lai, xuất CSV.
+// Việc 3: hoàn tiền giao dịch SUCCESS (qua cổng hoặc ghi nhận hoàn tay).
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,8 +9,9 @@ import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, StatCard, formatVnd, toneOf } from './adminUi.jsx';
 import UserDrawer from './UserDrawer.jsx';
+import { RefundDialog } from './BillingDialogs.jsx';
 
-const STATUSES = ['SUCCESS', 'PENDING', 'FAILED', 'EXPIRED'];
+const STATUSES = ['SUCCESS', 'PENDING', 'FAILED', 'EXPIRED', 'REFUNDED'];
 const EMPTY = { status: '', email: '', from: '', to: '' };
 
 export default function AdminPayments() {
@@ -25,6 +27,9 @@ export default function AdminPayments() {
     const [summary, setSummary] = useState(null);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(null);             // id giao dịch đang tải biên lai | 'csv'
+    const [refunding, setRefunding] = useState(null);   // dòng giao dịch đang mở hộp thoại hoàn tiền
+    const [refundBusy, setRefundBusy] = useState(false);
+    const [success, setSuccess] = useState('');
 
     const load = useCallback(() => {
         setError('');
@@ -34,6 +39,23 @@ export default function AdminPayments() {
     }, [applied, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => { load(); }, [load]);
+
+    const confirmRefund = async ({ reason, viaGateway }) => {
+        const p = refunding;
+        setRefundBusy(true); setError(''); setSuccess('');
+        try {
+            await adminApi.refundPayment(p.id, reason, viaGateway);
+            setSuccess(t('payments.refund.success', { email: p.userEmail }));
+            setRefunding(null);
+            load();
+            adminApi.paymentSummary(applied).then(setSummary).catch(() => {});
+        } catch (e) {
+            setError(getErrorMessage(e, t('payments.refund.error')));
+            setRefunding(null);
+        } finally {
+            setRefundBusy(false);
+        }
+    };
     useEffect(() => {
         adminApi.paymentSummary(applied).then(setSummary).catch(() => setSummary(null));
     }, [applied]);
@@ -90,6 +112,7 @@ export default function AdminPayments() {
             </form>
 
             <Alert>{error}</Alert>
+            <Alert type="success">{success}</Alert>
             {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon="receipt_long" title={t('payments.empty.title')} text={filtered ? t('payments.empty.filtered') : t('payments.empty.text')} />
@@ -125,17 +148,30 @@ export default function AdminPayments() {
                                     <p className="text-[11px] text-outline">{t('payments.currentPlan', { plan: p.currentPlanCode })}</p>
                                 </td>
                                 <td data-label={t('payments.cols.amount')} className="lv-num font-semibold">{formatVnd(p.amountVnd)}</td>
-                                <td data-label={t('payments.cols.status')}><Stamp tone={toneOf(p.status)}>{t(`payments.status.${p.status}`, { defaultValue: p.status })}</Stamp></td>
+                                <td data-label={t('payments.cols.status')}>
+                                    <Stamp tone={toneOf(p.status)}>{t(`payments.status.${p.status}`, { defaultValue: p.status })}</Stamp>
+                                    {p.refundedAt && (
+                                        <p className="text-[11px] text-outline mt-1" title={p.refundReason || ''}>
+                                            {t('payments.refund.on', { date: formatDate(p.refundedAt, true) })}
+                                        </p>
+                                    )}
+                                </td>
                                 <td data-label={t('payments.cols.provider')}>
                                     <p className="text-xs font-semibold">{p.provider}</p>
                                     {p.providerTransactionNo && <p className="lv-mono text-[11px] text-outline">#{p.providerTransactionNo}</p>}
                                 </td>
                                 <td className="text-right">
                                     {p.status === 'SUCCESS' && (
-                                        <button onClick={() => receipt(p)} disabled={busy === p.id}
-                                                className="text-xs font-semibold text-secondary hover:text-primary inline-flex items-center gap-1 disabled:opacity-60">
-                                            <Icon name="picture_as_pdf" className="text-[16px]" /> {busy === p.id ? t('wait') : t('payments.receipt')}
-                                        </button>
+                                        <div className="inline-flex flex-col items-end gap-1.5">
+                                            <button onClick={() => receipt(p)} disabled={busy === p.id}
+                                                    className="text-xs font-semibold text-secondary hover:text-primary inline-flex items-center gap-1 disabled:opacity-60">
+                                                <Icon name="picture_as_pdf" className="text-[16px]" /> {busy === p.id ? t('wait') : t('payments.receipt')}
+                                            </button>
+                                            <button onClick={() => setRefunding(p)}
+                                                    className="text-xs font-semibold text-error hover:underline inline-flex items-center gap-1 whitespace-nowrap">
+                                                <Icon name="undo" className="text-[16px]" /> {t('payments.refund.action')}
+                                            </button>
+                                        </div>
                                     )}
                                 </td>
                             </tr>
@@ -146,6 +182,7 @@ export default function AdminPayments() {
             )}
             <Pager page={page} totalPages={data?.totalPages} onChange={setPage} />
             <UserDrawer userId={openUserId} onClose={() => setOpenUserId(null)} />
+            <RefundDialog payment={refunding} busy={refundBusy} onConfirm={confirmRefund} onCancel={() => setRefunding(null)} />
         </AdminLayout>
     );
 }

@@ -110,6 +110,12 @@ export const adminApi = {
     // note: ghi chú tuỳ chọn (≤ 500 ký tự)
     acknowledgeAlert: (alertId, note) =>
         http.patch(`/admin/security-alerts/${alertId}/acknowledge`, { note: note || null }).then(unwrap),
+    // Việc 3: hoàn tiền giao dịch SUCCESS. viaGateway=false: chỉ ghi nhận đã hoàn tay. -> dòng giao dịch mới
+    refundPayment: (id, reason, viaGateway) =>
+        http.post(`/admin/payments/${id}/refund`, { reason, viaGateway }).then(unwrap),
+    // Việc 3: tặng VIP N ngày (1..365) cho Owner -> { planCode, expiresAt }
+    grantVip: (userId, days, reason) =>
+        http.post(`/admin/users/${userId}/vip-grant`, { days, reason }).then(unwrap),
     // B4: CSV theo bộ lọc hiện tại (from/to là ISO string)
     exportAuditLogs: ({ action, actorEmail, ip, from, to } = {}) =>
         downloadBlob('/admin/audit-logs/export', clean({ action, actorEmail, ip, from, to }), 'audit-logs.csv'),
