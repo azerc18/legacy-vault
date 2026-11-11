@@ -23,13 +23,17 @@ import java.util.UUID;
  * <p>Mỗi đơn chạy trong transaction riêng của {@link PaymentService#reconcilePending}, có khóa dòng nên không
  * đụng IPN về cùng lúc. VNPay huỷ phiên sau 15 phút, nên mặc định chỉ đụng tới đơn cũ hơn 30 phút.
  *
- * <p>Đơn EXPIRED chưa thu tiền trong {@code give-up-after} gần nhất cũng được hỏi lại (chỉ để kích hoạt nếu cổng
- * báo đã trả), vì checkout lại sẽ đóng ngay đơn cũ mà người mua có thể đã trả nhưng IPN bị lỡ.
+ * <p>Đơn bị thay thế (EXPIRED vì checkout lại) chưa thu tiền trong {@code give-up-after} gần nhất cũng được hỏi lại
+ * (chỉ để kích hoạt nếu cổng báo đã trả), vì checkout lại sẽ đóng ngay đơn cũ mà người mua có thể đã trả nhưng IPN
+ * bị lỡ. Với PayPal chỉ đọc kết quả đã capture, không bao giờ capture đơn đã bị thay thế.
  */
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "app.payment.reconcile.enabled", havingValue = "true", matchIfMissing = true)
 public class PendingPaymentReconciler {
+
+    /** Lý do đóng đơn khi người mua checkout lại; xem PaymentServiceImpl.checkout. */
+    static final String SUPERSEDED = "SUPERSEDED";
 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentService paymentService;
@@ -58,8 +62,10 @@ public class PendingPaymentReconciler {
     public Map<ReconcileOutcome, Integer> reconcile(LocalDateTime now) {
         Map<ReconcileOutcome, Integer> counts = new EnumMap<>(ReconcileOutcome.class);
         // Đơn đã đóng trước: hỏi lại trước, để đơn vừa đóng ở lượt này đợi tới lượt sau mới hỏi lại
-        List<UUID> expired = paymentTransactionRepository.findUnpaidIdsByStatusAndCreatedAtSince(
-                PaymentStatus.EXPIRED, now.minus(giveUpAfter), PageRequest.of(0, batchSize));
+        // Chỉ đơn bị thay thế khi checkout lại: các đơn khác đã EXPIRED vì cổng trả lời chắc chắn là chưa trả
+        // (91, mã thất bại...) hoặc đã quá give-up-after, hỏi lại chỉ tốn lượt gọi cổng (review #251 m5).
+        List<UUID> expired = paymentTransactionRepository.findUnpaidIdsByStatusAndReasonSince(
+                PaymentStatus.EXPIRED, SUPERSEDED, now.minus(giveUpAfter), PageRequest.of(0, batchSize));
         List<UUID> pending = paymentTransactionRepository.findIdsByStatusAndCreatedAtBefore(
                 PaymentStatus.PENDING, now.minus(pendingTimeout), PageRequest.of(0, batchSize));
         run(expired, now, counts);
