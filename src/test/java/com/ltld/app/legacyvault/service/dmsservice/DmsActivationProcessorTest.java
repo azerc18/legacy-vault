@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
@@ -282,6 +283,31 @@ class DmsActivationProcessorTest {
         processor.trigger(config.getId(), now);
         assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Lời mời: Primary chưa đồng ý -> bỏ qua, kích hoạt Backup đã đồng ý")
+    void trigger_pendingPrimaryActivatesAcceptedBackup() {
+        primary.setResponseStatus(ExecutorResponseStatus.PENDING);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
+    }
+
+    @Test
+    @DisplayName("Lời mời: cả Primary và Backup chưa đồng ý -> DMS TRIGGERED không có Executor (báo Admin)")
+    void trigger_noAcceptedExecutor_triggersWithoutExecutor() {
+        primary.setResponseStatus(ExecutorResponseStatus.PENDING);
+        backup.setResponseStatus(ExecutorResponseStatus.PENDING);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "DMS_TRIGGERED_NO_EXECUTOR");
     }
 
     @Test

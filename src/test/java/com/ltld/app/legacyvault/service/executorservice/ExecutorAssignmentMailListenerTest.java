@@ -36,15 +36,39 @@ class ExecutorAssignmentMailListenerTest {
     @InjectMocks
     private ExecutorAssignmentMailListener listener;
 
+    private static final java.util.UUID ASSIGNMENT_ID = java.util.UUID.randomUUID();
+
+    @Test
+    @DisplayName("Lời mời: báo Owner kết quả đồng ý / từ chối kèm lý do")
+    void invitationResponded_notifiesOwner() {
+        listener.on(new ExecutorInvitationRespondedEvent(ASSIGNMENT_ID, java.util.UUID.randomUUID(),
+                "owner@example.test", "Owner A", "Exec B", "exec@example.test", ExecutorType.BACKUP, false, "Busy"));
+
+        verify(emailSender).sendExecutorInvitationResponseNotice(
+                "owner@example.test", "Exec B (exec@example.test)", ExecutorType.BACKUP, false, "Busy");
+    }
+
+    @Test
+    @DisplayName("Lời mời: lỗi gửi mail cho Owner bị nuốt, không ném ra")
+    void invitationResponded_sendFailureIsSwallowed() {
+        doThrow(new MailSendException("SMTP down")).when(emailSender).sendExecutorInvitationResponseNotice(
+                any(), any(), any(), eq(true), any());
+
+        assertThatCode(() -> listener.on(new ExecutorInvitationRespondedEvent(ASSIGNMENT_ID,
+                java.util.UUID.randomUUID(), "owner@example.test", null, null, "exec@example.test",
+                ExecutorType.PRIMARY, true, null))).doesNotThrowAnyException();
+    }
+
     @Test
     @DisplayName("ASSIGNED gọi sendExecutorAssignedNotice, REVOKED gọi sendExecutorRevokedNotice")
     void dispatchesEachMailToMatchingMethod() {
         listener.on(new ExecutorAssignmentChangedEvent(List.of(
-                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY),
+                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY,
+                        ASSIGNMENT_ID),
                 ExecutorMail.revoked("old@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY))));
 
         verify(emailSender).sendExecutorAssignedNotice(
-                "new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
+                "new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY, ASSIGNMENT_ID);
         verify(emailSender).sendExecutorRevokedNotice(
                 "old@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
         verify(emailSender, never()).sendExecutorRevokedNotice(
@@ -55,10 +79,11 @@ class ExecutorAssignmentMailListenerTest {
     @DisplayName("Lỗi gửi mail bị nuốt (không ném ra) và không chặn các mail còn lại")
     void sendFailure_isSwallowedAndOtherMailsStillSent() {
         doThrow(new MailSendException("SMTP down")).when(emailSender).sendExecutorAssignedNotice(
-                "new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP);
+                "new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP, ASSIGNMENT_ID);
 
         assertThatCode(() -> listener.on(new ExecutorAssignmentChangedEvent(List.of(
-                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP),
+                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP,
+                        ASSIGNMENT_ID),
                 ExecutorMail.revoked("old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP)))))
                 .doesNotThrowAnyException();
 

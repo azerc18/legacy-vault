@@ -9,6 +9,7 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
@@ -128,8 +129,12 @@ class ExecutorManagementServiceImplTest {
         assertThat(saved.getExecutorUser()).isSameAs(candidate);
         assertThat(saved.getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
         assertThat(saved.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        // Lời mời: người được chỉ định phải tự đồng ý mới thành Executor dùng được
+        assertThat(saved.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
+        assertThat(saved.getRespondedAt()).isNull();
         assertThat(saved.getAssignedAt()).isNotNull();
         assertThat(candidate.getRoles()).containsExactly(executorRole);
+        assertThat(response.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
 
         assertThat(response.getAssignmentId()).isEqualTo(saved.getId());
         assertThat(response.getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
@@ -504,6 +509,39 @@ class ExecutorManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("Lời mời: DMS ACTIVE, thu hồi lời mời còn chờ phản hồi -> được phép (người đó chưa nhận bàn giao được)")
+    void revoke_pendingInvitationWhileDmsActive_allowed() {
+        ExecutorAssignment primary = assignment(ExecutorType.PRIMARY,
+                user(UUID.randomUUID(), "p@example.test", UserStatus.ACTIVE), ExecutorStatus.INACTIVE);
+        ExecutorAssignment backup = assignment(ExecutorType.BACKUP, candidate, ExecutorStatus.INACTIVE);
+        backup.setResponseStatus(ExecutorResponseStatus.PENDING);
+        primary.setStatus(ExecutorStatus.REVOKED);
+        lockedExecutors(primary, backup);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        ExecutorAssignmentResponse response = service.revokeExecutor(ownerId, ExecutorType.BACKUP);
+
+        assertThat(response.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        verify(executorAssignmentRepository).saveAndFlush(backup);
+    }
+
+    @Test
+    @DisplayName("Lời mời: DMS ACTIVE, thu hồi Primary đã đồng ý khi Backup còn chờ phản hồi -> 409 (Backup chưa nhận được bàn giao)")
+    void revoke_lastAcceptedWhileOtherPending_dmsActive_conflict() {
+        ExecutorAssignment primary = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
+        ExecutorAssignment backup = assignment(ExecutorType.BACKUP,
+                user(UUID.randomUUID(), "b@example.test", UserStatus.ACTIVE), ExecutorStatus.INACTIVE);
+        backup.setResponseStatus(ExecutorResponseStatus.PENDING);
+        lockedExecutors(primary, backup);
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(dmsConfig(DmsStatus.ACTIVE)));
+
+        assertStatus(() -> service.revokeExecutor(ownerId, ExecutorType.PRIMARY), HttpStatus.CONFLICT);
+
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     @DisplayName("B-01a: DMS ACTIVE, thu hồi Primary khi Backup còn -> được phép (đúng chữ tài liệu)")
     void revoke_primaryWhileBackupLeft_dmsActive_allowed() {
         ExecutorAssignment primary = assignment(ExecutorType.PRIMARY, candidate, ExecutorStatus.INACTIVE);
@@ -593,8 +631,11 @@ class ExecutorManagementServiceImplTest {
         InOrder order = inOrder(executorAssignmentRepository, eventPublisher);
         order.verify(executorAssignmentRepository).saveAndFlush(any());
         order.verify(eventPublisher).publishEvent(any(Object.class));
-        assertThat(publishedMails()).containsExactly(
-                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY));
+        List<ExecutorMail> mails = publishedMails();
+        assertThat(mails).usingRecursiveFieldByFieldElementComparatorIgnoringFields("assignmentId").containsExactly(
+                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY, null));
+        // Lời mời mang id của assignment để mail / chuông dẫn tới trang đồng ý / từ chối
+        assertThat(mails.getFirst().assignmentId()).isNotNull();
     }
 
     @Test
@@ -605,8 +646,9 @@ class ExecutorManagementServiceImplTest {
 
         service.assignExecutor(ownerId, ExecutorType.BACKUP, request(CANDIDATE_EMAIL, false));
 
-        assertThat(publishedMails()).containsExactly(
-                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.BACKUP));
+        assertThat(publishedMails()).usingRecursiveFieldByFieldElementComparatorIgnoringFields("assignmentId")
+                .containsExactly(
+                        ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.BACKUP, null));
     }
 
     @Test
@@ -617,9 +659,10 @@ class ExecutorManagementServiceImplTest {
 
         service.assignExecutor(ownerId, ExecutorType.PRIMARY, request(CANDIDATE_EMAIL, true));
 
-        assertThat(publishedMails()).containsExactly(
-                ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY),
-                ExecutorMail.revoked("old@example.test", owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY));
+        assertThat(publishedMails()).usingRecursiveFieldByFieldElementComparatorIgnoringFields("assignmentId")
+                .containsExactly(
+                        ExecutorMail.assigned(CANDIDATE_EMAIL, owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY, null),
+                        ExecutorMail.revoked("old@example.test", owner.getFullName(), OWNER_EMAIL, ExecutorType.PRIMARY));
     }
 
     @Test

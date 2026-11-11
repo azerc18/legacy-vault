@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import org.junit.jupiter.api.DisplayName;
@@ -18,8 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * FR-03: các tổ hợp dưới đây PHẢI khớp với cách DmsActivationProcessor.trigger chọn người khi DMS kích hoạt:
  * Primary có status != REVOKED, nếu không có thì Backup có status == INACTIVE, nếu không có nữa thì không ai
- * (DMS_TRIGGERED_NO_EXECUTOR). Trigger chưa dùng ExecutorActivationRule; khi chuyển trigger sang dùng helper
- * (PR riêng) thì bảng này là hợp đồng để đối chiếu, và đổi một bên phải đổi cả bên kia.
+ * (DMS_TRIGGERED_NO_EXECUTOR). Trigger và leo thang Backup đã dùng ExecutorActivationRule; ngoài ra người được chọn
+ * phải đã đồng ý lời mời (ACCEPTED, mặc định của builder).
  */
 class ExecutorActivationRuleTest {
 
@@ -58,6 +59,43 @@ class ExecutorActivationRuleTest {
         assertThat(ExecutorActivationRule.isUsableBackup(assignment(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE))).isFalse();
         assertThat(ExecutorActivationRule.isUsablePrimary(assignment(ExecutorType.PRIMARY, ExecutorStatus.ACTIVE))).isTrue();
         assertThat(ExecutorActivationRule.isUsableBackup(assignment(ExecutorType.BACKUP, ExecutorStatus.ACTIVE))).isFalse();
+    }
+
+    // Lời mời: người chưa đồng ý (PENDING) không bao giờ được chọn, kể cả khi vị trí còn lại trống
+    @ParameterizedTest(name = "Primary={0}, Backup={1} -> {2}")
+    @CsvSource({
+            "PENDING, ACCEPTED, BACKUP",
+            "PENDING, PENDING, ",
+            "PENDING, , ",
+            "ACCEPTED, PENDING, PRIMARY",
+            ", PENDING, "
+    })
+    @DisplayName("Lời mời: chỉ chọn Executor đã đồng ý (ACCEPTED)")
+    void pickActivationTarget_skipsPendingInvitations(ExecutorResponseStatus primary, ExecutorResponseStatus backup,
+                                                      ExecutorType expected) {
+        List<ExecutorAssignment> rows = new ArrayList<>();
+        if (backup != null) rows.add(assignment(ExecutorType.BACKUP, ExecutorStatus.INACTIVE, backup));
+        if (primary != null) rows.add(assignment(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE, primary));
+
+        assertThat(ExecutorActivationRule.pickActivationTarget(rows).map(ExecutorAssignment::getExecutorType))
+                .isEqualTo(Optional.ofNullable(expected));
+    }
+
+    @Test
+    @DisplayName("Lời mời: mặc định của builder là ACCEPTED (dữ liệu cũ, Admin chỉ định)")
+    void builderDefault_isAccepted() {
+        assertThat(ExecutorActivationRule.isAccepted(assignment(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE))).isTrue();
+        assertThat(ExecutorActivationRule.isUsablePrimary(
+                assignment(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE, ExecutorResponseStatus.PENDING))).isFalse();
+        assertThat(ExecutorActivationRule.isUsableBackup(
+                assignment(ExecutorType.BACKUP, ExecutorStatus.INACTIVE, ExecutorResponseStatus.DECLINED))).isFalse();
+    }
+
+    private static ExecutorAssignment assignment(ExecutorType type, ExecutorStatus status,
+                                                 ExecutorResponseStatus response) {
+        ExecutorAssignment a = assignment(type, status);
+        a.setResponseStatus(response);
+        return a;
     }
 
     private static ExecutorAssignment assignment(ExecutorType type, ExecutorStatus status) {

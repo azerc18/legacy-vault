@@ -52,6 +52,7 @@ class ExecutorClaimTrackingControllerSecurityTest {
     @MockitoBean private VerificationExchangeService verificationExchangeService;
     @MockitoBean private ExecutorSelfService executorSelfService;
     @MockitoBean private ExecutorClaimTrackingService executorClaimTrackingService;
+    @MockitoBean private com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationService executorInvitationService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     private final UUID userId = UUID.randomUUID();
