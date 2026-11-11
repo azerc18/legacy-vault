@@ -8,9 +8,9 @@
     "EXPIRED": { "label": "Cần xác thực lại", "hint": "Xác thực đã hết hạn" }
   },
   "methods": {
-    "FILE_HASH": { "label": "Dấu vân tay tệp (SHA-256)", "desc": "Tải bản gốc lên két, hệ thống lưu dấu vân tay SHA-256 của tệp.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống lưu dấu vân tay SHA-256 của tệp để sau này phát hiện nếu tệp bị thay. Cách này chưa chứng minh tài liệu là thật." },
-    "DOCUMENT_TIMESTAMP": { "label": "Dấu thời gian (Mô phỏng)", "desc": "Ghi nhận tệp đã tồn tại ở thời điểm xác nhận, gắn với mã băm SHA-256 trên hệ thống.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống lưu mã băm SHA-256 và gắn mốc thời gian UTC (mô phỏng) chứng minh tệp đã tồn tại." },
-    "SECOND_PERSON_CONFIRM": { "label": "Xác nhận của người thứ hai", "desc": "Gửi mã tới người xác nhận tin cậy (DMS) của bạn; người đã xem bản gốc đọc mã lại cho bạn nhập." },
+    "FILE_HASH": { "label": "Lưu tệp gốc để đối chiếu", "desc": "Tải tệp gốc lên két. Sau này nếu tệp bị sửa, hệ thống sẽ nhận ra.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống giữ lại một dấu nhận dạng riêng của tệp để sau này biết nếu tệp bị thay. Cách này chưa chứng minh tài liệu là thật." },
+    "DOCUMENT_TIMESTAMP": { "label": "Ghi lại ngày giờ (mô phỏng)", "desc": "Lưu bằng chứng rằng tệp đã có từ lúc bạn xác nhận. Đây chỉ là mô phỏng.", "fileIntro": "Tải bản gốc của tài liệu (PDF, DOC/DOCX, PNG hoặc JPG, tối đa 10 MB). Hệ thống ghi lại ngày giờ bạn tải lên để chứng minh tệp đã có từ lúc đó (mô phỏng)." },
+    "SECOND_PERSON_CONFIRM": { "label": "Nhờ người tin cậy xác nhận", "desc": "Hệ thống gửi một mã cho người tin cậy bạn đã chọn. Người từng xem bản gốc sẽ đọc mã đó cho bạn nhập." },
     "OTP_EMAIL": { "label": "Mã OTP qua email", "desc": "Nhận mã gửi tới email của tài sản và nhập lại." },
     "GOOGLE_LOGIN": { "label": "Đăng nhập Google", "desc": "Đăng nhập đúng tài khoản Google đã khai." },
     "SMS_CODE_MOCK": { "label": "Mã SMS (mô phỏng)", "desc": "Nhập mã SMS mô phỏng gửi tới số điện thoại đã khai." },

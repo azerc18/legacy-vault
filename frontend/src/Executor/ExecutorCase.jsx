@@ -8,7 +8,7 @@ import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
-import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { tEnum } from '../i18n/format.js';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 import EmptyState from "../Common/EmptyState.jsx";
@@ -84,7 +84,7 @@ export default function ExecutorCase() {
                     subtitle={assignment && t('case.subtitle', { type: t(`type.${assignment.executorType}`, assignment.executorType), date: formatDate(assignment.activatedAt, true) })}
                 />
                 <Alert>{error}</Alert>
-                {loading && <p className="text-on-surface-variant">{t('loading')}</p>}
+                {loading && <LoadingSkeleton label={t('loading')}/>}
 
                 {assignment && assignment.status !== 'ACTIVE' && (
                     <Alert type="info">{t('case.standby')}</Alert>
@@ -391,7 +391,7 @@ function VaultClaims({ assignmentId, vault }) {
             <h3 className="font-semibold mb-2">{vault.vaultName}</h3>
             <Alert>{error}</Alert>
             {notice && <Alert type="info">{notice}</Alert>}
-            {rows === null && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+            {rows === null && <LoadingSkeleton label={t('loading')}/>}
             {rows?.length === 0 && !error && <p className="text-sm text-on-surface-variant">{t('case.claims.none')}</p>}
             {rows?.length > 0 && (
                 <div className="overflow-x-auto">
@@ -455,7 +455,7 @@ function AccountTasksSection({ assignmentId, progress }) {
                 {tasks && ` ${t('case.tasks.done', { done, total: tasks.length })}`}
             </p>
             <Alert>{error}</Alert>
-            {tasks === null && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+            {tasks === null && <LoadingSkeleton label={t('loading')}/>}
             <div className="space-y-4">
                 {(tasks || []).map((task) => (
                     <AccountTaskRow key={task.id} assignmentId={assignmentId} task={task}

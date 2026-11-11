@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 import UserDrawer from './UserDrawer.jsx';
@@ -96,7 +96,7 @@ export default function AdminUsers() {
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
 
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')}/>}
             {data && rows.length === 0 && <EmptyState bordered icon="person_search" title={t('users.empty.title')} text={t('users.empty.text')} />}
 
             {rows.length > 0 && (

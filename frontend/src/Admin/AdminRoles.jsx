@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, ConfirmDialog, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, ConfirmDialog, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Stamp } from './adminUi.jsx';
 
 // Khớp @Pattern của CreateRoleRequest ở BE
@@ -101,7 +101,7 @@ export default function AdminRoles() {
                 />
             )}
 
-            {!roles && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!roles && !error && <LoadingSkeleton label={t('loading')}/>}
 
             {roles && (
                 <div className="lv-dossier overflow-x-auto">

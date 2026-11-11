@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, toneOf } from './adminUi.jsx';
 import UserDrawer from './UserDrawer.jsx';
@@ -58,7 +58,7 @@ export default function AdminNotifications() {
 
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')}/>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon={status === 'FAILED' ? 'mark_email_read' : 'inbox'}
                             title={status === 'FAILED' ? t('notifications.empty.failedTitle') : t('notifications.empty.title')}

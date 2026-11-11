@@ -98,6 +98,19 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     );
 }
 
+// Trang đang tải: khung kính mờ giữ chỗ có vệt sáng chạy ngang, không hiện chữ "Đang tải…" (chữ chỉ dành cho trình đọc màn hình)
+export function LoadingSkeleton({label = '', rows = 3}) {
+    return (
+        <div role="status" aria-busy="true" className="space-y-4">
+            {label && <span className="sr-only">{label}</span>}
+            <div className="lv-skeleton p-5 space-y-3" aria-hidden="true">
+                <div className="lv-skeleton-bar h-5 w-44"/>
+                {Array.from({length: rows}, (_, i) => <div key={i} className="lv-skeleton h-12"/>)}
+            </div>
+        </div>
+    );
+}
+
 export function OwnerLayout({title, subtitle, back, actions, loading = false, children}) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">

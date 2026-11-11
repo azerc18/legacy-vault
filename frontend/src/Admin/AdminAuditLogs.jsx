@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager, Stamp, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 
@@ -95,7 +95,7 @@ export default function AdminAuditLogs() {
 
             <Alert>{error}</Alert>
 
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')}/>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon="manage_search" title={t('audit.empty.title')}
                             text={t('audit.empty.text')} />

@@ -8,6 +8,7 @@ import { statusLabel, STATUS_CLASS, formatDate, shortId } from './verifierUi.js'
 import VerifierHeader from './VerifierHeader.jsx';
 import {PAGE_WIDTH} from "../Common/AppHeader.jsx";
 import EmptyState from '../Common/EmptyState.jsx';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 export default function LegalVerifierDashboard() {
     const { t } = useTranslation('verifier');
@@ -38,7 +39,7 @@ export default function LegalVerifierDashboard() {
                     {t('dashboard.viewHistory')}
                 </Link>
 
-                {loading && <p>{t('loading')}</p>}
+                {loading && <LoadingSkeleton label={t('loading')}/>}
                 {error && <div className="p-4 rounded-xl bg-error-container text-on-error-container">{error}</div>}
                 {!loading && !error && requests.length === 0 && (
                     <EmptyState bordered icon="task_alt" title={t('dashboard.emptyTitle')}

@@ -5,6 +5,7 @@ import { getUser } from '../auth/auth.js';
 import { beneficiaryApi } from '../api/beneficiaryApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { BeneficiaryLayout, Icon, StatusBadge, formatDate } from './beneficiaryUi.jsx';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 export default function BeneficiaryVaults() {
     const { t } = useTranslation('beneficiary');
@@ -32,7 +33,7 @@ export default function BeneficiaryVaults() {
             </div>
 
             {loading ? (
-                <p className="text-on-surface-variant">{t('list.loading')}</p>
+                <LoadingSkeleton label={t('list.loading')}/>
             ) : vaults.length === 0 ? (
                 <div data-tour="beneficiary-vault-list" className="text-center py-16 bg-surface-container-lowest rounded-2xl border border-outline-variant/30">
                     <Icon name="inventory_2" className="text-[40px] text-outline" />

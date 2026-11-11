@@ -1002,8 +1002,62 @@ function Owl3D({ action, costume }) {
     );
 }
 
+// Avatar nhỏ trong khung chat: chụp một khung hình 3D của con cú đang mặc đúng trang phục rồi dùng làm ảnh,
+// nên avatar trong chat luôn giống con cú bên ngoài mà không phải mở thêm WebGL context cho từng tin nhắn.
+const snapCache = new Map();
+function snapshotOwl(costume) {
+    if (snapCache.has(costume)) return snapCache.get(costume);
+    const p = new Promise((resolve) => {
+        let renderer;
+        try {
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        } catch {
+            resolve(null);
+            return;
+        }
+        let rig;
+        try {
+            renderer.setPixelRatio(1);
+            renderer.setSize(192, 192);
+            renderer.setClearColor(0x000000, 0);
+            const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
+            camera.position.set(0, 2.5, 8.2);
+            camera.lookAt(0, 1.25, 0);
+            rig = buildOwl();
+            rig.setCostume(costume, false);
+            makeAnimator(rig, () => ({ name: 'idle', t0: 0 }))(1, 0.016, 0, 0);
+            renderer.render(rig.scene, camera);
+            resolve(renderer.domElement.toDataURL('image/png'));
+        } catch {
+            resolve(null);
+        } finally {
+            rig?.scene.traverse((o) => {
+                o.geometry?.dispose?.();
+                const m = o.material;
+                if (m) (Array.isArray(m) ? m : [m]).forEach((xx) => { xx.map?.dispose?.(); xx.gradientMap?.dispose?.(); xx.dispose(); });
+            });
+            renderer.forceContextLoss();
+            renderer.dispose();
+        }
+    });
+    snapCache.set(costume, p);
+    return p;
+}
+
+function MiniOwl({ action, costume }) {
+    const [src, setSrc] = useState(null);
+    useEffect(() => {
+        let alive = true;
+        setSrc(null);
+        snapshotOwl(costume).then((u) => { if (alive) setSrc(u); });
+        return () => { alive = false; };
+    }, [costume]);
+    if (!src) return <ChibiAvatar mini action={action} />;
+    return <img src={src} alt="" aria-hidden="true" className="chibi-mini" style={{ objectFit: 'contain' }} />;
+}
+
 export default function ChibiAvatar3D({ action = 'idle', costume = 'none', mini = false }) {
-    // avatar nhỏ 32px trong khung chat: giữ SVG 2D (tránh tạo nhiều WebGL context)
-    if (mini) return <ChibiAvatar mini action={action} />;
+    // avatar nhỏ 32px trong khung chat: ảnh chụp con cú 3D đúng trang phục; chưa mặc gì thì giữ SVG 2D
+    if (mini) return costume === 'none' ? <ChibiAvatar mini action={action} /> : <MiniOwl action={action} costume={costume} />;
     return <Owl3D action={action} costume={costume} />;
 }
