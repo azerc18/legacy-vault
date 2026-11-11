@@ -4,8 +4,11 @@ import com.ltld.app.legacyvault.dto.coupondto.CouponPreviewResponse;
 import com.ltld.app.legacyvault.dto.coupondto.CouponQuote;
 import com.ltld.app.legacyvault.dto.coupondto.CreateCouponRequest;
 import com.ltld.app.legacyvault.entity.Coupon;
+import com.ltld.app.legacyvault.entity.PaymentTransaction;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
+import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.CouponRepository;
@@ -24,6 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,7 +146,8 @@ class CouponServiceTest {
         var res = service.create(userId, new CreateCouponRequest("tet-2027", 25, null, 100, until, " Tết "));
 
         assertThat(res.code()).isEqualTo("TET-2027");
-        assertThat(res.validUntil()).isEqualTo(until.plusDays(1).atStartOfDay());
+        // trả về ngày cuối cùng theo giờ VN, đúng ngày admin chọn
+        assertThat(res.validUntil()).isEqualTo(until);
         assertThat(res.note()).isEqualTo("Tết");
         verify(auditLogService).log(eq(AuditAction.COUPON_CREATED), any(), eq(userId), any(), eq("Coupon"), anyString(), anyString());
     }
@@ -161,9 +167,67 @@ class CouponServiceTest {
                 .extracting("errorCode").isEqualTo(ErrorCode.BAD_REQUEST);
     }
 
+    private PaymentTransaction paid(String code) {
+        return PaymentTransaction.builder().id(UUID.randomUUID()).couponCode(code)
+                .user(User.builder().id(userId).email("o@x.vn").build()).build();
+    }
+
     @Test
-    void redeem_incrementsByNormalizedCode() {
-        service.redeem(" tet2027 ");
+    void redeem_firstPaidUse_incrementsByNormalizedCode() {
+        when(transactionRepository.countByUserIdAndCouponCodeIgnoreCaseAndStatusIn(eq(userId), eq("TET2027"), any()))
+                .thenReturn(1L);
+        service.redeem(paid(" tet2027 "));
         verify(couponRepository).incrementRedeemed("TET2027");
+        verify(auditLogService, never()).log(eq(AuditAction.COUPON_REUSED), any(), any(), any(), any(), any(), any());
+    }
+
+    // Review #256 m1: mở hai đơn cùng mã rồi trả cả hai thì lần sau không cộng lượt, chỉ ghi cảnh báo cho admin
+    @Test
+    void redeem_secondPaidUseBySameAccount_keepsMoneyButFlagsForAdmin() {
+        when(transactionRepository.countByUserIdAndCouponCodeIgnoreCaseAndStatusIn(eq(userId), eq("TET2027"), any()))
+                .thenReturn(2L);
+        PaymentTransaction tx = paid("TET2027");
+        service.redeem(tx);
+        verify(couponRepository, never()).incrementRedeemed(anyString());
+        verify(auditLogService).log(eq(AuditAction.COUPON_REUSED), eq(AuditResult.FAILURE), eq(userId), eq("o@x.vn"),
+                eq("PaymentTransaction"), eq(tx.getId().toString()), anyString());
+    }
+
+    // Review #256 n1: nhập sai quá 10 lần trong 10 phút thì khóa tạm, kể cả khi lần sau nhập đúng
+    @Test
+    void preview_tooManyWrongCodes_isRateLimitedPerAccount() {
+        coupon("TET2027", 20);
+        for (int i = 0; i < CouponService.MAX_FAILED_GUESSES; i++) {
+            String guess = "GUESS" + i;
+            assertThatThrownBy(() -> service.preview(userId, guess))
+                    .extracting("errorCode").isEqualTo(ErrorCode.COUPON_INVALID);
+        }
+        assertThatThrownBy(() -> service.preview(userId, "TET2027"))
+                .extracting("errorCode").isEqualTo(ErrorCode.TOO_MANY_ATTEMPTS);
+        // tài khoản khác không bị ảnh hưởng
+        assertThat(service.preview(UUID.randomUUID(), "TET2027").percentOff()).isEqualTo(20);
+    }
+
+    @Test
+    void validCodes_doNotCountTowardTheLimit() {
+        coupon("TET2027", 20);
+        for (int i = 0; i < CouponService.MAX_FAILED_GUESSES + 5; i++) {
+            assertThat(service.preview(userId, "TET2027").percentOff()).isEqualTo(20);
+        }
+    }
+
+    // Review #256 n2: "hết ngày 31/12" là 0h ngày 1/1 giờ VN, dù server chạy UTC
+    @Test
+    void endOfVnDay_andLastValidDay_useVietnamTimeWhateverTheServerZone() {
+        TimeZone original = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+            LocalDateTime end = CouponService.endOfVnDay(LocalDate.of(2026, 12, 31));
+            assertThat(end).isEqualTo(LocalDateTime.of(2026, 12, 31, 17, 0));
+            assertThat(CouponService.lastValidDay(end)).isEqualTo(LocalDate.of(2026, 12, 31));
+            assertThat(CouponService.lastValidDay(null)).isNull();
+        } finally {
+            TimeZone.setDefault(original);
+        }
     }
 }

@@ -87,7 +87,7 @@
     "noEnd": "No end date",
     "enable": "Turn on",
     "disable": "Turn off",
-    "form": { "code": "Code", "percent": "% off", "plan": "Applies to", "allPlans": "Every VIP plan", "max": "Uses", "until": "Ends after", "note": "Note", "notePlaceholder": "e.g. Tet promotion, sent to past customers only", "create": "Create code", "hint": "3–40 letters, digits, - or _. At most 90% off; to give VIP for free use Grant VIP in the user profile. Once created, the code and % cannot change; you can only turn it off or on." },
+    "form": { "code": "Code", "percent": "% off", "plan": "Applies to", "allPlans": "Every VIP plan", "max": "Uses", "until": "Ends after", "note": "Note", "notePlaceholder": "e.g. Tet promotion, sent to past customers only", "create": "Create code", "hint": "3–40 letters, digits, - or _. At most 90% off; to give VIP for free use Grant VIP in the user profile. Use 8 or more characters that are hard to guess (e.g. TET2027-VIP), since each account can only try 10 wrong codes per 10 minutes. The end date is Vietnam time. Once created, the code and % cannot change; you can only turn it off or on." },
     "cols": { "code": "Code", "percent": "Off", "plan": "Plan", "used": "Used", "until": "Ends", "status": "Status" },
     "state": { "on": "Active", "off": "Off", "expired": "Expired", "usedUp": "Used up" }
   },
