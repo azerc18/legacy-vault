@@ -31,6 +31,7 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -88,6 +89,12 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Cannot checkout a free plan.");
         }
 
+        // Bấm thanh toán nhiều lần: đơn cũ chưa trả tiền thành EXPIRED để lịch sử không đầy đơn treo.
+        // An toàn vì IPN/return về muộn cho đơn EXPIRED vẫn được xử lý (xem isOpen).
+        for (PaymentTransaction old : paymentTransactionRepository.findByUserIdAndStatus(userId, PaymentStatus.PENDING)) {
+            markExpired(old, "SUPERSEDED");
+        }
+
         PaymentTransaction tx = PaymentTransaction.builder()
                 .user(user)
                 .plan(plan)
@@ -96,6 +103,8 @@ public class PaymentServiceImpl implements PaymentService {
                 .provider(provider)
                 .build();
         tx = paymentTransactionRepository.save(tx);
+        // flush để có createdAt: vnp_CreateDate phải bằng giờ này thì querydr về sau mới tìm thấy đơn
+        paymentTransactionRepository.flush();
 
         String paymentUrl;
         if (provider == PaymentProvider.PAYPAL) {
@@ -107,7 +116,8 @@ public class PaymentServiceImpl implements PaymentService {
             paymentUrl = order.approveUrl();
         } else {
             String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
-            paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress);
+            paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress,
+                    tx.getCreatedAt());
         }
 
         return CheckoutResponse.builder()
@@ -177,7 +187,7 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         // Idempotency: đơn đã xử lý (SUCCESS hoặc FAILED) thì không xử lý lại
-        if (tx.getStatus() != PaymentStatus.PENDING) {
+        if (!isOpen(tx)) {
             return response("02", "Order already confirmed");
         }
 
@@ -197,23 +207,7 @@ public class PaymentServiceImpl implements PaymentService {
         tx.setVnpBankCode(params.get("vnp_BankCode"));
 
         if (isPaid(params)) {
-            LocalDateTime now = LocalDateTime.now();
-            tx.setStatus(PaymentStatus.SUCCESS);
-            tx.setPaidAt(now);
-            paymentTransactionRepository.save(tx);
-
-            SubscriptionPlan plan = tx.getPlan();
-            activateOrExtendSubscription(user, plan, now);
-
-            auditLogService.log(
-                    AuditAction.PAYMENT_SUCCEEDED,
-                    AuditResult.SUCCESS,
-                    user != null ? user.getId() : null,
-                    user != null ? user.getEmail() : null,
-                    "PaymentTransaction",
-                    tx.getId().toString(),
-                    plan != null ? plan.getCode() : "VIP"
-            );
+            settleSuccess(tx, LocalDateTime.now());
         } else {
             tx.setStatus(PaymentStatus.FAILED);
             paymentTransactionRepository.save(tx);
@@ -233,17 +227,27 @@ public class PaymentServiceImpl implements PaymentService {
             return buildFrontendResultUrl("failed", null, ErrorCode.NOT_FOUND.name());
         }
         String ref = tx.getId().toString();
-        if (tx.getStatus() != PaymentStatus.PENDING) {
+        if (!isOpen(tx)) {
             return buildFrontendResultUrl(tx.getStatus() == PaymentStatus.SUCCESS ? "success" : "failed", ref, null);
         }
 
+        PaypalOutcome outcome = capturePaypal(tx, orderId);
+        return buildFrontendResultUrl(outcome.success() ? "success" : "failed", ref, outcome.errorCode());
+    }
+
+    /** Kết quả capture PayPal; {@code unknown=true}: lỗi mạng, chưa biết đã trừ tiền chưa, đơn giữ nguyên trạng thái. */
+    private record PaypalOutcome(boolean success, boolean unknown, String errorCode) {
+    }
+
+    /** Capture rồi ghi kết quả vào đơn đang giữ khóa; dùng chung cho lần quay về và job đối soát. */
+    private PaypalOutcome capturePaypal(PaymentTransaction tx, String orderId) {
         PaypalClient.Capture capture;
         try {
             capture = paypalClient.capture(orderId);
         } catch (RuntimeException ex) {
-            // Chưa biết PayPal đã trừ tiền chưa: giữ PENDING để lần quay về sau capture lại an toàn
+            // Chưa biết PayPal đã trừ tiền chưa: giữ nguyên để lần sau capture lại an toàn
             log.warn("PayPal: capture of order {} failed: {}", orderId, ex.getMessage());
-            return buildFrontendResultUrl("failed", ref, ErrorCode.SERVICE_UNAVAILABLE.name());
+            return new PaypalOutcome(false, true, ErrorCode.SERVICE_UNAVAILABLE.name());
         }
 
         User user = tx.getUser();
@@ -253,30 +257,16 @@ public class PaymentServiceImpl implements PaymentService {
         tx.setVnpBankCode(PaymentProvider.PAYPAL.name());
         if (!capture.completed()) {
             markFailed(tx, user, "PayPal capture status=" + capture.status());
-            return buildFrontendResultUrl("failed", ref, null);
+            return new PaypalOutcome(false, false, null);
         }
         if (!"USD".equals(capture.currency()) || tx.getAmountUsdCents() == null
                 || capture.cents() != tx.getAmountUsdCents()) {
             markFailed(tx, user, "Amount mismatch: expected " + tx.getAmountUsdCents() + " USD cents, got "
                     + capture.cents() + " " + capture.currency());
-            return buildFrontendResultUrl("failed", ref, ErrorCode.PAYMENT_AMOUNT_MISMATCH.name());
+            return new PaypalOutcome(false, false, ErrorCode.PAYMENT_AMOUNT_MISMATCH.name());
         }
-
-        LocalDateTime now = LocalDateTime.now();
-        tx.setStatus(PaymentStatus.SUCCESS);
-        tx.setPaidAt(now);
-        paymentTransactionRepository.save(tx);
-        activateOrExtendSubscription(user, tx.getPlan(), now);
-        auditLogService.log(
-                AuditAction.PAYMENT_SUCCEEDED,
-                AuditResult.SUCCESS,
-                user != null ? user.getId() : null,
-                user != null ? user.getEmail() : null,
-                "PaymentTransaction",
-                tx.getId().toString(),
-                tx.getPlan() != null ? tx.getPlan().getCode() : "VIP"
-        );
-        return buildFrontendResultUrl("success", ref, null);
+        settleSuccess(tx, LocalDateTime.now());
+        return new PaypalOutcome(true, false, null);
     }
 
     @Override
@@ -318,6 +308,142 @@ public class PaymentServiceImpl implements PaymentService {
         tx.setStatus(PaymentStatus.FAILED);
         paymentTransactionRepository.save(tx);
         logFailure(tx, user, detail);
+    }
+
+    /** Đơn đã trừ tiền: ghi SUCCESS, kích hoạt/gia hạn gói, ghi audit (audit kéo theo mail + chuông). */
+    private void settleSuccess(PaymentTransaction tx, LocalDateTime now) {
+        User user = tx.getUser();
+        tx.setStatus(PaymentStatus.SUCCESS);
+        tx.setPaidAt(now);
+        paymentTransactionRepository.save(tx);
+        SubscriptionPlan plan = tx.getPlan();
+        activateOrExtendSubscription(user, plan, now);
+        auditLogService.log(
+                AuditAction.PAYMENT_SUCCEEDED,
+                AuditResult.SUCCESS,
+                user != null ? user.getId() : null,
+                user != null ? user.getEmail() : null,
+                "PaymentTransaction",
+                tx.getId().toString(),
+                plan != null ? plan.getCode() : "VIP"
+        );
+    }
+
+    /**
+     * Đơn còn nhận kết quả từ cổng: PENDING, hoặc EXPIRED (người mua thanh toán muộn ở tab cũ, sau khi job đã
+     * đóng đơn hoặc sau khi tạo đơn mới). SUCCESS/FAILED là kết quả cuối, không xử lý lại.
+     */
+    private static boolean isOpen(PaymentTransaction tx) {
+        return tx.getStatus() == PaymentStatus.PENDING || tx.getStatus() == PaymentStatus.EXPIRED;
+    }
+
+    /** Đóng đơn chưa trả tiền; không gửi mail "thanh toán thất bại" vì người mua chỉ bỏ ngang. */
+    private void markExpired(PaymentTransaction tx, String reason) {
+        tx.setStatus(PaymentStatus.EXPIRED);
+        if (tx.getVnpResponseCode() == null || tx.getVnpResponseCode().isBlank()) {
+            tx.setVnpResponseCode(reason);
+        }
+        paymentTransactionRepository.save(tx);
+        User user = tx.getUser();
+        auditLogService.log(
+                AuditAction.PAYMENT_EXPIRED,
+                AuditResult.SUCCESS,
+                user != null ? user.getId() : null,
+                user != null ? user.getEmail() : null,
+                "PaymentTransaction",
+                tx.getId().toString(),
+                reason
+        );
+    }
+
+    /**
+     * Job đối soát gọi cho từng đơn PENDING quá hạn. Hỏi cổng thanh toán trước khi đóng đơn: đã trừ tiền thì kích hoạt
+     * gói (trường hợp IPN bị lỡ), chưa trả thì EXPIRED. Không hỏi được cổng thì để PENDING tới lần sau, trừ khi đơn đã
+     * quá {@code giveUpAfter} (lúc đó đóng luôn; nếu sau này IPN về vẫn xử lý được vì EXPIRED còn mở).
+     */
+    @Override
+    @Transactional
+    public ReconcileOutcome reconcilePending(UUID transactionId, LocalDateTime now, Duration giveUpAfter) {
+        PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(transactionId).orElse(null);
+        if (tx == null || tx.getStatus() != PaymentStatus.PENDING) {
+            return ReconcileOutcome.SKIPPED;
+        }
+        boolean giveUp = tx.getCreatedAt() == null || tx.getCreatedAt().isBefore(now.minus(giveUpAfter));
+        return tx.getProvider() == PaymentProvider.PAYPAL
+                ? reconcilePaypal(tx, giveUp)
+                : reconcileVnpay(tx, now, giveUp);
+    }
+
+    private ReconcileOutcome reconcileVnpay(PaymentTransaction tx, LocalDateTime now, boolean giveUp) {
+        if (!vnpayClient.isConfigured()) {
+            return expireOrWait(tx, giveUp, "TIMEOUT");
+        }
+        LocalDateTime createdAt = tx.getCreatedAt() != null ? tx.getCreatedAt() : now;
+        VnpayClient.QueryResult q = vnpayClient.queryTransaction(tx.getId(), createdAt,
+                "Doi soat LegacyVault " + VnpayClient.toTxnRef(tx.getId()), "127.0.0.1");
+
+        if (q.paid()) {
+            if (q.amountVnd() != tx.getAmountVnd()) {
+                tx.setVnpResponseCode("04");
+                markFailed(tx, tx.getUser(), "querydr amount mismatch: expected " + tx.getAmountVnd()
+                        + " VND, got " + q.amountVnd() + " VND");
+                return ReconcileOutcome.FAILED;
+            }
+            tx.setVnpResponseCode("00");
+            tx.setVnpTransactionNo(q.transactionNo());
+            tx.setVnpBankCode(q.bankCode());
+            settleSuccess(tx, now);
+            log.info("Reconcile: VNPay order {} was paid but IPN was missed; plan activated", tx.getId());
+            return ReconcileOutcome.ACTIVATED;
+        }
+        if (!q.reachable()) {
+            return expireOrWait(tx, giveUp, "TIMEOUT");
+        }
+        // VNPay trả lời chắc chắn là chưa thu tiền: không có giao dịch (91), hoặc có nhưng chưa hoàn tất / lỗi.
+        // Phản hồi sai chữ ký vẫn chỉ được dẫn tới EXPIRED (không kích hoạt gói), nên dùng được ở nhánh này.
+        boolean answeredNotPaid = q.notFound() || ("00".equals(q.responseCode()) && q.signatureValid());
+        if (answeredNotPaid) {
+            markExpired(tx, q.notFound() ? "TIMEOUT" : "TIMEOUT_" + q.transactionStatus());
+            return ReconcileOutcome.EXPIRED;
+        }
+        log.warn("Reconcile: VNPay querydr for {} answered {} {}", tx.getId(), q.responseCode(), q.message());
+        return expireOrWait(tx, giveUp, "TIMEOUT");
+    }
+
+    private ReconcileOutcome reconcilePaypal(PaymentTransaction tx, boolean giveUp) {
+        String orderId = tx.getGatewayTxnRef();
+        if (orderId == null || orderId.isBlank() || !paypalClient.isConfigured()) {
+            // Không tạo được order bên PayPal: người mua chưa từng thấy trang thanh toán
+            return orderId == null || orderId.isBlank()
+                    ? expire(tx, "TIMEOUT")
+                    : expireOrWait(tx, giveUp, "TIMEOUT");
+        }
+        String status;
+        try {
+            status = paypalClient.getOrderStatus(orderId);
+        } catch (RuntimeException ex) {
+            log.warn("Reconcile: PayPal order {} status lookup failed: {}", orderId, ex.getMessage());
+            return expireOrWait(tx, giveUp, "TIMEOUT");
+        }
+        if ("APPROVED".equals(status) || "COMPLETED".equals(status)) {
+            // Người mua đã đồng ý trả nhưng không quay về web (đóng tab): capture giống lần quay về
+            PaypalOutcome outcome = capturePaypal(tx, orderId);
+            if (outcome.success()) {
+                return ReconcileOutcome.ACTIVATED;
+            }
+            return outcome.unknown() ? expireOrWait(tx, giveUp, "TIMEOUT") : ReconcileOutcome.FAILED;
+        }
+        // CREATED / PAYER_ACTION_REQUIRED / VOIDED / NOT_FOUND: chưa trả tiền
+        return expire(tx, "TIMEOUT");
+    }
+
+    private ReconcileOutcome expire(PaymentTransaction tx, String reason) {
+        markExpired(tx, reason);
+        return ReconcileOutcome.EXPIRED;
+    }
+
+    private ReconcileOutcome expireOrWait(PaymentTransaction tx, boolean giveUp, String reason) {
+        return giveUp ? expire(tx, reason) : ReconcileOutcome.STILL_PENDING;
     }
 
     private static PaymentProvider parseProvider(String raw) {

@@ -70,7 +70,9 @@
       "ref": "Mã giao dịch",
       "receipt": "Hóa đơn",
       "downloadReceipt": "Tải hóa đơn",
-      "downloading": "Đang tải..."
+      "downloading": "Đang tải...",
+      "statusLabel": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn" },
+      "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về."
     },
     "errors": {
       "loadFailed": "Không thể tải thông tin thanh toán.",

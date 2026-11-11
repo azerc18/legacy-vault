@@ -150,6 +150,28 @@ public class PaypalClient {
         }
     }
 
+    private record OrderStatusResponse(String id, String status) {}
+
+    /**
+     * Trạng thái order (CREATED, APPROVED, PAYER_ACTION_REQUIRED, COMPLETED, VOIDED) để job đối soát quyết định
+     * capture hay đóng đơn. Order không còn tồn tại (404) trả {@code "NOT_FOUND"}.
+     *
+     * @throws RuntimeException lỗi mạng hoặc 5xx: chưa biết kết quả
+     */
+    public String getOrderStatus(String orderId) {
+        ensureConfigured();
+        String token = accessToken();
+        try {
+            OrderStatusResponse response = client.get().uri("/v2/checkout/orders/{id}", orderId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .retrieve()
+                    .body(OrderStatusResponse.class);
+            return response == null || response.status() == null ? "UNKNOWN" : response.status();
+        } catch (HttpClientErrorException.NotFound ex) {
+            return "NOT_FOUND";
+        }
+    }
+
     private static Capture toCapture(CaptureResponse response) {
         CaptureItem item = response == null || response.purchase_units() == null ? null
                 : response.purchase_units().stream()

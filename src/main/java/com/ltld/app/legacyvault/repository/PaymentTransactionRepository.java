@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.repository;
 import com.ltld.app.legacyvault.entity.PaymentTransaction;
 import com.ltld.app.legacyvault.enums.PaymentStatus;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -28,6 +29,14 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     @EntityGraph(attributePaths = {"user", "plan"})
     @Query("SELECT p FROM PaymentTransaction p WHERE p.id = :id")
     Optional<PaymentTransaction> findByIdForUpdate(@Param("id") UUID id);
+
+    /** Đơn PENDING tạo trước mốc {@code before}, cũ nhất trước (job đối soát). */
+    @Query("SELECT p.id FROM PaymentTransaction p WHERE p.status = :status AND p.createdAt < :before ORDER BY p.createdAt")
+    List<UUID> findIdsByStatusAndCreatedAtBefore(@Param("status") PaymentStatus status,
+                                                @Param("before") LocalDateTime before,
+                                                Pageable pageable);
+
+    List<PaymentTransaction> findByUserIdAndStatus(UUID userId, PaymentStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {"user", "plan"})

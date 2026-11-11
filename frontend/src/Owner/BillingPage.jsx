@@ -159,15 +159,18 @@ export default function BillingPage() {
                                                 <td className="py-3 pr-4">{formatVnd(tx.amountVnd)}</td>
                                                 <td className="py-3 pr-4">
                                                     <span
+                                                        title={tx.status === 'EXPIRED' ? t('billing.history.expiredHint') : undefined}
                                                         className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                                                             tx.status === 'SUCCESS'
                                                                 ? 'bg-success-container text-on-success-container'
                                                                 : tx.status === 'FAILED'
                                                                 ? 'bg-error-container text-on-error-container'
+                                                                : tx.status === 'EXPIRED'
+                                                                ? 'bg-surface-container-high text-on-surface-variant'
                                                                 : 'bg-secondary-fixed text-on-secondary-fixed'
                                                         }`}
                                                     >
-                                                        {tx.status}
+                                                        {t(`billing.history.statusLabel.${tx.status}`, { defaultValue: tx.status })}
                                                     </span>
                                                 </td>
                                                 <td className="py-3 pr-4 text-xs text-on-surface-variant">

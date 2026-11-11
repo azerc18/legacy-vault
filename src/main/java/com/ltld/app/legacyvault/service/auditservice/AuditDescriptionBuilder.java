@@ -161,6 +161,7 @@ public class AuditDescriptionBuilder {
             case EXECUTOR_ACKNOWLEDGED -> "The executor acknowledged the activation notice.";
             case PAYMENT_SUCCEEDED -> "Subscription payment succeeded.";
             case PAYMENT_FAILED -> "Subscription payment failed.";
+            case PAYMENT_EXPIRED -> "An unpaid checkout expired.";
             default -> "Performed action: " + log.getAction();
         };
     }

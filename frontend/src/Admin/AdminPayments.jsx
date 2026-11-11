@@ -9,7 +9,7 @@ import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, StatCard, formatVnd, toneOf } from './adminUi.jsx';
 import UserDrawer from './UserDrawer.jsx';
 
-const STATUSES = ['SUCCESS', 'PENDING', 'FAILED'];
+const STATUSES = ['SUCCESS', 'PENDING', 'FAILED', 'EXPIRED'];
 const EMPTY = { status: '', email: '', from: '', to: '' };
 
 export default function AdminPayments() {
