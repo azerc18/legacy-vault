@@ -92,6 +92,10 @@ public class AdminExecutorRescueServiceImpl implements AdminExecutorRescueServic
         assignment.setActivatedAt(now);
         assignment.setAcknowledgedAt(null);
         assignment.setRevokedAt(null);
+        // Admin cứu hộ khi DMS đã TRIGGERED: không có bước mời, coi như người được chọn đã đồng ý
+        assignment.setResponseStatus(ExecutorResponseStatus.ACCEPTED);
+        assignment.setRespondedAt(now);
+        assignment.setDeclineReason(null);
 
         executorRoleManager.grant(candidate);
         if (previous != null) {

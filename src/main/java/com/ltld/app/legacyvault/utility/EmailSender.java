@@ -383,6 +383,11 @@ public class EmailSender {
         return (vaultId == null || base == null) ? null : base + "/beneficiary/vaults/" + vaultId;
     }
 
+    private String executorInvitationLink(UUID assignmentId) {
+        String base = frontendBase();
+        return (assignmentId == null || base == null) ? null : base + "/executor/invitations/" + assignmentId;
+    }
+
     private String registerLink() {
         String base = frontendBase();
         return base == null ? null : base + "/register";
@@ -498,10 +503,39 @@ public class EmailSender {
 
     // FR-06: method đồng bộ; bản thân listener AFTER_COMMIT đã chạy @Async, lỗi do listener bắt và log.
     // Không nêu tên Executor còn lại của Owner.
-    public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
+    /**
+     * Lời mời làm Executor: có nút dẫn tới trang đồng ý / từ chối (/executor/invitations/{assignmentId}).
+     * Chưa cấu hình app.frontend.base-url (hoặc thiếu assignmentId) thì thay nút bằng hướng dẫn đăng nhập.
+     */
+    public void sendExecutorAssignedNotice(String to, String ownerName, String ownerEmail, ExecutorType type,
+                                           UUID assignmentId) {
         AppLanguage lang = languageResolver.forEmail(to);
-        sendKeyed(to, lang, Style.CASE, "mail.execAssigned", List.of(MailMessages.get(lang, "mail.execAssigned.body",
-                ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), ownerDisplayName(ownerName, ownerEmail))));
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.execAssigned.body",
+                ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), ownerDisplayName(ownerName, ownerEmail)));
+        String link = executorInvitationLink(assignmentId);
+        paras.add(link != null
+                ? MailMessages.get(lang, "mail.execAssigned.button") + ": " + link
+                : MailMessages.get(lang, "mail.execAssigned.noLink"));
+        paras.add(MailMessages.get(lang, "mail.execAssigned.unknown"));
+        sendKeyed(to, lang, Style.CASE, "mail.execAssigned", paras);
+    }
+
+    /** Báo Owner: người được mời đã đồng ý / từ chối (kèm lý do nếu có), nút mở trang Người thực thi. */
+    public void sendExecutorInvitationResponseNotice(String ownerEmail, String executorLabel, ExecutorType type,
+                                                     boolean accepted, String declineReason) {
+        AppLanguage lang = languageResolver.forEmail(ownerEmail);
+        String prefix = accepted ? "mail.execAccepted" : "mail.execDeclined";
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, prefix + ".body", executorLabel, roleLabel(lang, type)));
+        if (!accepted && declineReason != null && !declineReason.isBlank()) {
+            paras.add(MailMessages.get(lang, "mail.execDeclined.reason", declineReason.trim()));
+        }
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.execResponse.button") + ": " + base + "/owner/executors");
+        }
+        sendKeyed(ownerEmail, lang, accepted ? Style.CASE : Style.NOTICE, prefix, paras);
     }
 
     public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {

@@ -27,6 +27,11 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
 
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorType(UUID ownerId, ExecutorType executorType);
 
+    // Lời mời làm Executor: lấy Owner của assignment mà KHÔNG nạp entity, để khóa DmsConfig -> User -> assignment
+    // đúng thứ tự FR-06 rồi mới đọc assignment (bản đã nạp trước khi khóa sẽ không được làm mới).
+    @Query("select a.owner.id from ExecutorAssignment a where a.id = :id")
+    Optional<UUID> findOwnerIdById(@Param("id") UUID id);
+
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorTypeAndStatus(
             UUID ownerId, ExecutorType executorType, ExecutorStatus status);
 

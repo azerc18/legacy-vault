@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.dto.executordto;
 
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
@@ -19,6 +20,8 @@ public class MyExecutorAssignmentResponse {
     private String ownerEmail;
     private ExecutorType executorType;
     private ExecutorStatus status;
+    // Lời mời: PENDING = chưa đồng ý (FE hiện ở khối "Lời mời đang chờ"), ACCEPTED = đã nhận trách nhiệm
+    private ExecutorResponseStatus responseStatus;
     private LocalDateTime assignedAt;
     private LocalDateTime activatedAt;
     private LocalDateTime acknowledgedAt;

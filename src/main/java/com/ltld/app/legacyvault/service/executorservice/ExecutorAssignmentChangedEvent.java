@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.executorservice;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * FR-06 bước 5: phát ra khi Owner chỉ định / thay thế / thu hồi Executor, mang sẵn các mail cần gửi.
@@ -22,30 +23,34 @@ public record ExecutorAssignmentChangedEvent(List<ExecutorMail> mails) {
         REPLACED_BY_ADMIN
     }
 
-    /** Một mail cho một Executor; chỉ chứa thông tin của Owner và vị trí của chính người nhận. */
+    /**
+     * Một mail cho một Executor; chỉ chứa thông tin của Owner và vị trí của chính người nhận.
+     * assignmentId: chỉ có ở ASSIGNED (lời mời), để mail và thông báo trên chuông dẫn tới trang đồng ý / từ chối.
+     */
     public record ExecutorMail(MailType type, String recipientEmail, String ownerName, String ownerEmail,
-                               ExecutorType executorType, int waitDays) {
+                               ExecutorType executorType, int waitDays, UUID assignmentId) {
 
         public static ExecutorMail assigned(String recipientEmail, String ownerName, String ownerEmail,
-                                            ExecutorType executorType) {
-            return new ExecutorMail(MailType.ASSIGNED, recipientEmail, ownerName, ownerEmail, executorType, 0);
+                                            ExecutorType executorType, UUID assignmentId) {
+            return new ExecutorMail(MailType.ASSIGNED, recipientEmail, ownerName, ownerEmail, executorType, 0,
+                    assignmentId);
         }
 
         public static ExecutorMail revoked(String recipientEmail, String ownerName, String ownerEmail,
                                            ExecutorType executorType) {
-            return new ExecutorMail(MailType.REVOKED, recipientEmail, ownerName, ownerEmail, executorType, 0);
+            return new ExecutorMail(MailType.REVOKED, recipientEmail, ownerName, ownerEmail, executorType, 0, null);
         }
 
         public static ExecutorMail revokedByTimeout(String recipientEmail, String ownerName, String ownerEmail,
                                                     int waitDays) {
             return new ExecutorMail(MailType.REVOKED_TIMEOUT, recipientEmail, ownerName, ownerEmail,
-                    ExecutorType.PRIMARY, waitDays);
+                    ExecutorType.PRIMARY, waitDays, null);
         }
 
         public static ExecutorMail replacedByAdmin(String recipientEmail, String ownerName, String ownerEmail,
                                                    ExecutorType executorType) {
             return new ExecutorMail(MailType.REPLACED_BY_ADMIN, recipientEmail, ownerName, ownerEmail,
-                    executorType, 0);
+                    executorType, 0, null);
         }
     }
 }

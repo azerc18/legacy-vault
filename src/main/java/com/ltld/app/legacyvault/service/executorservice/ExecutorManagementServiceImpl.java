@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.UserStatus;
@@ -21,6 +22,7 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
+import com.ltld.app.legacyvault.service.dmsservice.ExecutorActivationRule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -137,6 +139,10 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 : ExecutorAssignment.builder().owner(owner).executorType(type).build();
         assignment.setExecutorUser(candidate);
         assignment.setStatus(ExecutorStatus.INACTIVE);
+        // Lời mời: người được chọn phải tự đồng ý thì mới được tính là Executor dùng được (ExecutorActivationRule)
+        assignment.setResponseStatus(ExecutorResponseStatus.PENDING);
+        assignment.setRespondedAt(null);
+        assignment.setDeclineReason(null);
         assignment.setAssignedAt(LocalDateTime.now());
         assignment.setActivatedAt(null);
         assignment.setAcknowledgedAt(null);
@@ -159,7 +165,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
 
         // FR-06 bước 5: người mới được báo chỉ định; khi thay người thì người cũ được báo bị thu hồi.
         List<ExecutorMail> mails = new ArrayList<>();
-        mails.add(ExecutorMail.assigned(candidate.getEmail(), owner.getFullName(), owner.getEmail(), type));
+        mails.add(ExecutorMail.assigned(candidate.getEmail(), owner.getFullName(), owner.getEmail(), type,
+                saved.getId()));
         if (previous != null) {
             mails.add(ExecutorMail.revoked(previous.getEmail(), owner.getFullName(), owner.getEmail(), type));
         }
@@ -259,9 +266,13 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         boolean dmsActive = lockedDms.or(() -> dmsConfigRepository.findByOwnerId(ownerId))
                 .filter(c -> c.getStatus() == DmsStatus.ACTIVE || c.getStatus() == DmsStatus.PENDING_CONFIRMATION)
                 .isPresent();
+        // Chỉ chặn khi người bị thu hồi đang là Executor đã đồng ý và không còn ai khác đã đồng ý;
+        // thu hồi một lời mời còn chờ phản hồi không làm DMS mất người nhận bàn giao.
+        boolean targetAccepted = ExecutorActivationRule.isAccepted(target);
         boolean othersLeft = executors.stream()
-                .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED);
-        if (dmsActive && !othersLeft) {
+                .anyMatch(a -> !a.getId().equals(target.getId()) && a.getStatus() != ExecutorStatus.REVOKED
+                        && ExecutorActivationRule.isAccepted(a));
+        if (dmsActive && targetAccepted && !othersLeft) {
             throw new ExecutorManagementException(LAST_EXECUTOR_MESSAGE, HttpStatus.CONFLICT);
         }
     }
@@ -317,6 +328,9 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .activatedAt(assignment.getActivatedAt())
                 .acknowledgedAt(assignment.getAcknowledgedAt())
                 .revokedAt(assignment.getRevokedAt())
+                .responseStatus(assignment.getResponseStatus())
+                .respondedAt(assignment.getRespondedAt())
+                .declineReason(assignment.getDeclineReason())
                 .build();
     }
 }

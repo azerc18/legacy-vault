@@ -19,6 +19,7 @@ import com.ltld.app.legacyvault.service.auditservice.MailDataReader;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.MailType;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationRespondedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -34,6 +35,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.REF_DMS_CONFIG;
+import static com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.REF_EXECUTOR_ASSIGNMENT;
 import static com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.REF_REQUEST;
 import static com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.REF_VAULT;
 import static com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.displayName;
@@ -202,8 +204,10 @@ public class InAppNotificationEventListener {
                         ? mail.ownerEmail() : mail.ownerName();
                 String role = mail.executorType() == null ? null : mail.executorType().name();
                 if (mail.type() == MailType.ASSIGNED) {
-                    notifier.addForEmail(mail.recipientEmail(), draft(NotificationType.EXECUTOR_ASSIGNED, null, null,
-                            String.format("%s appointed you as their executor.", owner),
+                    // Lời mời: tham chiếu tới assignment để chuông mở trang đồng ý / từ chối
+                    notifier.addForEmail(mail.recipientEmail(), draft(NotificationType.EXECUTOR_ASSIGNED,
+                            mail.assignmentId() == null ? null : REF_EXECUTOR_ASSIGNMENT, mail.assignmentId(),
+                            String.format("%s invited you to be their executor. Open the invitation to accept or decline.", owner),
                             "owner", owner, "role", role));
                 } else {
                     // variant: FE chọn câu notifications.types.EXECUTOR_REVOKED_<variant>
@@ -218,6 +222,19 @@ public class InAppNotificationEventListener {
                 }
             }
         });
+    }
+
+    // Lời mời làm Executor: báo Owner người được mời đã đồng ý / từ chối (lý do nếu có)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onExecutorInvitationResponded(ExecutorInvitationRespondedEvent event) {
+        String role = event.executorType() == null ? null : event.executorType().name();
+        notifier.toUser(event.ownerId(), event.accepted()
+                ? draft(NotificationType.EXECUTOR_INVITATION_ACCEPTED, REF_EXECUTOR_ASSIGNMENT, event.assignmentId(),
+                        String.format("%s accepted to be your executor.", event.executorLabel()),
+                        "executor", event.executorLabel(), "role", role)
+                : draft(NotificationType.EXECUTOR_INVITATION_DECLINED, REF_EXECUTOR_ASSIGNMENT, event.assignmentId(),
+                        String.format("%s declined to be your executor. Please assign someone else.", event.executorLabel()),
+                        "executor", event.executorLabel(), "role", role, "reason", event.declineReason()));
     }
 
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi

@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.dto.executordto;
 
+import com.ltld.app.legacyvault.enums.ExecutorResponseStatus;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import lombok.Builder;
@@ -22,4 +23,8 @@ public class ExecutorAssignmentResponse {
     // FR-06: Owner thấy Executor đã xác nhận bàn giao hay chưa (null = chưa xác nhận)
     private LocalDateTime acknowledgedAt;
     private LocalDateTime revokedAt;
+    // Lời mời: PENDING (chờ Executor phản hồi) / ACCEPTED / DECLINED (kèm REVOKED); declineReason có thể null
+    private ExecutorResponseStatus responseStatus;
+    private LocalDateTime respondedAt;
+    private String declineReason;
 }

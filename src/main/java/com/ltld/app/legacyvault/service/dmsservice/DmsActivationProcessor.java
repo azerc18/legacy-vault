@@ -218,13 +218,14 @@ public class DmsActivationProcessor {
                 .occurredAt(now)
                 .build());
 
+        // Chỉ người đã đồng ý lời mời (ExecutorActivationRule): Primary còn chờ phản hồi thì coi như không có Primary.
         Optional<ExecutorAssignment> primary = executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.PRIMARY)
-                .filter(a -> a.getStatus() != ExecutorStatus.REVOKED);
-        // Không có Primary hợp lệ (chưa chỉ định hoặc đã bị thu hồi): kích hoạt thẳng Backup để không bị kẹt.
+                .filter(ExecutorActivationRule::isUsablePrimary);
+        // Không có Primary hợp lệ (chưa chỉ định, đã bị thu hồi hoặc chưa đồng ý): kích hoạt thẳng Backup để không bị kẹt.
         Optional<ExecutorAssignment> target = primary.isPresent() ? primary : executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP)
-                .filter(a -> a.getStatus() == ExecutorStatus.INACTIVE);
+                .filter(ExecutorActivationRule::isUsableBackup);
         target.ifPresent(a -> markActive(a, now));
 
         flushBeforeSideEffects();
@@ -315,7 +316,7 @@ public class DmsActivationProcessor {
 
         Optional<ExecutorAssignment> backupOptional = executorAssignmentRepository
                 .findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP)
-                .filter(a -> a.getStatus() == ExecutorStatus.INACTIVE);
+                .filter(ExecutorActivationRule::isUsableBackup);
         if (backupOptional.isEmpty()) {
             log.warn("FR-07: primary {} did not respond but owner {} has no inactive backup", primary.getId(), ownerId);
             return;

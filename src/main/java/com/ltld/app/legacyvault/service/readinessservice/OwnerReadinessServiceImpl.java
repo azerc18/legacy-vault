@@ -240,7 +240,8 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
 
     private static boolean hasExecutor(List<ExecutorAssignment> executors, ExecutorType type) {
         return executors.stream()
-                .anyMatch(e -> e.getExecutorType() == type && e.getStatus() != ExecutorStatus.REVOKED);
+                .anyMatch(e -> e.getExecutorType() == type && e.getStatus() != ExecutorStatus.REVOKED
+                        && e.getResponseStatus() == ExecutorResponseStatus.ACCEPTED);
     }
 
     // m3 (N3 đã merge): dùng cơ chế chuyển giao đã lưu trên tài sản; chỉ dữ liệu cũ (NULL) mới suy ra từ loại tài sản

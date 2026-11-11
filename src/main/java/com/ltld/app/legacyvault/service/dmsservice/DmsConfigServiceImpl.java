@@ -54,8 +54,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
     static final String ALREADY_SUSPENDED_MESSAGE = "The Dead Man's Switch is already suspended.";
     static final String NOT_SUSPENDED_MESSAGE = "The Dead Man's Switch is not suspended.";
-    static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Assign a primary executor before enabling the Dead Man's Switch.";
-    static final String NO_ACTIVATION_TARGET_MESSAGE = "No executor is available to receive the handover. "
+    // Executor chỉ được tính khi đã đồng ý lời mời (ExecutorActivationRule)
+    static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Assign a primary executor and wait for them to accept "
+            + "the invitation before enabling the Dead Man's Switch.";
+    static final String NO_ACTIVATION_TARGET_MESSAGE = "No executor who has accepted the invitation is available to receive the handover. "
             + "Assign an executor before saving the Dead Man's Switch configuration.";
     static final String NO_VAULT_MESSAGE =
             "You have no vault yet, so the check-in was not successful. Create a vault first.";
