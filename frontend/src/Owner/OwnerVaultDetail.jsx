@@ -7,8 +7,7 @@ import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
-    ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger,
-} from './ownerUi.jsx';
+    ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger, LoadingSkeleton } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import LegacyMessageSection from './LegacyMessageSection.jsx';
@@ -70,7 +69,7 @@ export default function OwnerVaultDetail() {
         >
             {location.state?.created && <Alert type="success">{t('detail.createdSuccess')}</Alert>}
             <Alert>{error}</Alert>
-            {!vault && !error && <p className="text-on-surface-variant">{t('ui.loading')}</p>}
+            {!vault && !error && <LoadingSkeleton label={t('ui.loading')}/>}
             {vault && !editable && (
                 <Alert type="warning">{vault.lockReason || t('detail.lockedNotice', { status: t(`status.${vault.status}`).toLowerCase() })}</Alert>
             )}
@@ -895,7 +894,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         </button>
                     </div>
                     {historyLoading ? (
-                        <p className="text-sm text-on-surface-variant">{t('ui.loading')}</p>
+                        <LoadingSkeleton label={t('ui.loading')}/>
                     ) : (
                         <ul className="divide-y divide-outline-variant/30 mb-4 max-h-72 overflow-y-auto">
                             {versions.map((v) => (
@@ -958,7 +957,7 @@ function ActivitySection({ vaultId }) {
     return (
         <Card title={t('detail.activity.title')} icon="history">
             <Alert>{error}</Alert>
-            {!data && !error && <p className="text-sm text-on-surface-variant">{t('ui.loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('ui.loading')}/>}
             {data && rows.length === 0 && (
                 <EmptyState compact icon="history" title={t('detail.activity.emptyTitle')} text={t('detail.activity.emptyText')} />
             )}

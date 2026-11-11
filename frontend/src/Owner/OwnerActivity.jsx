@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { ReducedMotionConfig, useMotionTokens } from '@animate-ui/react/utils/motion';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Icon, Alert, formatDate, humanize, inputClass } from './ownerUi.jsx';
+import { OwnerLayout, Card, Icon, Alert, formatDate, humanize, inputClass, LoadingSkeleton } from './ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 
 // Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
@@ -112,7 +112,7 @@ export default function OwnerActivity() {
             <Alert>{error}</Alert>
             <div data-tour="activity-list">
             <Card className="lv-glass-thick">
-                {!data && !error && <p className="text-sm text-on-surface-variant">{t('loading')}</p>}
+                {!data && !error && <LoadingSkeleton label={t('loading')}/>}
                 {data && rows.length === 0 && (
                     <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
                                 title={days > 0 ? t('empty.periodTitle') : (isAccess ? tAccess('emptyTitle') : t('empty.noneTitle'))}
