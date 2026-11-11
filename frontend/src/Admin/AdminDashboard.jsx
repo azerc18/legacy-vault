@@ -6,7 +6,7 @@ import { CountingNumber } from '@animate-ui/react/primitives/texts/counting-numb
 import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Stamp, StatCard, formatVnd } from './adminUi.jsx';
 
@@ -106,7 +106,7 @@ export default function AdminDashboard() {
             )}
         >
             <Alert>{error}</Alert>
-            {!s && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!s && !error && <LoadingSkeleton label={t('loading')}/>}
 
             {s && (
                 <>

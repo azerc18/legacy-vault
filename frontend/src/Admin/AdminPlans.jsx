@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
-import { Icon, Alert, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Dossier, Stamp, formatVnd } from './adminUi.jsx';
 
 const MIN_PRICE = 10000;
@@ -100,7 +100,7 @@ export default function AdminPlans() {
         <AdminLayout title={t('plans.title')} subtitle={t('plans.subtitle')}>
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
-            {!plans && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!plans && !error && <LoadingSkeleton label={t('loading')}/>}
             {plans && (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {plans.map((p) => <PlanCard key={`${p.code}-${p.priceVnd}-${p.name}`} plan={p} onSaved={(m) => { setSuccess(m); load(); }} />)}

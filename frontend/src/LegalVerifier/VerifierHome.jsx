@@ -7,6 +7,7 @@ import {getErrorMessage} from '../api/http.js';
 import {formatDate, statusLabel} from './verifierUi.js';
 import AppHeader, {PAGE_WIDTH} from '../Common/AppHeader.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 // Trang home của Legal Verifier — cùng bố cục với UserHome.
 // to = null => chưa làm, hiện "Coming soon".
@@ -139,7 +140,7 @@ export default function VerifierHome() {
                         <Link to="/verifier" className="text-sm font-semibold text-secondary hover:text-primary">{t('home.viewAll')}</Link>
                     </div>
 
-                    {requests === null && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+                    {requests === null && !error && <LoadingSkeleton label={t('loading')}/>}
                     {requests !== null && todo.length === 0 && (
                         <EmptyState bordered compact icon="task_alt" title={t('home.emptyTitle')}
                                     text={t('home.emptyText')}

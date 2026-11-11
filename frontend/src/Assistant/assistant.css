@@ -29,7 +29,7 @@
 .lv-assistant-launcher--vip::before {
     content: '';
     position: absolute;
-    inset: 4% 2% 0;
+    inset: -14% -30% -8%;
     z-index: -1;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(255, 205, 100, 0.62) 0%, rgba(255, 150, 70, 0.28) 45%, transparent 70%);
@@ -167,7 +167,7 @@
 
 /* Giao diện sáng: hào quang nhạt trên nền trắng gần như không thấy, nên dùng màu hổ phách đậm hơn và thêm bóng sáng quanh cú */
 html:not(.dark) .lv-assistant-launcher--vip {
-    filter: drop-shadow(0 0 10px rgba(240, 140, 20, 0.5));
+    filter: drop-shadow(0 0 12px rgba(240, 140, 20, 0.6));
 }
 html:not(.dark) .lv-assistant-launcher--vip::before {
     background: radial-gradient(circle, rgba(255, 168, 36, 0.78) 0%, rgba(255, 120, 30, 0.42) 48%, transparent 74%);

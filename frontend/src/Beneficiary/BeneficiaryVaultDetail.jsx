@@ -14,6 +14,7 @@ import {
 } from './beneficiaryUi.jsx';
 import BeneficiaryLegacyMessages from './BeneficiaryLegacyMessages.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 const OTP_RESEND_SECONDS = 60; // khớp BeneficiaryServiceImpl.OTP_RESEND_SECONDS
 
@@ -106,7 +107,7 @@ export default function BeneficiaryVaultDetail() {
                 <Icon name="menu_book" className="text-[18px]" /> {t('detail.guideLink')}
             </Link>
 
-            {stage === 'loading' && <p className="text-on-surface-variant">{t('detail.loading')}</p>}
+            {stage === 'loading' && <LoadingSkeleton label={t('detail.loading')}/>}
             {stage === 'error' && <Alert>{message}</Alert>}
             {stage === 'locked' && <Alert type="warning">{message}</Alert>}
             {stage === 'expired' && <Alert type="warning">{message || t('detail.expired')}</Alert>}
