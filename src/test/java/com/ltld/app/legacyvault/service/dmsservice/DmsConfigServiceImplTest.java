@@ -703,6 +703,18 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
+    @DisplayName("Hạn trigger bị đẩy về sau (hoãn 24h / chờ xác nhận 72h) -> checkinDueAt vẫn = lastCheckinAt + chu kỳ")
+    void getConfig_triggerPushedLater_keepsCheckinDueFromLastCheckin() {
+        DmsConfig existing = existingConfig(DmsStatus.PENDING_CONFIRMATION);
+        existing.setNextCheckinDueAt(existing.getNextCheckinDueAt().plusHours(72));
+
+        DmsConfigResponse response = service.getConfig(ownerId);
+
+        assertThat(response.getCheckinDueAt()).isEqualTo(existing.getLastCheckinAt().plusDays(30));
+        assertThat(response.getTriggerAt()).isEqualTo(existing.getNextCheckinDueAt());
+    }
+
+    @Test
     @DisplayName("FR-03: xem cấu hình -> checkinDueAt = lastCheckinAt + chu kỳ, triggerAt = nextCheckinDueAt")
     void getConfig_mapsSchedule() {
         DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
@@ -1042,6 +1054,10 @@ class DmsConfigServiceImplTest {
     void simulateOverdueByAdmin_active_movesDeadlineToPastAndAudits() {
         DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
         existing.setRemindersSent(0);
+        // Owner vừa check-in hôm qua: hạn check-in thật còn 29 ngày nữa
+        LocalDateTime lastCheckin = LocalDateTime.now().minusDays(1);
+        existing.setLastCheckinAt(lastCheckin);
+        existing.setNextCheckinDueAt(lastCheckin.plusDays(37));
         LocalDateTime previousDueAt = existing.getNextCheckinDueAt();
         LocalDateTime nextReminder = existing.getNextReminderAt();
 
@@ -1052,6 +1068,10 @@ class DmsConfigServiceImplTest {
         assertThat(existing.getNextCheckinDueAt()).isBefore(LocalDateTime.now());
         assertThat(existing.getRemindersSent()).isEqualTo(1);
         assertThat(existing.getNextReminderAt()).isEqualTo(nextReminder);
+        // Trang DMS: hạn check-in lùi theo hạn trigger (không còn ở tương lai), lastCheckinAt vẫn là lần check-in thật
+        assertThat(response.getCheckinDueAt()).isEqualTo(existing.getNextCheckinDueAt().minusDays(7));
+        assertThat(response.getCheckinDueAt()).isBefore(LocalDateTime.now());
+        assertThat(response.getLastCheckinAt()).isEqualTo(lastCheckin);
 
         ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
         InOrder order = inOrder(dmsConfigRepository, auditLogService);

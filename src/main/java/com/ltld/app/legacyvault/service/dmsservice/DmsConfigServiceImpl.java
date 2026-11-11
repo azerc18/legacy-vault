@@ -482,9 +482,6 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     private DmsConfigResponse toResponse(DmsConfig config, List<ExecutorAssignment> executors) {
-        LocalDateTime checkinDueAt = config.getLastCheckinAt() != null && config.getCheckinIntervalDays() != null
-                ? config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays())
-                : null;
         return DmsConfigResponse.builder()
                 .configured(true)
                 .status(config.getStatus())
@@ -493,7 +490,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .reminderCount(config.getReminderCount())
                 .notificationChannel(config.getNotificationChannel())
                 .lastCheckinAt(config.getLastCheckinAt())
-                .checkinDueAt(checkinDueAt)
+                .checkinDueAt(checkinDueAt(config))
                 .triggerAt(config.getNextCheckinDueAt())
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
@@ -503,6 +500,24 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
                 .hasVault(vaultRepository.existsByOwnerId(config.getOwner().getId()))
                 .build();
+    }
+
+    /**
+     * Hạn check-in hiển thị = lastCheckinAt + chu kỳ, nhưng không muộn hơn (hạn trigger - thời gian chờ). Bình thường hai
+     * mốc trùng nhau; hoãn 24 giờ, chờ xác nhận 72 giờ hay confirmer hoãn chỉ đẩy hạn trigger về sau nên giá trị không đổi.
+     * Chỉ khi hạn trigger bị kéo về trước (Admin giả quá hạn lúc demo) thì hạn check-in lùi theo, để trang DMS không hiện
+     * "Hạn check-in" ở tương lai trong khi "Bắt đầu bàn giao" đã qua. lastCheckinAt giữ nguyên là lần check-in thật.
+     */
+    static LocalDateTime checkinDueAt(DmsConfig config) {
+        if (config.getLastCheckinAt() == null || config.getCheckinIntervalDays() == null) {
+            return null;
+        }
+        LocalDateTime byLastCheckin = config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays());
+        if (config.getNextCheckinDueAt() == null || config.getGracePeriodDays() == null) {
+            return byLastCheckin;
+        }
+        LocalDateTime byTrigger = config.getNextCheckinDueAt().minusDays(config.getGracePeriodDays());
+        return byTrigger.isBefore(byLastCheckin) ? byTrigger : byLastCheckin;
     }
 
     private DmsCheckinResponse toCheckinResponse(DmsCheckin checkin) {
