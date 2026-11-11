@@ -37,7 +37,10 @@
       "nameLength": "Họ tên phải từ 2 đến 100 ký tự.",
       "phone": "Số điện thoại không hợp lệ.",
       "failed": "Không cập nhật được hồ sơ."
-    }
+    },
+    "phoneHint": "Không bắt buộc. Số di động Việt Nam 10 chữ số.",
+    "kycLocked": "Họ tên và số điện thoại đã gắn với danh tính bạn đã xác minh.",
+    "kycLockedCta": "Sửa ở trang Xác minh danh tính"
   },
   "password": {
     "title": "Đổi mật khẩu",

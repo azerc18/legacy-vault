@@ -173,9 +173,12 @@ export default function EstateReadinessCard() {
                                                 >
                                                     {t(item.titleKey, { defaultValue: item.title })}
                                                 </p>
-                                                <span className="inline-block mt-1 text-[11px] font-semibold text-[#b9c9ff]">
-                                                    {t('points', { count: item.points })}
-                                                </span>
+                                                {/* Mục 0 điểm (vd. xác minh danh tính) chỉ để nhắc, không hiện "+0 điểm" */}
+                                                {item.points > 0 && (
+                                                    <span className="inline-block mt-1 text-[11px] font-semibold text-[#b9c9ff]">
+                                                        {t('points', { count: item.points })}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 

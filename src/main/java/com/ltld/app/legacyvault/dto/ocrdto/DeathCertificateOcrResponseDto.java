@@ -45,6 +45,11 @@ public class DeathCertificateOcrResponseDto {
     private String signerName;
     private boolean hasOfficialSeal;
     private boolean ownerNameMatched;
+    /**
+     * Đối chiếu số giấy tờ trên giấy chứng tử với CCCD / CMND Owner đã xác minh (OwnerIdMatch):
+     * MATCHED | MISMATCHED | NOT_ON_DOCUMENT | UNVERIFIABLE | OWNER_NOT_VERIFIED; null khi AI không chạy.
+     */
+    private String ownerIdMatch;
     private String expectedOwnerName;
     private Integer confidenceScore;
     private String suggestedRejectionCode;

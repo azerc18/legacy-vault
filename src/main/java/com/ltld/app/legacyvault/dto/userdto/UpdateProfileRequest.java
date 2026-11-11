@@ -11,7 +11,9 @@ public class UpdateProfileRequest {
     @Size(min = 2, max = 100, message = "Full name must be 2-100 characters")
     private String fullName;
 
-    @Pattern(regexp = "^$|^[0-9+()\\-\\s]{8,20}$", message = "Invalid phone number")
+    // Ở đây chỉ chặn ký tự lạ (số cũ đã lưu đều thoả điều kiện này). Quy tắc số di động Việt Nam kiểm ở service
+    // (VnPhoneNumber) và chỉ khi số thay đổi, để số cũ không đúng chuẩn không chặn việc sửa tên.
+    @Pattern(regexp = "^$|^[0-9+()\\-.\\s]{1,30}$", message = "Invalid phone number")
     private String phoneNumber;
 
     // Ngôn ngữ nhận email: "vi" hoặc "en". Không gửi thì giữ nguyên.

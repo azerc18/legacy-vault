@@ -1,6 +1,6 @@
 // Trang hồ sơ cá nhân (/me) — dùng chung cho mọi role
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { userApi, toStoredUser } from '../api/userApi.js';
@@ -13,6 +13,7 @@ import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline, Load
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import SharedPasswordInput from '../Common/PasswordInput.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
+import { displayVnPhone, formatPhoneInput, parseVnPhone, samePhone } from '../Common/vnPhone.js';
 import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import TwoFactorCard from './TwoFactorCard.jsx';
@@ -32,7 +33,6 @@ const STATUS_STYLE = {
 };
 
 // Giống regex ở UpdateProfileRequest (BE)
-const PHONE_RE = /^[0-9+()\-\s]{8,20}$/;
 
 const MAX_AVATAR = 2 * 1024 * 1024; // khớp giới hạn 2MB ở BE
 
@@ -170,10 +170,12 @@ function SummaryCard({ profile, onChanged }) {
 
 // ---------- Form thông tin cá nhân ----------
 function ProfileForm({ profile, onSaved }) {
-    const { t } = useTranslation('profile');
+    const { t } = useTranslation(['profile', 'identity']);
     const toast = useToast();
     const [fullName, setFullName] = useState(profile.fullName || '');
-    const [phone, setPhone] = useState(profile.phoneNumber || '');
+    const [phone, setPhone] = useState(displayVnPhone(profile.phoneNumber));
+    // Đã xác minh danh tính (KYC): họ tên và số điện thoại chỉ đổi ở trang Xác minh danh tính
+    const kycLocked = !!profile.kycLevel && profile.kycLevel !== 'NONE';
     const [language, setLanguage] = useState(profile.preferredLanguage || 'vi');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -181,12 +183,12 @@ function ProfileForm({ profile, onSaved }) {
 
     const dirty =
         fullName.trim() !== (profile.fullName || '') ||
-        phone.trim() !== (profile.phoneNumber || '') ||
+        !samePhone(phone, profile.phoneNumber || '') ||
         language !== (profile.preferredLanguage || 'vi');
 
     const reset = () => {
         setFullName(profile.fullName || '');
-        setPhone(profile.phoneNumber || '');
+        setPhone(displayVnPhone(profile.phoneNumber));
         setLanguage(profile.preferredLanguage || 'vi');
         setError('');
     };
@@ -197,11 +199,22 @@ function ProfileForm({ profile, onSaved }) {
         setSuccess('');
         const name = fullName.trim();
         if (name.length < 2 || name.length > 100) return setError(t('info.errors.nameLength'));
-        if (phone.trim() && !PHONE_RE.test(phone.trim())) return setError(t('info.errors.phone'));
+        // Chỉ kiểm khi đổi số: số cũ lưu trước khi siết quy tắc vẫn giữ được để sửa tên
+        const phoneChanged = !samePhone(phone, profile.phoneNumber || '');
+        let phoneToSend = phone.trim() ? (profile.phoneNumber || '') : '';
+        if (phoneChanged && phone.trim()) {
+            const parsed = parseVnPhone(phone);
+            if (!parsed.ok) {
+                return setError(parsed.problem === 'LEGACY_11_DIGIT' && parsed.suggestion
+                    ? t('identity:phone.errors.LEGACY_11_DIGIT_SUGGEST', { suggestion: displayVnPhone(parsed.suggestion) })
+                    : t(`identity:phone.errors.${parsed.problem}`));
+            }
+            phoneToSend = parsed.e164;
+        }
 
         setBusy(true);
         try {
-            const updated = await userApi.updateMe(name, phone.trim(), language);
+            const updated = await userApi.updateMe(name, phoneToSend, language);
             onSaved(updated);
             setSuccess(t('info.saved'));
             toast.success(t('info.saved'));
@@ -219,12 +232,21 @@ function ProfileForm({ profile, onSaved }) {
             <form onSubmit={submit} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                     <Field label={t('info.fullName')}>
-                        <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} className={inputClass} />
+                        <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} disabled={kycLocked}
+                               className={`${inputClass} ${kycLocked ? 'opacity-60 cursor-not-allowed' : ''}`} />
                     </Field>
-                    <Field label={t('info.phone')} hint={t('info.optional')}>
-                        <input id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0901 234 567" className={inputClass} />
+                    <Field label={t('info.phone')} hint={t('info.phoneHint')}>
+                        <input id="profile-phone" type="tel" inputMode="tel" autoComplete="tel" value={phone} disabled={kycLocked}
+                               onChange={(e) => setPhone(formatPhoneInput(e.target.value))} placeholder="0901 234 567"
+                               className={`${inputClass} ${kycLocked ? 'opacity-60 cursor-not-allowed' : ''}`} />
                     </Field>
                 </div>
+                {kycLocked && (
+                    <p className="text-xs text-on-surface-variant">
+                        {t('info.kycLocked')}{' '}
+                        <Link to="/owner/identity" className="font-semibold text-secondary underline">{t('info.kycLockedCta')}</Link>
+                    </p>
+                )}
                 <Field label={t('info.email')} hint={t('info.emailHint')}>
                     <input value={profile.email} disabled className={`${inputClass} opacity-60 cursor-not-allowed`} />
                 </Field>

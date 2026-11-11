@@ -57,6 +57,9 @@ class DeathCertificateOcrServiceImplTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @org.mockito.Mock
+    private com.ltld.app.legacyvault.service.identityservice.OwnerIdentityService ownerIdentityService;
+
     private DeathCertificateOcrServiceImpl ocrService;
 
     @BeforeEach
@@ -70,7 +73,8 @@ class DeathCertificateOcrServiceImplTest {
                 cryptoService,
                 new ObjectMapper(),
                 auditLogService,
-                transactionManager
+                transactionManager,
+                ownerIdentityService
         );
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");
@@ -254,6 +258,65 @@ class DeathCertificateOcrServiceImplTest {
                 eq("engine=UNAVAILABLE")
         );
     }
+
+    // ---------- KYC: đối chiếu CCCD trên giấy chứng tử với CCCD Owner đã xác minh ----------
+
+    private static DeathCertificateOcrResponseDto okResult() {
+        return DeathCertificateOcrResponseDto.builder()
+                .idNumber("079201123456").ownerNameMatched(true).confidenceScore(92)
+                .deathProofRelevancePercent(95).executorSuggestion("E").verifierSuggestion("V")
+                .warnings(new java.util.ArrayList<>(java.util.List.of("w1"))).build();
+    }
+
+    @Test
+    void ownerIdMismatch_addsWarning_suggestsInfoMismatch_andCapsScores() {
+        DeathCertificateOcrResponseDto r = okResult();
+
+        DeathCertificateOcrServiceImpl.applyOwnerIdMatch(r, com.ltld.app.legacyvault.enums.OwnerIdMatch.MISMATCHED);
+
+        org.assertj.core.api.Assertions.assertThat(r.getOwnerIdMatch()).isEqualTo("MISMATCHED");
+        org.assertj.core.api.Assertions.assertThat(r.getSuggestedRejectionCode()).isEqualTo("INFO_MISMATCH");
+        org.assertj.core.api.Assertions.assertThat(r.getConfidenceScore()).isEqualTo(40);
+        org.assertj.core.api.Assertions.assertThat(r.getDeathProofRelevancePercent()).isEqualTo(40);
+        org.assertj.core.api.Assertions.assertThat(r.getWarnings().get(0)).contains("không khớp với CCCD Chủ két");
+        org.assertj.core.api.Assertions.assertThat(r.getVerifierSuggestion()).startsWith("Gợi ý cho Verifier: Số CCCD");
+    }
+
+    @Test
+    void ownerIdMismatch_keepsSuspectedForgery() {
+        DeathCertificateOcrResponseDto r = okResult();
+        r.setSuggestedRejectionCode("SUSPECTED_FORGERY");
+
+        DeathCertificateOcrServiceImpl.applyOwnerIdMatch(r, com.ltld.app.legacyvault.enums.OwnerIdMatch.MISMATCHED);
+
+        org.assertj.core.api.Assertions.assertThat(r.getSuggestedRejectionCode()).isEqualTo("SUSPECTED_FORGERY");
+    }
+
+    @Test
+    void ownerIdMatched_changesNothingButTheFlag() {
+        DeathCertificateOcrResponseDto r = okResult();
+
+        DeathCertificateOcrServiceImpl.applyOwnerIdMatch(r, com.ltld.app.legacyvault.enums.OwnerIdMatch.MATCHED);
+
+        org.assertj.core.api.Assertions.assertThat(r.getOwnerIdMatch()).isEqualTo("MATCHED");
+        org.assertj.core.api.Assertions.assertThat(r.getSuggestedRejectionCode()).isNull();
+        org.assertj.core.api.Assertions.assertThat(r.getConfidenceScore()).isEqualTo(92);
+        org.assertj.core.api.Assertions.assertThat(r.getWarnings()).containsExactly("w1");
+    }
+
+    @Test
+    void ownerNotVerifiedOrIdMissing_addsSoftWarningOnly() {
+        for (var m : java.util.List.of(com.ltld.app.legacyvault.enums.OwnerIdMatch.OWNER_NOT_VERIFIED,
+                com.ltld.app.legacyvault.enums.OwnerIdMatch.NOT_ON_DOCUMENT,
+                com.ltld.app.legacyvault.enums.OwnerIdMatch.UNVERIFIABLE)) {
+            DeathCertificateOcrResponseDto r = okResult();
+            DeathCertificateOcrServiceImpl.applyOwnerIdMatch(r, m);
+            org.assertj.core.api.Assertions.assertThat(r.getSuggestedRejectionCode()).isNull();
+            org.assertj.core.api.Assertions.assertThat(r.getConfidenceScore()).isEqualTo(92);
+            org.assertj.core.api.Assertions.assertThat(r.getWarnings()).hasSize(2);
+        }
+    }
+
     @Test
     void analyzeBytes_fallsBackToBackupModel_whenPrimaryFailsWithRetryableError() throws Exception {
         DeathCertificateOcrServiceImpl spyService = spy(ocrService);

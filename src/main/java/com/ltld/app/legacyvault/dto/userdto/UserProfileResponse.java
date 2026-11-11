@@ -26,4 +26,8 @@ public class UserProfileResponse {
     private boolean mfaEnabled;
     // Ngôn ngữ nhận email và nội dung hệ thống gửi: "vi" hoặc "en"
     private String preferredLanguage;
+    // Mức xác minh danh tính: NONE / BASIC / VERIFIED
+    private String kycLevel;
+    // Số điện thoại đã xác minh bằng OTP SMS
+    private boolean phoneVerified;
 }

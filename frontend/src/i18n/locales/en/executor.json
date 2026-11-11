@@ -184,9 +184,8 @@
     "evalSectionTitle": "4 In-Depth AI Assessment Criteria",
     "imageQualityTitle": "1. Image Quality & Clarity",
     "headerTitleLabel": "2. Internal Document Header / Title",
-    "deathProofTitle": "3. Death Proof Relevance (%)",
-    "suggestionExecutorTitle": "4. Advisory Suggestion for Executor",
-    "suggestionVerifierTitle": "4. Advisory Suggestion for Legal Verifier",
+    "suggestionExecutorTitle": "3. Advisory Suggestion for Executor",
+    "suggestionVerifierTitle": "3. Advisory Suggestion for Legal Verifier",
     "docType": "Document Classification",
     "certNo": "Certificate / Document No.",
     "bookNo": "Registry / Dossier No.",
@@ -204,6 +203,15 @@
     "sealMissing": "Official seal unclear/missing",
     "warningsTitle": "Detailed AI Notes & Warnings",
     "applyNoteBtn": "Insert AI summary into submission notes",
-    "suggestRejectBtn": "Pre-select suggested rejection reason (Optional)"
+    "suggestRejectBtn": "Pre-select suggested rejection reason (Optional)",
+    "idMismatchBadge": "Warning: ID number on the document does not match the owner's ID",
+    "idMatchLabel": "Owner ID check",
+    "idMatch": {
+      "MATCHED": "Matches the owner's verified ID",
+      "MISMATCHED": "Does not match the owner's verified ID",
+      "NOT_ON_DOCUMENT": "No ID number on the document (or unreadable)",
+      "UNVERIFIABLE": "The ID number on the document cannot be checked",
+      "OWNER_NOT_VERIFIED": "Owner has not verified an ID; name check only"
+    }
   }
 }

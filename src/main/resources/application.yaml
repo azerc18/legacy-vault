@@ -44,6 +44,10 @@ security:
     cookie-secure: ${JWT_COOKIE_SECURE:false}
 
 app:
+  kyc:
+    # true = chưa nối nhà cung cấp SMS: mã OTP số điện thoại hiện ngay trên màn hình, "đã xác minh số" chưa chứng minh
+    # Owner giữ số đó (audit OWNER_PHONE_VERIFIED ghi sandbox=true). Đặt false khi đã nối SMS thật.
+    sms-sandbox: ${KYC_SMS_SANDBOX:true}
   verification:
     bank:
       # Độ dài số tài khoản hợp lệ theo ngân hàng, dùng cho cách xác thực BANK_FORMAT_CHECK (chỉ kiểm định dạng).
@@ -99,6 +103,9 @@ app:
       master-key: ${CRYPTO_MASTER_KEY}
     # #19: khóa HMAC băm OTP (Base64, >= 32 byte). Để trống: suy ra từ CRYPTO_MASTER_KEY
     otp-hmac-key: ${OTP_HMAC_KEY:}
+    # KYC: khóa HMAC băm số CCCD/CMND để tra trùng (Base64, >= 32 byte), RIÊNG với khóa OTP.
+    # Để trống: suy ra từ CRYPTO_MASTER_KEY. Đổi khóa này thì phải tính lại cột *_hash của owner_identities.
+    identity-hmac-key: ${IDENTITY_HMAC_KEY:}
   vnpay:
     # Lấy từ cổng merchant VNPay; để trống khi chưa tích hợp. KHÔNG commit giá trị thật.
     tmn-code: ${VNPAY_TMN_CODE:}
