@@ -527,10 +527,13 @@ public class EmailSender {
         AppLanguage lang = languageResolver.forEmail(ownerEmail);
         String prefix = accepted ? "mail.execAccepted" : "mail.execDeclined";
         List<String> paras = new ArrayList<>();
-        paras.add(MailMessages.get(lang, prefix + ".body", executorLabel, roleLabel(lang, type)));
+        String body = MailMessages.get(lang, prefix + ".body", executorLabel, roleLabel(lang, type));
         if (!accepted && declineReason != null && !declineReason.isBlank()) {
-            paras.add(MailMessages.get(lang, "mail.execDeclined.reason", declineReason.trim()));
+            // Nối vào cùng đoạn bằng xuống dòng: đoạn riêng dạng "Nhãn: https://..." sẽ bị MailHtml
+            // dựng thành nút, nên lý do có chứa link sẽ thành nút bấm được trong mail của Owner.
+            body += "\n" + MailMessages.get(lang, "mail.execDeclined.reason", declineReason.trim());
         }
+        paras.add(body);
         String base = frontendBase();
         if (base != null) {
             paras.add(MailMessages.get(lang, "mail.execResponse.button") + ": " + base + "/owner/executors");

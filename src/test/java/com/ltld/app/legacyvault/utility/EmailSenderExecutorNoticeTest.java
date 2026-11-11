@@ -80,6 +80,19 @@ class EmailSenderExecutorNoticeTest {
                         "Reason: Too busy", "https://app.example.test/owner/executors");
     }
 
+    // Lý do từ chối do người dùng gõ: không được biến thành nút bấm trong mail của Owner
+    // (đoạn riêng dạng "Nhãn: https://..." sẽ bị MailHtml dựng thành nút).
+    @Test
+    void invitationDeclined_reasonWithUrl_isNotRenderedAsButton() {
+        emailSender.sendExecutorInvitationResponseNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.PRIMARY, false, "https://phishing.example.test");
+
+        SentMail message = sentMessage();
+        assertThat(message.getText()).contains("Reason: https://phishing.example.test");
+        // Nút dùng display:inline-block + padding:13px 44px; link thường trong đoạn thì không.
+        assertThat(message.getHtml()).doesNotContain("display:inline-block;background:");
+    }
+
     @Test
     void assignedNotice_mentionsOwnerAndRole_withoutOtpFooter() {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",

@@ -228,13 +228,22 @@ public class InAppNotificationEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onExecutorInvitationResponded(ExecutorInvitationRespondedEvent event) {
         String role = event.executorType() == null ? null : event.executorType().name();
+        String reason = event.declineReason() == null || event.declineReason().isBlank()
+                ? null : event.declineReason().trim();
+        // variant="reason" -> câu dịch EXECUTOR_INVITATION_DECLINED_reason (có {{reason}}); không có lý do thì
+        // dùng câu thường. NotificationParams bỏ giá trị null nên không cần lọc thêm.
         notifier.toUser(event.ownerId(), event.accepted()
                 ? draft(NotificationType.EXECUTOR_INVITATION_ACCEPTED, REF_EXECUTOR_ASSIGNMENT, event.assignmentId(),
                         String.format("%s accepted to be your executor.", event.executorLabel()),
                         "executor", event.executorLabel(), "role", role)
                 : draft(NotificationType.EXECUTOR_INVITATION_DECLINED, REF_EXECUTOR_ASSIGNMENT, event.assignmentId(),
-                        String.format("%s declined to be your executor. Please assign someone else.", event.executorLabel()),
-                        "executor", event.executorLabel(), "role", role, "reason", event.declineReason()));
+                        reason == null
+                                ? String.format("%s declined to be your executor. Please assign someone else.",
+                                        event.executorLabel())
+                                : String.format("%s declined to be your executor. Reason: %s. Please assign someone else.",
+                                        event.executorLabel(), reason),
+                        "executor", event.executorLabel(), "role", role, "reason", reason,
+                        "variant", reason == null ? null : "reason"));
     }
 
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi

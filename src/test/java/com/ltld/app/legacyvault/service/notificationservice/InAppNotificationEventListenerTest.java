@@ -289,7 +289,21 @@ class InAppNotificationEventListenerTest {
         assertThat(n.getType()).isEqualTo(NotificationType.EXECUTOR_INVITATION_DECLINED);
         assertThat(NotificationParams.parse(n.getParams()))
                 .containsEntry("executor", "exec@example.com").containsEntry("role", "BACKUP")
-                .containsEntry("reason", "Busy");
+                .containsEntry("reason", "Busy")
+                // variant -> câu dịch EXECUTOR_INVITATION_DECLINED_reason có {{reason}}
+                .containsEntry("variant", "reason");
+        assertThat(n.getContent()).contains("Reason: Busy");
+    }
+
+    @Test
+    void executorInvitationDeclinedWithoutReason_usesPlainVariant() {
+        listener.onExecutorInvitationResponded(new ExecutorInvitationRespondedEvent(UUID.randomUUID(), owner.getId(),
+                owner.getEmail(), owner.getFullName(), null, "exec@example.com", ExecutorType.BACKUP, false, "  "));
+
+        Notification n = saved(1).get(0);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .doesNotContainKey("reason").doesNotContainKey("variant");
+        assertThat(n.getContent()).doesNotContain("Reason:");
     }
 
     @Test

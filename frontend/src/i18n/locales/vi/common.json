@@ -38,6 +38,7 @@
       "BENEFICIARY_REMOVED": "{{owner}} đã gỡ bạn khỏi danh sách người thụ hưởng của két sắt \"{{vault}}\".",
       "EXECUTOR_ASSIGNED": "{{owner}} mời bạn làm {{role}}. Mở lời mời để đồng ý hoặc từ chối.",
       "EXECUTOR_INVITATION_ACCEPTED": "{{executor}} đã đồng ý làm {{role}} của bạn.",
+      "EXECUTOR_INVITATION_DECLINED_reason": "{{executor}} đã từ chối làm {{role}} của bạn. Lý do: {{reason}}. Hãy chỉ định người khác.",
       "EXECUTOR_INVITATION_DECLINED": "{{executor}} đã từ chối làm {{role}} của bạn. Hãy chỉ định người khác.",
       "EXECUTOR_REVOKED_OWNER": "{{owner}} đã thu hồi vai trò {{role}} của bạn.",
       "EXECUTOR_REVOKED_TIMEOUT": "Bạn không xác nhận đúng hạn nên vai trò người thi hành cho {{owner}} đã chuyển sang người dự phòng.",
