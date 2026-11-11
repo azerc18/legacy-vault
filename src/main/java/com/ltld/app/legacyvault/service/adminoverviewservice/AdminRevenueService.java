@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -25,13 +26,22 @@ import java.util.Set;
 /**
  * Việc 5: biểu đồ doanh thu cho Admin. Chỉ đọc. Lấy các giao dịch chạm vào kỳ đang xem hoặc kỳ liền trước (tối đa
  * 24 tháng) rồi gom trong Java: lượng giao dịch hiện tại nhỏ, và một chỗ gom duy nhất dễ kiểm hơn nhiều câu GROUP BY.
- * Ngày tính theo giờ server như {@code paidAt}, giống biểu đồ ở trang Tổng quan.
+ * Câu query lọc bằng OR trên 3 cột ngày nên quét cả bảng {@code payment_transactions}; ổn với lượng giao dịch hiện
+ * tại, khi bảng lớn thì tách thành 3 query theo từng cột (mỗi cột một index) rồi gộp.
+ *
+ * <p>Ngày tính theo giờ Việt Nam: {@code paidAt}/{@code refundedAt}/{@code createdAt} lưu theo giờ server (Azure chạy
+ * UTC) nên được đổi sang giờ VN trước khi gom, và "hôm nay" cũng lấy theo giờ VN.
  */
 @Service
 public class AdminRevenueService {
 
     /** Giao dịch đã thu tiền: kể cả giao dịch sau đó bị hoàn (tiền hoàn tính riêng theo ngày hoàn). */
     static final Set<PaymentStatus> COLLECTED = Set.of(PaymentStatus.SUCCESS, PaymentStatus.REFUNDED);
+
+    static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    /** Lý do đóng đơn khi người mua bấm thanh toán lại (#251): không tính vào mẫu số tỉ lệ thanh toán. */
+    static final String SUPERSEDED = "SUPERSEDED";
 
     public enum Range {
         DAYS_30("30d"), MONTHS_12("12m");
@@ -68,7 +78,13 @@ public class AdminRevenueService {
 
     /** Những cột cần cho báo cáo, đọc một lần. */
     record Row(LocalDateTime createdAt, LocalDateTime paidAt, LocalDateTime refundedAt, PaymentStatus status,
-               PaymentProvider provider, String planCode, String planName, long amountVnd, Long discountVnd) {}
+               PaymentProvider provider, String planCode, String planName, long amountVnd, Long discountVnd,
+               String reason) {
+
+        boolean superseded() {
+            return status == PaymentStatus.EXPIRED && SUPERSEDED.equals(reason);
+        }
+    }
 
     @PersistenceContext
     private EntityManager em;
@@ -76,23 +92,32 @@ public class AdminRevenueService {
     @Transactional(readOnly = true)
     public AdminRevenueResponse report(String rangeCode) {
         Range range = Range.parse(rangeCode);
-        LocalDate today = LocalDate.now();
-        LocalDateTime since = range.previousStart(range.start(today)).atStartOfDay();
+        ZoneId server = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(VN_ZONE);
+        LocalDateTime since = range.previousStart(range.start(today)).atStartOfDay(VN_ZONE)
+                .withZoneSameInstant(server).toLocalDateTime();
         List<Row> rows = em.createQuery("""
                         SELECT p.createdAt, p.paidAt, p.refundedAt, p.status, p.provider, pl.code, pl.name,
-                               p.amountVnd, p.discountVnd
+                               p.amountVnd, p.discountVnd, p.vnpResponseCode
                         FROM PaymentTransaction p JOIN p.plan pl
                         WHERE p.createdAt >= :since OR p.paidAt >= :since OR p.refundedAt >= :since""", Object[].class)
                 .setParameter("since", since)
                 .getResultList().stream()
-                .map(r -> new Row((LocalDateTime) r[0], (LocalDateTime) r[1], (LocalDateTime) r[2],
-                        (PaymentStatus) r[3], (PaymentProvider) r[4], (String) r[5], (String) r[6],
-                        ((Number) r[7]).longValue(), r[8] == null ? null : ((Number) r[8]).longValue()))
+                .map(r -> new Row(toVn((LocalDateTime) r[0], server), toVn((LocalDateTime) r[1], server),
+                        toVn((LocalDateTime) r[2], server), (PaymentStatus) r[3], (PaymentProvider) r[4],
+                        (String) r[5], (String) r[6], ((Number) r[7]).longValue(),
+                        r[8] == null ? null : ((Number) r[8]).longValue(), (String) r[9]))
                 .toList();
         return aggregate(range, today, rows);
     }
 
-    /** Phần tính toán thuần, tách riêng để kiểm không cần cơ sở dữ liệu. */
+    /** Giờ server (cách các cột LocalDateTime được ghi) sang giờ Việt Nam. */
+    static LocalDateTime toVn(LocalDateTime serverTime, ZoneId server) {
+        return serverTime == null ? null
+                : serverTime.atZone(server).withZoneSameInstant(VN_ZONE).toLocalDateTime();
+    }
+
+    /** Phần tính toán thuần, tách riêng để kiểm không cần cơ sở dữ liệu. Mọi mốc thời gian đã là giờ VN. */
     static AdminRevenueResponse aggregate(Range range, LocalDate today, List<Row> rows) {
         LocalDate from = range.start(today);
         LocalDate prevFrom = range.previousStart(from);
@@ -136,7 +161,8 @@ public class AdminRevenueService {
                 refunded += r.amountVnd();
                 refunds++;
             }
-            if (r.createdAt() != null && in(r.createdAt(), from, to)) {
+            // Đơn bị thay bằng đơn mới khi bấm thanh toán lại không phải một lần mua riêng (review #257 m2)
+            if (r.createdAt() != null && !r.superseded() && in(r.createdAt(), from, to)) {
                 created++;
                 if (wasCollected) createdAndPaid++;
             }

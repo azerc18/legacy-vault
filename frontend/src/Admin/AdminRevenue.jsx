@@ -178,10 +178,11 @@ function Ranked({ slices, labelOf, empty }) {
     );
 }
 
-// Phần trăm thay đổi so với kỳ trước; null khi kỳ trước bằng 0 (không chia được)
+// Phần trăm thay đổi so với kỳ trước; null khi kỳ trước bằng 0 (không chia được). Chia cho |kỳ trước| để kỳ trước
+// âm (hoàn nhiều hơn thu) không đảo dấu tăng/giảm.
 function delta(now, before) {
     if (!before) return null;
-    return Math.round(((now - before) / before) * 1000) / 10;
+    return Math.round(((now - before) / Math.abs(before)) * 1000) / 10;
 }
 
 export default function AdminRevenue() {

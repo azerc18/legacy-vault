@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Việc 5: báo cáo doanh thu cho Admin. Mọi số tiền là VND; mốc thời gian theo giờ server (như {@code paidAt}).
+ * Việc 5: báo cáo doanh thu cho Admin. Mọi số tiền là VND; ngày tính theo giờ Việt Nam.
  *
  * @param range       {@code 30d} (theo ngày) hoặc {@code 12m} (theo tháng)
  * @param from        ngày đầu kỳ (tính cả ngày đó)
@@ -32,7 +32,8 @@ public record AdminRevenueResponse(
      * @param collectedVnd      tiền đã thu theo ngày thanh toán (gồm cả giao dịch sau đó bị hoàn)
      * @param refundedVnd       tiền đã hoàn theo ngày hoàn
      * @param netVnd            {@code collectedVnd - refundedVnd}
-     * @param conversionPercent đơn đã thanh toán / đơn tạo ra trong kỳ; null khi kỳ không có đơn nào
+     * @param checkoutCount     đơn tạo ra trong kỳ, trừ đơn bị thay khi người mua bấm thanh toán lại
+     * @param conversionPercent đơn đã thanh toán / {@code checkoutCount}; null khi kỳ không có đơn nào
      */
     public record Totals(long collectedVnd, long refundedVnd, long netVnd, long paidCount, long refundCount,
                          long checkoutCount, Double conversionPercent, long averageOrderVnd, long discountVnd) {}

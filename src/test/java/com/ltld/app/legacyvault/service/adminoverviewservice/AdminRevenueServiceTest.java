@@ -24,7 +24,7 @@ class AdminRevenueServiceTest {
     }
 
     private static Row paid(LocalDateTime when, long amount, String plan, PaymentProvider provider) {
-        return new Row(when, when, null, PaymentStatus.SUCCESS, provider, plan, plan + " name", amount, null);
+        return new Row(when, when, null, PaymentStatus.SUCCESS, provider, plan, plan + " name", amount, null, null);
     }
 
     @Test
@@ -74,7 +74,7 @@ class AdminRevenueServiceTest {
     @Test
     void refund_countsCollectedOnPaidDayAndRefundOnRefundDay() {
         Row refunded = new Row(at(10, 20), at(10, 20), at(11, 5), PaymentStatus.REFUNDED, PaymentProvider.VNPAY,
-                "VIP_MONTH", "VIP", 199_000, null);
+                "VIP_MONTH", "VIP", 199_000, null, null);
 
         AdminRevenueResponse r = AdminRevenueService.aggregate(Range.DAYS_30, TODAY, List.of(refunded));
 
@@ -86,12 +86,35 @@ class AdminRevenueServiceTest {
                 .orElseThrow().refundedVnd()).isEqualTo(199_000);
     }
 
+    // Review #257 m2: bấm thanh toán 3 lần rồi trả -> vẫn là 1/1, không phải 1/3
+    @Test
+    void conversion_ignoresSupersededOrders() {
+        List<Row> rows = List.of(
+                new Row(at(11, 1), null, null, PaymentStatus.EXPIRED, PaymentProvider.VNPAY, "A", "A", 100_000, null, "SUPERSEDED"),
+                new Row(at(11, 1), null, null, PaymentStatus.EXPIRED, PaymentProvider.VNPAY, "A", "A", 100_000, null, "SUPERSEDED"),
+                paid(at(11, 1), 100_000, "A", PaymentProvider.VNPAY));
+
+        AdminRevenueResponse r = AdminRevenueService.aggregate(Range.DAYS_30, TODAY, rows);
+
+        assertThat(r.current().checkoutCount()).isEqualTo(1);
+        assertThat(r.current().conversionPercent()).isEqualTo(100.0);
+    }
+
+    // Review #257 m1: server chạy UTC, trả lúc 18:30 UTC ngày 10/11 = 01:30 ngày 11/11 giờ VN
+    @Test
+    void toVn_shiftsServerUtcToVietnamDay() {
+        LocalDateTime utc = LocalDateTime.of(2026, 11, 10, 18, 30);
+        assertThat(AdminRevenueService.toVn(utc, java.time.ZoneOffset.UTC))
+                .isEqualTo(LocalDateTime.of(2026, 11, 11, 1, 30));
+        assertThat(AdminRevenueService.toVn(null, java.time.ZoneOffset.UTC)).isNull();
+    }
+
     @Test
     void conversion_isPaidOverCreatedInPeriod_andNullWithoutOrders() {
         List<Row> rows = List.of(
                 paid(at(11, 1), 100_000, "A", PaymentProvider.VNPAY),
-                new Row(at(11, 2), null, null, PaymentStatus.EXPIRED, PaymentProvider.VNPAY, "A", "A", 100_000, null),
-                new Row(at(11, 3), null, null, PaymentStatus.FAILED, PaymentProvider.PAYPAL, "A", "A", 100_000, null));
+                new Row(at(11, 2), null, null, PaymentStatus.EXPIRED, PaymentProvider.VNPAY, "A", "A", 100_000, null, null),
+                new Row(at(11, 3), null, null, PaymentStatus.FAILED, PaymentProvider.PAYPAL, "A", "A", 100_000, null, null));
 
         AdminRevenueResponse r = AdminRevenueService.aggregate(Range.DAYS_30, TODAY, rows);
 
@@ -107,8 +130,8 @@ class AdminRevenueServiceTest {
                 paid(at(11, 1), 100_000, "B", PaymentProvider.PAYPAL),
                 paid(at(11, 2), 300_000, "A", PaymentProvider.VNPAY),
                 new Row(at(11, 3), at(11, 3), null, PaymentStatus.SUCCESS, PaymentProvider.VNPAY, "B", "B name",
-                        90_000, 10_000L),
-                new Row(at(11, 4), null, null, PaymentStatus.PENDING, PaymentProvider.VNPAY, "C", "C", 1, null));
+                        90_000, 10_000L, null),
+                new Row(at(11, 4), null, null, PaymentStatus.PENDING, PaymentProvider.VNPAY, "C", "C", 1, null, null));
 
         AdminRevenueResponse r = AdminRevenueService.aggregate(Range.DAYS_30, TODAY, rows);
 
