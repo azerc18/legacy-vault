@@ -326,7 +326,7 @@ export default function DeadMansSwitch() {
                                 <label key={k} className="block">
                                     <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
                                     <input
-                                        type="number" min={l.min} max={l.max} disabled={locked}
+                                        type="number" min={l.min} max={l.max} disabled={locked || pausedNoVault}
                                         value={form[k]}
                                         onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
                                         className={`${inputClass} mt-1`}
@@ -334,9 +334,13 @@ export default function DeadMansSwitch() {
                                     <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
                                 </label>
                             ))}
-                            <button type="submit" disabled={saving || locked} className={`${btnPrimary} w-full`}>
+                            <button type="submit" disabled={saving || locked || pausedNoVault} className={`${btnPrimary} w-full`}>
                                 {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
                             </button>
+                            {/* Review #263: đang tạm dừng vì hết két thì BE từ chối lưu lịch, nên khoá form và nói lý do */}
+                            {pausedNoVault && (
+                                <p className="text-xs text-on-surface-variant text-center">{t('dms.noVaultScheduleHint')}</p>
+                            )}
                         </form>
                     </Card>
                     </div>

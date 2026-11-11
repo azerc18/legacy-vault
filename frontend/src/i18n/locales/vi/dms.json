@@ -23,6 +23,7 @@
     "checkedInShort": "Đã check-in",
     "triggeredNote": "Quy trình bàn giao đã được kích hoạt lúc {{date}}. Không thể thay đổi cài đặt nữa.",
     "suspendedNote": "Quản trị viên đã tạm dừng tính năng này. Vui lòng liên hệ bộ phận hỗ trợ.",
+    "noVaultScheduleHint": "Hãy tạo két trước để thay đổi lịch.",
     "noVaultNote": "Bạn đã xoá hết két nên Dead Man's Switch đang tạm dừng: không gửi nhắc và sẽ không bắt đầu bàn giao. Hãy tạo két mới để bắt đầu chu kỳ check-in mới.",
     "info": {
       "lastCheckin": "Lần check-in gần nhất",
