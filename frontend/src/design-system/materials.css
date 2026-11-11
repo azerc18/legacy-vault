@@ -15,8 +15,8 @@
   background-color: var(--lv-glass-clear-fill) !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 0%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.14 + var(--g-prox, 0) * 0.22)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.16)),
       transparent 72%
     ),
     linear-gradient(
@@ -52,8 +52,8 @@ main .bg-surface-container-high:not(.lv-surface-secure):not(.lv-glass-secure):no
   background-color: var(--lv-glass-regular-fill) !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 0%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.08 + var(--g-prox, 0) * 0.24)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.14)),
       transparent 74%
     ),
     linear-gradient(
@@ -110,8 +110,8 @@ a.lv-glass-regular:hover {
   background-color: var(--lv-glass-thick-fill) !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 0%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.07 + var(--g-prox, 0) * 0.20)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.12)),
       transparent 74%
     ),
     linear-gradient(
@@ -149,8 +149,8 @@ html:not(.dark) .lv-glass-table {
   background-color: var(--lv-glass-tinted-fill);
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 0%),
-      rgb(255 255 255 / 0.22),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(255 255 255 / calc(var(--g-prox, 0) * 0.18)),
       transparent 72%
     ),
     linear-gradient(
@@ -179,8 +179,8 @@ html:not(.dark) .lv-glass-table {
   background-color: rgb(11 16 32 / 0.92) !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 80%) var(--gy, 20%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.10 + var(--g-prox, 0) * 0.16)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.14)),
       transparent 72%
     ),
     linear-gradient(
@@ -228,8 +228,8 @@ html.dark .lv-page-hero {
   background-color: var(--lv-glass-secure-fill) !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 0%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.06 + var(--g-prox, 0) * 0.16)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.10)),
       transparent 74%
     ),
     linear-gradient(
@@ -327,8 +327,8 @@ html:not(.dark) select option {
   background-color: #0b1020 !important;
   background-image:
     radial-gradient(
-      42px circle at var(--gx, 50%) var(--gy, 18%),
-      rgb(var(--lock-accent-rgb, 143 164 255) / calc(0.05 + var(--g-prox, 0) * 0.10)),
+      64px circle at var(--gx, -200px) var(--gy, -200px),
+      rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.08)),
       transparent 72%
     ),
     linear-gradient(
@@ -608,4 +608,48 @@ body:has([data-lv-loading]) .lv-page-hero::after {
   .lv-skeleton::after,
   .lv-page-hero--loading::after,
   body:has([data-lv-loading]) .lv-page-hero::after { animation: none; opacity: 0; }
+}
+
+/* ===== Đốm sáng theo chuột =====
+   Một lớp duy nhất (.lv-cursor-aura) nằm trên các tấm kính, di chuyển bằng transform (InteractiveVaultLock ghi trong pointermove).
+   Tấm kính nằm dưới con trỏ có thêm lớp .lv-glass-lit: viền sáng + điểm sáng tại --gx/--gy (đặt --g-prox = 1).
+   Màu riêng cho từng giao diện, không phụ thuộc màu hạng tài khoản: sáng = xanh đậm hơn, tối = xanh nhạt hoà trộn screen. */
+:root {
+  --lv-aura-rgb: 61 90 224;
+}
+html.dark,
+.lv-page-hero,
+.lv-side {
+  /* dải tiêu đề và thanh bên luôn nền navy: điểm sáng trên đó dùng xanh nhạt ở cả hai giao diện */
+  --lv-aura-rgb: 143 164 255;
+}
+.lv-cursor-aura {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 45;
+  opacity: 0;
+  transition: opacity 180ms ease;
+  will-change: transform;
+  background: radial-gradient(circle, rgb(var(--lv-aura-rgb) / 0.18) 0%, rgb(var(--lv-aura-rgb) / 0.07) 42%, transparent 70%);
+}
+html.dark .lv-cursor-aura {
+  mix-blend-mode: screen;
+  background: radial-gradient(circle, rgb(var(--lv-aura-rgb) / 0.26) 0%, rgb(var(--lv-aura-rgb) / 0.10) 42%, transparent 70%);
+}
+.lv-cursor-aura.is-on {
+  opacity: 1;
+}
+.lv-glass-lit {
+  outline: 1px solid rgb(var(--lv-aura-rgb) / 0.32);
+  outline-offset: -1px;
+}
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .lv-cursor-aura {
+    display: none;
+  }
 }

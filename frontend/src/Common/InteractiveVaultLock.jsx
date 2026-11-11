@@ -21,6 +21,11 @@ const AUTH_ROUTES = PUBLIC_ROUTES.filter((p) => p !== '/');
 
 const DIAL_TICKS_24 = Array.from({ length: 24 }, (_, i) => i * 15);
 
+// Các tấm kính có hiệu ứng đốm sáng: chỉ tấm nằm dưới con trỏ được bật (.lv-glass-lit)
+const GLASS_SELECTOR =
+    '.lv-side, .lv-dossier, .lv-page-hero, .lv-glass, .lv-glass-clear, .lv-glass-regular, .lv-glass-thick, .lv-glass-tinted, .lv-glass-secure, .lv-surface-standard, .lv-surface-secure, .bg-surface-container-lowest.rounded-2xl, .bg-surface-container-lowest.rounded-3xl';
+const AURA_RADIUS = 60;   // khớp kích thước .lv-cursor-aura (120px) trong materials.css
+
 const ARCHETYPE_ORDER = ['AUTO', 'ADMIN', 'VIP', 'FREE', 'VERIFIER', 'EXECUTOR', 'BENEFICIARY'];
 
 /**
@@ -218,6 +223,13 @@ export default function InteractiveVaultLock({
 
     const isPublic = PUBLIC_ROUTES.includes(location.pathname);
 
+    // Đốm sáng theo chuột (chỉ ở bản sentinel): MỘT lớp duy nhất (.lv-cursor-aura), di chuyển bằng transform ngay trong
+    // sự kiện pointermove nên gần như dính theo con trỏ. Không ghi biến lên <html> (tránh tính lại style cả trang), không quét
+    // mọi tấm kính mỗi khung hình: chỉ tấm kính ĐANG nằm dưới con trỏ được bật sáng (lớp .lv-glass-lit + --gx/--gy).
+    const auraRef = useRef(null);
+    const litRef = useRef(null);
+    const nearRef = useRef(false);
+
     useEffect(() => {
         const reduced =
             typeof window !== 'undefined' &&
@@ -225,87 +237,129 @@ export default function InteractiveVaultLock({
             window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (reduced) return undefined;
 
+        const sentinel = variant === 'sentinel';
         let lastX = window.innerWidth / 2;
         let lastY = window.innerHeight / 2;
+        let px = lastX;
+        let py = lastY;
 
-        const handlePointerMove = (e) => {
-            const clientX = e.clientX;
-            const clientY = e.clientY;
+        const setLit = (node) => {
+            if (litRef.current === node) return;
+            if (litRef.current) {
+                litRef.current.classList.remove('lv-glass-lit');
+                litRef.current.style.removeProperty('--g-prox');
+            }
+            litRef.current = node;
+            if (node) {
+                node.classList.add('lv-glass-lit');
+                node.style.setProperty('--g-prox', '1');
+            }
+        };
 
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            rafRef.current = requestAnimationFrame(() => {
-                if (variant === 'sentinel') {
-                    document.documentElement.style.setProperty('--cursor-x', `${clientX}px`);
-                    document.documentElement.style.setProperty('--cursor-y', `${clientY}px`);
+        const frame = () => {
+            rafRef.current = null;
+            const clientX = px;
+            const clientY = py;
 
-                    const glassNodes = document.querySelectorAll(
-                        '.lv-side, .lv-dossier, .lv-page-hero, .lv-glass, .lv-glass-clear, .lv-glass-regular, .lv-glass-thick, .lv-glass-tinted, .lv-glass-secure, .lv-surface-standard, .lv-surface-secure, .bg-surface-container-lowest.rounded-2xl, .bg-surface-container-lowest.rounded-3xl'
-                    );
-                    for (let i = 0; i < glassNodes.length; i += 1) {
-                        const node = glassNodes[i];
-                        const r = node.getBoundingClientRect();
-                        if (r.bottom < -80 || r.top > window.innerHeight + 80) continue;
-
-                        const gx = Math.round(clientX - r.left);
-                        const gy = Math.round(clientY - r.top);
-                        const dxEdge = Math.max(r.left - clientX, 0, clientX - r.right);
-                        const dyEdge = Math.max(r.top - clientY, 0, clientY - r.bottom);
-                        const distToCard = Math.hypot(dxEdge, dyEdge);
-                        const prox = Math.max(0, Math.min(1, 1 - distToCard / 42));
-
-                        node.style.setProperty('--gx', `${gx}px`);
-                        node.style.setProperty('--gy', `${gy}px`);
-                        node.style.setProperty('--g-prox', prox.toFixed(3));
-                    }
+            if (sentinel) {
+                // Một lần elementFromPoint + một lần đo cho đúng tấm kính dưới con trỏ (đọc trước, ghi sau: không giật bố cục)
+                const hit = document.elementFromPoint(clientX, clientY);
+                const glass = hit ? hit.closest(GLASS_SELECTOR) : null;
+                if (glass) {
+                    const r = glass.getBoundingClientRect();
+                    setLit(glass);
+                    glass.style.setProperty('--gx', `${Math.round(clientX - r.left)}px`);
+                    glass.style.setProperty('--gy', `${Math.round(clientY - r.top)}px`);
+                } else {
+                    setLit(null);
                 }
+            }
 
-                const el = lockRef.current;
-                if (!el) return;
-                const rect = el.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
+            const el = lockRef.current;
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
 
-                const dx = clientX - cx;
-                const dy = clientY - cy;
-                const dist = Math.hypot(dx, dy);
-                const vx = clientX - lastX;
-                const vy = clientY - lastY;
-                const speed = Math.min(100, Math.round(Math.hypot(vx, vy) * 2.2));
-                lastX = clientX;
-                lastY = clientY;
+            const dx = clientX - cx;
+            const dy = clientY - cy;
+            const dist = Math.hypot(dx, dy);
+            const vx = clientX - lastX;
+            const vy = clientY - lastY;
+            const speed = Math.min(100, Math.round(Math.hypot(vx, vy) * 2.2));
+            lastX = clientX;
+            lastY = clientY;
 
-                const rawAngle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-                const normalizedAngle = ((Math.round(rawAngle) % 360) + 360) % 360;
+            const rawAngle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+            const normalizedAngle = ((Math.round(rawAngle) % 360) + 360) % 360;
 
-                const maxRadius = variant === 'hero' ? 220 : 520;
-                const factor = Math.max(0, 1 - dist / maxRadius);
-                const clampDx = Math.max(-1, Math.min(1, dx / 240));
-                const clampDy = Math.max(-1, Math.min(1, dy / 240));
+            const maxRadius = variant === 'hero' ? 220 : 520;
+            const factor = Math.max(0, 1 - dist / maxRadius);
+            const clampDx = Math.max(-1, Math.min(1, dx / 240));
+            const clampDy = Math.max(-1, Math.min(1, dy / 240));
 
-                const tiltScale = variant === 'hero' ? 12 : variant === 'sentinel' ? 10 : 0;
-                const pullScale = variant === 'hero' ? 6 : variant === 'sentinel' ? 12 : 0;
+            const tiltScale = variant === 'hero' ? 12 : variant === 'sentinel' ? 10 : 0;
+            const pullScale = variant === 'hero' ? 6 : variant === 'sentinel' ? 12 : 0;
 
-                const tiltX = Number((-clampDy * factor * tiltScale).toFixed(2));
-                const tiltY = Number((clampDx * factor * tiltScale).toFixed(2));
-                const pullX = Number((clampDx * factor * pullScale).toFixed(2));
-                const pullY = Number((clampDy * factor * pullScale).toFixed(2));
+            const tiltX = Number((-clampDy * factor * tiltScale).toFixed(2));
+            const tiltY = Number((clampDx * factor * tiltScale).toFixed(2));
+            const pullX = Number((clampDx * factor * pullScale).toFixed(2));
+            const pullY = Number((clampDy * factor * pullScale).toFixed(2));
 
-                setCursor({
-                    tiltX,
-                    tiltY,
-                    pullX,
-                    pullY,
-                    dialAngle: normalizedAngle,
-                    distance: Math.round(dist),
-                    speed,
-                });
+            if (sentinel) {
+                // Cú nền: ghi thẳng transform, không qua React (trước đây setState mỗi khung hình làm vẽ lại cả SVG lớn).
+                // State chỉ đổi khi con trỏ vào/ra vùng 85px quanh cú (mở càng khoá ở trang công khai).
+                el.style.transform = `perspective(900px) translate3d(${pullX}px, ${pullY}px, 0) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
+                const near = dist < 85;
+                if (near !== nearRef.current) {
+                    nearRef.current = near;
+                    setCursor((c) => ({ ...c, distance: near ? 0 : 999 }));
+                }
+                return;
+            }
+
+            setCursor({
+                tiltX,
+                tiltY,
+                pullX,
+                pullY,
+                dialAngle: normalizedAngle,
+                distance: Math.round(dist),
+                speed,
             });
         };
 
+        const handlePointerMove = (e) => {
+            px = e.clientX;
+            py = e.clientY;
+            const aura = auraRef.current;
+            if (aura) {
+                if (e.pointerType === 'touch') {
+                    aura.classList.remove('is-on');
+                } else {
+                    // Ghi ngay trong sự kiện (không chờ khung hình sau) để đốm sáng bám sát con trỏ
+                    aura.style.transform = `translate3d(${px - AURA_RADIUS}px, ${py - AURA_RADIUS}px, 0)`;
+                    aura.classList.add('is-on');
+                }
+            }
+            if (!rafRef.current) rafRef.current = requestAnimationFrame(frame);
+        };
+        const hideAura = () => {
+            auraRef.current?.classList.remove('is-on');
+            setLit(null);
+        };
+        const onLeave = (e) => { if (!e.relatedTarget) hideAura(); };
+
         window.addEventListener('pointermove', handlePointerMove, { passive: true });
+        document.addEventListener('pointerout', onLeave);
+        window.addEventListener('blur', hideAura);
         return () => {
             window.removeEventListener('pointermove', handlePointerMove);
+            document.removeEventListener('pointerout', onLeave);
+            window.removeEventListener('blur', hideAura);
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
+            rafRef.current = null;
+            setLit(null);
         };
     }, [variant]);
 
@@ -692,10 +746,8 @@ export default function InteractiveVaultLock({
                 <div
                     ref={lockRef}
                     className="lv-backdrop-lock-stage relative flex flex-col items-center justify-center"
-                    style={{
-                        transform: `perspective(900px) translate3d(${cursor.pullX}px, ${cursor.pullY}px, 0) rotateX(${cursor.tiltX}deg) rotateY(${cursor.tiltY}deg)`,
-                        transition: 'transform 160ms cubic-bezier(0.22, 1, 0.36, 1)',
-                    }}
+                    // transform do effect pointermove ghi thẳng vào style (không qua state); ở đây chỉ giữ transition
+                    style={{ transition: 'transform 160ms cubic-bezier(0.22, 1, 0.36, 1)' }}
                 >
                     {renderOwlLockSvg(
                         'w-[460px] h-[460px] md:w-[600px] md:h-[600px] lg:w-[700px] lg:h-[700px]',
@@ -703,6 +755,9 @@ export default function InteractiveVaultLock({
                     )}
                 </div>
             </div>
+
+            {/* Đốm sáng theo chuột: 1 lớp duy nhất, nằm trên các tấm kính, không bắt sự kiện chuột */}
+            <div ref={auraRef} aria-hidden="true" className="lv-cursor-aura" />
         </>
     );
 }
