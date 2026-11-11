@@ -13,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -41,13 +44,11 @@ public class PlanUsageService {
                 + legacyMessageRepository.sumAttachmentSizeByOwnerId(ownerId);
         long messages = legacyMessageRepository.countByOwnerId(ownerId);
 
-        List<String> atLimit = new ArrayList<>();
         List<String> overLimit = new ArrayList<>();
-        check(vaults, plan.getMaxVaults(), PlanFeature.MULTIPLE_VAULTS, atLimit, overLimit);
-        check(busiestVault, plan.getMaxBeneficiaries(), PlanFeature.BENEFICIARY_LIMIT, atLimit, overLimit);
-        check(storage, plan.getStorageQuotaBytes(), PlanFeature.STORAGE, atLimit, overLimit);
+        check(vaults, plan.getMaxVaults(), PlanFeature.MULTIPLE_VAULTS, overLimit);
+        check(busiestVault, plan.getMaxBeneficiaries(), PlanFeature.BENEFICIARY_LIMIT, overLimit);
+        check(storage, plan.getStorageQuotaBytes(), PlanFeature.STORAGE, overLimit);
         if (!plan.isLegacyMessagesEnabled() && messages > 0) {
-            atLimit.add(PlanFeature.LEGACY_MESSAGES.name());
             overLimit.add(PlanFeature.LEGACY_MESSAGES.name());
         }
 
@@ -60,7 +61,7 @@ public class PlanUsageService {
                 .planCode(plan.getCode())
                 .vip(vip)
                 .vipLapsed(lapsed)
-                .vipExpiredAt(lapsed ? latest.get().getExpiresAt() : null)
+                .vipExpiredAt(lapsed ? toInstant(latest.get().getExpiresAt()) : null)
                 .vaultsUsed(vaults)
                 .maxVaults(plan.getMaxVaults())
                 .maxBeneficiariesInAVault(busiestVault)
@@ -69,15 +70,16 @@ public class PlanUsageService {
                 .maxStorageBytes(plan.getStorageQuotaBytes())
                 .legacyMessages(messages)
                 .legacyMessagesEnabled(plan.isLegacyMessagesEnabled())
-                .atLimit(atLimit)
                 .overLimit(overLimit)
                 .build();
     }
 
-    private static void check(long used, long max, PlanFeature feature, List<String> atLimit, List<String> overLimit) {
-        if (used >= max) {
-            atLimit.add(feature.name());
-        }
+    // Giống NotificationParams (#247): LocalDateTime trong DB là giờ JVM, đổi sang Instant để FE tự đổi múi giờ
+    private static Instant toInstant(LocalDateTime t) {
+        return t == null ? null : t.atZone(ZoneId.systemDefault()).toInstant();
+    }
+
+    private static void check(long used, long max, PlanFeature feature, List<String> overLimit) {
         if (used > max) {
             overLimit.add(feature.name());
         }

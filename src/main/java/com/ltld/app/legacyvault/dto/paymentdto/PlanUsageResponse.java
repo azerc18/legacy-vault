@@ -3,7 +3,7 @@ package com.ltld.app.legacyvault.dto.paymentdto;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -19,7 +19,8 @@ public class PlanUsageResponse {
     private boolean vip;
     /** Từng có VIP nhưng đã hết hạn (đang dùng FREE). */
     private boolean vipLapsed;
-    private LocalDateTime vipExpiredAt;
+    /** Instant (có múi giờ) để FE hiện đúng ngày theo giờ người xem dù server chạy UTC. */
+    private Instant vipExpiredAt;
 
     private long vaultsUsed;
     private int maxVaults;
@@ -31,8 +32,6 @@ public class PlanUsageResponse {
     private long legacyMessages;
     private boolean legacyMessagesEnabled;
 
-    /** Mục đang chạm hoặc vượt hạn mức: MULTIPLE_VAULTS, BENEFICIARY_LIMIT, STORAGE, LEGACY_MESSAGES. */
-    private List<String> atLimit;
-    /** Mục đang VƯỢT hạn mức (thường do VIP hết hạn); dữ liệu giữ nguyên nhưng không thêm mới được. */
+    /** Mục đang VƯỢT hạn mức (MULTIPLE_VAULTS, BENEFICIARY_LIMIT, STORAGE, LEGACY_MESSAGES) (thường do VIP hết hạn); dữ liệu giữ nguyên nhưng không thêm mới được. */
     private List<String> overLimit;
 }

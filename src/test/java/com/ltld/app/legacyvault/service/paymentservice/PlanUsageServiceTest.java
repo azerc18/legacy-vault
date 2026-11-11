@@ -67,7 +67,6 @@ class PlanUsageServiceTest {
         assertThat(r.getVaultsUsed()).isEqualTo(2);
         assertThat(r.getMaxBeneficiariesInAVault()).isEqualTo(3);
         assertThat(r.getStorageUsedBytes()).isEqualTo(15_000);
-        assertThat(r.getAtLimit()).isEmpty();
         assertThat(r.getOverLimit()).isEmpty();
         assertThat(r.isVipLapsed()).isFalse();
     }
@@ -84,18 +83,17 @@ class PlanUsageServiceTest {
 
         assertThat(r.isVip()).isFalse();
         assertThat(r.isVipLapsed()).isTrue();
-        assertThat(r.getVipExpiredAt()).isEqualTo(expired);
+        assertThat(r.getVipExpiredAt()).isEqualTo(expired.atZone(java.time.ZoneId.systemDefault()).toInstant());
         assertThat(r.getOverLimit()).containsExactly("MULTIPLE_VAULTS", "BENEFICIARY_LIMIT", "STORAGE", "LEGACY_MESSAGES");
     }
 
     @Test
-    void freeOwner_exactlyAtLimit_isAtLimitButNotOver() {
+    void freeOwner_exactlyAtLimit_isNotOver() {
         when(entitlementService.resolveEffectivePlan(ownerId)).thenReturn(free);
         usage(1, List.of(2L), 0, 0, 0);
 
         PlanUsageResponse r = service.getUsage(ownerId);
 
-        assertThat(r.getAtLimit()).containsExactly("MULTIPLE_VAULTS", "BENEFICIARY_LIMIT");
         assertThat(r.getOverLimit()).isEmpty();
         assertThat(r.isVipLapsed()).isFalse();
     }
