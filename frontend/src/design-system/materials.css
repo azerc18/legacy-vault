@@ -169,44 +169,57 @@ html:not(.dark) .lv-glass-table {
   transition: all 200ms var(--lv-ease-spring);
 }
 
-/* Page Hero Banner (.lv-page-hero) — Deep Navy Tinted Liquid Glass Slab */
+/* Page Hero Banner (.lv-page-hero): dải tiêu đề trang, kính mờ "đục" riêng cho tiêu đề
+   - Khác kính nội dung: lớp màu navy dày hơn (đục hơn) để chữ trắng luôn rõ, nhưng vẫn trong suốt một phần nên
+     hình Cú - Ổ khoá và các mảng màu ở nền hiện mờ phía sau, đồng bộ với các tấm kính khác.
+   - Độ mờ dùng biến --lv-hero-blur: 26px trên màn rộng, hạ còn 12px trên điện thoại (xem @media max-width 767px bên dưới).
+   - Đang tải: vòng sáng chạy quanh viền (xem phần "Đang tải" cuối file). */
 .lv-page-hero {
+  --lv-hero-blur: 26px;
   position: relative;
   overflow: hidden;
   border-radius: var(--lv-glass-radius-lg);
   padding: 1.35rem 1.65rem;
   color: #f6f8ff;
-  background-color: rgb(11 16 32 / 0.92) !important;
+  background-color: rgb(18 30 70 / 0.72) !important;
   background-image:
+    /* điểm sáng theo chuột (InteractiveVaultLock đặt --gx/--gy/--g-prox cho tấm kính dưới con trỏ) */
     radial-gradient(
       64px circle at var(--gx, -200px) var(--gy, -200px),
       rgb(var(--lv-aura-rgb) / calc(var(--g-prox, 0) * 0.14)),
       transparent 72%
     ),
+    /* ánh phản chiếu chéo trên mặt kính */
     linear-gradient(
       135deg,
-      rgb(255 255 255 / 0.06) 0%,
-      transparent 42%,
-      rgb(61 90 224 / 0.14) 100%
+      rgb(255 255 255 / 0.12) 0%,
+      rgb(255 255 255 / 0.03) 38%,
+      transparent 55%,
+      rgb(91 120 246 / 0.18) 100%
     ),
+    /* lớp màu kính navy, hơi đậm dần xuống dưới */
     linear-gradient(
-      145deg,
-      rgb(20 31 64 / 0.92) 0%,
-      rgb(13 20 42 / 0.94) 55%,
-      rgb(10 15 30 / 0.96) 100%
+      160deg,
+      rgb(28 42 86 / 0.30) 0%,
+      rgb(12 18 40 / 0.36) 100%
     ) !important;
-  -webkit-backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(175%);
-  backdrop-filter: blur(var(--lv-glass-blur-regular)) saturate(175%);
-  border: 1px solid rgb(143 164 255 / 0.20) !important;
+  -webkit-backdrop-filter: blur(var(--lv-hero-blur)) saturate(170%);
+  backdrop-filter: blur(var(--lv-hero-blur)) saturate(170%);
+  border: 1px solid rgb(185 201 255 / 0.30) !important;
   box-shadow:
-    inset 0 1px 0 0 rgb(255 255 255 / 0.22),
-    inset 0 -1px 0 0 rgb(0 0 0 / 0.32),
-    0 20px 44px -18px rgb(8 14 32 / 0.38);
+    inset 0 1px 0 0 rgb(255 255 255 / 0.30),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.22),
+    0 20px 44px -20px rgb(8 14 32 / 0.42);
 }
 
 html.dark .lv-page-hero {
-  background-color: rgb(13 20 40 / 0.72) !important;
-  border-color: rgb(var(--lock-accent-rgb, 143 164 255) / 0.22) !important;
+  /* nền trang tối sẵn: bớt lớp màu để thấy rõ hơn những gì ở phía sau */
+  background-color: rgb(14 21 44 / 0.52) !important;
+  border-color: rgb(143 164 255 / 0.26) !important;
+  box-shadow:
+    inset 0 1px 0 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.30),
+    0 20px 44px -20px rgb(0 0 0 / 0.55);
 }
 
 .lv-page-hero h1 {
@@ -556,11 +569,12 @@ main table tbody tr:hover {
   .lv-page-hero {
     --lv-glass-blur-regular: 12px;
     --lv-glass-blur-thick: 16px;
+    --lv-hero-blur: 12px;   /* dải tiêu đề: điện thoại yếu đỡ giật */
   }
 }
 
 /* Đang tải: không hiện chữ "Đang tải…". Khi trong trang còn phần tử [data-lv-loading] (LoadingSkeleton), dải tiêu đề trang
-   chạy một vệt sáng ngang như ánh sáng lướt qua mặt kính. */
+   có một vòng sáng chạy quanh viền (xem cuối phần này). .lv-skeleton (khung giữ chỗ) vẫn dùng vệt sáng quét ngang. */
 .lv-skeleton {
   position: relative;
   overflow: hidden;
@@ -583,9 +597,7 @@ html.dark .lv-skeleton {
 html.dark .lv-skeleton-bar {
   background: rgb(255 255 255 / 0.12);
 }
-.lv-skeleton::after,
-.lv-page-hero--loading::after,
-body:has([data-lv-loading]) .lv-page-hero::after {
+.lv-skeleton::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -597,13 +609,46 @@ body:has([data-lv-loading]) .lv-page-hero::after {
 html.dark .lv-skeleton::after {
   background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.14) 50%, transparent 65%);
 }
-.lv-page-hero--loading::after,
-body:has([data-lv-loading]) .lv-page-hero::after {
-  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.10) 42%, rgb(255 255 255 / 0.32) 50%, rgb(255 255 255 / 0.10) 58%, transparent 70%);
-}
 @keyframes lv-sheen {
   to { transform: translateX(100%); }
 }
+
+/* Dải tiêu đề đang tải: vòng sáng chạy quanh viền cả khối */
+@property --lv-hero-ring {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+.lv-page-hero--loading::after,
+body:has([data-lv-loading]) .lv-page-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;                            /* độ dày vòng sáng = phần viền chừa lại sau khi khoét lõi */
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--lv-hero-ring),
+    transparent 0deg,
+    transparent 170deg,
+    rgb(143 164 255 / 0.30) 250deg,
+    rgb(200 214 255 / 0.85) 325deg,
+    #ffffff 348deg,
+    rgb(200 214 255 / 0.40) 356deg,
+    transparent 360deg
+  );
+  /* chỉ giữ dải viền: khoét phần lõi (content-box) khỏi lớp nền */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  /* 1 lớp quầng sáng: .lv-page-hero có overflow: hidden nên quầng rộng hơn sẽ bị cắt, chỉ tốn công vẽ */
+  filter: drop-shadow(0 0 4px rgb(200 214 255 / 0.9));
+  animation: lv-hero-ring 1.8s linear infinite;
+}
+@keyframes lv-hero-ring {
+  to { --lv-hero-ring: 360deg; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lv-skeleton::after,
   .lv-page-hero--loading::after,
