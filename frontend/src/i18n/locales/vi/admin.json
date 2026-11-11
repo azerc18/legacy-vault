@@ -63,8 +63,8 @@
     "paidAt": "Thanh toán {{date}}",
     "currentPlan": "Gói hiện tại: {{plan}}",
     "receipt": "Biên lai",
-    "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại" },
-    "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay" },
+    "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn" },
+    "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay", "expiredFoot": "{{count}} đơn bỏ ngang đã tự đóng" },
     "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
     "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
   },

@@ -150,6 +150,38 @@ public class PaypalClient {
         }
     }
 
+    /**
+     * Order đọc từ GET /v2/checkout/orders/{id}. {@code capture} chỉ có khi order đã COMPLETED (đã capture): job đối
+     * soát đọc kết quả có sẵn thay vì capture lại (capture lại một order đã COMPLETED bị PayPal trả 422).
+     */
+    public record OrderSnapshot(String status, Capture capture) {}
+
+    /**
+     * Trạng thái order (CREATED, APPROVED, PAYER_ACTION_REQUIRED, COMPLETED, VOIDED) và kết quả capture nếu có.
+     * Order không còn tồn tại (404) trả status {@code "NOT_FOUND"}.
+     *
+     * @throws RuntimeException lỗi mạng hoặc 5xx: chưa biết kết quả
+     */
+    public OrderSnapshot getOrder(String orderId) {
+        ensureConfigured();
+        String token = accessToken();
+        try {
+            CaptureResponse response = client.get().uri("/v2/checkout/orders/{id}", orderId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .retrieve()
+                    .body(CaptureResponse.class);
+            String status = response == null || response.status() == null ? "UNKNOWN" : response.status();
+            return new OrderSnapshot(status, "COMPLETED".equals(status) ? toCapture(response) : null);
+        } catch (HttpClientErrorException.NotFound ex) {
+            return new OrderSnapshot("NOT_FOUND", null);
+        }
+    }
+
+    /** Chỉ trạng thái của order; xem {@link #getOrder}. */
+    public String getOrderStatus(String orderId) {
+        return getOrder(orderId).status();
+    }
+
     private static Capture toCapture(CaptureResponse response) {
         CaptureItem item = response == null || response.purchase_units() == null ? null
                 : response.purchase_units().stream()

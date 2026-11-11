@@ -109,6 +109,15 @@ app:
     return-url: ${VNPAY_RETURN_URL:http://localhost:8084/api/payments/vnpay-return}
     # false: chỉ IPN (server-to-server, có chữ ký) mới kích hoạt gói; return-url chỉ để hiển thị kết quả
     activate-on-return: false
+    # API querydr dùng để đối soát đơn PENDING; trống thì suy ra từ pay-url (sandbox -> API sandbox)
+    api-url: ${VNPAY_API_URL:}
+  payment:
+    reconcile:
+      # Job đóng đơn PENDING quá hạn, hỏi lại VNPay/PayPal trước khi đóng (PendingPaymentReconciler)
+      enabled: ${PAYMENT_RECONCILE_ENABLED:true}
+      pending-timeout: PT30M
+      give-up-after: PT24H
+      interval: PT10M
   paypal:
     # Lấy từ developer.paypal.com; để trống thì cổng PayPal tự ẩn. KHÔNG commit giá trị thật.
     client-id: ${PAYPAL_CLIENT_ID:}

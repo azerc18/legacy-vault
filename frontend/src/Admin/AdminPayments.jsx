@@ -9,7 +9,7 @@ import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, StatCard, formatVnd, toneOf } from './adminUi.jsx';
 import UserDrawer from './UserDrawer.jsx';
 
-const STATUSES = ['SUCCESS', 'PENDING', 'FAILED'];
+const STATUSES = ['SUCCESS', 'PENDING', 'FAILED', 'EXPIRED'];
 const EMPTY = { status: '', email: '', from: '', to: '' };
 
 export default function AdminPayments() {
@@ -69,7 +69,8 @@ export default function AdminPayments() {
                 <StatCard icon="payments" tone="ok" label={t('payments.summary.revenue')} value={summary ? formatVnd(summary.totalRevenueVnd) : '—'}
                           foot={filtered ? t('payments.summary.filtered') : t('payments.summary.allTime')} />
                 <StatCard icon="check_circle" tone="ok" label={t('payments.status.SUCCESS')} value={summary?.successCount ?? '—'} />
-                <StatCard icon="schedule" tone="warn" label={t('payments.status.PENDING')} value={summary?.pendingCount ?? '—'} />
+                <StatCard icon="schedule" tone="warn" label={t('payments.status.PENDING')} value={summary?.pendingCount ?? '—'}
+                          foot={summary ? t('payments.summary.expiredFoot', { count: summary.expiredCount ?? 0 }) : undefined} />
                 <StatCard icon="cancel" tone="danger" label={t('payments.status.FAILED')} value={summary?.failedCount ?? '—'} />
             </div>
 

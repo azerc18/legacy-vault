@@ -70,7 +70,9 @@
       "ref": "Transaction Ref",
       "receipt": "Invoice",
       "downloadReceipt": "Download invoice",
-      "downloading": "Downloading..."
+      "downloading": "Downloading...",
+      "statusLabel": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired" },
+      "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back."
     },
     "usage": {
       "title": "Usage",

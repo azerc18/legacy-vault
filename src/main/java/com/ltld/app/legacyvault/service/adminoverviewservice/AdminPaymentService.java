@@ -69,6 +69,7 @@ public class AdminPaymentService {
                 .successCount(counts.getOrDefault(PaymentStatus.SUCCESS, 0L))
                 .pendingCount(counts.getOrDefault(PaymentStatus.PENDING, 0L))
                 .failedCount(counts.getOrDefault(PaymentStatus.FAILED, 0L))
+                .expiredCount(counts.getOrDefault(PaymentStatus.EXPIRED, 0L))
                 .build();
     }
 
