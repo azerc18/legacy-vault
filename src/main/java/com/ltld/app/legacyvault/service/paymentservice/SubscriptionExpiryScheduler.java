@@ -67,8 +67,7 @@ public class SubscriptionExpiryScheduler {
             log.info("Marked subscription {} as EXPIRED for user {}",
                     sub.getId(), sub.getUser() != null ? sub.getUser().getId() : null);
             if (sub.getUser() != null && sub.getUser().getEmail() != null) {
-                expiredNotices.add(new Reminder(sub.getId(), sub.getUser().getEmail(), sub.getUser().getFullName(),
-                        sub.getPlan() != null ? sub.getPlan().getName() : "VIP", sub.getExpiresAt()));
+                expiredNotices.add(reminderOf(sub, sub.getUser()));
             }
         }
 
@@ -83,12 +82,7 @@ public class SubscriptionExpiryScheduler {
             }
             sub.setReminderSent(true);
             subscriptionRepository.save(sub);
-            reminders.add(new Reminder(
-                    sub.getId(),
-                    user.getEmail(),
-                    user.getFullName(),
-                    sub.getPlan() != null ? sub.getPlan().getName() : "VIP",
-                    sub.getExpiresAt()));
+            reminders.add(reminderOf(sub, user));
         }
         return new Batch(expiredList.size(), reminders, expiredNotices);
     }
@@ -98,7 +92,8 @@ public class SubscriptionExpiryScheduler {
         inAppNotifier.toEmail(notice.email(), InAppNotifier.draft(NotificationType.SUBSCRIPTION_EXPIRED, null, null,
                 "Your " + notice.planName() + " plan has expired.", "plan", notice.planName()));
         try {
-            emailSender.sendSubscriptionExpiredNotice(notice.email(), notice.fullName(), notice.planName());
+            emailSender.sendSubscriptionExpiredNotice(notice.email(), notice.fullName(), notice.planName(),
+                    notice.planCode());
         } catch (RuntimeException ex) {
             log.warn("N12: could not send expired notice for subscription {}: {}", notice.subscriptionId(), ex.getMessage());
         }
@@ -110,8 +105,8 @@ public class SubscriptionExpiryScheduler {
                 "Your " + reminder.planName() + " plan is about to expire.",
                 "plan", reminder.planName(), "expiresAt", reminder.expiresAt()));
         try {
-            emailSender.sendSubscriptionExpiryReminder(
-                    reminder.email(), reminder.fullName(), reminder.planName(), reminder.expiresAt());
+            emailSender.sendSubscriptionExpiryReminder(reminder.email(), reminder.fullName(), reminder.planName(),
+                    reminder.planCode(), reminder.expiresAt(), reminder.cancelled());
         } catch (RuntimeException ex) {
             log.warn("T1: could not send expiry reminder for subscription {}: {}", reminder.subscriptionId(), ex.getMessage());
             resetReminderSent(reminder.subscriptionId());
@@ -133,6 +128,16 @@ public class SubscriptionExpiryScheduler {
     private record Batch(int expiredCount, List<Reminder> reminders, List<Reminder> expired) {
     }
 
-    private record Reminder(UUID subscriptionId, String email, String fullName, String planName, LocalDateTime expiresAt) {
+    // Việc 6: planCode cho nút "Gia hạn 1 chạm"; cancelled = Owner đã tắt gia hạn (mail nói rõ gói sẽ kết thúc)
+    private static Reminder reminderOf(Subscription sub, User user) {
+        boolean vip = sub.getPlan() != null && sub.getPlan().isVip();
+        return new Reminder(sub.getId(), user.getEmail(), user.getFullName(),
+                sub.getPlan() != null ? sub.getPlan().getName() : "VIP",
+                vip ? sub.getPlan().getCode() : null,
+                sub.getExpiresAt(), sub.isCancelAtPeriodEnd());
+    }
+
+    private record Reminder(UUID subscriptionId, String email, String fullName, String planName, String planCode,
+                            LocalDateTime expiresAt, boolean cancelled) {
     }
 }

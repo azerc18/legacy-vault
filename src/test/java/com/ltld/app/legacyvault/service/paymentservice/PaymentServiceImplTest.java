@@ -240,6 +240,38 @@ class PaymentServiceImplTest {
         );
     }
 
+    // Việc 6: Owner đã hủy gia hạn rồi trả tiền gia hạn -> cờ hủy cuối kỳ được bỏ, hạn cộng nối tiếp
+    @Test
+    void handleVnpayIpn_renewAfterCancel_clearsCancelFlagAndExtends() {
+        UUID txId = UUID.randomUUID();
+        PaymentTransaction tx = PaymentTransaction.builder()
+                .id(txId).user(owner).plan(vipMonthPlan).amountVnd(99_000L).status(PaymentStatus.PENDING).build();
+        java.time.LocalDateTime oldExpiry = java.time.LocalDateTime.now().plusDays(5);
+        Subscription running = Subscription.builder()
+                .id(UUID.randomUUID()).user(owner).plan(vipMonthPlan).status(SubscriptionStatus.ACTIVE)
+                .startedAt(oldExpiry.minusDays(30)).expiresAt(oldExpiry)
+                .cancelAtPeriodEnd(true).cancelledAt(java.time.LocalDateTime.now().minusDays(2)).build();
+
+        when(paymentTransactionRepository.findByIdForUpdate(txId)).thenReturn(Optional.of(tx));
+        when(userRepository.findByIdForUpdate(owner.getId())).thenReturn(Optional.of(owner));
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.of(running));
+
+        Map<String, String> params = new HashMap<>();
+        params.put("vnp_TxnRef", txId.toString());
+        params.put("vnp_Amount", "9900000");
+        params.put("vnp_ResponseCode", "00");
+        params.put("vnp_TransactionStatus", "00");
+        params.put("vnp_TransactionNo", "14567891");
+        params.put("vnp_BankCode", "NCB");
+        params.put("vnp_SecureHash", vnpayClient.signParams(params));
+
+        assertEquals("00", paymentService.handleVnpayIpn(params).get("RspCode"));
+        assertEquals(false, running.isCancelAtPeriodEnd());
+        assertEquals(null, running.getCancelledAt());
+        assertEquals(oldExpiry.plusDays(30), running.getExpiresAt());
+    }
+
     // IPN với vnp_TxnRef dạng 32 hex (định dạng gửi VNPay từ bản sửa "Invalid data format") vẫn tìm được đơn và kích hoạt gói
     @Test
     void handleVnpayIpn_hexTxnRef_activatesAndReturns00() {

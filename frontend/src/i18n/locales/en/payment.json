@@ -71,7 +71,13 @@
       "receipt": "Invoice",
       "downloadReceipt": "Download invoice",
       "downloading": "Downloading...",
-      "statusLabel": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired", "REFUNDED": "Refunded" },
+      "statusLabel": {
+        "SUCCESS": "Successful",
+        "PENDING": "Pending",
+        "FAILED": "Failed",
+        "EXPIRED": "Expired",
+        "REFUNDED": "Refunded"
+      },
       "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back."
     },
     "usage": {
@@ -98,6 +104,37 @@
     "errors": {
       "loadFailed": "Could not load billing information.",
       "receiptFailed": "Could not download the invoice."
+    },
+    "renewal": {
+      "active": {
+        "title": "Your plan runs until {{date}}",
+        "text": "LegacyVault never charges you automatically. Near the end you get a reminder email with a one-tap renew button, or you can renew early right now."
+      },
+      "cancelled": {
+        "title": "Renewal turned off: VIP ends on {{date}}",
+        "text": "You keep every VIP feature until {{date}}, then your account moves to the free plan. Your data is kept. The remaining time is not refunded."
+      },
+      "lapsed": {
+        "title": "Your VIP plan expired on {{date}}",
+        "text": "Your account is on the free plan and all your data is still there. Renew to get the VIP limits back."
+      },
+      "renew": "Renew in one tap · {{plan}} {{price}}",
+      "redirecting": "Redirecting to the payment gateway...",
+      "resume": "Keep renewing",
+      "wait": "Please wait...",
+      "cancel": "Cancel renewal",
+      "provider": "Payment gateway",
+      "stackHint": "Renewing early loses no days: the new period starts after {{date}}.",
+      "confirm": {
+        "title": "Cancel VIP renewal?",
+        "message": "You keep {{plan}} until {{date}}, then your account moves to the free plan. The remaining time is not refunded. You still get one reminder email 7 days before, in case you change your mind, and you can turn renewal back on any time before that date.",
+        "ok": "Cancel renewal",
+        "keep": "Keep plan"
+      },
+      "errors": {
+        "renew": "Could not start the renewal payment. Please try again.",
+        "toggle": "Could not update renewal. Please try again."
+      }
     }
   },
   "result": {

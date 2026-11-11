@@ -38,5 +38,12 @@ public class SubscriptionMeResponse {
     private long maxStorageBytes;
     private boolean legacyMessageEnabled;
     private boolean vip;
+    /** Việc 6: đã hủy gia hạn, VIP giữ tới {@code expiresAt} rồi về FREE. */
+    private boolean cancelAtPeriodEnd;
+    private LocalDateTime cancelledAt;
+    /** Việc 6: gói để nút "Gia hạn 1 chạm" thanh toán lại (gói VIP đang dùng hoặc vừa hết); null nếu chưa từng VIP. */
+    private String renewPlanCode;
+    /** Việc 6: cổng của lần thanh toán thành công gần nhất (VNPAY/PAYPAL), FE chọn sẵn cổng này. */
+    private String lastProvider;
     private List<SubscriptionPlanDto> availablePlans;
 }

@@ -548,6 +548,10 @@ public class PaymentServiceImpl implements PaymentService {
                         .maxStorageBytes(plan.getStorageQuotaBytes())
                         .legacyMessageEnabled(plan.isLegacyMessagesEnabled())
                         .vip(plan.isVip())
+                        .cancelAtPeriodEnd(sub.isCancelAtPeriodEnd())
+                        .cancelledAt(sub.getCancelledAt())
+                        .renewPlanCode(plan.isVip() ? plan.getCode() : null)
+                        .lastProvider(lastProvider(userId))
                         .availablePlans(plans)
                         .build();
             }
@@ -569,8 +573,20 @@ public class PaymentServiceImpl implements PaymentService {
                 .maxStorageBytes(freePlan.getStorageQuotaBytes())
                 .legacyMessageEnabled(freePlan.isLegacyMessagesEnabled())
                 .vip(false)
+                .cancelAtPeriodEnd(latestSubOpt.map(Subscription::isCancelAtPeriodEnd).orElse(false))
+                .cancelledAt(latestSubOpt.map(Subscription::getCancelledAt).orElse(null))
+                .renewPlanCode(latestSubOpt.map(Subscription::getPlan)
+                        .filter(SubscriptionPlan::isVip).map(SubscriptionPlan::getCode).orElse(null))
+                .lastProvider(lastProvider(userId))
                 .availablePlans(plans)
                 .build();
+    }
+
+    private String lastProvider(UUID userId) {
+        return paymentTransactionRepository.findFirstByUserIdAndStatusOrderByPaidAtDesc(userId, PaymentStatus.SUCCESS)
+                .map(PaymentTransaction::getProvider)
+                .map(Enum::name)
+                .orElse(null);
     }
 
     @Override
@@ -603,6 +619,9 @@ public class PaymentServiceImpl implements PaymentService {
             existing.setPlan(plan);
             existing.setStatus(SubscriptionStatus.ACTIVE);
             existing.setReminderSent(false);
+            // Việc 6: trả tiền gia hạn nghĩa là muốn dùng tiếp, nên bỏ cờ hủy cuối kỳ
+            existing.setCancelAtPeriodEnd(false);
+            existing.setCancelledAt(null);
             existing.setExpiresAt(baseTime.plusDays(durationDays));
             subscriptionRepository.save(existing);
         } else {

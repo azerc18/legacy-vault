@@ -14,6 +14,13 @@ export const paymentApi = {
     getMySubscription: (config) =>
         http.get('/subscriptions/me', config).then((r) => r.data.data),
 
+    // Việc 6: hủy gia hạn cuối kỳ / bật lại; trả về gói hiện tại mới (giống getMySubscription)
+    cancelRenewal: () =>
+        http.post('/subscriptions/me/cancel').then((r) => r.data.data),
+
+    resumeRenewal: () =>
+        http.post('/subscriptions/me/resume').then((r) => r.data.data),
+
     // Việc 2: đã dùng / hạn mức và mục đang vượt hạn mức (sau khi VIP hết hạn)
     getMyUsage: () =>
         http.get('/subscriptions/me/usage').then((r) => r.data.data),

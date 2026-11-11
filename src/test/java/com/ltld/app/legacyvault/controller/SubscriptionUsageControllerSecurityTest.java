@@ -32,6 +32,7 @@ class SubscriptionUsageControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private PaymentService paymentService;
     @MockitoBean private PlanUsageService planUsageService;
+    @MockitoBean private com.ltld.app.legacyvault.service.paymentservice.SubscriptionRenewalService renewalService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     @Test
