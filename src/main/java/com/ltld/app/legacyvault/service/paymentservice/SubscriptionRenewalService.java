@@ -22,7 +22,10 @@ import java.util.UUID;
  *
  * <p>Hệ thống không tự trừ tiền, nên "hủy" chỉ là ghi nhận ý định: gói vẫn ACTIVE và giữ mọi quyền VIP tới
  * {@code expiresAt}, không hoàn tiền; khi tới hạn job {@link SubscriptionExpiryScheduler} đưa về FREE như mọi gói
- * hết hạn. Mail nhắc trước 7 ngày vẫn gửi nhưng nói rõ gói sẽ kết thúc, kèm nút gia hạn phòng khi đổi ý. Owner đổi ý thì bật lại trước hạn; trả tiền gia hạn cũng tự bỏ cờ hủy.
+ * hết hạn. Mail nhắc trước 7 ngày vẫn gửi nhưng nói rõ gói sẽ kết thúc, kèm nút gia hạn phòng khi đổi ý.
+ *
+ * <p>Owner đổi ý thì bật lại trước hạn. Trả tiền gia hạn cũng tự bỏ cờ hủy (Owner chủ động mua thêm). Admin "Tặng VIP"
+ * thì giữ nguyên cờ hủy: đó là lựa chọn của Owner, và mail nhắc vẫn đúng vì dùng hạn mới sau khi tặng.
  */
 @Service
 @RequiredArgsConstructor
