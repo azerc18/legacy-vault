@@ -74,6 +74,27 @@
       "statusLabel": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn" },
       "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về."
     },
+    "usage": {
+      "title": "Mức sử dụng",
+      "vaults": "Két sắt",
+      "beneficiaries": "Người thụ hưởng (két đông nhất)",
+      "beneficiariesHint": "Hạn mức người thụ hưởng tính riêng cho từng két; số bên trái là két có nhiều người nhất.",
+      "storage": "Dung lượng mã hoá",
+      "messages": "Lời nhắn di sản",
+      "messagesOn": "Gói của bạn cho phép tạo lời nhắn âm thanh / video.",
+      "messagesOff": "Gói Free không tạo được lời nhắn mới. Lời nhắn đã có vẫn được giữ và vẫn được trao.",
+      "overTitle": "Bạn đang vượt hạn mức của gói hiện tại",
+      "overTitleLapsed": "Gói VIP đã hết hạn ngày {{date}}, tài khoản đang ở gói Free",
+      "overList": "Đang vượt ở: {{items}}.",
+      "policy": "Mọi dữ liệu vẫn được giữ nguyên, bạn vẫn xem, sửa, xoá được, và di sản vẫn được trao khi kích hoạt. Bạn chỉ không thêm mới được ở các mục trên cho tới khi gia hạn VIP hoặc giảm xuống dưới hạn mức.",
+      "renew": "Gia hạn VIP",
+      "feature": {
+        "MULTIPLE_VAULTS": "số két sắt",
+        "BENEFICIARY_LIMIT": "số người thụ hưởng mỗi két",
+        "STORAGE": "dung lượng lưu trữ",
+        "LEGACY_MESSAGES": "lời nhắn di sản"
+      }
+    },
     "errors": {
       "loadFailed": "Không thể tải thông tin thanh toán.",
       "receiptFailed": "Không thể tải hóa đơn."

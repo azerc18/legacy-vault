@@ -13,11 +13,19 @@ const formatVnd = (n) =>
 
 const PROVIDER_LABEL = { VNPAY: 'VNPay', PAYPAL: 'PayPal' };
 const PROVIDER_ICON = { VNPAY: 'qr_code_2', PAYPAL: 'account_balance_wallet' };
+// Logo chính thức (chỉ phần biểu tượng, không chữ). Nằm trên ô nền trắng để giữ đúng màu thương hiệu ở chế độ tối.
+const PROVIDER_LOGO = { VNPAY: '/brand/payment/vnpay.png', PAYPAL: '/brand/payment/paypal.png' };
 
-// Biểu tượng cổng thanh toán. Chưa có logo chính thức trong public/brand nên dùng biểu tượng; khi có file thì
-// đổi thành <img> trực tiếp (không dò file lúc chạy để tránh 404 ở mỗi lần mở trang).
 function ProviderMark({ code }) {
-    return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
+    const logo = PROVIDER_LOGO[code];
+    if (!logo) {
+        return <Icon name={PROVIDER_ICON[code] ?? 'payments'} className="text-[28px] text-secondary" />;
+    }
+    return (
+        <span className="w-10 h-10 shrink-0 rounded-lg bg-white border border-outline-variant/40 flex items-center justify-center p-1.5">
+            <img src={logo} alt="" width="28" height="28" className="w-7 h-7 object-contain" />
+        </span>
+    );
 }
 
 // n3: % tiết kiệm của gói năm so với 12 tháng gói tháng, tính từ giá thật; không tính được thì null
@@ -118,7 +126,8 @@ export default function PricingPage() {
                 </div>
             )}
 
-            {providers.length > 1 && (
+            {/* Hiện cả khi chỉ bật 1 cổng để người dùng luôn thấy logo cổng sẽ dùng */}
+            {providers.length > 0 && (
                 <fieldset className="mb-6">
                     <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
                     <div className="flex flex-wrap gap-4">
