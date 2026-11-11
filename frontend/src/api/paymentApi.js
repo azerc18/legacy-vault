@@ -14,6 +14,13 @@ export const paymentApi = {
     getMySubscription: (config) =>
         http.get('/subscriptions/me', config).then((r) => r.data.data),
 
+    // Việc 6: hủy gia hạn cuối kỳ / bật lại; trả về gói hiện tại mới (giống getMySubscription)
+    cancelRenewal: () =>
+        http.post('/subscriptions/me/cancel').then((r) => r.data.data),
+
+    resumeRenewal: () =>
+        http.post('/subscriptions/me/resume').then((r) => r.data.data),
+
     // Việc 2: đã dùng / hạn mức và mục đang vượt hạn mức (sau khi VIP hết hạn)
     getMyUsage: () =>
         http.get('/subscriptions/me/usage').then((r) => r.data.data),
@@ -21,8 +28,15 @@ export const paymentApi = {
     getMyPayments: () =>
         http.get('/payments/me').then((r) => r.data.data),
 
-    checkout: (planCode, provider) =>
-        http.post('/payments/checkout', { planCode, provider }).then((r) => r.data.data),
+    // Việc 4: couponCode không bắt buộc
+    checkout: (planCode, provider, couponCode) =>
+        http.post('/payments/checkout', { planCode, provider, couponCode }).then((r) => r.data.data),
+
+    previewCoupon: (code) =>
+        http.get('/payments/coupons/preview', { params: { code } }).then((r) => r.data.data),
+
+    startTrial: () =>
+        http.post('/subscriptions/me/trial').then((r) => r.data.data),
 
     getProviders: () =>
         http.get('/payments/providers').then((r) => r.data.data),
