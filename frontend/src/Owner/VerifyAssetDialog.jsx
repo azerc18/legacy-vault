@@ -13,7 +13,7 @@ import { getErrorMessage } from '../api/http.js';
 import FilePicker from '../Common/FilePicker.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
-import { Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
+import { Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from './ownerUi.jsx';
 import { schemaOf } from './AssetFields.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
 
@@ -191,7 +191,7 @@ function VerifyAssetDialogInner({ vaultId, asset, schemas, onClose, onChanged })
                     <div>
                         <Alert>{error}</Alert>
 
-                        {current === null && <p className="text-sm text-on-surface-variant">{t('dialog.loading')}</p>}
+                        {current === null && <LoadingSkeleton label={t('dialog.loading')} />}
 
                         {/* Kết quả sau khi hoàn tất */}
                         {result && (

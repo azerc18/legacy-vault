@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
-import { Alert, btnOutline, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
+import { Alert, btnOutline, btnPrimary, Card, formatDate, Icon, OwnerLayout, LoadingSkeleton } from './ownerUi.jsx';
 import { CouponBox, TrialBanner } from './PricingExtras.jsx';
 
 const formatVnd = (n) =>
@@ -165,7 +165,7 @@ export default function PricingPage() {
             {plans.some((p) => p.priceVnd > 0) && <CouponBox coupon={coupon} onApply={setCoupon} />}
 
             {loading ? (
-                <p className="text-on-surface-variant">{t('pricing.loading')}</p>
+                <LoadingSkeleton label={t('pricing.loading')} />
             ) : loadError || plans.length === 0 ? (
                 <Card className="text-center">
                     <p className="text-sm text-on-surface-variant">{loadError || t('pricing.errors.noPlans')}</p>

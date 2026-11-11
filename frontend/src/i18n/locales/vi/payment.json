@@ -8,7 +8,7 @@
   "pricing": {
     "title": "Gói dịch vụ & Bảng giá",
     "subtitle": "Bảo vệ di sản số của bạn với nhiều két chuyên biệt, người thụ hưởng dự phòng, phân chia theo tỷ lệ (%) và 5 GB lưu trữ mã hoá.",
-    "back": "Gói thuê bao & Thanh toán",
+    "back": "Gói thuê bao & VIP",
     "currentPlan": "Gói hiện tại:",
     "expires": "Hết hạn ngày {{date}}",
     "viewBilling": "Xem lịch sử thanh toán",
@@ -58,7 +58,7 @@
     }
   },
   "billing": {
-    "title": "Gói thuê bao & Thanh toán",
+    "title": "Gói thuê bao & VIP",
     "subtitle": "Quản lý gói LegacyVault, quyền lợi và lịch sử thanh toán của bạn.",
     "extendVip": "Gia hạn VIP",
     "upgradeToVip": "Nâng cấp lên VIP",

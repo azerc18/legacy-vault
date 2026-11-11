@@ -157,7 +157,8 @@
         "thresholdPlaceholder": "Số người cần đồng ý",
         "thresholdOption": "{{k}} trên {{n}} người",
         "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
-        "vipNote": "Chia theo tỷ lệ %, người dự phòng và đồng thuận cần gói VIP.",
+        "vipNote": "Các lựa chọn có nhãn VIP (chia theo tỷ lệ %, đồng thuận K trên N người, người dự phòng) chỉ dùng được với gói VIP. Gói miễn phí vẫn chia cho tất cả hoặc chọn một người nhận.",
+        "subtitle": "Chọn ai được nhận tài sản này và nhận theo cách nào.",
         "proportionalUnavailable": "Chia theo tỷ lệ % chỉ dùng cho tài sản cần làm thủ tục pháp lý (tài khoản ngân hàng, tài khoản sàn, tài liệu), nên loại tài sản này không có lựa chọn đó.",
         "summary": {
           "ALL": "Tất cả người thụ hưởng",
@@ -215,7 +216,7 @@
     },
     "documents": {
       "title": "Tài liệu pháp lý ({{count}})",
-      "hint": "PDF, DOC/DOCX, JPG/PNG — tối đa 10MB. Tệp được mã hoá trước khi lưu trữ.",
+      "hint": "PDF, DOC/DOCX, JPG/PNG — mỗi lần tải lên 1 tệp, tối đa 10MB cho mỗi tệp. Tệp được mã hoá trước khi lưu trữ.",
       "history": "Lịch sử",
       "uploadNewVersion": "Tải bản mới",
       "uploadNewVersionTitle": "Tải lên phiên bản mới",
@@ -229,7 +230,7 @@
         "load": "Không thể tải danh sách tài liệu.",
         "chooseFile": "Vui lòng chọn một tệp.",
         "invalidType": "Chỉ chấp nhận tệp PDF, DOC/DOCX, JPG/PNG.",
-        "tooLarge": "Tệp vượt quá giới hạn 10MB.",
+        "tooLarge": "Tệp này lớn hơn 10MB (giới hạn tính cho từng tệp). Hãy chọn tệp nhỏ hơn.",
         "upload": "Tải lên thất bại.",
         "uploadVersion": "Không thể tải lên phiên bản mới.",
         "history": "Không thể tải lịch sử phiên bản.",
@@ -386,7 +387,8 @@
       "cryptoSecretRequired": "Cần nhập cụm từ khôi phục (seed phrase) hoặc khoá riêng tư (private key).",
       "fieldRequired": "{{label}} là trường bắt buộc.",
       "fieldInvalid": "{{label}} không đúng định dạng.",
-      "numberInvalid": "{{label}} phải là số nguyên (chỉ gồm chữ số, ví dụ 10000000)."
+      "numberInvalid": "{{label}} phải là số nguyên (chỉ gồm chữ số, ví dụ 10000000).",
+      "numberRange": "{{label}} không được có số 0 thừa ở đầu và tối đa 15 chữ số (ví dụ 10000000)."
     }
   }
 }

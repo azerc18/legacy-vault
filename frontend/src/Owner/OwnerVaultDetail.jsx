@@ -13,7 +13,7 @@ import EmptyState from '../Common/EmptyState.jsx';
 import LegacyMessageSection from './LegacyMessageSection.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
 import VerifyAssetDialog from './VerifyAssetDialog.jsx';
-import { AssetFieldsForm, AssetFieldsView, cleanFields, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
+import { AssetFieldsForm, AssetFieldsView, cleanFields, deriveAssetName, fieldProblems, focusFirstInvalid, schemaOf, useAssetSchemas, validateFields } from './AssetFields.jsx';
 import { AllocationFields, allocationBody, allocationFromAsset, allocationSummary, emptyAllocation, validateAllocation } from './AllocationFields.jsx';
 
 const textareaCls = 'w-full mt-1 px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
@@ -395,6 +395,8 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const [f, setF] = useState(initial);
     const [show, setShow] = useState(false);
     const [error, setError] = useState('');
+    const [nameError, setNameError] = useState('');
+    const [submitted, setSubmitted] = useState(false);   // đã bấm Lưu: ô bắt buộc còn trống báo lỗi ngay tại ô
     const [loading, setLoading] = useState(false);
     const footRef = useRef(null);
     // Lỗi hiện sát nút Lưu; nếu hộp thoại đang cuộn thì kéo cả lỗi lẫn nút Lưu vào tầm nhìn
@@ -419,10 +421,23 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const submit = async (e) => {
         e.preventDefault();
         setError('');
-        if (!f.assetName.trim()) return setError(t('detail.assets.errors.nameRequired'));
+        setNameError('');
+        setSubmitted(true);
         if (schemaMissing) return setError(t('detail.assets.errors.schemaMissing'));
+        // Loại "Khác" (hoặc form không theo schema) tự đặt tên; các loại còn lại tên được dựng từ loại + tên tổ chức
+        const typeLabel = t(`enums:assetType.${f.assetType}`, { defaultValue: ASSET_TYPES.find((a) => a.value === f.assetType)?.label || f.assetType });
+        const nameTyped = f.assetType === 'OTHER' || !dynamic;
+        if (nameTyped && !f.assetName.trim()) {
+            setNameError(t('detail.assets.errors.nameRequired'));
+            focusFirstInvalid();
+            return;
+        }
+        if (dynamic && Object.keys(fieldProblems(schema, f.fields || {}, isEdit)).length) {
+            focusFirstInvalid();   // lỗi đã hiện tại từng ô
+            return;
+        }
         if (dynamic) {
-            const msg = validateFields(schema, f.fields || {}, isEdit);
+            const msg = validateFields(schema, f.fields || {}, isEdit);   // còn lại: ví crypto thiếu seed/private key
             if (msg) return setError(msg);
         } else if (!isEdit && !f.secret.trim()) return setError(t('detail.assets.errors.secretRequired'));
         if (showAllocation) {
@@ -433,7 +448,9 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
         try {
             const body = {
                 assetType: f.assetType,
-                assetName: f.assetName.trim(),
+                assetName: nameTyped ? f.assetName.trim()
+                    : (isEdit && f.assetType === initial.assetType && f.assetName.trim()) ? f.assetName.trim()   // sửa cùng loại: giữ tên cũ
+                        : deriveAssetName(typeLabel, schema, f.fields),
                 notes: isEdit ? f.notes.trim() : (f.notes.trim() || null), // sửa: "" = xoá ghi chú
             };
             if (dynamic) body.fields = cleanFields(f.fields || {}, schema);
@@ -475,9 +492,17 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                                 </option>
                             ))}
                         </select>
-                        <input value={f.assetName} maxLength={200} onChange={set('assetName')} placeholder={t('detail.assets.assetNamePlaceholder')} className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
+                        {(f.assetType === 'OTHER' || !dynamic) && (
+                            <div>
+                                <input value={f.assetName} maxLength={200} aria-invalid={nameError ? true : undefined}
+                                       onChange={(e) => { set('assetName')(e); setNameError(''); }}
+                                       placeholder={t('detail.assets.assetNamePlaceholder')}
+                                       className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40${nameError ? ' lv-field-invalid' : ''}`} />
+                                {nameError && <p role="alert" className="mt-1.5 text-xs font-semibold text-error">{nameError}</p>}
+                            </div>
+                        )}
                         {dynamic ? (
-                            <AssetFieldsForm part="main" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />
+                            <AssetFieldsForm part="main" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} showErrors={submitted} />
                         ) : (
                             <div className="relative">
                                 <input
@@ -491,7 +516,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
                         )}
                     </div>
                     <div className="space-y-3">
-                        {dynamic && <AssetFieldsForm part="sealed" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} />}
+                        {dynamic && <AssetFieldsForm part="sealed" schema={schema} values={f.fields || {}} onChange={setField} isEdit={isEdit} showErrors={submitted} />}
                         <textarea rows={3} maxLength={2000} value={f.notes} onChange={set('notes')} placeholder={t('detail.assets.notesPlaceholder')} className={`${textareaCls} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40`} />
                         {showAllocation && (
                             <AllocationFields
@@ -843,7 +868,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                 </option>
                             ))}
                         </select>
-                        <FilePicker file={file} onChange={setFile} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={file} onChange={(f) => { setFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
                         <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.uploading') : t('ui.upload')}</button>
                     </form>
                 </>
@@ -868,7 +893,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         })}
                     </p>
                     <form onSubmit={uploadNewVersion} className="space-y-4">
-                        <FilePicker file={newVersionFile} onChange={setNewVersionFile} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={newVersionFile} onChange={(f) => { setNewVersionFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>{t('common:actions.cancel')}</button>
                             <button type="submit" disabled={loading || !newVersionFile} className={btnPrimary}>

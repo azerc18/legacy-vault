@@ -19,6 +19,7 @@
     "notSetUpHint": "Chọn lịch ở bên phải rồi lưu để bật.",
     "checkIn": "Tôi vẫn ổn — check-in",
     "checkingIn": "Đang check-in...",
+    "checkedInShort": "Đã check-in",
     "triggeredNote": "Quy trình bàn giao đã được kích hoạt lúc {{date}}. Không thể thay đổi cài đặt nữa.",
     "suspendedNote": "Quản trị viên đã tạm dừng tính năng này. Vui lòng liên hệ bộ phận hỗ trợ.",
     "info": {

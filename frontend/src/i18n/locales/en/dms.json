@@ -18,6 +18,7 @@
     "notSetUp": "Not set up yet",
     "notSetUpHint": "Choose your schedule on the right and save to turn it on.",
     "checkIn": "I'm okay — check in",
+    "checkedInShort": "Checked in",
     "checkingIn": "Checking in...",
     "triggeredNote": "The hand-over was triggered on {{date}}. Settings can no longer be changed.",
     "suspendedNote": "Suspended by an administrator. Please contact support.",

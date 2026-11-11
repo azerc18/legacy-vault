@@ -63,8 +63,8 @@ function buildRoleSections(roles, pathname, tCommon, tAdmin, openAlerts = 0) {
                     matchPrefix: '/owner',
                     items: [
                         { to: '/owner/vaults', label: tCommon('nav.myVaults'), icon: 'inventory_2' },
-                        { to: '/owner/dms', label: tCommon('nav.dms'), icon: 'favorite' },
                         { to: '/owner/executors', label: tCommon('nav.executors'), icon: 'badge' },
+                        { to: '/owner/dms', label: tCommon('nav.dms'), icon: 'favorite' },
                         { to: '/owner/activity', label: tCommon('nav.activity'), icon: 'history' },
                         { to: '/billing', label: tCommon('nav.billing'), icon: 'workspace_premium' },
                     ],

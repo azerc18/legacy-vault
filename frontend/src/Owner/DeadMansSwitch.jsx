@@ -6,7 +6,9 @@ import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary } from './ownerUi.jsx';
+import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary, LoadingSkeleton } from './ownerUi.jsx';
+import { VipChip, VipLocked } from '../Common/VipLock.jsx';
+import { useVipStatus } from '../Common/useVipStatus.js';
 
 // Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
 const LIMITS = {
@@ -26,6 +28,7 @@ const STATUS = {
 
 export default function DeadMansSwitch() {
     const { t } = useTranslation('dms');
+    const vip = useVipStatus();   // false = gói FREE: Trusted Social Confirmers hiện mờ + khoá
     const toast = useToast();
     const user = getUser();
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
@@ -34,6 +37,7 @@ export default function DeadMansSwitch() {
     const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
+    const [justCheckedIn, setJustCheckedIn] = useState(false);
     const [confirmerForm, setConfirmerForm] = useState({ name: '', email: '', relationship: '' });
     const [addingConfirmer, setAddingConfirmer] = useState(false);
     const [removingId, setRemovingId] = useState('');
@@ -101,6 +105,7 @@ export default function DeadMansSwitch() {
         setError(''); setChecking(true);
         try {
             applyConfig(await ownerApi.checkIn());
+            setJustCheckedIn(true);   // khoá nút tới khi tải lại trang, BE cũng chặn check-in liên tục
             toast.success(t('dms.checkedIn'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.errors.checkIn')));
@@ -166,7 +171,7 @@ export default function DeadMansSwitch() {
                 </Alert>
             )}
 
-            {loading ? <p className="text-on-surface-variant">{t('dms.loading')}</p> : (
+            {loading ? <LoadingSkeleton label={t('dms.loading')} /> : (
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
                     <div className="space-y-6">
                     {/* Trạng thái + check-in */}
@@ -185,8 +190,8 @@ export default function DeadMansSwitch() {
                                         <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
                                     </span>
                                     {canCheckIn && (
-                                        <button onClick={checkIn} disabled={checking} className={btnPrimary}>
-                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : t('dms.checkIn')}
+                                        <button onClick={checkIn} disabled={checking || justCheckedIn} className={btnPrimary}>
+                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
                                         </button>
                                     )}
                                 </div>
@@ -221,7 +226,8 @@ export default function DeadMansSwitch() {
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
                         <div data-tour="dms-confirmers">
-                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
+                        <VipLocked locked={vip === false}>
+                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /> <VipChip className="ml-1" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
                             <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
                             {confirmers.length === 0 ? (
@@ -292,6 +298,7 @@ export default function DeadMansSwitch() {
                                 </form>
                             )}
                         </Card>
+                        </VipLocked>
                         </div>
                     )}
                     </div>

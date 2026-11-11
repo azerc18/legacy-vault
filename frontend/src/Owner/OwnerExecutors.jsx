@@ -5,7 +5,7 @@ import { Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi, needsReplaceConfirm } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
+import { OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from './ownerUi.jsx';
 
 // Tiêu đề/mô tả ở executors.positions.<type> (namespace dms)
 const POSITIONS = [
@@ -42,7 +42,7 @@ export default function OwnerExecutors() {
     return (
         <OwnerLayout title={t('executors.title')} subtitle={t('executors.subtitle')}>
             <Alert>{error}</Alert>
-            {loading ? <p className="text-on-surface-variant">{t('executors.loading')}</p> : (
+            {loading ? <LoadingSkeleton label={t('executors.loading')} /> : (
                 <div data-tour="executors-overview" className="grid md:grid-cols-2 gap-6">
                     {POSITIONS.map((p) => (
                         <ExecutorCard key={p.type} position={p} assignment={current(p.type)} onChanged={load} />

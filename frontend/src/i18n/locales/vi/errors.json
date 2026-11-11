@@ -26,6 +26,7 @@
   "EXECUTOR_NOT_ACTIVE": "Vai trò người thi hành của bạn chưa được kích hoạt cho di sản này.",
   "CHECKIN_TOKEN_INVALID": "Liên kết check-in không hợp lệ hoặc đã hết hạn.",
   "CONFIRMER_TOKEN_INVALID": "Liên kết xác nhận không hợp lệ hoặc đã hết hạn.",
+  "DMS_CHECKIN_TOO_SOON": "Bạn vừa check-in xong rồi. Hãy thử lại sau ít phút.",
   "REMINDER_TOO_SOON": "Chỉ được gửi nhắc nhở 1 lần mỗi 24 giờ.",
   "EMERGENCY_REQUEST_EXISTS": "Đang có một yêu cầu truy cập khẩn cấp chờ duyệt.",
   "INVALID_SIGN_CODE": "Mã ký duyệt không đúng.",
