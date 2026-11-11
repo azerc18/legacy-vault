@@ -14,6 +14,8 @@ import {
     DEMO_BENEFICIARY_VAULTS,
     DEMO_EXECUTOR_CASES,
     DEMO_VERIFIER_REQUESTS,
+    DEMO_ACCESS_LOGS,
+    DEMO_SUBSCRIPTION,
     demoNotifications
 } from '../Common/demoMockData.js';
 
@@ -39,6 +41,10 @@ function handleDemoMock(config) {
         data = { success: true, data: DEMO_USER };
     } else if (url.includes('/plans/my-subscription')) {
         data = { success: true, data: { vip: true, planName: 'VIP_UNLIMITED' } };
+    } else if (url.endsWith('/subscriptions/me')) {
+        data = { success: true, data: DEMO_SUBSCRIPTION };
+    } else if (url.includes('/owner/activity-logs/access')) {
+        data = { success: true, data: DEMO_ACCESS_LOGS };
     } else if (url.includes('/owner/readiness')) {
         data = { success: true, data: DEMO_READINESS };
     } else if (url.includes('/documents')) {

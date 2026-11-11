@@ -22,6 +22,7 @@ import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -67,8 +68,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     private final AuditLogService auditLogService;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
 
-    // Chống bấm check-in liên tục: lần check-in cách lần trước chưa đủ số phút này thì từ chối. 0 = tắt (unit test, integration test).
-    @org.springframework.beans.factory.annotation.Value("${app.dms.checkin-cooldown-minutes:60}")
+    // Chống bấm check-in liên tục: lần check-in TRONG ỨNG DỤNG cách lần check-in trong ứng dụng trước chưa đủ số phút này
+    // thì từ chối. Chỉ tính các dòng DmsCheckin OWNER_RESPONDED kênh IN_APP (do checkIn ghi), nên lưu cấu hình / mở lại DMS
+    // (cũng đặt lastCheckinAt = now) hay check-in bằng link trong mail không làm khoá nút. 0 = tắt (integration test).
+    @Value("${app.dms.checkin-cooldown-minutes:60}")
     private long checkinCooldownMinutes;
 
     @Override
@@ -181,16 +184,18 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             }, HttpStatus.CONFLICT);
         }
         assertScheduleComplete(config);
-        if (checkinCooldownMinutes > 0 && config.getLastCheckinAt() != null
-                && LocalDateTime.now().isBefore(config.getLastCheckinAt().plusMinutes(checkinCooldownMinutes))) {
+
+        LocalDateTime now = LocalDateTime.now();
+        if (checkinCooldownMinutes > 0 && dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                config.getId(), DmsCheckinType.OWNER_RESPONDED, NotificationChannel.IN_APP,
+                now.minusMinutes(checkinCooldownMinutes))) {
             throw new DmsException(ErrorCode.DMS_CHECKIN_TOO_SOON, TOO_SOON_MESSAGE);
         }
 
-        LocalDateTime now = LocalDateTime.now();
         config.setStatus(DmsStatus.ACTIVE);
         startNewCycle(config, now);
         config = dmsConfigRepository.saveAndFlush(config);
-        recordOwnerResponded(config, now);
+        recordOwnerResponded(config, now, NotificationChannel.IN_APP);
 
         audit(AuditAction.DMS_CHECKIN, config.getOwner(), config,
                 "nextCheckinDueAt=" + config.getNextCheckinDueAt());
@@ -376,9 +381,15 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
     // occurredAt = mốc vừa truyền vào startNewCycle (= lastCheckinAt). Gọi sau khi đã lưu DmsConfig.
     private void recordOwnerResponded(DmsConfig config, LocalDateTime now) {
+        recordOwnerResponded(config, now, null);
+    }
+
+    // channel IN_APP = Owner bấm Check-in trong ứng dụng (dùng cho cooldown); null = lưu cấu hình / mở lại DMS.
+    private void recordOwnerResponded(DmsConfig config, LocalDateTime now, NotificationChannel channel) {
         dmsCheckinRepository.saveAndFlush(DmsCheckin.builder()
                 .dmsConfig(config)
                 .checkinType(DmsCheckinType.OWNER_RESPONDED)
+                .channel(channel)
                 .occurredAt(now)
                 .build());
     }
