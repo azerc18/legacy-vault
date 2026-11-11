@@ -173,4 +173,9 @@ export const adminApi = {
     listPlans: () => http.get('/admin/plans').then(unwrap),
     // Chỉ đổi giá/tên cho lần mua sau. body: { priceVnd, name?, reason? }
     updatePlan: (code, body) => http.patch(`/admin/plans/${encodeURIComponent(code)}`, body).then(unwrap),
+
+    // Việc 4: mã giảm giá
+    listCoupons: () => http.get('/admin/coupons').then(unwrap),
+    createCoupon: (body) => http.post('/admin/coupons', body).then(unwrap),
+    setCouponActive: (id, active) => http.patch(`/admin/coupons/${id}`, { active }).then(unwrap),
 };

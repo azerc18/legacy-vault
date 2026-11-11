@@ -16,4 +16,6 @@ public class CheckoutResponse {
     private String paymentUrl;
     private String planCode;
     private long amountVnd;
+    // Việc 4: số tiền được giảm nhờ mã (0 nếu không dùng mã)
+    private long discountVnd;
 }

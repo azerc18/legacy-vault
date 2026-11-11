@@ -148,7 +148,12 @@ export default function AdminPayments() {
                                     <p className="font-semibold">{p.planName || p.planCode}</p>
                                     <p className="text-[11px] text-outline">{t('payments.currentPlan', { plan: p.currentPlanCode })}</p>
                                 </td>
-                                <td data-label={t('payments.cols.amount')} className="lv-num font-semibold">{formatVnd(p.amountVnd)}</td>
+                                <td data-label={t('payments.cols.amount')} className="lv-num font-semibold">
+                                    {formatVnd(p.amountVnd)}
+                                    {p.couponCode && (
+                                        <p className="text-[11px] font-normal text-outline">{t('payments.coupon', { code: p.couponCode, discount: formatVnd(p.discountVnd) })}</p>
+                                    )}
+                                </td>
                                 <td data-label={t('payments.cols.status')}>
                                     <Stamp tone={toneOf(p.status)}>{t(`payments.status.${p.status}`, { defaultValue: p.status })}</Stamp>
                                     {p.refundedAt && (

@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.paymentdto.SubscriptionMeResponse;
 import com.ltld.app.legacyvault.service.paymentservice.PaymentService;
 import com.ltld.app.legacyvault.service.paymentservice.SubscriptionRenewalService;
+import com.ltld.app.legacyvault.service.paymentservice.TrialService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ public class SubscriptionController {
 
     private final PaymentService paymentService;
     private final SubscriptionRenewalService renewalService;
+    private final TrialService trialService;
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<SubscriptionMeResponse>> getMySubscription(Principal principal) {
@@ -49,5 +51,12 @@ public class SubscriptionController {
         UUID userId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success(
                 "Renewal turned back on", renewalService.resume(userId)));
+    }
+
+    // Việc 4: dùng thử VIP miễn phí (mỗi tài khoản một lần)
+    @PostMapping("/me/trial")
+    public ResponseEntity<ApiResponse<SubscriptionMeResponse>> startTrial(Principal principal) {
+        UUID userId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Trial started", trialService.start(userId)));
     }
 }

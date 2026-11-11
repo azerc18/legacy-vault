@@ -69,7 +69,7 @@ class PendingPaymentReconcileTest {
                 "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html", "http://localhost:8084/api/payments/vnpay-return", false);
         vnpayClient = spy(new VnpayClient(props, "http://localhost:5173"));
         service = new PaymentServiceImpl(userRepository, planRepository, subscriptionRepository, transactionRepository,
-                entitlementService, vnpayClient, props, paypalClient, auditLogService);
+                entitlementService, vnpayClient, props, paypalClient, auditLogService, mock(CouponService.class));
         now = LocalDateTime.of(2026, 11, 11, 12, 0);
         owner = User.builder().id(UUID.randomUUID()).email("owner@example.com").fullName("Owner").build();
         plan = SubscriptionPlan.builder().id(UUID.randomUUID()).code("VIP_MONTH").name("VIP Monthly")

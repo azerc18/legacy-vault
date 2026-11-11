@@ -24,6 +24,9 @@ public class PaymentTransactionResponse {
     private String vnpResponseCode;
     private LocalDateTime createdAt;
     private LocalDateTime paidAt;
+    // Việc 4: mã giảm giá đã dùng và số tiền được giảm (amountVnd là số đã trả)
+    private String couponCode;
+    private Long discountVnd;
 
     public static PaymentTransactionResponse from(PaymentTransaction tx) {
         return PaymentTransactionResponse.builder()
@@ -37,6 +40,8 @@ public class PaymentTransactionResponse {
                 .vnpResponseCode(tx.getVnpResponseCode())
                 .createdAt(tx.getCreatedAt())
                 .paidAt(tx.getPaidAt())
+                .couponCode(tx.getCouponCode())
+                .discountVnd(tx.getDiscountVnd())
                 .build();
     }
 }

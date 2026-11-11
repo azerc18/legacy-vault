@@ -29,6 +29,9 @@ public class AdminPaymentResponse {
     // Việc 3: thời điểm và lý do admin hoàn tiền (null nếu chưa hoàn)
     private LocalDateTime refundedAt;
     private String refundReason;
+    // Việc 4
+    private String couponCode;
+    private Long discountVnd;
     // Gói đang dùng hiện tại của user (FREE nếu không có gói trả phí còn hạn)
     private String currentPlanCode;
 }

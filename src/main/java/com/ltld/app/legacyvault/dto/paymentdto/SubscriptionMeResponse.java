@@ -45,5 +45,10 @@ public class SubscriptionMeResponse {
     private String renewPlanCode;
     /** Việc 6: cổng của lần thanh toán thành công gần nhất (VNPAY/PAYPAL), FE chọn sẵn cổng này. */
     private String lastProvider;
+    /** Việc 4: gói hiện tại là bản dùng thử. */
+    private boolean trial;
+    /** Việc 4: chưa từng có gói nào và chưa từng trả tiền: được bấm "Dùng thử VIP {trialDays} ngày". */
+    private boolean trialEligible;
+    private int trialDays;
     private List<SubscriptionPlanDto> availablePlans;
 }

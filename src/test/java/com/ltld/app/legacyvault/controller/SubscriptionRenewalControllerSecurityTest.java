@@ -31,6 +31,7 @@ class SubscriptionRenewalControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @MockitoBean private PaymentService paymentService;
     @MockitoBean private SubscriptionRenewalService renewalService;
+    @MockitoBean private com.ltld.app.legacyvault.service.paymentservice.TrialService trialService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     @Test
@@ -59,5 +60,27 @@ class SubscriptionRenewalControllerSecurityTest {
     void cancel_anonymous_returns401() throws Exception {
         mockMvc.perform(post("/api/subscriptions/me/cancel")).andExpect(status().isUnauthorized());
         verifyNoInteractions(renewalService);
+    }
+
+    // Việc 4: dùng thử chỉ cho Owner, theo id trong token
+    @Test
+    void trial_owner_startsOwnTrial() throws Exception {
+        UUID me = UUID.randomUUID();
+        when(trialService.start(me)).thenReturn(SubscriptionMeResponse.builder().planCode("VIP_MONTH").trial(true).build());
+
+        mockMvc.perform(post("/api/subscriptions/me/trial")
+                        .with(jwt().jwt(j -> j.subject(me.toString())).authorities(new SimpleGrantedAuthority("ROLE_OWNER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.trial").value(true));
+        verify(trialService).start(me);
+    }
+
+    @Test
+    void trial_beneficiary_returns403() throws Exception {
+        mockMvc.perform(post("/api/subscriptions/me/trial")
+                        .with(jwt().jwt(j -> j.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_BENEFICIARY"))))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(trialService);
     }
 }

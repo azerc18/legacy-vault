@@ -14,6 +14,9 @@ import java.util.UUID;
 @Repository
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
 
+    // Việc 4: đã từng có gói nào (kể cả dùng thử, đã hết hạn) thì không được dùng thử nữa
+    boolean existsByUserId(UUID userId);
+
     @EntityGraph(attributePaths = {"plan"})
     Optional<Subscription> findFirstByUserIdOrderByCreatedAtDesc(UUID userId);
 

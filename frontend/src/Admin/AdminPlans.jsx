@@ -6,6 +6,7 @@ import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
 import { Icon, Alert, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Dossier, Stamp, formatVnd } from './adminUi.jsx';
+import AdminCoupons from './AdminCoupons.jsx';
 
 const MIN_PRICE = 10000;
 const MAX_PRICE = 100000000;
@@ -107,6 +108,7 @@ export default function AdminPlans() {
                 </div>
             )}
             <p className="mt-6 text-xs text-on-surface-variant flex gap-1.5"><Icon name="lock" className="text-[16px]" />{t('plans.limitsLocked')}</p>
+            <AdminCoupons plans={plans} />
         </AdminLayout>
     );
 }

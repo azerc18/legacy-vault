@@ -5,6 +5,7 @@ import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
 import { Alert, btnOutline, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
+import { CouponBox, TrialBanner } from './PricingExtras.jsx';
 
 const formatVnd = (n) =>
     typeof n === 'number'
@@ -39,6 +40,7 @@ export default function PricingPage() {
     const [reloadKey, setReloadKey] = useState(0);
     const [providers, setProviders] = useState(['VNPAY']);
     const [provider, setProvider] = useState('VNPAY');
+    const [coupon, setCoupon] = useState(null);         // Việc 4: mã đang áp dụng (kết quả preview)
 
     // Lỗi thì giữ VNPay như trước khi có nhiều cổng
     useEffect(() => {
@@ -75,7 +77,8 @@ export default function PricingPage() {
         setError('');
         setBusyCode(planCode);
         try {
-            const res = await paymentApi.checkout(planCode, provider);
+            const quote = coupon?.plans?.find((q) => q.planCode === planCode);
+            const res = await paymentApi.checkout(planCode, provider, quote ? coupon.code : undefined);
             if (res?.paymentUrl) {
                 window.location.href = res.paymentUrl;
             }
@@ -118,6 +121,8 @@ export default function PricingPage() {
                 </div>
             )}
 
+            <TrialBanner sub={sub} onStarted={setSub} />
+
             {providers.length > 1 && (
                 <fieldset className="mb-6">
                     <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
@@ -148,6 +153,8 @@ export default function PricingPage() {
                 </fieldset>
             )}
 
+            {plans.some((p) => p.priceVnd > 0) && <CouponBox coupon={coupon} onApply={setCoupon} />}
+
             {loading ? (
                 <p className="text-on-surface-variant">{t('pricing.loading')}</p>
             ) : loadError || plans.length === 0 ? (
@@ -164,6 +171,7 @@ export default function PricingPage() {
                         const isCurrent = sub?.planCode === p.code && sub?.status === 'ACTIVE';
                         const isPopular = p.code === 'VIP_YEAR';
                         const showSaving = isPopular && savingPercent !== null;
+                        const quote = coupon?.plans?.find((q) => q.planCode === p.code);
 
                         return (
                             <Card
@@ -181,8 +189,16 @@ export default function PricingPage() {
                                             </span>
                                         )}
                                     </div>
-                                    <p className="mt-3 text-2xl font-bold text-primary">
-                                        {isFree ? t('pricing.free') : formatVnd(p.priceVnd)}
+                                    {quote && (
+                                        <p className="mt-3 text-sm text-on-surface-variant">
+                                            <span className="line-through">{formatVnd(quote.originalVnd)}</span>
+                                            <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-full bg-success-container text-on-success-container">
+                                                -{formatVnd(quote.discountVnd)}
+                                            </span>
+                                        </p>
+                                    )}
+                                    <p className={`${quote ? 'mt-1' : 'mt-3'} text-2xl font-bold text-primary`}>
+                                        {isFree ? t('pricing.free') : formatVnd(quote ? quote.finalVnd : p.priceVnd)}
                                         {!isFree && p.durationDays && (
                                             <span className="text-sm font-normal text-on-surface-variant">
                                                 {' '}

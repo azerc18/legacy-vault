@@ -149,6 +149,8 @@ public class AdminPaymentService {
                     .paidAt(p.getPaidAt())
                     .refundedAt(p.getRefundedAt())
                     .refundReason(p.getRefundReason())
+                    .couponCode(p.getCouponCode())
+                    .discountVnd(p.getDiscountVnd())
                     .currentPlanCode(currentPlan.getOrDefault(p.getUser().getId(), SubscriptionPlan.CODE_FREE))
                     .build();
         }).toList();

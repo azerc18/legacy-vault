@@ -38,6 +38,23 @@
       "loadFailed": "Không thể tải danh sách gói thuê bao.",
       "noPlans": "Hiện chưa có gói thuê bao nào.",
       "checkoutFailed": "Không thể khởi tạo thanh toán."
+    },
+    "coupon": {
+      "label": "Có mã giảm giá?",
+      "placeholder": "Nhập mã, vd. TET2027",
+      "apply": "Áp dụng",
+      "checking": "Đang kiểm tra...",
+      "applied": "Đã áp dụng mã {{code}}: giảm {{percent}}%",
+      "until": "hạn tới {{date}}",
+      "remove": "Bỏ mã",
+      "error": "Không áp dụng được mã này."
+    },
+    "trial": {
+      "title": "Dùng thử VIP {{days}} ngày miễn phí",
+      "text": "Mở đủ tính năng VIP trong {{days}} ngày, không cần thanh toán. Hết hạn thì tài khoản về gói miễn phí, dữ liệu vẫn giữ nguyên. Mỗi tài khoản dùng thử một lần.",
+      "start": "Dùng thử {{days}} ngày",
+      "starting": "Đang kích hoạt...",
+      "error": "Không bắt đầu được bản dùng thử."
     }
   },
   "billing": {
@@ -58,7 +75,8 @@
       "storage": "Lưu trữ mã hoá & Tin nhắn di nguyện",
       "storageDetail": "{{storage}} · {{media}}",
       "mediaEnabled": "Hỗ trợ tin nhắn đa phương tiện",
-      "noMedia": "Chưa hỗ trợ tin nhắn đa phương tiện"
+      "noMedia": "Chưa hỗ trợ tin nhắn đa phương tiện",
+      "trial": "Dùng thử"
     },
     "history": {
       "title": "Lịch sử giao dịch",
@@ -78,7 +96,8 @@
         "EXPIRED": "Đã hết hạn",
         "REFUNDED": "Đã hoàn tiền"
       },
-      "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về."
+      "expiredHint": "Đơn chưa thanh toán đã tự đóng. Nếu bạn đã bị trừ tiền, hệ thống vẫn ghi nhận khi cổng thanh toán báo về.",
+      "coupon": "Mã {{code}}: -{{discount}}"
     },
     "errors": {
       "loadFailed": "Không thể tải thông tin thanh toán.",
