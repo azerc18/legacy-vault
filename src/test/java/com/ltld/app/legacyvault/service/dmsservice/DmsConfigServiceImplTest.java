@@ -1093,6 +1093,37 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
+    @DisplayName("Demo: Owner không còn két -> 409 DMS_NO_VAULT, không đổi hạn, không ghi gì (job bỏ qua Owner không két)")
+    void simulateOverdueByAdmin_noVault_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getErrorCode()).isEqualTo(ErrorCode.DMS_NO_VAULT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("Demo: Owner không còn Executor nhận bàn giao -> 409, không đổi hạn, không ghi gì")
+    void simulateOverdueByAdmin_withoutActivationTarget_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.REVOKED),
+                executor(ExecutorType.BACKUP, ExecutorStatus.REVOKED));
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.SIMULATE_NO_ACTIVATION_TARGET_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
     @DisplayName("Demo: chưa có DmsConfig -> 404")
     void simulateOverdueByAdmin_noConfig_returns404() {
         when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());

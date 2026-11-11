@@ -1,6 +1,6 @@
 // A3: ngăn kéo chi tiết người dùng (GET /api/admin/users/{id}). Mở từ trang Người dùng, Kho, Thanh toán, Cảnh báo.
 // Thao tác nhanh dùng lại API sẵn có: khoá / mở khoá tài khoản, tạm dừng / tiếp tục DMS.
-// Demo: nút "Giả quá hạn" chỉ hiện khi server bật APP_DEMO_TOOLS_ENABLED và DMS của Owner đang ACTIVE.
+// Demo: nút "Giả quá hạn" chỉ hiện khi server bật APP_DEMO_TOOLS_ENABLED, DMS của Owner đang ACTIVE và Owner còn két.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -162,7 +162,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                 {!isMe && u.status === 'LOCKED' && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
                                 {isOwner && u.dmsStatus === 'ACTIVE' && <button className={btn} onClick={() => setDialog('suspend')}><Icon name="pause_circle" className="text-[16px]" />{t('users.actions.suspend')}</button>}
                                 {isOwner && u.dmsStatus === 'SUSPENDED' && <button className={btn} onClick={() => setDialog('resume')}><Icon name="play_circle" className="text-[16px]" />{t('users.actions.resume')}</button>}
-                                {demoTools && isOwner && u.dmsStatus === 'ACTIVE' && (
+                                {demoTools && isOwner && u.dmsStatus === 'ACTIVE' && u.vaults?.length > 0 && (
                                     <button className={`${btn} border-dashed text-error`} title={t('users.actions.simulateOverdueHint')}
                                             onClick={() => setDialog('simulateOverdue')}>
                                         <Icon name="science" className="text-[16px]" />{t('users.actions.simulateOverdue')}
