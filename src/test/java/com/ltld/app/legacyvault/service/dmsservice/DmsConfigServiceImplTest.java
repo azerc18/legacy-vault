@@ -486,11 +486,31 @@ class DmsConfigServiceImplTest {
         LocalDateTime before = LocalDateTime.now();
 
         service.checkIn(ownerId);
+        LocalDateTime after = LocalDateTime.now();
 
-        ArgumentCaptor<LocalDateTime> after = ArgumentCaptor.forClass(LocalDateTime.class);
+        ArgumentCaptor<LocalDateTime> since = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(dmsCheckinRepository).existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
-                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), after.capture());
-        assertThat(after.getValue()).isBetween(before.minusMinutes(60), existing.getLastCheckinAt().minusMinutes(60));
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), since.capture());
+        // Mốc hỏi = thời điểm check-in - 60 phút, không phụ thuộc lastCheckinAt
+        assertThat(since.getValue()).isBetween(before.minusMinutes(60), after.minusMinutes(60));
+        verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
+    }
+
+    @Test
+    @DisplayName("Cooldown: vừa check-in bằng link một chạm trong mail (kênh EMAIL) thì nút check-in trong ứng dụng vẫn dùng được")
+    void checkIn_afterEmailLinkCheckin_isNotBlocked() {
+        ReflectionTestUtils.setField(service, "checkinCooldownMinutes", 60L);
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        // Có dòng OWNER_RESPONDED kênh EMAIL trong 60 phút, không có dòng IN_APP
+        when(dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.EMAIL), any()))
+                .thenReturn(true);
+        when(dmsCheckinRepository.existsByDmsConfigIdAndCheckinTypeAndChannelAndOccurredAtAfter(
+                eq(existing.getId()), eq(DmsCheckinType.OWNER_RESPONDED), eq(NotificationChannel.IN_APP), any()))
+                .thenReturn(false);
+
+        assertThatCode(() -> service.checkIn(ownerId)).doesNotThrowAnyException();
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
         verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
     }
 
