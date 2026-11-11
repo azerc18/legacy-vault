@@ -9,7 +9,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
@@ -144,6 +143,27 @@ class GeminiAiClientTest {
     }
 
     @Test
+    void chat_fallsBackToBackupModel_whenPrimaryModelIsNotFound() {
+        // Google trả 404 khi model chính bị ngừng hoặc đổi tên: model dự phòng vẫn trả lời được
+        server.expect(requestTo(PRIMARY_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("x-goog-api-key", "primary-key"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        server.expect(requestTo(BACKUP_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("x-goog-api-key", "backup-key"))
+                .andRespond(withSuccess("""
+                        {"candidates": [{"content": {"parts": [{"text": "Model dự phòng trả lời."}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        String reply = client.chat("Bạn là trợ lý Vaulty", List.of(new ChatMessage("user", "Chào bạn")));
+
+        assertThat(reply).isEqualTo("Model dự phòng trả lời.");
+        server.verify();
+    }
+
+    @Test
     void chat_throwsException_whenBothPrimaryAndBackupFail() {
         server.expect(requestTo(PRIMARY_URL))
                 .andExpect(method(HttpMethod.POST))
@@ -159,25 +179,5 @@ class GeminiAiClientTest {
                 .isInstanceOf(HttpServerErrorException.class);
 
         server.verify();
-    }
-
-    @Test
-    void isRetryable_distinguishesTransientFromTerminalErrors() {
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS))).isTrue();
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE))).isTrue();
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpServerErrorException(HttpStatus.BAD_GATEWAY))).isTrue();
-        assertThat(GeminiAiClient.isRetryable(
-                new ResourceAccessException("I/O error"))).isTrue();
-
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpClientErrorException(HttpStatus.BAD_REQUEST))).isFalse();
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpClientErrorException(HttpStatus.UNAUTHORIZED))).isFalse();
-        assertThat(GeminiAiClient.isRetryable(
-                new HttpClientErrorException(HttpStatus.FORBIDDEN))).isFalse();
-        assertThat(GeminiAiClient.isRetryable(null)).isFalse();
     }
 }

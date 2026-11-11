@@ -331,25 +331,6 @@ class DeathCertificateOcrServiceImplTest {
     }
 
     @Test
-    void isRetryable_distinguishesTransientFromTerminalErrors() {
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new ResourceAccessException("I/O error"))).isTrue();
-
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.BAD_REQUEST))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.UNAUTHORIZED))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.FORBIDDEN))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(null)).isFalse();
-    }
-    @Test
     void cleanJsonContent_stripsMarkdownCodeFences() {
         String fenced = "```json\n{\"documentCategory\":\"VALID_DEATH_CERTIFICATE\"}\n```";
         String cleaned = DeathCertificateOcrServiceImpl.cleanJsonContent(fenced);

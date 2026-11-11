@@ -12,6 +12,7 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAccessGuard;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.service.legalverificationservice.VerifierAccessGuard;
+import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -255,8 +256,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                         PRIMARY_CONNECT_TIMEOUT_MS, PRIMARY_READ_TIMEOUT_MS);
             } catch (Exception primaryEx) {
                 log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Retryable: {}",
-                        model, fileName, primaryEx.getMessage(), isRetryable(primaryEx));
-                if (isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
+                        model, fileName, primaryEx.getMessage(), GeminiErrors.isRetryable(primaryEx));
+                if (GeminiErrors.isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                     try {
                         String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
                         DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName,
@@ -309,32 +310,6 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                 .hasOfficialSeal(false)
                 .warnings(List.of(msg))
                 .build();
-    }
-
-    /**
-     * Chỉ chuyển sang model dự phòng khi lỗi có thể giải quyết được bằng việc đổi model / gọi lại:
-     * 429 (hết quota / rate limit), 5xx (server error phía Google), hoặc lỗi mạng / timeout.
-     * Không retry với 400 (Bad Request - sai API key, file lỗi, prompt vi phạm policy...) hoặc 401/403.
-     */
-    static boolean isRetryable(Throwable ex) {
-        Throwable current = ex;
-        int depth = 0;
-        while (current != null && depth < 10) {
-            if (current instanceof org.springframework.web.client.HttpStatusCodeException hsce) {
-                int status = hsce.getStatusCode().value();
-                return status == 429 || hsce.getStatusCode().is5xxServerError();
-            }
-            if (current instanceof org.springframework.web.client.ResourceAccessException) {
-                return true;
-            }
-            if (current instanceof java.util.concurrent.TimeoutException
-                    || current instanceof java.net.SocketTimeoutException) {
-                return true;
-            }
-            current = current.getCause();
-            depth++;
-        }
-        return false;
     }
 
     DeathCertificateOcrResponseDto callGeminiVisionOcr(
