@@ -7,7 +7,6 @@ import './index.css'
 import './design-system/tokens.css'
 import './design-system/themes.css'
 import './design-system/materials.css'
-import './design-system/page-hero.css'
 import './design-system/motion.css'
 
 // Trang tách code (React.lazy): sau mỗi lần deploy, file chunk đổi tên. Tab mở từ trước chuyển trang sẽ tải chunk cũ đã bị xoá
