@@ -7,6 +7,8 @@ import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary } from './ownerUi.jsx';
+import { VipChip, VipLocked } from '../Common/VipLock.jsx';
+import { useVipStatus } from '../Common/useVipStatus.js';
 
 // Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
 const LIMITS = {
@@ -26,6 +28,7 @@ const STATUS = {
 
 export default function DeadMansSwitch() {
     const { t } = useTranslation('dms');
+    const vip = useVipStatus();   // false = gói FREE: Trusted Social Confirmers hiện mờ + khoá
     const toast = useToast();
     const user = getUser();
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
@@ -221,7 +224,8 @@ export default function DeadMansSwitch() {
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
                         <div data-tour="dms-confirmers">
-                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /></>} icon="verified_user">
+                        <VipLocked locked={vip === false}>
+                        <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /> <VipChip className="ml-1" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
                             <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
                             {confirmers.length === 0 ? (
@@ -292,6 +296,7 @@ export default function DeadMansSwitch() {
                                 </form>
                             )}
                         </Card>
+                        </VipLocked>
                         </div>
                     )}
                     </div>

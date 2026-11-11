@@ -483,6 +483,19 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
+    @DisplayName("Đã xoá hết vault: check-in báo lỗi DMS_NO_VAULT và không reset chu kỳ")
+    void checkIn_noVault_rejected() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime lastCheckin = existing.getLastCheckinAt();
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .hasMessageContaining("no vault");
+        assertThat(existing.getLastCheckinAt()).isEqualTo(lastCheckin);
+    }
+
+    @Test
     @DisplayName("Q27 (T7): check-in bắt đầu chu kỳ mới -> triggerDeferrals về 0")
     void checkIn_resetsTriggerDeferrals() {
         DmsConfig existing = existingConfig(DmsStatus.ACTIVE);

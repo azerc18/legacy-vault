@@ -6,7 +6,7 @@ import {ownerApi} from '../api/ownerApi.js';
 import {getErrorMessage} from '../api/http.js';
 import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline} from './ownerUi.jsx';
 import {AssetTypeIcon} from './assetArt.jsx';
-import {AssetFieldsForm, cleanFields, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
+import {AssetFieldsForm, cleanFields, deriveAssetName, fieldProblems, focusFirstInvalid, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
 import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
 
 const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation()});
@@ -14,6 +14,9 @@ const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '',
 const emailKey = (b) => b.email.trim().toLowerCase();
 const canSplitPercent = (schema) => schema?.mechanism === 'LEGAL_CLAIM_DOSSIER';   // BE chỉ cho chia % với tài sản cần hồ sơ pháp lý
 const hasFieldValues = (fields) => Object.values(fields || {}).some((v) => v && String(v).trim());
+const isFilledAsset = (a) => !!(a.assetName.trim() || a.secret.trim() || hasFieldValues(a.fields));
+// Chỉ loại "Khác" (hoặc loại chưa có schema) cho nhập tên; các loại còn lại tên tự dựng từ loại + tên tổ chức
+const nameIsTyped = (a, schema) => a.assetType === 'OTHER' || !schema;
 // uid: khoá ổn định của từng dòng người thụ hưởng, để sửa email không làm mất lựa chọn phân bổ đã chọn
 let beneficiaryUid = 0;
 const emptyBeneficiary = () => ({uid: `b${++beneficiaryUid}`, email: '', fullName: '', relationship: ''});
@@ -31,6 +34,8 @@ export default function CreateVault() {
     // errorAt: chỗ hiện lỗi (null = cạnh nút tạo két): 'name' | 'beneficiaries' | 'asset-<số thứ tự từ 0>'
     const [errorAt, setErrorAt] = useState(null);
     const errorRef = useRef(null);
+    const [submitted, setSubmitted] = useState(false);   // đã bấm Tạo: ô bắt buộc còn trống báo lỗi ngay tại ô
+    const [nameErrorAt, setNameErrorAt] = useState(null); // số thứ tự tài sản thiếu tên (loại Khác)
     const [loading, setLoading] = useState(false);
     // Két đã tạo nhưng một số tài sản theo schema lưu lỗi: không cho gửi lại (tránh tạo trùng két)
     const [partial, setPartial] = useState(null);
@@ -78,17 +83,29 @@ export default function CreateVault() {
         e.preventDefault();
         setError('');
         setErrorAt(null);
+        setNameErrorAt(null);
+        setSubmitted(true);
         // BE không validate name/secret nên FE phải chặn trước
         if (!name.trim()) return fail(t('create.errors.nameRequired'), 'name');
         // Tài sản có schema (N3) nhập theo từng trường; không có schema thì dùng 1 ô bí mật như cũ
         const filled = assets
             .map((a, i) => ({...a, index: i + 1, schema: schemaOf(schemas, a.assetType)}))
-            .filter((a) => a.assetName.trim() || a.secret.trim() || hasFieldValues(a.fields));
+            .filter(isFilledAsset);
         for (const a of filled) {
             const at = `asset-${a.index - 1}`;
-            if (!a.assetName.trim()) return fail(t('create.errors.assetIncomplete'), at);
+            const typeLabel = t(`enums:assetType.${a.assetType}`, {defaultValue: ASSET_TYPES.find((x) => x.value === a.assetType)?.label || a.assetType});
+            a.name = nameIsTyped(a, a.schema) ? a.assetName.trim() : deriveAssetName(typeLabel, a.schema, a.fields);
+            if (nameIsTyped(a, a.schema) && !a.name) {
+                setNameErrorAt(a.index - 1);
+                focusFirstInvalid();
+                return;
+            }
             if (a.schema) {
-                const msg = validateFields(a.schema, a.fields, false);
+                if (Object.keys(fieldProblems(a.schema, a.fields, false)).length) {
+                    focusFirstInvalid();   // lỗi đã hiện tại từng ô
+                    return;
+                }
+                const msg = validateFields(a.schema, a.fields, false);   // còn lại: ví crypto thiếu seed/private key
                 if (msg) return fail(msg, at);
             } else if (!a.secret.trim()) return fail(t('create.errors.assetIncomplete'), at);
         }
@@ -130,7 +147,7 @@ export default function CreateVault() {
                     })),
                 assets: legacy.map((a) => ({
                     assetType: a.assetType,
-                    assetName: a.assetName.trim(),
+                    assetName: a.name,
                     secret: a.secret,
                     notes: a.notes.trim() || null,
                 })),
@@ -155,7 +172,7 @@ export default function CreateVault() {
                 try {
                     const body = {
                         assetType: a.assetType,
-                        assetName: a.assetName.trim(),
+                        assetName: a.name,
                         notes: a.notes.trim() || null,
                     };
                     if (a.schema) body.fields = cleanFields(a.fields, a.schema);
@@ -258,7 +275,7 @@ export default function CreateVault() {
                                             {t('create.assetItem', {index: i + 1})}
                                         </div>
                                         <div className="font-title-lg text-lg leading-snug text-on-surface truncate">
-                                            {a.assetName.trim() || t(`enums:assetType.${a.assetType}`)}
+                                            {(nameIsTyped(a, schemaOf(schemas, a.assetType)) ? a.assetName.trim() : deriveAssetName(t(`enums:assetType.${a.assetType}`), schemaOf(schemas, a.assetType), a.fields)) || t(`enums:assetType.${a.assetType}`)}
                                         </div>
                                     </div>
                                     {assets.length > 1 && (
@@ -289,14 +306,19 @@ export default function CreateVault() {
                                         </div>
                                     </div>
 
+                                    {nameIsTyped(a, schemaOf(schemas, a.assetType)) && (
                                     <div>
                                         <label htmlFor={`asset-name-${i}`} className="block text-sm font-semibold text-on-surface mb-1.5">
-                                            {t('detail.assets.assetNamePlaceholder')}
+                                            {t('detail.assets.assetNamePlaceholder')} <span className="text-primary">*</span>
                                         </label>
                                         <input id={`asset-name-${i}`} value={a.assetName} maxLength={200}
-                                               onChange={(e) => updateAsset(i, 'assetName', e.target.value)}
-                                               placeholder={t('create.assetNamePlaceholder')} className={inputClass}/>
+                                               aria-invalid={nameErrorAt === i ? true : undefined}
+                                               onChange={(e) => { updateAsset(i, 'assetName', e.target.value); setNameErrorAt(null); }}
+                                               placeholder={t('create.assetNamePlaceholder')}
+                                               className={inputClass + (nameErrorAt === i ? ' lv-field-invalid' : '')}/>
+                                        {nameErrorAt === i && <p role="alert" className="mt-1.5 text-xs font-semibold text-error">{t('detail.assets.errors.nameRequired')}</p>}
                                     </div>
+                                    )}
 
                                     <div data-tour="asset-fields">
                                     {schemas === null ? (
@@ -304,6 +326,7 @@ export default function CreateVault() {
                                     ) : schemaOf(schemas, a.assetType) ? (
                                         <AssetFieldsForm schema={schemaOf(schemas, a.assetType)} values={a.fields}
                                                          onChange={(k, v) => setAssetField(i, k, v)} isEdit={false}
+                                                         showErrors={submitted && isFilledAsset(a)}
                                                          idPrefix={`asset-${i}`}/>
                                     ) : (
                                         <div>

@@ -23,6 +23,7 @@
   "MFA_REQUIRED": "Vui lòng nhập mã xác thực 2 lớp.",
   "MFA_INVALID_CODE": "Mã xác thực 2 lớp không đúng.",
   "DMS_NOT_TRIGGERED": "Dead Man's Switch chưa được kích hoạt.",
+  "DMS_NO_VAULT": "Chưa có két sắt nào tồn tại nên check-in không thành công. Hãy tạo két sắt trước.",
   "EXECUTOR_NOT_ACTIVE": "Vai trò người thi hành của bạn chưa được kích hoạt cho di sản này.",
   "CHECKIN_TOKEN_INVALID": "Liên kết check-in không hợp lệ hoặc đã hết hạn.",
   "CONFIRMER_TOKEN_INVALID": "Liên kết xác nhận không hợp lệ hoặc đã hết hạn.",

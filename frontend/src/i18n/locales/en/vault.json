@@ -157,7 +157,8 @@
         "thresholdPlaceholder": "Approvals needed",
         "thresholdOption": "{{k}} of {{n}} people",
         "notePlaceholder": "Note about this allocation (optional)",
-        "vipNote": "Percentage split, backup beneficiary and joint approval require a VIP plan.",
+        "vipNote": "Options marked VIP (percentage split, joint approval, backup beneficiary) need the VIP plan. The free plan can still give the asset to everyone or to one person.",
+        "subtitle": "Choose who receives this asset and how.",
         "proportionalUnavailable": "Percentage split is only available for assets that need a legal claim (bank accounts, exchange accounts, documents), so this asset type does not offer it.",
         "summary": {
           "ALL": "All beneficiaries",
@@ -215,7 +216,7 @@
     },
     "documents": {
       "title": "Legal documents ({{count}})",
-      "hint": "PDF, DOC/DOCX, JPG/PNG — up to 10MB. Files are encrypted before storage.",
+      "hint": "PDF, DOC/DOCX, JPG/PNG — one file per upload, up to 10MB each. Files are encrypted before storage.",
       "history": "History",
       "uploadNewVersion": "Upload new version",
       "uploadNewVersionTitle": "Upload new version",
@@ -229,7 +230,7 @@
         "load": "Could not load documents.",
         "chooseFile": "Please choose a file.",
         "invalidType": "Only PDF, DOC/DOCX, JPG/PNG are allowed.",
-        "tooLarge": "File exceeds the 10MB limit.",
+        "tooLarge": "This file is larger than 10MB (the limit applies to each file). Please choose a smaller one.",
         "upload": "Upload failed.",
         "uploadVersion": "Could not upload new version.",
         "history": "Could not load version history.",
@@ -386,7 +387,8 @@
       "cryptoSecretRequired": "Seed phrase or private key is required.",
       "fieldRequired": "{{label}} is required.",
       "fieldInvalid": "{{label}} has an invalid format.",
-      "numberInvalid": "{{label}} must be a whole number (digits only, e.g. 10000000)."
+      "numberInvalid": "{{label}} must be a whole number (digits only, e.g. 10000000).",
+      "numberRange": "{{label}} must be greater than 0, must not start with 0 and can have at most 15 digits (e.g. 10000000)."
     }
   }
 }

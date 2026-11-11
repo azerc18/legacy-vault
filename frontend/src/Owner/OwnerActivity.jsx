@@ -37,14 +37,16 @@ export default function OwnerActivity() {
     const { t, i18n } = useTranslation('activity');
     const { t: tAccess } = useTranslation('accessLog');
     const { spring } = useMotionTokens();
-    const [tab, setTab] = useState('dms');
+    const [tab, setTab] = useState('all');   // all = gộp cả hai nhật ký thành một dòng thời gian
     const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
-    const [data, setData] = useState(null);
+    const [data, setData] = useState(null);      // mảng sự kiện đã gộp, mới nhất trước
     const [error, setError] = useState('');
+    const PAGE_SIZE = 20;
+    const FETCH_SIZE = 100;                      // mỗi nguồn lấy tối đa 100 dòng gần nhất rồi gộp và chia trang ở máy khách
 
     useEffect(() => {
-        let cancelled = false; // F6 (m4): đổi tab / trang nhanh thì bỏ kết quả của request cũ
+        let cancelled = false; // F6 (m4): đổi bộ lọc nhanh thì bỏ kết quả của request cũ
         setError('');
         setData(null);
         const range = {};
@@ -53,17 +55,26 @@ export default function OwnerActivity() {
             range.startDate = new Date(end.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
             range.endDate = end.toISOString();
         }
-        const fetcher = tab === 'access' ? ownerApi.getEstateAccessLogs : ownerApi.getOwnerActivityLogs;
-        fetcher({ ...range, page, size: 20 })
-            .then((res) => { if (!cancelled) setData(res); })
+        const args = { ...range, page: 0, size: FETCH_SIZE };
+        const tag = (res, kind) => (res?.content ?? []).map((r) => ({ ...r, kind }));
+        Promise.all([
+            tab === 'access' ? [] : ownerApi.getOwnerActivityLogs(args).then((r) => tag(r, 'dms')),
+            tab === 'dms' ? [] : ownerApi.getEstateAccessLogs(args).then((r) => tag(r, 'access')),
+        ])
+            .then(([dms, access]) => {
+                if (cancelled) return;
+                setData([...dms, ...access].sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt)));
+            })
             .catch((e) => { if (!cancelled) setError(getErrorMessage(e, t('errors.load'))); });
         return () => { cancelled = true; };
-    }, [tab, days, page, t]);
+    }, [tab, days, t]);
 
-    const rows = data?.content ?? [];
-    const totalPages = data?.totalPages ?? 0;
+    const all = data ?? [];
+    const rows = all.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const totalPages = Math.ceil(all.length / PAGE_SIZE);
     const isAccess = tab === 'access';
     const tabs = [
+        { id: 'all', icon: 'list_alt', label: t('filterAll', { defaultValue: 'Tất cả' }) },
         { id: 'dms', icon: 'history', label: tAccess('tabDms') },
         { id: 'access', icon: 'visibility', label: tAccess('tab') },
     ];
@@ -71,7 +82,7 @@ export default function OwnerActivity() {
     return (
         <OwnerLayout
             title={t('title')}
-            subtitle={isAccess ? tAccess('subtitle') : t('subtitle')}
+            subtitle={t('subtitle')}
             actions={
                 <div data-tour="activity-filter">
                     <select value={days} onChange={(e) => { setDays(Number(e.target.value)); setPage(0); }} className={`${inputClass} w-48`}>
@@ -113,7 +124,7 @@ export default function OwnerActivity() {
             <div data-tour="activity-list">
             <Card className="lv-glass-thick">
                 {!data && !error && <LoadingSkeleton label={t('loading')}/>}
-                {data && rows.length === 0 && (
+                {data && all.length === 0 && (
                     <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
                                 title={days > 0 ? t('empty.periodTitle') : (isAccess ? tAccess('emptyTitle') : t('empty.noneTitle'))}
                                 text={days > 0 ? t('empty.periodText') : (isAccess ? tAccess('emptyText') : t('empty.noneText'))} />

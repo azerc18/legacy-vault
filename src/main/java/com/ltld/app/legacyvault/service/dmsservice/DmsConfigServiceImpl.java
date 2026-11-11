@@ -14,6 +14,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsCheckinLinkException;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -46,6 +47,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
     static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "The Dead Man's Switch has been suspended by an administrator. Please contact an admin.";
+    static final String NO_VAULT_MESSAGE = "You have no vault, so the check-in could not be completed. Create a vault first.";
     static final String HANDOVER_STARTED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be changed.";
     static final String INCOMPLETE_CONFIG_MESSAGE = "The Dead Man's Switch configuration is incomplete. Please save the configuration again.";
     static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
@@ -175,6 +177,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             }, HttpStatus.CONFLICT);
         }
         assertScheduleComplete(config);
+        // Đã xoá hết vault thì không còn gì để bảo vệ: check-in không thành công và không reset chu kỳ
+        if (!vaultRepository.existsByOwnerId(ownerId)) {
+            throw new DmsException(ErrorCode.DMS_NO_VAULT, NO_VAULT_MESSAGE);
+        }
 
         LocalDateTime now = LocalDateTime.now();
         config.setStatus(DmsStatus.ACTIVE);

@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 /** N3: kiểm các trường người dùng gửi theo schema của loại tài sản. Lỗi -> ASSET_FIELD_INVALID. */
 public final class AssetFieldsValidator {
 
-    private static final Pattern WHOLE_NUMBER = Pattern.compile("^\\d+$");
+    private static final Pattern WHOLE_NUMBER = Pattern.compile("^[1-9]\\d{0,14}$");
 
     static final int MAX_VALUE_LENGTH = 2000;
 
@@ -49,10 +49,10 @@ public final class AssetFieldsValidator {
                     }
                 }
                 case NUMBER -> {
-                    // Số nguyên không âm, chỉ gồm chữ số (khớp luật ở FE: AssetFields.fieldError); không nhận
-                    // thập phân, dấu âm hay ký hiệu khoa học như 1e5
+                    // Số nguyên dương, chỉ gồm chữ số, không bắt đầu bằng 0 và tối đa 15 chữ số (khớp luật ở FE:
+                    // AssetFields.fieldError); không nhận thập phân, dấu âm, ký hiệu khoa học như 1e5 hay "000000"
                     if (!WHOLE_NUMBER.matcher(value).matches()) {
-                        throw invalid(spec.label() + " must be a whole number (digits only)");
+                        throw invalid(spec.label() + " must be a whole number greater than 0 (digits only, no leading zero, max 15 digits)");
                     }
                 }
                 default -> {
