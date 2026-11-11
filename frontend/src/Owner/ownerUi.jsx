@@ -98,13 +98,13 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
     );
 }
 
-export function OwnerLayout({title, subtitle, back, actions, children}) {
+export function OwnerLayout({title, subtitle, back, actions, loading = false, children}) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             <AppHeader />
             <main className={`${PAGE_WIDTH} py-10`}>
                 <ProtectionBanner/>
-                <PageTitle back={back} title={title} subtitle={subtitle} right={actions}/>
+                <PageTitle back={back} title={title} subtitle={subtitle} right={actions} loading={loading}/>
                 {children}
             </main>
         </div>

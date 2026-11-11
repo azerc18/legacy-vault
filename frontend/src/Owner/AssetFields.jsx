@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ownerApi } from '../api/ownerApi.js';
 import { Icon, inputClass } from './ownerUi.jsx';
@@ -45,6 +45,40 @@ export const normalizeNumber = (raw) => {
     const v = (raw || '').trim();
     return GROUPED_RE.test(v) ? v.replace(/[.,\s]/g, '') : v;
 };
+
+// Hiển thị số nguyên theo nhóm 3 chữ số cho dễ đọc: 98543000 -> "98 543 000". Chuỗi không phải số nguyên (vd "1.5") giữ nguyên để báo lỗi.
+export const formatGrouped = (raw) => {
+    const n = normalizeNumber(raw);
+    return INT_RE.test(n) ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : (raw || '');
+};
+// Giá trị lưu trong state: chỉ có chữ số và khoảng trắng thì bỏ khoảng trắng (khoảng trắng do chính ô này thêm vào);
+// còn lại (dán "10.000.000", gõ "1.5") đi qua normalizeNumber như cũ.
+const toStored = (raw) => (/^[\d\s]*$/.test(raw) ? raw.replace(/\s/g, '') : normalizeNumber(raw));
+
+// Ô nhập số: tự chèn khoảng trắng ngăn nhóm 3 chữ số khi gõ, con trỏ giữ nguyên vị trí theo số chữ số đứng trước nó
+function NumberInput({ value, onChange, ...rest }) {
+    const ref = useRef(null);
+    const pending = useRef(null);
+    const shown = formatGrouped(value);
+    useLayoutEffect(() => {
+        const want = pending.current;
+        pending.current = null;
+        const el = ref.current;
+        if (!want || !el || document.activeElement !== el || want.raw === shown) return;   // chữ không đổi: trình duyệt đã đặt đúng chỗ
+        let pos = 0;
+        let seen = 0;
+        while (pos < shown.length && seen < want.digits) { if (/\d/.test(shown[pos++])) seen++; }
+        el.setSelectionRange(pos, pos);
+    });
+    return (
+        <input {...rest} ref={ref} type="text" inputMode="numeric" value={shown}
+               onChange={(e) => {
+                   const raw = e.target.value;
+                   pending.current = { raw, digits: raw.slice(0, e.target.selectionStart ?? raw.length).replace(/\D/g, '').length };
+                   onChange(toStored(raw));
+               }} />
+    );
+}
 
 // Lỗi của MỘT ô (rỗng = hợp lệ hoặc chưa nhập): kiểu dữ liệu số và pattern từ BE
 export function fieldError(f, raw) {
@@ -94,7 +128,8 @@ const MECHANISM_ICON = {
 
 // Form nhập theo schema: phần nhận diện (công khai) xếp lưới 2 cột, phần bí mật gom vào khung "niêm phong".
 // Mỗi ô có nhãn, ví dụ (placeholder) và gợi ý lấy từ i18n assetFields.examples / assetFields.hints (không có thì bỏ trống).
-export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = 'asset-field' }) {
+// part: 'all' (mặc định) | 'main' (ô công khai) | 'sealed' (khung niêm phong) để hộp thoại rộng chia hai cột
+export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = 'asset-field', part = 'all' }) {
     const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
     const [touched, setTouched] = useState({});
@@ -142,10 +177,12 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
                     <textarea {...common} rows={3} maxLength={2000} placeholder={example}
                               className={`${inputClass} h-auto min-h-24 py-3 leading-relaxed${errCls}`} />
                 )}
-                {(f.type === 'TEXT' || f.type === 'NUMBER') && (
-                    <input {...common} type="text"
-                           inputMode={f.type === 'NUMBER' ? 'decimal' : undefined}
-                           maxLength={500} placeholder={example} className={inputClass + errCls} />
+                {f.type === 'TEXT' && (
+                    <input {...common} type="text" maxLength={500} placeholder={example} className={inputClass + errCls} />
+                )}
+                {f.type === 'NUMBER' && (
+                    <NumberInput {...common} onChange={(next) => onChange(f.key, next)}
+                                 maxLength={500} placeholder={example} className={inputClass + errCls} />
                 )}
                 {f.type === 'SECRET' && (
                     <div className="relative">
@@ -168,20 +205,24 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
         );
     };
 
+    // Khung giải thích cơ chế: màn rộng (hai cột) nằm ở cột phải cho cột trái ngắn lại, màn hẹp nằm ngay trên các ô như cũ
+    const mechanismBanner = (cls) => schema.mechanism && (
+        <div className={`flex items-start gap-3 rounded-lg border border-secondary/30 bg-tertiary-fixed/40 p-3 ${cls}`.trim()}>
+            <Icon name={MECHANISM_ICON[schema.mechanism] || 'info'} className="text-[20px] text-secondary shrink-0" />
+            <p className="text-sm text-on-surface">
+                {t(`assetFields.mechanisms.${schema.mechanism}`, { defaultValue: MECHANISM_TEXT[schema.mechanism] })}
+            </p>
+        </div>
+    );
+
     return (
         <div className="space-y-4">
-            {schema.mechanism && (
-                <div className="flex items-start gap-3 rounded-lg border border-secondary/30 bg-tertiary-fixed/40 p-3">
-                    <Icon name={MECHANISM_ICON[schema.mechanism] || 'info'} className="text-[20px] text-secondary shrink-0" />
-                    <p className="text-sm text-on-surface">
-                        {t(`assetFields.mechanisms.${schema.mechanism}`, { defaultValue: MECHANISM_TEXT[schema.mechanism] })}
-                    </p>
-                </div>
-            )}
-            {publicFields.length > 0 && (
+            {part !== 'sealed' && mechanismBanner(part === 'main' ? 'lg:hidden' : '')}
+            {part === 'sealed' && mechanismBanner('hidden lg:flex')}
+            {part !== 'sealed' && publicFields.length > 0 && (
                 <div className="grid sm:grid-cols-2 gap-x-3 gap-y-4">{publicFields.map(renderField)}</div>
             )}
-            {secretFields.length > 0 && (
+            {part !== 'main' && secretFields.length > 0 && (
                 <div className="rounded-xl border border-dashed border-primary/40 bg-surface-container-low p-4 space-y-4">
                     <div className="flex items-start gap-3">
                         <span className="w-9 h-9 shrink-0 rounded-full border-2 border-primary text-primary flex items-center justify-center">
@@ -222,7 +263,9 @@ export function AssetFieldsView({ schema, fields }) {
                                 {t(`assetFields.labels.${f.key}`, { defaultValue: f.label })}
                             </p>
                             <p className="text-sm font-semibold text-on-surface dark:text-white break-words whitespace-pre-wrap">
-                                {t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
+                                {f.type === 'NUMBER'
+                                    ? formatGrouped(fields[f.key])
+                                    : t(`assetFields.options.${fields[f.key]}`, { defaultValue: OPTION_LABEL[fields[f.key]] || fields[f.key] })}
                             </p>
                         </div>
                     ))}
