@@ -13,7 +13,8 @@
       "ACTIVE": "Active",
       "PENDING_CONFIRMATION": "Waiting for confirmers",
       "TRIGGERED": "Triggered",
-      "SUSPENDED": "Suspended"
+      "SUSPENDED": "Suspended",
+      "NO_VAULT": "Paused — no vault"
     },
     "notSetUp": "Not set up yet",
     "notSetUpHint": "Choose your schedule on the right and save to turn it on.",
@@ -22,6 +23,8 @@
     "checkingIn": "Checking in...",
     "triggeredNote": "The hand-over was triggered on {{date}}. Settings can no longer be changed.",
     "suspendedNote": "Suspended by an administrator. Please contact support.",
+    "noVaultScheduleHint": "Create a vault first to change the schedule.",
+    "noVaultNote": "You have deleted all your vaults, so the Dead Man's Switch is paused: no reminders are sent and no hand-over will start. Create a new vault to start a new check-in cycle.",
     "info": {
       "lastCheckin": "Last check-in",
       "nextDue": "Next check-in due",

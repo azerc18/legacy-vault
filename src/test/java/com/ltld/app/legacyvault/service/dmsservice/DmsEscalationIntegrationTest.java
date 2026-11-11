@@ -79,6 +79,8 @@ class DmsEscalationIntegrationTest {
     @Autowired
     private NotificationRepository notificationRepository;
     @Autowired
+    private VaultRepository vaultRepository;
+    @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -101,6 +103,9 @@ class DmsEscalationIntegrationTest {
             dmsCheckinRepository.deleteAll(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(s.configId));
             executorAssignmentRepository.deleteAll(executorAssignmentRepository.findAllByOwnerId(s.ownerId));
             dmsConfigRepository.deleteById(s.configId);
+            vaultRepository.deleteAll(vaultRepository.findAll().stream()
+                    .filter(v -> v.getOwner().getId().equals(s.ownerId))
+                    .toList());
             userRepository.deleteAllById(userIds);
         }
         seeds.clear();
@@ -474,6 +479,8 @@ class DmsEscalationIntegrationTest {
     private Seed seed(boolean withPrimary, boolean withBackup, int waitDays, LocalDateTime nextCheckinDueAt) {
         String tag = UUID.randomUUID().toString().substring(0, 8);
         User owner = user("owner-" + tag);
+        // Owner phải còn vault: không còn vault thì DMS tạm dừng, không trigger.
+        vaultRepository.save(Vault.builder().owner(owner).name("Vault " + tag).build());
         DmsConfig config = dmsConfigRepository.save(DmsConfig.builder()
                 .owner(owner)
                 .backupActivationWaitDays(waitDays)

@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,7 @@ class DmsReminderProcessorTest {
 
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private DmsCheckinRepository dmsCheckinRepository;
+    @Mock private VaultRepository vaultRepository;
 
     @InjectMocks
     private DmsReminderProcessor processor;
@@ -62,6 +64,7 @@ class DmsReminderProcessorTest {
                 .remindersSent(0)
                 .build();
         when(dmsConfigRepository.findById(config.getId())).thenReturn(Optional.of(config));
+        when(vaultRepository.existsByOwnerId(any())).thenReturn(true);
     }
 
     private DmsCheckin savedCheckin() {
@@ -89,6 +92,18 @@ class DmsReminderProcessorTest {
         verifyNoInteractions(dmsCheckinRepository);   // M1: REMINDER_SENT ghi sau khi gửi (recordReminderSent)
 
         assertThat(mail).contains(new DmsReminderProcessor.ReminderMail("owner@example.test", DUE, TRIGGER, 1, 3, 0));
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> DMS tạm dừng: tới hạn nhắc cũng không nhắc, không ghi gì")
+    void ownerWithoutVault_noReminder() {
+        when(vaultRepository.existsByOwnerId(any())).thenReturn(false);
+
+        assertThat(processor.prepareReminder(config.getId(), DUE.plusMinutes(1))).isEmpty();
+
+        assertThat(config.getRemindersSent()).isZero();
+        assertThat(config.getNextReminderAt()).isEqualTo(DUE);
+        verifyNothingWritten();
     }
 
     @Test

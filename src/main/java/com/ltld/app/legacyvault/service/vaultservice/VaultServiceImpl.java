@@ -124,7 +124,12 @@ public class VaultServiceImpl implements VaultService {
                 .status(VaultStatus.ACTIVE)
                 .build();
 
+        // DMS tạm dừng khi Owner đã xoá hết vault: vault đầu tiên tạo lại thì bắt đầu chu kỳ check-in mới
+        boolean firstVault = !vaultRepository.existsByOwnerId(ownerId);
         vault = vaultRepository.save(vault);
+        if (firstVault) {
+            dmsConfigService.restartCycleAfterFirstVaultCreated(ownerId);
+        }
 
         // 3. Nếu người dùng có gửi kèm danh sách tài sản, ta sẽ MÃ HÓA rồi lưu
         if (request.getAssets() != null) {
