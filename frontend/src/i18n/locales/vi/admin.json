@@ -65,9 +65,28 @@
     "receipt": "Biên lai",
     "refund": {"action": "Hoàn tiền", "title": "Hoàn tiền giao dịch", "message": "Hoàn {{amount}} cho {{email}} (gói {{plan}}). Chỉ phần chưa dùng của kỳ mà giao dịch này mua bị trừ khỏi hạn hiện tại (giao dịch cũ đã dùng hết thì không trừ); nếu hết thời gian thì tài khoản về gói Free ngay.", "viaGateway": "Hoàn qua cổng {{provider}}", "viaGatewayHint": "Hệ thống gọi API hoàn tiền của cổng. Nếu cổng từ chối thì không có gì thay đổi.", "manualHint": "Chỉ ghi nhận là đã hoàn tay (bạn đã chuyển khoản trả lại ngoài hệ thống). Không gọi cổng thanh toán.", "reasonPlaceholder": "Lý do hoàn tiền (bắt buộc, tối đa 255 ký tự)", "confirm": "Hoàn tiền", "success": "Đã hoàn tiền giao dịch của {{email}}.", "error": "Không hoàn tiền được.", "on": "Hoàn tiền {{date}}"},
     "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn", "REFUNDED": "Đã hoàn tiền" },
+    "coupon": "Mã {{code}} -{{discount}}",
+    "couponReused": "Mã đã trả quá 1 lần",
+    "couponReusedHint": "Tài khoản này đã trả nhiều đơn với cùng mã. Kiểm tra và hoàn đơn thừa nếu cần.",
     "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay", "expiredFoot": "{{count}} đơn bỏ ngang đã tự đóng", "refundedFoot": "Thêm {{count}} giao dịch đã hoàn" },
     "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
     "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
+  },
+
+  "coupons": {
+    "title": "Mã giảm giá",
+    "subtitle": "Owner nhập mã ở trang Bảng giá. Giảm theo %, giá sau giảm làm tròn tới 1.000 ₫ và tối thiểu 10.000 ₫. Mỗi tài khoản dùng một mã một lần; lượt dùng chỉ tính khi thanh toán thành công.",
+    "count": "{{count}} mã",
+    "loadError": "Không tải được danh sách mã.",
+    "saveError": "Không lưu được mã.",
+    "created": "Đã tạo mã {{code}}.",
+    "empty": "Chưa có mã nào.",
+    "noEnd": "Không hạn",
+    "enable": "Bật lại",
+    "disable": "Tắt mã",
+    "form": { "code": "Mã", "percent": "Giảm %", "plan": "Áp dụng cho", "allPlans": "Mọi gói VIP", "max": "Số lượt", "until": "Hết hạn sau ngày", "note": "Ghi chú", "notePlaceholder": "Ví dụ: khuyến mãi Tết, chỉ gửi nhóm khách cũ", "create": "Tạo mã", "hint": "Mã 3–40 ký tự chữ, số, - hoặc _. Giảm tối đa 90%; muốn tặng miễn phí thì dùng nút Tặng VIP trong hồ sơ người dùng. Nên đặt mã từ 8 ký tự, khó đoán (ví dụ TET2027-VIP), vì mỗi tài khoản chỉ được nhập sai 10 lần trong 10 phút. Ngày hết hạn tính theo giờ Việt Nam. Tạo rồi thì không sửa được mã và %, chỉ tắt / bật." },
+    "cols": { "code": "Mã", "percent": "Giảm", "plan": "Gói", "used": "Đã dùng", "until": "Hạn", "status": "Trạng thái" },
+    "state": { "on": "Đang dùng", "off": "Đã tắt", "expired": "Hết hạn", "usedUp": "Hết lượt" }
   },
 
   "drawer": {

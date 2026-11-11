@@ -81,6 +81,13 @@ public class PaymentTransaction {
     @Column(name = "refund_ref", length = 100)
     private String refundRef;
 
+    // Việc 4: mã giảm giá đã áp dụng; amountVnd là số tiền sau giảm
+    @Column(name = "coupon_code", length = 40)
+    private String couponCode;
+
+    @Column(name = "discount_vnd")
+    private Long discountVnd;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -64,9 +64,13 @@ public class PaymentServiceImpl implements PaymentService {
     private final VnpayProperties vnpayProperties;
     private final PaypalClient paypalClient;
     private final AuditLogService auditLogService;
+    private final CouponService couponService;
 
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl = "http://localhost:5173";
+
+    @Value("${app.subscription.trial-days:7}")
+    private int trialDays = 7;
 
     @Override
     @Transactional
@@ -89,6 +93,13 @@ public class PaymentServiceImpl implements PaymentService {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Cannot checkout a free plan.");
         }
 
+        // Việc 4: kiểm mã trước khi đóng đơn cũ, để mã sai không làm mất đơn đang chờ
+        com.ltld.app.legacyvault.dto.coupondto.CouponQuote quote = null;
+        if (request.getCouponCode() != null && !request.getCouponCode().isBlank()) {
+            quote = couponService.quote(userId, request.getCouponCode(), plan);
+        }
+        long amountVnd = quote != null ? quote.finalVnd() : plan.getPriceVnd();
+
         // Bấm thanh toán nhiều lần: đơn cũ chưa trả tiền thành EXPIRED để lịch sử không đầy đơn treo.
         // An toàn vì IPN/return về muộn cho đơn EXPIRED vẫn được xử lý (xem isOpen).
         for (PaymentTransaction old : paymentTransactionRepository.findByUserIdAndStatus(userId, PaymentStatus.PENDING)) {
@@ -98,9 +109,11 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentTransaction tx = PaymentTransaction.builder()
                 .user(user)
                 .plan(plan)
-                .amountVnd(plan.getPriceVnd())
+                .amountVnd(amountVnd)
                 .status(PaymentStatus.PENDING)
                 .provider(provider)
+                .couponCode(quote != null ? CouponService.normalize(request.getCouponCode()) : null)
+                .discountVnd(quote != null ? quote.discountVnd() : null)
                 .build();
         tx = paymentTransactionRepository.save(tx);
         // flush để có createdAt: vnp_CreateDate phải bằng giờ này thì querydr về sau mới tìm thấy đơn
@@ -108,7 +121,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         String paymentUrl;
         if (provider == PaymentProvider.PAYPAL) {
-            long usdCents = paypalClient.toUsdCents(plan.getPriceVnd());
+            long usdCents = paypalClient.toUsdCents(amountVnd);
             PaypalClient.Order order = paypalClient.createOrder(tx.getId(), usdCents, "LegacyVault " + plan.getCode());
             tx.setAmountUsdCents(usdCents);
             tx.setGatewayTxnRef(order.id());
@@ -116,7 +129,7 @@ public class PaymentServiceImpl implements PaymentService {
             paymentUrl = order.approveUrl();
         } else {
             String orderInfo = "Nang cap LegacyVault " + plan.getCode() + " ma " + VnpayClient.toTxnRef(tx.getId());
-            paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), plan.getPriceVnd(), orderInfo, ipAddress,
+            paymentUrl = vnpayClient.buildPaymentUrl(tx.getId(), amountVnd, orderInfo, ipAddress,
                     tx.getCreatedAt());
         }
 
@@ -124,7 +137,8 @@ public class PaymentServiceImpl implements PaymentService {
                 .transactionId(tx.getId())
                 .paymentUrl(paymentUrl)
                 .planCode(plan.getCode())
-                .amountVnd(plan.getPriceVnd())
+                .amountVnd(amountVnd)
+                .discountVnd(quote != null ? quote.discountVnd() : 0L)
                 .build();
     }
 
@@ -333,6 +347,9 @@ public class PaymentServiceImpl implements PaymentService {
         paymentTransactionRepository.save(tx);
         SubscriptionPlan plan = tx.getPlan();
         activateOrExtendSubscription(user, plan, now);
+        if (tx.getCouponCode() != null) {
+            couponService.redeem(tx);
+        }
         auditLogService.log(
                 AuditAction.PAYMENT_SUCCEEDED,
                 AuditResult.SUCCESS,
@@ -552,6 +569,8 @@ public class PaymentServiceImpl implements PaymentService {
                         .cancelledAt(sub.getCancelledAt())
                         .renewPlanCode(plan.isVip() ? plan.getCode() : null)
                         .lastProvider(lastProvider(userId))
+                        .trial(sub.isTrial())
+                        .trialDays(trialDays)
                         .availablePlans(plans)
                         .build();
             }
@@ -578,6 +597,9 @@ public class PaymentServiceImpl implements PaymentService {
                 .renewPlanCode(latestSubOpt.map(Subscription::getPlan)
                         .filter(SubscriptionPlan::isVip).map(SubscriptionPlan::getCode).orElse(null))
                 .lastProvider(lastProvider(userId))
+                .trialEligible(latestSubOpt.isEmpty()
+                        && !paymentTransactionRepository.existsByUserIdAndStatus(userId, PaymentStatus.SUCCESS))
+                .trialDays(trialDays)
                 .availablePlans(plans)
                 .build();
     }
@@ -622,6 +644,8 @@ public class PaymentServiceImpl implements PaymentService {
             // Việc 6: trả tiền gia hạn nghĩa là muốn dùng tiếp, nên bỏ cờ hủy cuối kỳ
             existing.setCancelAtPeriodEnd(false);
             existing.setCancelledAt(null);
+            // Review #256 m2: trả tiền trong lúc dùng thử thì kỳ này là kỳ trả phí, không còn là dùng thử
+            existing.setTrial(false);
             existing.setExpiresAt(baseTime.plusDays(durationDays));
             subscriptionRepository.save(existing);
         } else {

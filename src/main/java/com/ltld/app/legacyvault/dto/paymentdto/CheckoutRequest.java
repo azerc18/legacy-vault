@@ -17,5 +17,12 @@ public class CheckoutRequest {
 
     // VNPAY hoặc PAYPAL; để trống là VNPAY (client cũ không gửi trường này)
     private String provider;
+
+    // Việc 4: mã giảm giá (không bắt buộc)
+    private String couponCode;
+
+    public CheckoutRequest(String planCode, String provider) {
+        this(planCode, provider, null);
+    }
 }
 

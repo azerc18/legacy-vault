@@ -122,6 +122,11 @@ export default function BillingPage() {
                                                 {t('billing.current.vip')}
                                             </span>
                                         )}
+                                        {sub.trial && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                                                {t('billing.current.trial')}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="p-4 rounded-xl bg-surface-container-low">
@@ -252,7 +257,14 @@ export default function BillingPage() {
                                                 <td className="py-3 pr-4 font-semibold">
                                                     {tx.planName || tx.planCode}
                                                 </td>
-                                                <td className="py-3 pr-4">{formatVnd(tx.amountVnd)}</td>
+                                                <td className="py-3 pr-4">
+                                                    {formatVnd(tx.amountVnd)}
+                                                    {tx.couponCode && (
+                                                        <span className="block text-xs text-on-surface-variant">
+                                                            {t('billing.history.coupon', { code: tx.couponCode, discount: formatVnd(tx.discountVnd) })}
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="py-3 pr-4">
                                                     <span
                                                         title={tx.status === 'EXPIRED' ? t('billing.history.expiredHint') : undefined}

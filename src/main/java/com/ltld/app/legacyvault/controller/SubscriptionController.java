@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.paymentdto.PlanUsageResponse;
 import com.ltld.app.legacyvault.dto.paymentdto.SubscriptionMeResponse;
 import com.ltld.app.legacyvault.service.paymentservice.PaymentService;
 import com.ltld.app.legacyvault.service.paymentservice.SubscriptionRenewalService;
+import com.ltld.app.legacyvault.service.paymentservice.TrialService;
 import com.ltld.app.legacyvault.service.paymentservice.PlanUsageService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SubscriptionController {
 
     private final PaymentService paymentService;
     private final SubscriptionRenewalService renewalService;
+    private final TrialService trialService;
     private final PlanUsageService planUsageService;
 
     @GetMapping("/me")
@@ -52,6 +54,13 @@ public class SubscriptionController {
         UUID userId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success(
                 "Renewal turned back on", renewalService.resume(userId)));
+    }
+
+    // Việc 4: dùng thử VIP miễn phí (mỗi tài khoản một lần)
+    @PostMapping("/me/trial")
+    public ResponseEntity<ApiResponse<SubscriptionMeResponse>> startTrial(Principal principal) {
+        UUID userId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Trial started", trialService.start(userId)));
     }
 
     /** Việc 2: đã dùng bao nhiêu so với hạn mức gói, và mục nào đang vượt (sau khi VIP hết hạn). */

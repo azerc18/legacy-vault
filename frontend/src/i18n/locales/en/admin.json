@@ -68,9 +68,29 @@
     "receipt": "Receipt",
     "refund": {"action": "Refund", "title": "Refund payment", "message": "Refund {{amount}} to {{email}} ({{plan}}). Only the unused part of the period this payment bought is removed from the current expiry (an old, fully used payment removes nothing); if no time is left the account goes back to Free right away.", "viaGateway": "Refund through {{provider}}", "viaGatewayHint": "Calls the gateway refund API. If the gateway refuses, nothing changes.", "manualHint": "Only records that you refunded by hand outside the system. The gateway is not called.", "reasonPlaceholder": "Reason for the refund (required, max 255 characters)", "confirm": "Refund", "success": "Refunded the payment of {{email}}.", "error": "Could not refund.", "on": "Refunded {{date}}"},
     "status": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired", "REFUNDED": "Refunded" },
+    "coupon": "Code {{code}} -{{discount}}",
+    "couponReused": "Code paid more than once",
+    "couponReusedHint": "This account paid more than one order with this code. Check and refund the extra one if needed.",
     "summary": { "revenue": "Total revenue", "filtered": "For the current filters", "allTime": "All time", "expiredFoot_one": "{{count}} abandoned checkout closed", "expiredFoot_other": "{{count}} abandoned checkouts closed", "refundedFoot_one": "{{count}} more refunded", "refundedFoot_other": "{{count}} more refunded" },
     "cols": { "time": "Time", "user": "User", "plan": "Plan", "amount": "Amount", "status": "Status", "provider": "Gateway" },
     "empty": { "title": "No payments yet", "text": "Plan upgrade payments will appear here.", "filtered": "No payments match these filters. Try removing some." }
+  },
+
+  "coupons": {
+    "title": "Discount codes",
+    "subtitle": "Owners enter a code on the Pricing page. Percent off; the new price is rounded to 1,000 ₫ and is at least 10,000 ₫. One use per account; a use only counts once the payment succeeds.",
+    "count_one": "{{count}} code",
+    "count_other": "{{count}} codes",
+    "loadError": "Could not load the codes.",
+    "saveError": "Could not save the code.",
+    "created": "Created code {{code}}.",
+    "empty": "No codes yet.",
+    "noEnd": "No end date",
+    "enable": "Turn on",
+    "disable": "Turn off",
+    "form": { "code": "Code", "percent": "% off", "plan": "Applies to", "allPlans": "Every VIP plan", "max": "Uses", "until": "Ends after", "note": "Note", "notePlaceholder": "e.g. Tet promotion, sent to past customers only", "create": "Create code", "hint": "3–40 letters, digits, - or _. At most 90% off; to give VIP for free use Grant VIP in the user profile. Use 8 or more characters that are hard to guess (e.g. TET2027-VIP), since each account can only try 10 wrong codes per 10 minutes. The end date is Vietnam time. Once created, the code and % cannot change; you can only turn it off or on." },
+    "cols": { "code": "Code", "percent": "Off", "plan": "Plan", "used": "Used", "until": "Ends", "status": "Status" },
+    "state": { "on": "Active", "off": "Off", "expired": "Expired", "usedUp": "Used up" }
   },
 
   "drawer": {

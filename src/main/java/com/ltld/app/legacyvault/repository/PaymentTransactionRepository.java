@@ -49,6 +49,16 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     List<PaymentTransaction> findByUserIdAndStatus(UUID userId, PaymentStatus status);
 
+    // Việc 4: mỗi tài khoản dùng một mã một lần (tính giao dịch đã thu tiền, kể cả đã hoàn)
+    boolean existsByUserIdAndCouponCodeIgnoreCaseAndStatusIn(UUID userId, String couponCode,
+                                                             java.util.Collection<PaymentStatus> statuses);
+
+    // Review #256 m1: số giao dịch đã thu tiền của tài khoản với cùng mã (kể cả giao dịch vừa ghi SUCCESS)
+    long countByUserIdAndCouponCodeIgnoreCaseAndStatusIn(UUID userId, String couponCode,
+                                                         java.util.Collection<PaymentStatus> statuses);
+
+    boolean existsByUserIdAndStatus(UUID userId, PaymentStatus status);
+
     // Việc 6: cổng của lần thanh toán thành công gần nhất, để "Gia hạn 1 chạm" chọn sẵn
     Optional<PaymentTransaction> findFirstByUserIdAndStatusOrderByPaidAtDesc(UUID userId, PaymentStatus status);
 

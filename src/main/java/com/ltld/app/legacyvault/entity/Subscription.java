@@ -60,6 +60,11 @@ public class Subscription {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
+    // Việc 4: gói dùng thử miễn phí (mỗi tài khoản một lần)
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean trial = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

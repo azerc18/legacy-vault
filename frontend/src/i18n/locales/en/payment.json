@@ -38,6 +38,23 @@
       "loadFailed": "Could not load subscription plans.",
       "noPlans": "No subscription plans are available right now.",
       "checkoutFailed": "Could not initiate checkout."
+    },
+    "coupon": {
+      "label": "Have a discount code?",
+      "placeholder": "Enter a code, e.g. TET2027",
+      "apply": "Apply",
+      "checking": "Checking...",
+      "applied": "Code {{code}} applied: {{percent}}% off",
+      "until": "valid until {{date}}",
+      "remove": "Remove code",
+      "error": "This code cannot be applied."
+    },
+    "trial": {
+      "title": "Try VIP free for {{days}} days",
+      "text": "Get every VIP feature for {{days}} days without paying. When it ends your account moves to the free plan and your data is kept. One trial per account.",
+      "start": "Start {{days}}-day trial",
+      "starting": "Starting...",
+      "error": "Could not start the trial."
     }
   },
   "billing": {
@@ -58,7 +75,8 @@
       "storage": "Encrypted Storage & Media",
       "storageDetail": "{{storage}} · {{media}}",
       "mediaEnabled": "Media enabled",
-      "noMedia": "No legacy media"
+      "noMedia": "No legacy media",
+      "trial": "Trial"
     },
     "history": {
       "title": "Payment History",
@@ -78,7 +96,8 @@
         "EXPIRED": "Expired",
         "REFUNDED": "Refunded"
       },
-      "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back."
+      "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back.",
+      "coupon": "Code {{code}}: -{{discount}}"
     },
     "usage": {
       "title": "Usage",

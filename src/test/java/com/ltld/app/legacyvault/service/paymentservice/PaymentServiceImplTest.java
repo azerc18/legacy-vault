@@ -31,6 +31,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -44,6 +45,7 @@ class PaymentServiceImplTest {
     @Mock private EntitlementServiceImpl entitlementService;
     @Mock private AuditLogService auditLogService;
     @Mock private PaypalClient paypalClient;
+    @Mock private CouponService couponService;
 
     private VnpayClient vnpayClient;
     private PaymentServiceImpl paymentService;
@@ -67,7 +69,8 @@ class PaymentServiceImplTest {
                 client,
                 properties,
                 paypalClient,
-                auditLogService
+                auditLogService,
+                couponService
         );
     }
 
@@ -240,7 +243,7 @@ class PaymentServiceImplTest {
         );
     }
 
-    // Việc 6: Owner đã hủy gia hạn rồi trả tiền gia hạn -> cờ hủy cuối kỳ được bỏ, hạn cộng nối tiếp
+    // Việc 6: Owner đã hủy gia hạn (đang dùng thử) rồi trả tiền gia hạn -> bỏ cờ hủy cuối kỳ và cờ dùng thử, hạn cộng nối tiếp
     @Test
     void handleVnpayIpn_renewAfterCancel_clearsCancelFlagAndExtends() {
         UUID txId = UUID.randomUUID();
@@ -250,7 +253,7 @@ class PaymentServiceImplTest {
         Subscription running = Subscription.builder()
                 .id(UUID.randomUUID()).user(owner).plan(vipMonthPlan).status(SubscriptionStatus.ACTIVE)
                 .startedAt(oldExpiry.minusDays(30)).expiresAt(oldExpiry)
-                .cancelAtPeriodEnd(true).cancelledAt(java.time.LocalDateTime.now().minusDays(2)).build();
+                .cancelAtPeriodEnd(true).cancelledAt(java.time.LocalDateTime.now().minusDays(2)).trial(true).build();
 
         when(paymentTransactionRepository.findByIdForUpdate(txId)).thenReturn(Optional.of(tx));
         when(userRepository.findByIdForUpdate(owner.getId())).thenReturn(Optional.of(owner));
@@ -269,6 +272,8 @@ class PaymentServiceImplTest {
         assertEquals("00", paymentService.handleVnpayIpn(params).get("RspCode"));
         assertEquals(false, running.isCancelAtPeriodEnd());
         assertEquals(null, running.getCancelledAt());
+        // review #256 m2: trả tiền trong lúc dùng thử thì kỳ này không còn là dùng thử
+        assertEquals(false, running.isTrial());
         assertEquals(oldExpiry.plusDays(30), running.getExpiresAt());
     }
 
@@ -436,5 +441,67 @@ class PaymentServiceImplTest {
                 () -> unconfiguredPaymentService.checkout(owner.getId(), request, "127.0.0.1")
         );
         assertEquals(ErrorCode.SERVICE_UNAVAILABLE, ex.getErrorCode());
+    }
+
+    // Việc 4: checkout có mã -> giao dịch và URL VNPay dùng giá sau giảm, nhớ mã và số tiền giảm
+    @Test
+    void checkout_withCoupon_chargesDiscountedAmount() {
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+        when(subscriptionPlanRepository.findByCode("VIP_MONTH")).thenReturn(Optional.of(vipMonthPlan));
+        when(couponService.quote(owner.getId(), "tet2027", vipMonthPlan))
+                .thenReturn(new com.ltld.app.legacyvault.dto.coupondto.CouponQuote("VIP_MONTH", 99_000L, 20_000L, 79_000L));
+        org.mockito.ArgumentCaptor<PaymentTransaction> saved = org.mockito.ArgumentCaptor.forClass(PaymentTransaction.class);
+        when(paymentTransactionRepository.save(saved.capture())).thenAnswer(inv -> {
+            PaymentTransaction tx = inv.getArgument(0);
+            tx.setId(UUID.randomUUID());
+            return tx;
+        });
+
+        CheckoutResponse response = paymentService.checkout(owner.getId(),
+                new CheckoutRequest("VIP_MONTH", null, "tet2027"), "127.0.0.1");
+
+        assertEquals(79_000L, response.getAmountVnd());
+        assertEquals(20_000L, response.getDiscountVnd());
+        assertTrue(response.getPaymentUrl().contains("vnp_Amount=7900000"));
+        PaymentTransaction tx = saved.getValue();
+        assertEquals(79_000L, tx.getAmountVnd());
+        assertEquals("TET2027", tx.getCouponCode());
+        assertEquals(20_000L, tx.getDiscountVnd());
+    }
+
+    // Việc 4: mã sai thì không tạo đơn và không đóng đơn đang chờ
+    @Test
+    void checkout_withInvalidCoupon_createsNothing() {
+        when(userRepository.findById(owner.getId())).thenReturn(Optional.of(owner));
+        when(subscriptionPlanRepository.findByCode("VIP_MONTH")).thenReturn(Optional.of(vipMonthPlan));
+        when(couponService.quote(any(), any(), any()))
+                .thenThrow(new BusinessException(ErrorCode.COUPON_INVALID, "bad"));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> paymentService.checkout(owner.getId(),
+                new CheckoutRequest("VIP_MONTH", null, "BAD"), "127.0.0.1"));
+        assertEquals(ErrorCode.COUPON_INVALID, ex.getErrorCode());
+        verify(paymentTransactionRepository, never()).save(any());
+        verify(paymentTransactionRepository, never()).findByUserIdAndStatus(any(), any());
+    }
+
+    // Việc 4: lượt dùng mã chỉ tăng khi giao dịch thành công
+    @Test
+    void ipnSuccess_withCoupon_redeemsCode() {
+        UUID txId = UUID.randomUUID();
+        PaymentTransaction tx = PaymentTransaction.builder().id(txId).user(owner).plan(vipMonthPlan)
+                .amountVnd(79_000L).couponCode("TET2027").discountVnd(20_000L).status(PaymentStatus.PENDING).build();
+        when(paymentTransactionRepository.findByIdForUpdate(txId)).thenReturn(Optional.of(tx));
+        when(userRepository.findByIdForUpdate(owner.getId())).thenReturn(Optional.of(owner));
+        when(subscriptionRepository.findFirstByUserIdAndStatusOrderByExpiresAtDesc(owner.getId(), SubscriptionStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        Map<String, String> params = new HashMap<>();
+        params.put("vnp_TxnRef", txId.toString());
+        params.put("vnp_Amount", "7900000");
+        params.put("vnp_ResponseCode", "00");
+        params.put("vnp_TransactionStatus", "00");
+        params.put("vnp_SecureHash", vnpayClient.signParams(params));
+
+        assertEquals("00", paymentService.handleVnpayIpn(params).get("RspCode"));
+        verify(couponService).redeem(tx);
     }
 }
