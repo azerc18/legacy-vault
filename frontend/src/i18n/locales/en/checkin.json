@@ -18,7 +18,8 @@
       "TOKEN_INVALID": "This check-in link is invalid, expired, already used, or from an earlier reminder cycle.",
       "TRIGGERED": "Your Dead Man's Switch has already started the handover process, so check-in is no longer possible.",
       "SUSPENDED": "Your Dead Man's Switch is currently suspended by an administrator. Please contact an admin.",
-      "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration."
+      "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration.",
+      "NO_VAULT": "You have no vault yet, so the check-in was not successful. Sign in and create a vault first."
     },
     "nextDue": "Next check-in due:",
     "openDms": "Open Dead Man's Switch",

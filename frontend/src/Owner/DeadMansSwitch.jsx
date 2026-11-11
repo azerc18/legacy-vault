@@ -5,7 +5,7 @@ import { useToast } from '../Common/Toast.jsx';
 import { Link, Navigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
-import { getErrorMessage } from '../api/http.js';
+import { getErrorCode, getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary, LoadingSkeleton } from './ownerUi.jsx';
 import { VipChip, VipLocked } from '../Common/VipLock.jsx';
 import { useVipStatus } from '../Common/useVipStatus.js';
@@ -24,6 +24,8 @@ const STATUS = {
     PENDING_CONFIRMATION: { cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
     TRIGGERED: { cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
     SUSPENDED: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
+    // Không phải trạng thái của BE: DMS ACTIVE / chờ xác nhận nhưng Owner đã xoá hết két (hasVault = false)
+    NO_VAULT: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
 export default function DeadMansSwitch() {
@@ -72,6 +74,9 @@ export default function DeadMansSwitch() {
     // X2: đang chờ xác nhận vẫn check-in / sửa cấu hình được (cả hai đều huỷ quy trình xác nhận)
     const canCheckIn = configured && (config.status === 'ACTIVE' || config.status === 'PENDING_CONFIRMATION');
     const locked = configured && !canCheckIn; // TRIGGERED / SUSPENDED: không sửa, không check-in
+    // Owner đã xoá hết két: BE tạm dừng DMS (không nhắc, không bàn giao); nút check-in vẫn hiện nhưng BE trả DMS_NO_VAULT.
+    // Giữ lần check-in cuối, các mốc của chu kỳ không còn chạy nên hiện "—". Tạo két mới thì BE bắt đầu chu kỳ mới.
+    const pausedNoVault = canCheckIn && config.hasVault === false;
     // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
     const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
@@ -109,6 +114,10 @@ export default function DeadMansSwitch() {
             toast.success(t('dms.checkedIn'));
         } catch (err) {
             setError(getErrorMessage(err, t('dms.errors.checkIn')));
+            // Két vừa bị xoá ở tab khác: tải lại để khung trạng thái chuyển sang "Tạm dừng — chưa có két"
+            if (getErrorCode(err) === 'DMS_NO_VAULT') {
+                ownerApi.getDms().then(applyConfig).catch(() => {});
+            }
         } finally {
             setChecking(false);
         }
@@ -153,7 +162,7 @@ export default function DeadMansSwitch() {
         }
     };
 
-    const statusKey = configured && STATUS[config.status] ? config.status : 'ACTIVE';
+    const statusKey = pausedNoVault ? 'NO_VAULT' : configured && STATUS[config.status] ? config.status : 'ACTIVE';
     const s = configured ? STATUS[statusKey] : null;
     // Dựa vào câu lỗi của BE (mã CONFLICT, chưa có bản dịch nên giữ nguyên tiếng Anh) — giữ nguyên logic cũ
     const needVault = /Vault/i.test(error) && !configured;
@@ -196,7 +205,13 @@ export default function DeadMansSwitch() {
                                     )}
                                 </div>
 
-                                {config.status === 'PENDING_CONFIRMATION' && (
+                                {pausedNoVault && (
+                                    <p className="mt-4 text-sm text-on-surface-variant">
+                                        {t('dms.noVaultNote')}{' '}
+                                        <Link to="/owner/vaults/new" className="text-secondary font-semibold">{t('dms.createVaultFirst')}</Link>
+                                    </p>
+                                )}
+                                {!pausedNoVault && config.status === 'PENDING_CONFIRMATION' && (
                                     <p className="mt-4 text-sm text-on-surface-variant">
                                         {t('dms.pending.body', { deadline: formatDate(config.triggerAt, true), button: t('dms.checkIn') })}
                                     </p>
@@ -212,10 +227,10 @@ export default function DeadMansSwitch() {
 
                                 <dl className="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
                                     <Info label={t('dms.info.lastCheckin')} value={formatDate(config.lastCheckinAt, true)} />
-                                    <Info label={t('dms.info.nextDue')} value={formatDate(config.checkinDueAt, true)} highlight />
-                                    <Info label={t('dms.info.triggerAt')} value={formatDate(config.triggerAt, true)} />
-                                    <Info label={t('dms.info.nextReminder')} value={formatDate(config.nextReminderAt, true)} />
-                                    <Info label={t('dms.info.remindersSent')} value={`${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
+                                    <Info label={t('dms.info.nextDue')} value={pausedNoVault ? '—' : formatDate(config.checkinDueAt, true)} highlight={!pausedNoVault} />
+                                    <Info label={t('dms.info.triggerAt')} value={pausedNoVault ? '—' : formatDate(config.triggerAt, true)} />
+                                    <Info label={t('dms.info.nextReminder')} value={pausedNoVault ? '—' : formatDate(config.nextReminderAt, true)} />
+                                    <Info label={t('dms.info.remindersSent')} value={pausedNoVault ? '—' : `${config.remindersSent ?? 0} / ${config.reminderCount ?? '—'}`} />
                                     <Info label={t('dms.info.notifiedBy')} value={channelLabel(t, config.notificationChannel || 'EMAIL')} />
                                 </dl>
                             </>

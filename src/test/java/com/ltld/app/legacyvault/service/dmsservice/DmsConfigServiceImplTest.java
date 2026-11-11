@@ -15,6 +15,7 @@ import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
@@ -502,6 +503,98 @@ class DmsConfigServiceImplTest {
         assertThatThrownBy(() -> service.checkIn(ownerId))
                 .isInstanceOf(DmsException.class)
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> check-in 409 DMS_NO_VAULT, không reset chu kỳ, không audit")
+    void checkIn_withoutVault_returns409NoVault() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+        LocalDateTime lastCheckin = existing.getLastCheckinAt();
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getErrorCode()).isEqualTo(ErrorCode.DMS_NO_VAULT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        assertThat(existing.getLastCheckinAt()).isEqualTo(lastCheckin);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> DMS TRIGGERED vẫn báo lỗi TRIGGERED như cũ (kiểm trạng thái trước)")
+    void checkIn_withoutVault_whenTriggered_keepsTriggeredError() {
+        existingConfig(DmsStatus.TRIGGERED);
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.checkIn(ownerId))
+                .isInstanceOf(DmsException.class)
+                .hasMessageContaining("triggered");
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("getConfig trả hasVault theo việc Owner còn vault hay không")
+    void getConfig_reportsHasVault() {
+        existingConfig(DmsStatus.ACTIVE);
+        assertThat(service.getConfig(ownerId).getHasVault()).isTrue();
+
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+        assertThat(service.getConfig(ownerId).getHasVault()).isFalse();
+    }
+
+    // ---------- restartCycleAfterFirstVaultCreated ----------
+
+    @Test
+    @DisplayName("Tạo lại vault đầu tiên -> DMS ACTIVE bắt đầu chu kỳ mới từ lúc này, ghi OWNER_RESPONDED, audit DMS_CHECKIN")
+    void restartAfterFirstVault_activeConfig_startsNewCycle() {
+        DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
+        LocalDateTime before = LocalDateTime.now();
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        LocalDateTime now = existing.getLastCheckinAt();
+        assertThat(now).isAfterOrEqualTo(before);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(now.plusDays(37));
+        assertThat(existing.getRemindersSent()).isZero();
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        verify(dmsConfigRepository).saveAndFlush(existing);
+        verifyOwnerRespondedRecorded(existing);
+        verify(auditLogService).log(eq(AuditAction.DMS_CHECKIN), eq(AuditResult.SUCCESS), eq(ownerId),
+                any(), isNull(), any(), any(), contains("FIRST_VAULT_CREATED"));
+    }
+
+    @Test
+    @DisplayName("Tạo lại vault khi DMS đang chờ xác nhận chéo -> về ACTIVE với chu kỳ mới")
+    void restartAfterFirstVault_pendingConfirmation_backToActive() {
+        DmsConfig existing = existingConfig(DmsStatus.PENDING_CONFIRMATION);
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        verify(dmsConfigRepository).saveAndFlush(existing);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = {"TRIGGERED", "SUSPENDED"})
+    @DisplayName("Tạo vault khi DMS TRIGGERED / SUSPENDED -> không đổi gì")
+    void restartAfterFirstVault_triggeredOrSuspended_doesNothing(DmsStatus status) {
+        DmsConfig existing = existingConfig(status);
+        LocalDateTime deadline = existing.getNextCheckinDueAt();
+
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
+        assertThat(existing.getStatus()).isEqualTo(status);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(deadline);
+        verifyNothingWritten();
+    }
+
+    @Test
+    @DisplayName("Tạo vault khi chưa cấu hình DMS -> không làm gì")
+    void restartAfterFirstVault_notConfigured_doesNothing() {
+        service.restartCycleAfterFirstVaultCreated(ownerId);
+
         verifyNothingWritten();
     }
 

@@ -52,6 +52,8 @@ public enum ErrorCode {
     CONFIRMER_TOKEN_INVALID(HttpStatus.BAD_REQUEST),
     REMINDER_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
     EMERGENCY_REQUEST_EXISTS(HttpStatus.CONFLICT),
+    // Owner đã xoá hết vault: DMS tạm dừng, check-in không thành công
+    DMS_NO_VAULT(HttpStatus.CONFLICT),
 
     // Verifier
     INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),
