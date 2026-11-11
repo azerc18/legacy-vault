@@ -28,7 +28,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,9 +39,14 @@ import java.util.UUID;
 /**
  * Việc 3: Admin tặng VIP thủ công và hoàn tiền giao dịch.
  *
- * <p>Hoàn tiền trừ lại đúng số ngày gói của giao dịch đó khỏi hạn VIP hiện tại; nếu hạn mới đã qua thì gói chuyển
- * EXPIRED ngay (Owner về FREE, dữ liệu giữ nguyên theo chính sách hết hạn). Doanh thu chỉ tính SUCCESS nên giao dịch
- * REFUNDED tự rời khỏi số liệu doanh thu.
+ * <p>Hoàn tiền chỉ trừ phần CHƯA DÙNG của kỳ mà giao dịch đó mua ({@code paidAt + số ngày gói - bây giờ}, không âm)
+ * khỏi hạn VIP hiện tại. Giao dịch cũ đã dùng hết kỳ thì không trừ ngày nào, nên hoàn một giao dịch cũ không ăn vào
+ * kỳ của giao dịch gia hạn mới hơn. Khi Owner đã gia hạn nối tiếp, kỳ thật của giao dịch sau bắt đầu muộn hơn
+ * {@code paidAt}, nên cách tính này có thể trừ ít hơn thực tế: chấp nhận, vì lệch về phía có lợi cho Owner.
+ * Nếu hạn mới còn dưới 1 phút thì gói chuyển EXPIRED ngay (Owner về FREE, dữ liệu giữ nguyên theo chính sách hết hạn).
+ * Doanh thu chỉ tính SUCCESS nên giao dịch REFUNDED tự rời khỏi số liệu doanh thu.
+ *
+ * <p>Thông báo trong app chỉ gửi sau khi transaction commit, để không có thông báo "đã hoàn tiền" khi DB rollback.
  */
 @Slf4j
 @Service
@@ -91,18 +99,18 @@ public class AdminBillingService {
         }
         subscriptionRepository.save(sub);
 
-        auditLogService.log(AuditAction.ADMIN_VIP_GRANTED, AuditResult.SUCCESS, adminId, null,
+        auditLogService.log(AuditAction.ADMIN_VIP_GRANTED, AuditResult.SUCCESS, adminId, adminEmail(adminId),
                 "User", userId.toString(), "days=" + days + " until=" + sub.getExpiresAt()
                         + " reason=" + request.reason().trim());
-        inAppNotifier.toUser(userId, InAppNotifier.draft(NotificationType.SUBSCRIPTION_GRANTED, null, null,
-                "You received " + days + " VIP day(s).", "days", days, "expiresAt", sub.getExpiresAt()));
+        LocalDateTime expiresAt = sub.getExpiresAt();
+        afterCommit(() -> inAppNotifier.toUser(userId, InAppNotifier.draft(NotificationType.SUBSCRIPTION_GRANTED,
+                null, null, "You received " + days + " VIP day(s).", "days", days, "expiresAt", expiresAt)));
         return new VipGrantResponse(sub.getPlan().getCode(), sub.getExpiresAt());
     }
 
     @Transactional
     public AdminPaymentResponse refund(UUID adminId, UUID transactionId, RefundPaymentRequest request) {
-        String adminEmail = adminId == null ? null
-                : userRepository.findById(adminId).map(User::getEmail).orElse(null);
+        String adminEmail = adminEmail(adminId);
         PaymentTransaction tx = paymentTransactionRepository.findByIdForUpdate(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Payment not found."));
         if (tx.getStatus() != PaymentStatus.SUCCESS) {
@@ -112,6 +120,7 @@ public class AdminBillingService {
         String refundRef = null;
         if (request.gateway()) {
             refundRef = refundAtGateway(tx, adminEmail);
+            warnIfNotCommitted(tx, refundRef);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -122,18 +131,18 @@ public class AdminBillingService {
         paymentTransactionRepository.save(tx);
 
         User user = tx.getUser();
-        LocalDateTime newExpiry = revokeDays(user, tx.getPlan(), now);
+        LocalDateTime newExpiry = revokeUnusedDays(user, tx, now);
 
         auditLogService.log(AuditAction.PAYMENT_REFUNDED, AuditResult.SUCCESS, adminId, adminEmail,
                 "PaymentTransaction", tx.getId().toString(),
                 (request.gateway() ? "gateway ref=" + refundRef : "manual") + " amount=" + tx.getAmountVnd()
                         + " reason=" + request.reason().trim());
         if (user != null) {
-            inAppNotifier.toUser(user.getId(), InAppNotifier.draft(NotificationType.PAYMENT_REFUNDED,
-                    null, null, "A payment was refunded.",
-                    "amount", String.format(java.util.Locale.forLanguageTag("vi-VN"), "%,d", tx.getAmountVnd()),
-                    "plan", tx.getPlan() != null ? tx.getPlan().getName() : "VIP",
-                    "expiresAt", newExpiry));
+            UUID userId = user.getId();
+            String amount = String.format(java.util.Locale.forLanguageTag("vi-VN"), "%,d", tx.getAmountVnd());
+            String plan = tx.getPlan() != null ? tx.getPlan().getName() : "VIP";
+            afterCommit(() -> inAppNotifier.toUser(userId, InAppNotifier.draft(NotificationType.PAYMENT_REFUNDED,
+                    null, null, "A payment was refunded.", "amount", amount, "plan", plan, "expiresAt", newExpiry)));
         }
         return adminPaymentService.describe(tx);
     }
@@ -171,8 +180,11 @@ public class AdminBillingService {
         return result.transactionNo();
     }
 
-    /** Trừ số ngày của gói đã hoàn khỏi hạn VIP đang chạy; trả hạn mới (null nếu không còn gói nào chạy). */
-    private LocalDateTime revokeDays(User user, SubscriptionPlan plan, LocalDateTime now) {
+    /**
+     * Trừ phần chưa dùng của kỳ mà giao dịch đã mua khỏi hạn VIP đang chạy (xem javadoc lớp); trả hạn mới, null nếu
+     * không còn gói nào chạy.
+     */
+    private LocalDateTime revokeUnusedDays(User user, PaymentTransaction tx, LocalDateTime now) {
         if (user == null) {
             return null;
         }
@@ -183,10 +195,12 @@ public class AdminBillingService {
             return null;
         }
         Subscription sub = activeOpt.get();
-        int days = plan != null && plan.getDurationDays() != null && plan.getDurationDays() > 0
-                ? plan.getDurationDays() : DEFAULT_DURATION_DAYS;
-        LocalDateTime newExpiry = sub.getExpiresAt().minusDays(days);
-        if (!newExpiry.isAfter(now)) {
+        Duration unused = unusedPart(tx, now);
+        if (unused.isZero()) {
+            return sub.getExpiresAt();
+        }
+        LocalDateTime newExpiry = sub.getExpiresAt().minus(unused);
+        if (newExpiry.isBefore(now.plusMinutes(1))) {
             sub.setExpiresAt(now);
             sub.setStatus(SubscriptionStatus.EXPIRED);
         } else {
@@ -194,6 +208,58 @@ public class AdminBillingService {
         }
         subscriptionRepository.save(sub);
         return sub.getStatus() == SubscriptionStatus.ACTIVE ? sub.getExpiresAt() : null;
+    }
+
+    /** Phần chưa dùng của kỳ giao dịch đã mua: {@code paidAt + số ngày gói - now}, không âm, không quá số ngày gói. */
+    static Duration unusedPart(PaymentTransaction tx, LocalDateTime now) {
+        SubscriptionPlan plan = tx.getPlan();
+        int days = plan != null && plan.getDurationDays() != null && plan.getDurationDays() > 0
+                ? plan.getDurationDays() : DEFAULT_DURATION_DAYS;
+        LocalDateTime start = tx.getPaidAt() != null ? tx.getPaidAt() : now;
+        Duration left = Duration.between(now, start.plusDays(days));
+        if (left.isNegative()) {
+            return Duration.ZERO;
+        }
+        return left.compareTo(Duration.ofDays(days)) > 0 ? Duration.ofDays(days) : left;
+    }
+
+    private String adminEmail(UUID adminId) {
+        return adminId == null ? null : userRepository.findById(adminId).map(User::getEmail).orElse(null);
+    }
+
+    /** Chạy sau khi commit; ngoài transaction (test đơn vị) thì chạy luôn. */
+    private static void afterCommit(Runnable work) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            work.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                work.run();
+            }
+        });
+    }
+
+    /**
+     * Review #254 m1: cổng đã hoàn tiền nhưng bước ghi DB sau đó lỗi thì giao dịch vẫn SUCCESS. Log ERROR kèm mã hoàn
+     * của cổng để đối chiếu rồi dùng "ghi nhận hoàn tay" (PayPal gọi lại tự khớp nhờ PayPal-Request-Id, VNPay thì không).
+     */
+    private static void warnIfNotCommitted(PaymentTransaction tx, String refundRef) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        UUID txId = tx.getId();
+        PaymentProvider provider = tx.getProvider();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    log.error("Refund: {} refunded payment {} (refund ref {}) but the database update did not commit."
+                            + " Record it with a manual refund after checking the gateway.", provider, txId, refundRef);
+                }
+            }
+        });
     }
 
     private SubscriptionPlan vipPlan() {

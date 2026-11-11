@@ -65,7 +65,7 @@
     "receipt": "Biên lai",
     "refund": {"action": "Hoàn tiền", "title": "Hoàn tiền giao dịch", "message": "Hoàn {{amount}} cho {{email}} (gói {{plan}}). Thời hạn VIP của giao dịch này sẽ bị trừ khỏi hạn hiện tại; nếu hết thì tài khoản về gói Free ngay.", "viaGateway": "Hoàn qua cổng {{provider}}", "viaGatewayHint": "Hệ thống gọi API hoàn tiền của cổng. Nếu cổng từ chối thì không có gì thay đổi.", "manualHint": "Chỉ ghi nhận là đã hoàn tay (bạn đã chuyển khoản trả lại ngoài hệ thống). Không gọi cổng thanh toán.", "reasonPlaceholder": "Lý do hoàn tiền (bắt buộc, tối đa 255 ký tự)", "confirm": "Hoàn tiền", "success": "Đã hoàn tiền giao dịch của {{email}}.", "error": "Không hoàn tiền được.", "on": "Hoàn tiền {{date}}"},
     "status": { "SUCCESS": "Thành công", "PENDING": "Đang chờ", "FAILED": "Thất bại", "EXPIRED": "Đã hết hạn", "REFUNDED": "Đã hoàn tiền" },
-    "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay", "expiredFoot": "{{count}} đơn bỏ ngang đã tự đóng" },
+    "summary": { "revenue": "Tổng doanh thu", "filtered": "Theo bộ lọc đang chọn", "allTime": "Từ trước đến nay", "expiredFoot": "{{count}} đơn bỏ ngang đã tự đóng", "refundedFoot": "Thêm {{count}} giao dịch đã hoàn" },
     "cols": { "time": "Thời gian", "user": "Người dùng", "plan": "Gói", "amount": "Số tiền", "status": "Trạng thái", "provider": "Cổng" },
     "empty": { "title": "Chưa có giao dịch", "text": "Giao dịch nâng cấp gói sẽ hiện ở đây.", "filtered": "Không có giao dịch khớp bộ lọc. Thử bỏ bớt điều kiện." }
   },
