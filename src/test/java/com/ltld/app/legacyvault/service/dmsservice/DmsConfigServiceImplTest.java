@@ -739,6 +739,18 @@ class DmsConfigServiceImplTest {
     }
 
     @Test
+    @DisplayName("Hạn trigger bị đẩy về sau (hoãn 24h / chờ xác nhận 72h) -> checkinDueAt vẫn = lastCheckinAt + chu kỳ")
+    void getConfig_triggerPushedLater_keepsCheckinDueFromLastCheckin() {
+        DmsConfig existing = existingConfig(DmsStatus.PENDING_CONFIRMATION);
+        existing.setNextCheckinDueAt(existing.getNextCheckinDueAt().plusHours(72));
+
+        DmsConfigResponse response = service.getConfig(ownerId);
+
+        assertThat(response.getCheckinDueAt()).isEqualTo(existing.getLastCheckinAt().plusDays(30));
+        assertThat(response.getTriggerAt()).isEqualTo(existing.getNextCheckinDueAt());
+    }
+
+    @Test
     @DisplayName("FR-03: xem cấu hình -> checkinDueAt = lastCheckinAt + chu kỳ, triggerAt = nextCheckinDueAt")
     void getConfig_mapsSchedule() {
         DmsConfig existing = existingConfig(DmsStatus.ACTIVE);
@@ -1069,6 +1081,112 @@ class DmsConfigServiceImplTest {
                 .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(existing.getStatus()).isEqualTo(DmsStatus.SUSPENDED);
         verifyLockedLookupOnly();
+    }
+
+    // ---------- simulateOverdueByAdmin (demo) ----------
+
+    @Test
+    @DisplayName("Demo: Admin giả quá hạn -> hạn trigger về quá khứ, remindersSent >= 1, vẫn ACTIVE, audit DMS_DEMO_OVERDUE_SIMULATED")
+    void simulateOverdueByAdmin_active_movesDeadlineToPastAndAudits() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        existing.setRemindersSent(0);
+        // Owner vừa check-in hôm qua: hạn check-in thật còn 29 ngày nữa
+        LocalDateTime lastCheckin = LocalDateTime.now().minusDays(1);
+        existing.setLastCheckinAt(lastCheckin);
+        existing.setNextCheckinDueAt(lastCheckin.plusDays(37));
+        LocalDateTime previousDueAt = existing.getNextCheckinDueAt();
+        LocalDateTime nextReminder = existing.getNextReminderAt();
+
+        DmsConfigResponse response = service.simulateOverdueByAdmin(ownerId, adminId);
+
+        assertThat(response.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(existing.getNextCheckinDueAt()).isBefore(LocalDateTime.now());
+        assertThat(existing.getRemindersSent()).isEqualTo(1);
+        assertThat(existing.getNextReminderAt()).isEqualTo(nextReminder);
+        // Trang DMS: hạn check-in lùi theo hạn trigger (không còn ở tương lai), lastCheckinAt vẫn là lần check-in thật
+        assertThat(response.getCheckinDueAt()).isEqualTo(existing.getNextCheckinDueAt().minusDays(7));
+        assertThat(response.getCheckinDueAt()).isBefore(LocalDateTime.now());
+        assertThat(response.getLastCheckinAt()).isEqualTo(lastCheckin);
+
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        InOrder order = inOrder(dmsConfigRepository, auditLogService);
+        order.verify(dmsConfigRepository).saveAndFlush(existing);
+        order.verify(auditLogService).log(eq(AuditAction.DMS_DEMO_OVERDUE_SIMULATED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.test"), isNull(),
+                eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()), detail.capture());
+        assertThat(detail.getValue())
+                .startsWith("ownerId=" + ownerId)
+                .contains("previousDueAt=" + previousDueAt)
+                .contains("confirmationDeferrals=0");
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+    }
+
+    @Test
+    @DisplayName("Demo: remindersSent đã > 1 thì giữ nguyên")
+    void simulateOverdueByAdmin_keepsHigherReminderCount() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        existing.setRemindersSent(2);
+
+        service.simulateOverdueByAdmin(ownerId, adminId);
+
+        assertThat(existing.getRemindersSent()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = {"PENDING_CONFIRMATION", "TRIGGERED", "SUSPENDED"})
+    @DisplayName("Demo: DMS không ACTIVE -> 409, không ghi gì")
+    void simulateOverdueByAdmin_notActive_returns409(DmsStatus status) {
+        DmsConfig existing = lockedConfig(status);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.SIMULATE_NOT_ACTIVE_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("Demo: Owner không còn két -> 409 DMS_NO_VAULT, không đổi hạn, không ghi gì (job bỏ qua Owner không két)")
+    void simulateOverdueByAdmin_noVault_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getErrorCode()).isEqualTo(ErrorCode.DMS_NO_VAULT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("Demo: Owner không còn Executor nhận bàn giao -> 409, không đổi hạn, không ghi gì")
+    void simulateOverdueByAdmin_withoutActivationTarget_returns409() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+        executors(executor(ExecutorType.PRIMARY, ExecutorStatus.REVOKED),
+                executor(ExecutorType.BACKUP, ExecutorStatus.REVOKED));
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.SIMULATE_NO_ACTIVATION_TARGET_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verify(executorAssignmentRepository).findAllByOwnerIdForUpdate(ownerId);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("Demo: chưa có DmsConfig -> 404")
+    void simulateOverdueByAdmin_noConfig_returns404() {
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     private DmsConfig lockedConfig(DmsStatus status) {

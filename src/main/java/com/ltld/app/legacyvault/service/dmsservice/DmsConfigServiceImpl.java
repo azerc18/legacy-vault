@@ -62,6 +62,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             + "Assign an executor before saving the Dead Man's Switch configuration.";
     static final String NO_VAULT_MESSAGE =
             "You have no vault yet, so the check-in was not successful. Create a vault first.";
+    static final String SIMULATE_NOT_ACTIVE_MESSAGE =
+            "Only an active Dead Man's Switch can be made overdue.";
+    static final String SIMULATE_NO_ACTIVATION_TARGET_MESSAGE =
+            "The owner has no executor available to receive the handover; assign one before simulating an overdue check-in.";
     static final String RESUME_NO_ACTIVATION_TARGET_MESSAGE =
             "The owner has no executor available to receive the handover; the Dead Man's Switch cannot be resumed.";
 
@@ -375,6 +379,30 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         return toResponse(config, executors);
     }
 
+    @Override
+    @Transactional
+    public DmsConfigResponse simulateOverdueByAdmin(UUID ownerId, UUID adminId) {
+        DmsConfig config = findConfigForUpdate(ownerId);
+        if (config.getStatus() != DmsStatus.ACTIVE) {
+            throw new DmsException(SIMULATE_NOT_ACTIVE_MESSAGE, HttpStatus.CONFLICT);
+        }
+        // Job kích hoạt bỏ qua Owner không còn két (#263) và cần người nhận bàn giao: chặn ở đây thay vì báo
+        // "thành công" mà không có gì xảy ra, hoặc TRIGGERED mà không kích hoạt được ai.
+        assertHasVault(ownerId);
+        List<ExecutorAssignment> executors = lockExecutors(ownerId,
+                list -> ExecutorActivationRule.pickActivationTarget(list).isPresent(),
+                SIMULATE_NO_ACTIVATION_TARGET_MESSAGE);
+        LocalDateTime previousDueAt = config.getNextCheckinDueAt();
+        // Chỉ đổi 2 cột như lệnh SQL demo; giữ lịch nhắc và bộ đếm ALIVE để job chạy đúng luồng thật.
+        config.setNextCheckinDueAt(LocalDateTime.now().minusMinutes(1));
+        config.setRemindersSent(Math.max(config.getRemindersSent(), 1));
+        config = dmsConfigRepository.saveAndFlush(config);
+
+        auditByAdmin(AuditAction.DMS_DEMO_OVERDUE_SIMULATED, adminId, config,
+                "previousDueAt=" + previousDueAt + ", confirmationDeferrals=" + config.getConfirmationDeferrals());
+        return toResponse(config, executors);
+    }
+
     private DmsConfig findConfig(UUID ownerId) {
         return dmsConfigRepository.findByOwnerId(ownerId)
                 .orElseThrow(() -> new DmsException("The Dead Man's Switch has not been configured.", HttpStatus.NOT_FOUND));
@@ -464,9 +492,6 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     private DmsConfigResponse toResponse(DmsConfig config, List<ExecutorAssignment> executors) {
-        LocalDateTime checkinDueAt = config.getLastCheckinAt() != null && config.getCheckinIntervalDays() != null
-                ? config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays())
-                : null;
         return DmsConfigResponse.builder()
                 .configured(true)
                 .status(config.getStatus())
@@ -475,7 +500,7 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .reminderCount(config.getReminderCount())
                 .notificationChannel(config.getNotificationChannel())
                 .lastCheckinAt(config.getLastCheckinAt())
-                .checkinDueAt(checkinDueAt)
+                .checkinDueAt(checkinDueAt(config))
                 .triggerAt(config.getNextCheckinDueAt())
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
@@ -485,6 +510,24 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
                 .hasVault(vaultRepository.existsByOwnerId(config.getOwner().getId()))
                 .build();
+    }
+
+    /**
+     * Hạn check-in hiển thị = lastCheckinAt + chu kỳ, nhưng không muộn hơn (hạn trigger - thời gian chờ). Bình thường hai
+     * mốc trùng nhau; hoãn 24 giờ, chờ xác nhận 72 giờ hay confirmer hoãn chỉ đẩy hạn trigger về sau nên giá trị không đổi.
+     * Chỉ khi hạn trigger bị kéo về trước (Admin giả quá hạn lúc demo) thì hạn check-in lùi theo, để trang DMS không hiện
+     * "Hạn check-in" ở tương lai trong khi "Bắt đầu bàn giao" đã qua. lastCheckinAt giữ nguyên là lần check-in thật.
+     */
+    static LocalDateTime checkinDueAt(DmsConfig config) {
+        if (config.getLastCheckinAt() == null || config.getCheckinIntervalDays() == null) {
+            return null;
+        }
+        LocalDateTime byLastCheckin = config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays());
+        if (config.getNextCheckinDueAt() == null || config.getGracePeriodDays() == null) {
+            return byLastCheckin;
+        }
+        LocalDateTime byTrigger = config.getNextCheckinDueAt().minusDays(config.getGracePeriodDays());
+        return byTrigger.isBefore(byLastCheckin) ? byTrigger : byLastCheckin;
     }
 
     private DmsCheckinResponse toCheckinResponse(DmsCheckin checkin) {

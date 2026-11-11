@@ -145,4 +145,8 @@ app:
     ocr:
       # Chỉ bật khi trình diễn: tên file chứa từ khoá (mismatch, blur, cccd...) sẽ trả kết quả MÔ PHỎNG (engineSource=DEMO_SIMULATION).
       demo-scenarios: ${AI_OCR_DEMO_SCENARIOS:false}
+  demo:
+    # Chỉ bật trong buổi demo: Admin có nút "Simulate overdue" giả Owner quá hạn check-in (POST /api/admin/demo/...).
+    # Tắt (mặc định) thì nút ẩn và API trả 404. KHÔNG bật lâu dài trên production.
+    tools-enabled: ${APP_DEMO_TOOLS_ENABLED:false}
 

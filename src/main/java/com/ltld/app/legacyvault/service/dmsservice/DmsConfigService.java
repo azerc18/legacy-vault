@@ -71,6 +71,15 @@ public interface DmsConfigService {
      */
     DmsConfigResponse resumeByAdmin(UUID ownerId, UUID adminId);
 
+    /**
+     * Demo: Admin giả Owner quá hạn check-in, giống lệnh SQL trong hướng dẫn demo: hạn trigger lùi về quá khứ và
+     * remindersSent >= 1 (để không bị hoãn 24 giờ). Không đổi trạng thái: job quét DMS quá hạn (khoảng 20 giây) chạy
+     * luồng thật (PENDING_CONFIRMATION nếu có confirmer, ngược lại TRIGGERED). Nơi gọi PHẢI kiểm quyền ADMIN và cờ
+     * app.demo.tools-enabled. Chưa có DmsConfig -> 404; không phải ACTIVE, không còn két (DMS_NO_VAULT) hoặc không
+     * còn Executor nhận được bàn giao -> 409.
+     */
+    DmsConfigResponse simulateOverdueByAdmin(UUID ownerId, UUID adminId);
+
     /** Kết quả upsert; created = true khi vừa tạo cấu hình lần đầu (controller trả 201). */
     record UpsertResult(DmsConfigResponse config, boolean created) {
     }

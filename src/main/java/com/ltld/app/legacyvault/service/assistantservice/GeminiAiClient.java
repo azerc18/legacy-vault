@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.assistantservice;
 
 import com.ltld.app.legacyvault.dto.assistantdto.ChatMessage;
+import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,8 +67,8 @@ public class GeminiAiClient implements AiClient {
             return executeChat(model, apiKey, body);
         } catch (Exception primaryEx) {
             log.warn("Primary Gemini model '{}' failed for Vaulty chat: {}. Retryable: {}",
-                    model, primaryEx.getMessage(), isRetryable(primaryEx));
-            if (isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
+                    model, primaryEx.getMessage(), GeminiErrors.isRetryable(primaryEx));
+            if (GeminiErrors.isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                 try {
                     String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
                     String reply = executeChat(backupModel, keyToUse, body);
@@ -94,32 +95,6 @@ public class GeminiAiClient implements AiClient {
         var content = res.candidates().get(0).content();
         if (content == null || content.parts() == null || content.parts().isEmpty()) return "";
         return content.parts().get(0).text();
-    }
-
-    /**
-     * Chỉ chuyển sang model dự phòng khi lỗi có thể giải quyết được bằng việc đổi model / gọi lại:
-     * 429 (hết quota / rate limit), 5xx (server error phía Google), hoặc lỗi mạng / timeout.
-     * Không retry với 400 (Bad Request - sai API key, prompt vi phạm policy...) hoặc 401/403.
-     */
-    static boolean isRetryable(Throwable ex) {
-        Throwable current = ex;
-        int depth = 0;
-        while (current != null && depth < 10) {
-            if (current instanceof org.springframework.web.client.HttpStatusCodeException hsce) {
-                int status = hsce.getStatusCode().value();
-                return status == 429 || hsce.getStatusCode().is5xxServerError();
-            }
-            if (current instanceof org.springframework.web.client.ResourceAccessException) {
-                return true;
-            }
-            if (current instanceof java.util.concurrent.TimeoutException
-                    || current instanceof java.net.SocketTimeoutException) {
-                return true;
-            }
-            current = current.getCause();
-            depth++;
-        }
-        return false;
     }
 
     record GeminiResponse(List<Candidate> candidates) {}
