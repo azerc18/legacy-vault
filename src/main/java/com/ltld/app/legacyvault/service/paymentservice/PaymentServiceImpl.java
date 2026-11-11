@@ -497,9 +497,13 @@ public class PaymentServiceImpl implements PaymentService {
         if ("COMPLETED".equals(order.status()) && order.capture() != null) {
             // Đã capture bên PayPal nhưng DB chưa ghi: đọc kết quả có sẵn, không capture lại
             outcome = applyPaypalCapture(tx, order.capture(), recheckOnly);
-        } else if ("APPROVED".equals(order.status())) {
+        } else if ("APPROVED".equals(order.status()) && !recheckOnly) {
             // Người mua đã đồng ý trả nhưng không quay về web (đóng tab): capture giống lần quay về
-            outcome = capturePaypal(tx, orderId, recheckOnly);
+            outcome = capturePaypal(tx, orderId, false);
+        } else if ("APPROVED".equals(order.status())) {
+            // Review #251 M2: đơn đã bị thay thế (người mua đã trả đơn khác). Với PayPal, capture chính là thu tiền,
+            // nên job không bao giờ capture đơn EXPIRED; chỉ người mua tự quay lại tab cũ mới capture được.
+            return ReconcileOutcome.SKIPPED;
         } else {
             // CREATED / PAYER_ACTION_REQUIRED / VOIDED / NOT_FOUND: chưa trả tiền
             return recheckOnly ? ReconcileOutcome.SKIPPED : expire(tx, "TIMEOUT");

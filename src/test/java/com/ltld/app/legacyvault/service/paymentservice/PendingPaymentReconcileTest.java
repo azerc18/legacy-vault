@@ -311,18 +311,37 @@ class PendingPaymentReconcileTest {
         verify(paypalClient, never()).capture(any());
     }
 
+    // Review #251 M2: người mua đồng ý đơn 1 rồi trả đơn 2 -> job không được capture đơn 1 (thu tiền lần hai)
     @Test
-    void paypal_recheckOfExpiredOrder_declinedCapture_staysExpired() {
+    void paypal_recheckOfSupersededApprovedOrder_neverCaptures() {
         tx.setProvider(PaymentProvider.PAYPAL);
         tx.setGatewayTxnRef("ORDER1");
         tx.setAmountUsdCents(390L);
         tx.setStatus(PaymentStatus.EXPIRED);
+        tx.setVnpResponseCode("SUPERSEDED");
         when(paypalClient.isConfigured()).thenReturn(true);
         when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("APPROVED", null));
-        when(paypalClient.capture("ORDER1")).thenReturn(PaypalClient.Capture.declined("HTTP_422"));
 
         assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.SKIPPED);
         assertThat(tx.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        verify(paypalClient, never()).capture(any());
+    }
+
+    // Đơn bị thay thế nhưng thật ra đã capture xong bên PayPal (lần quay về bị lỡ): đọc kết quả có sẵn và kích hoạt
+    @Test
+    void paypal_recheckOfSupersededCompletedOrder_activatesWithoutCapturing() {
+        tx.setProvider(PaymentProvider.PAYPAL);
+        tx.setGatewayTxnRef("ORDER1");
+        tx.setAmountUsdCents(390L);
+        tx.setStatus(PaymentStatus.EXPIRED);
+        tx.setVnpResponseCode("SUPERSEDED");
+        when(paypalClient.isConfigured()).thenReturn(true);
+        when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("COMPLETED",
+                new PaypalClient.Capture(true, "COMPLETED", "CAP1", "USD", 390L)));
+
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.ACTIVATED);
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(paypalClient, never()).capture(any());
     }
 
     @Test
@@ -397,9 +416,9 @@ class PendingPaymentReconcileTest {
                 eq(now.minusMinutes(30)), any())).thenReturn(List.of(a, b));
         when(paymentService.reconcilePending(a, now, GIVE_UP)).thenThrow(new IllegalStateException("db"));
         when(paymentService.reconcilePending(b, now, GIVE_UP)).thenReturn(ReconcileOutcome.EXPIRED);
-        // Đơn EXPIRED chưa trả trong 24h gần nhất cũng được hỏi lại (review #251 M1)
+        // Đơn bị thay thế chưa trả trong 24h gần nhất cũng được hỏi lại (review #251 M1, m5)
         UUID superseded = UUID.randomUUID();
-        when(transactionRepository.findUnpaidIdsByStatusAndCreatedAtSince(eq(PaymentStatus.EXPIRED),
+        when(transactionRepository.findUnpaidIdsByStatusAndReasonSince(eq(PaymentStatus.EXPIRED), eq("SUPERSEDED"),
                 eq(now.minus(GIVE_UP)), any())).thenReturn(List.of(superseded));
         when(paymentService.reconcilePending(superseded, now, GIVE_UP)).thenReturn(ReconcileOutcome.ACTIVATED);
 

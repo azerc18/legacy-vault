@@ -90,7 +90,8 @@ export default function AdminPayments() {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
                 <StatCard icon="payments" tone="ok" label={t('payments.summary.revenue')} value={summary ? formatVnd(summary.totalRevenueVnd) : '—'}
                           foot={filtered ? t('payments.summary.filtered') : t('payments.summary.allTime')} />
-                <StatCard icon="check_circle" tone="ok" label={t('payments.status.SUCCESS')} value={summary?.successCount ?? '—'} />
+                <StatCard icon="check_circle" tone="ok" label={t('payments.status.SUCCESS')} value={summary?.successCount ?? '—'}
+                          foot={summary?.refundedCount ? t('payments.summary.refundedFoot', { count: summary.refundedCount }) : undefined} />
                 <StatCard icon="schedule" tone="warn" label={t('payments.status.PENDING')} value={summary?.pendingCount ?? '—'}
                           foot={summary ? t('payments.summary.expiredFoot', { count: summary.expiredCount ?? 0 }) : undefined} />
                 <StatCard icon="cancel" tone="danger" label={t('payments.status.FAILED')} value={summary?.failedCount ?? '—'} />

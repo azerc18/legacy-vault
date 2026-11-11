@@ -36,12 +36,16 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
                                                 @Param("before") LocalDateTime before,
                                                 Pageable pageable);
 
-    /** Đơn EXPIRED chưa thu tiền tạo sau mốc {@code since}: job hỏi lại cổng phòng khi đã trả mà IPN bị lỡ. */
+    /**
+     * Đơn EXPIRED chưa thu tiền, đóng vì lý do {@code reason} (lưu ở vnpResponseCode, vd. SUPERSEDED), tạo sau mốc
+     * {@code since}: job hỏi lại cổng phòng khi đã trả mà IPN bị lỡ. Mới nhất trước, vì đơn mới dễ là đơn vừa trả.
+     */
     @Query("SELECT p.id FROM PaymentTransaction p WHERE p.status = :status AND p.paidAt IS NULL"
-            + " AND p.createdAt >= :since ORDER BY p.createdAt")
-    List<UUID> findUnpaidIdsByStatusAndCreatedAtSince(@Param("status") PaymentStatus status,
-                                                     @Param("since") LocalDateTime since,
-                                                     Pageable pageable);
+            + " AND p.vnpResponseCode = :reason AND p.createdAt >= :since ORDER BY p.createdAt DESC")
+    List<UUID> findUnpaidIdsByStatusAndReasonSince(@Param("status") PaymentStatus status,
+                                                   @Param("reason") String reason,
+                                                   @Param("since") LocalDateTime since,
+                                                   Pageable pageable);
 
     List<PaymentTransaction> findByUserIdAndStatus(UUID userId, PaymentStatus status);
 
