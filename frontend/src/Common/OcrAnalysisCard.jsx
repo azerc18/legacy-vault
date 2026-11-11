@@ -62,7 +62,6 @@ export default function OcrAnalysisCard({
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
 
     const imageQualityScore = typeof data.imageQualityScore === 'number' ? data.imageQualityScore : null;
-    const deathProofPercent = typeof data.deathProofRelevancePercent === 'number' ? data.deathProofRelevancePercent : null;
     const confidenceScore = typeof data.confidenceScore === 'number' ? data.confidenceScore : null;
 
     const roleSuggestion = role === 'verifier'
@@ -221,7 +220,7 @@ export default function OcrAnalysisCard({
                     {t('ocr.evalSectionTitle')}
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     {/* 1. Image Quality & Clarity */}
                     <div className="rounded-lg border border-outline-variant/30 bg-background/70 p-2.5">
                         <div className="flex items-center justify-between gap-2 mb-1">
@@ -260,32 +259,9 @@ export default function OcrAnalysisCard({
                         </p>
                     </div>
 
-                    {/* 3. Death Proof Relevance Percentage */}
-                    <div className="rounded-lg border border-outline-variant/30 bg-background/70 p-2.5">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-semibold text-on-surface">{t('ocr.deathProofTitle')}</span>
-                            <span
-                                data-testid="ocr-death-proof-percent"
-                                className={`font-bold text-sm ${scoreTextColor(deathProofPercent)}`}
-                            >
-                                {deathProofPercent !== null ? `${deathProofPercent}%` : unreadableText}
-                            </span>
-                        </div>
-                        {deathProofPercent !== null && (
-                            <div className="w-full h-2 rounded-full bg-surface-container-highest overflow-hidden mb-1.5">
-                                <div
-                                    className={`h-full rounded-full transition-all ${scoreBarColor(deathProofPercent)}`}
-                                    style={{ width: `${Math.min(100, Math.max(5, deathProofPercent))}%` }}
-                                />
-                            </div>
-                        )}
-                        <p className="text-[11px] text-on-surface-variant leading-snug">
-                            {data.deathProofExplanation || unreadableText}
-                        </p>
-                    </div>
                 </div>
 
-                {/* 4. Role-specific Non-binding Advisory Suggestion */}
+                {/* 3. Role-specific Non-binding Advisory Suggestion */}
                 {roleSuggestion && (
                     <div
                         data-testid="ocr-role-suggestion"
