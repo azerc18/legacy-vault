@@ -32,6 +32,7 @@ class SubscriptionRenewalControllerSecurityTest {
     @MockitoBean private PaymentService paymentService;
     @MockitoBean private SubscriptionRenewalService renewalService;
     @MockitoBean private com.ltld.app.legacyvault.service.paymentservice.TrialService trialService;
+    @MockitoBean private com.ltld.app.legacyvault.service.paymentservice.PlanUsageService planUsageService;
     @MockitoBean private JwtDecoder jwtDecoder;
 
     @Test
