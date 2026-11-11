@@ -30,7 +30,7 @@ const STATUS = {
 
 export default function DeadMansSwitch() {
     const { t } = useTranslation('dms');
-    const vip = useVipStatus();   // false = gói FREE: Trusted Social Confirmers hiện mờ + khoá
+    const vip = useVipStatus();   // false = gói FREE: form thêm Trusted Social Confirmer hiện mờ + khoá
     const toast = useToast();
     const user = getUser();
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
@@ -241,7 +241,8 @@ export default function DeadMansSwitch() {
                     {/* X2: Trusted Social Confirmers (chỉ khi DMS đã cấu hình) */}
                     {configured && (
                         <div data-tour="dms-confirmers">
-                        <VipLocked locked={vip === false}>
+                        {/* Gói FREE: chỉ khoá phần THÊM người xác nhận (BE chặn thêm). Người đã khai vẫn được hỏi khi DMS kích hoạt
+                            (VIP hết hạn vẫn giữ), nên danh sách và nút Xoá luôn dùng được. */}
                         <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /> <VipChip className="ml-1" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
                             <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
@@ -282,6 +283,7 @@ export default function DeadMansSwitch() {
                             )}
 
                             {!locked && confirmers.length < 2 && (
+                                <VipLocked locked={vip === false}>
                                 <form onSubmit={handleAddConfirmer} className="grid sm:grid-cols-3 gap-3 pt-2">
                                     <input
                                         type="text"
@@ -311,9 +313,9 @@ export default function DeadMansSwitch() {
                                         </button>
                                     </div>
                                 </form>
+                                </VipLocked>
                             )}
                         </Card>
-                        </VipLocked>
                         </div>
                     )}
                     </div>

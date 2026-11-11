@@ -164,14 +164,15 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 </div>
             </div>
             <div role="radiogroup" aria-label={tt('title')} className="grid sm:grid-cols-2 gap-2">
-                {availableModes(allowProportional, value.mode).map((m) => {
+                {availableModes(allowProportional, value.mode).map((m, i, modes) => {
                     const locked = freePlan && VIP_MODES.includes(m);
                     const active = value.mode === m;
+                    const wide = modes.length % 2 === 1 && i === modes.length - 1;   // số ô lẻ: ô cuối chiếm cả hàng, không lệch, không xuống dòng
                     return (
                         <button key={m} type="button" role="radio" aria-checked={active}
                                 disabled={m === 'PROPORTIONAL' && !allowProportional}
                                 onClick={() => (locked ? setUpgradeOpen(true) : setMode(m))}
-                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors ${
+                                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors ${wide ? 'sm:col-span-2 ' : ''}${
                                     active ? 'border-primary bg-primary/10 text-on-surface' : 'border-outline-variant/50 text-on-surface hover:bg-surface-container'
                                 } ${locked ? 'opacity-55' : ''}`}>
                             <Icon name={locked ? 'lock' : active ? 'radio_button_checked' : 'radio_button_unchecked'} className="text-[18px] shrink-0" />
@@ -197,13 +198,17 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                         <option value="">{tt('recipientPlaceholder')}</option>
                         {beneficiaries.map((b) => <option key={b.id} value={b.id}>{nameOf(b)}</option>)}
                     </select>
-                    <VipLocked locked={freePlan} className="space-y-1.5">
+                    {/* Gói FREE: khoá chọn người dự phòng. Tài sản cũ đã có người dự phòng (lúc còn VIP) thì vẫn mở ô để bỏ chọn,
+                        chỉ còn "Không có" và người đang chọn; nếu không Owner FREE không lưu lại được tài sản đó. */}
+                    <VipLocked locked={freePlan && !value.contingentId} className="space-y-1.5">
                         <label className="flex items-center gap-2 text-xs font-semibold">{tt('contingent')} <VipChip /></label>
                         <select value={value.contingentId} onChange={(e) => set({ contingentId: e.target.value })} className={inputClass}>
                             <option value="">{tt('contingentNone')}</option>
-                            {beneficiaries.filter((b) => b.id !== value.selected[0]).map((b) => (
-                                <option key={b.id} value={b.id}>{nameOf(b)}</option>
-                            ))}
+                            {beneficiaries
+                                .filter((b) => b.id !== value.selected[0] && (!freePlan || b.id === value.contingentId))
+                                .map((b) => (
+                                    <option key={b.id} value={b.id}>{nameOf(b)}</option>
+                                ))}
                         </select>
                     </VipLocked>
                 </>

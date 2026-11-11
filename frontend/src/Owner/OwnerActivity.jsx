@@ -40,10 +40,12 @@ export default function OwnerActivity() {
     const [tab, setTab] = useState('all');   // all = gộp cả hai nhật ký thành một dòng thời gian
     const [days, setDays] = useState(0);
     const [page, setPage] = useState(0);
-    const [data, setData] = useState(null);      // mảng sự kiện đã gộp, mới nhất trước
+    // all: { merged: [...], truncated } gộp ở máy khách; dms / access: { rows, totalPages } phân trang từ máy chủ như trước
+    const [data, setData] = useState(null);
     const [error, setError] = useState('');
     const PAGE_SIZE = 20;
-    const FETCH_SIZE = 100;                      // mỗi nguồn lấy tối đa 100 dòng gần nhất rồi gộp và chia trang ở máy khách
+    const FETCH_SIZE = 100;                      // tab "Tất cả": mỗi nguồn lấy tối đa 100 dòng gần nhất rồi gộp, chia trang ở máy khách
+    const serverPage = tab === 'all' ? 0 : page; // tab "Tất cả" đổi trang không gọi lại API
 
     useEffect(() => {
         let cancelled = false; // F6 (m4): đổi bộ lọc nhanh thì bỏ kết quả của request cũ
@@ -55,23 +57,32 @@ export default function OwnerActivity() {
             range.startDate = new Date(end.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
             range.endDate = end.toISOString();
         }
-        const args = { ...range, page: 0, size: FETCH_SIZE };
         const tag = (res, kind) => (res?.content ?? []).map((r) => ({ ...r, kind }));
-        Promise.all([
-            tab === 'access' ? [] : ownerApi.getOwnerActivityLogs(args).then((r) => tag(r, 'dms')),
-            tab === 'dms' ? [] : ownerApi.getEstateAccessLogs(args).then((r) => tag(r, 'access')),
-        ])
-            .then(([dms, access]) => {
-                if (cancelled) return;
-                setData([...dms, ...access].sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt)));
-            })
+        let request;
+        if (tab === 'all') {
+            const args = { ...range, page: 0, size: FETCH_SIZE };
+            request = Promise.all([ownerApi.getOwnerActivityLogs(args), ownerApi.getEstateAccessLogs(args)])
+                .then(([dms, access]) => ({
+                    merged: [...tag(dms, 'dms'), ...tag(access, 'access')]
+                        .sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt)),
+                    // Một nguồn còn dòng cũ hơn 100 dòng đã lấy: báo để Owner mở tab riêng xem tiếp
+                    truncated: (dms?.totalElements ?? 0) > FETCH_SIZE || (access?.totalElements ?? 0) > FETCH_SIZE,
+                }));
+        } else {
+            const fetcher = tab === 'access' ? ownerApi.getEstateAccessLogs : ownerApi.getOwnerActivityLogs;
+            request = fetcher({ ...range, page: serverPage, size: PAGE_SIZE })
+                .then((res) => ({ rows: tag(res, tab), totalPages: res?.totalPages ?? 0 }));
+        }
+        request
+            .then((result) => { if (!cancelled) setData(result); })
             .catch((e) => { if (!cancelled) setError(getErrorMessage(e, t('errors.load'))); });
         return () => { cancelled = true; };
-    }, [tab, days, t]);
+    }, [tab, days, serverPage, t]);
 
-    const all = data ?? [];
-    const rows = all.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-    const totalPages = Math.ceil(all.length / PAGE_SIZE);
+    const merged = data?.merged;
+    const rows = merged ? merged.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : (data?.rows ?? []);
+    const totalPages = merged ? Math.ceil(merged.length / PAGE_SIZE) : (data?.totalPages ?? 0);
+    const isEmpty = !!data && (merged ? merged.length === 0 : rows.length === 0);
     const isAccess = tab === 'access';
     const tabs = [
         { id: 'all', icon: 'list_alt', label: t('filterAll', { defaultValue: 'Tất cả' }) },
@@ -124,7 +135,7 @@ export default function OwnerActivity() {
             <div data-tour="activity-list">
             <Card className="lv-glass-thick">
                 {!data && !error && <LoadingSkeleton label={t('loading')}/>}
-                {data && all.length === 0 && (
+                {isEmpty && (
                     <EmptyState compact icon={isAccess ? 'visibility' : 'history'}
                                 title={days > 0 ? t('empty.periodTitle') : (isAccess ? tAccess('emptyTitle') : t('empty.noneTitle'))}
                                 text={days > 0 ? t('empty.periodText') : (isAccess ? tAccess('emptyText') : t('empty.noneText'))} />
@@ -137,7 +148,7 @@ export default function OwnerActivity() {
                             </thead>
                             <tbody>
                                 {rows.map((r) => (
-                                    <tr key={r.id} className="border-t border-outline-variant/25">
+                                    <tr key={`${r.kind}-${r.id}`} className="border-t border-outline-variant/25">
                                         <td className="py-3 px-6 whitespace-nowrap tabular-nums">{formatDate(r.createdAt, true)}</td>
                                         <td className="py-3 px-4 font-semibold">{actionLabel(t, i18n, r.action)}</td>
                                         <td className="py-3 px-4">{actorLabel(t, r.actorName)}</td>
@@ -154,6 +165,9 @@ export default function OwnerActivity() {
                         <span className="text-on-surface-variant">{t('page', { page: page + 1, total: totalPages })}</span>
                         <button onClick={() => setPage((p) => p + 1)} disabled={page + 1 >= totalPages} className="font-semibold text-secondary disabled:text-outline">{t('next')}</button>
                     </div>
+                )}
+                {data?.truncated && (
+                    <p className="mt-3 text-xs text-on-surface-variant">{t('allTruncated', { count: FETCH_SIZE })}</p>
                 )}
             </Card>
             </div>

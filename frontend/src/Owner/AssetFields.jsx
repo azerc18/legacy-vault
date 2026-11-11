@@ -126,11 +126,17 @@ export function focusFirstInvalid(root = document) {
     });
 }
 
-// Tên tài sản tự đặt cho các loại không phải "Khác": "<Loại> – <giá trị ô văn bản bắt buộc đầu tiên>", ví dụ "Tài khoản ngân hàng – Vietcombank"
+// Ô dùng để đặt tên tài sản: tên tổ chức / nền tảng, KHÔNG dùng số tài khoản, username hay email. Tên tài sản không mã hoá
+// và còn hiện ở chuông, mail, trang người thụ hưởng, nên chỉ lấy thông tin chung như "Vietcombank", "Gmail", "MetaMask".
+const NAME_SOURCE_KEYS = ['institutionName', 'walletProvider', 'platform', 'documentTitle'];
+
+// Tên tài sản tự đặt cho các loại không phải "Khác": "<Loại> – <tên tổ chức / nền tảng>", ví dụ "Tài khoản ngân hàng – Vietcombank",
+// "Tài khoản email – Gmail". Nền tảng "Other" hoặc chưa nhập thì chỉ dùng tên loại.
 export function deriveAssetName(typeLabel, schema, fields) {
-    const key = (schema?.fields || []).find((f) => f.type === 'TEXT' && f.required)?.key;
-    const v = key ? (fields?.[key] || '').trim() : '';
-    return (v ? `${typeLabel} – ${v}` : typeLabel).slice(0, 200);
+    const keys = new Set((schema?.fields || []).map((f) => f.key));
+    const key = NAME_SOURCE_KEYS.find((k) => keys.has(k) && (fields?.[k] || '').trim());
+    const v = key ? fields[key].trim() : '';
+    return (v && v !== 'Other' ? `${typeLabel} – ${v}` : typeLabel).slice(0, 200);
 }
 
 // Trả về thông báo lỗi đầu tiên hoặc ''

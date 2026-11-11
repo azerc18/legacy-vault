@@ -1,6 +1,7 @@
 {
   "title": "Activity log",
   "subtitle": "Everything about the Dead Man's Switch, executors and every time someone viewed your estate, newest first. Events for a single vault are on that vault's page.",
+  "allTruncated": "This tab shows the {{count}} most recent events of each kind. Open the other two tabs to see older events.",
   "filterAll": "All",
   "loading": "Loading...",
   "range": {
