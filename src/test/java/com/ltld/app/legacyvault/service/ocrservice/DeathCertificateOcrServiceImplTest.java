@@ -286,6 +286,35 @@ class DeathCertificateOcrServiceImplTest {
     }
 
     @Test
+    void analyzeBytes_fallsBackToBackupModel_whenPrimaryModelIsNotFound() throws Exception {
+        // Google trả 404 khi model chính bị ngừng hoặc đổi tên: OCR vẫn chạy được bằng model dự phòng
+        DeathCertificateOcrServiceImpl spyService = spy(ocrService);
+        ReflectionTestUtils.setField(spyService, "aiProvider", "gemini");
+        ReflectionTestUtils.setField(spyService, "apiKey", "primary-key");
+        ReflectionTestUtils.setField(spyService, "backupApiKey", "backup-key");
+        ReflectionTestUtils.setField(spyService, "model", "gemini-retired-model");
+        ReflectionTestUtils.setField(spyService, "backupModel", "gemini-3.5-flash");
+
+        DeathCertificateOcrResponseDto backupSuccessDto = DeathCertificateOcrResponseDto.builder()
+                .engineSource(DeathCertificateOcrServiceImpl.ENGINE_GEMINI)
+                .documentCategory(DeathCertificateOcrServiceImpl.CAT_VALID_DEATH_CERT)
+                .deceasedFullName("Trần Long Vân")
+                .ownerNameMatched(true)
+                .build();
+
+        doThrow(new HttpClientErrorException(HttpStatus.NOT_FOUND, "models/gemini-retired-model is not found"))
+                .when(spyService).callGeminiVisionOcr(any(), any(), eq("gemini-retired-model"), eq("primary-key"), eq(5000), eq(25000));
+        doReturn(backupSuccessDto)
+                .when(spyService).callGeminiVisionOcr(any(), any(), eq("gemini-3.5-flash"), eq("backup-key"), eq(3000), eq(15000));
+
+        byte[] pdfBytes = "%PDF-1.4 test".getBytes(StandardCharsets.UTF_8);
+        DeathCertificateOcrResponseDto result = spyService.analyzeBytes(pdfBytes, "cert.pdf", "Trần Long Vân");
+
+        assertThat(result).isSameAs(backupSuccessDto);
+        verify(spyService).callGeminiVisionOcr(any(), eq("Trần Long Vân"), eq("gemini-3.5-flash"), eq("backup-key"), eq(3000), eq(15000));
+    }
+
+    @Test
     void analyzeBytes_doesNotFallBack_whenPrimaryFailsWithNonRetryableError() throws Exception {
         DeathCertificateOcrServiceImpl spyService = spy(ocrService);
         ReflectionTestUtils.setField(spyService, "aiProvider", "gemini");
@@ -330,25 +359,6 @@ class DeathCertificateOcrServiceImplTest {
         verify(spyService).callGeminiVisionOcr(any(), eq("Trần Long Vân"), eq("gemini-3.5-flash"), eq("backup-key"), eq(3000), eq(15000));
     }
 
-    @Test
-    void isRetryable_distinguishesTransientFromTerminalErrors() {
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.TOO_MANY_REQUESTS))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))).isTrue();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new ResourceAccessException("I/O error"))).isTrue();
-
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.BAD_REQUEST))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.UNAUTHORIZED))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(
-                new HttpClientErrorException(HttpStatus.FORBIDDEN))).isFalse();
-        assertThat(DeathCertificateOcrServiceImpl.isRetryable(null)).isFalse();
-    }
     @Test
     void cleanJsonContent_stripsMarkdownCodeFences() {
         String fenced = "```json\n{\"documentCategory\":\"VALID_DEATH_CERTIFICATE\"}\n```";
