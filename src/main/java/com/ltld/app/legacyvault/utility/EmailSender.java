@@ -33,9 +33,10 @@ public class EmailSender {
     private final int OTP_EXPIRE_SECONDS = 300;
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    // QR trong mail nhắc check-in: Content-ID của ảnh inline và cạnh ảnh PNG (hiển thị 168px, sinh gấp đôi cho màn hình nét)
+    // QR trong mail nhắc check-in: Content-ID của ảnh inline và cạnh ảnh PNG (hiển thị 220px, sinh gấp đôi cho màn hình nét).
+    // URL có JWT ~430 ký tự nên QR khoảng 81×81 ô; 220px để mỗi ô ~2.7px, camera laptop vẫn bắt được
     private static final String CHECKIN_QR_CID = "dms-checkin-qr";
-    private static final int CHECKIN_QR_PX = 336;
+    private static final int CHECKIN_QR_PX = 440;
     @Value("${app.frontend.base-url:}")
     private String frontendBaseUrl;
     /** Địa chỉ người gửi hiển thị, ví dụ "LegacyVault <no-reply@legacyvault.codes>". Trống thì dùng tài khoản SMTP. */

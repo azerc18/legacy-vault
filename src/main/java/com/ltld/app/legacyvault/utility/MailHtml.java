@@ -209,8 +209,8 @@ public final class MailHtml {
         }
         b.append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr>")
                 .append("<td bgcolor=\"#ffffff\" style=\"background:#ffffff;border-radius:8px;padding:8px;\">")
-                .append("<img src=\"cid:").append(esc(cid)).append("\" width=\"168\" height=\"168\" alt=\"QR check-in\" ")
-                .append("style=\"display:block;border:0;width:168px;height:168px;\"></td></tr></table>");
+                .append("<img src=\"cid:").append(esc(cid)).append("\" width=\"220\" height=\"220\" alt=\"QR check-in\" ")
+                .append("style=\"display:block;border:0;width:220px;height:220px;\"></td></tr></table>");
         return b.toString();
     }
 

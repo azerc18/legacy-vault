@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dmsCheckinApi } from '../api/dmsCheckinApi.js';
@@ -7,19 +7,17 @@ import { Alert, btnPrimary, Card, Icon } from './ownerUi.jsx';
 
 // F2: trang công khai mở từ link trong email nhắc. Mở trang KHÔNG gọi API (trình quét link của hộp thư có thể
 // tự mở link); chỉ check-in khi Owner bấm nút.
-// Ngoại lệ via=qr: link nằm trong ẢNH QR của mail (trình quét hộp thư không đọc ảnh), Owner đã chủ động quét bằng
-// điện thoại nên trang tự check-in ngay khi mở, rồi trang kết quả tự đóng sau 5 giây.
+// via=qr (link trong ảnh QR của mail) cũng phải bấm nút: nhiều bộ lọc mail doanh nghiệp đọc QR trong ảnh rồi mở
+// link bằng trình duyệt có chạy JS; nếu tự check-in thì mỗi mail nhắc sẽ check-in hộ và DMS không bao giờ kích hoạt.
+// Khác biệt duy nhất: câu chữ hợp điện thoại, và trang kết quả tự đóng sau 5 giây.
 export default function CheckinConfirmPage() {
     const { t } = useTranslation('checkin');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token') || '';
     const fromQr = searchParams.get('via') === 'qr';
-    // Quét QR thì coi như đang gửi ngay từ đầu (không setState đồng bộ trong effect)
-    const [submitting, setSubmitting] = useState(fromQr && Boolean(token));
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
-    // Token chỉ dùng 1 lần: chặn effect chạy 2 lần (StrictMode) gửi trùng rồi báo "link đã dùng"
-    const autoSent = useRef(false);
 
     // Gọi API và chuyển trang kết quả; trả về câu lỗi khi cần ở lại trang để bấm lại.
     const send = async () => {
@@ -53,17 +51,6 @@ export default function CheckinConfirmPage() {
         }
     };
 
-    useEffect(() => {
-        if (!fromQr || !token || autoSent.current) return;
-        autoSent.current = true;
-        send().then((message) => {
-            if (message) {
-                setError(message);
-                setSubmitting(false);
-            }
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mở trang từ QR
-    }, []);
 
     return (
         <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center px-5 py-12">
@@ -80,7 +67,7 @@ export default function CheckinConfirmPage() {
                 ) : (
                     <>
                         <p className="mt-3 text-sm text-on-surface-variant">
-                            {fromQr && submitting ? t('confirm.qrSubmitting') : t('confirm.intro')}
+                            {fromQr ? t('confirm.qrIntro') : t('confirm.intro')}
                         </p>
                         <div className="mt-4">
                             <Alert>{error}</Alert>
