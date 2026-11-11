@@ -61,5 +61,10 @@
   "MFA_CHALLENGE_EXPIRED": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
   "GOOGLE_LOGIN_DISABLED": "Đăng nhập bằng Google chưa được bật.",
   "GOOGLE_TOKEN_INVALID": "Google không xác nhận được lần đăng nhập này. Vui lòng thử lại.",
-  "GOOGLE_EMAIL_NOT_VERIFIED": "Email tài khoản Google của bạn chưa được xác minh."
+  "GOOGLE_EMAIL_NOT_VERIFIED": "Email tài khoản Google của bạn chưa được xác minh.",
+  "COUPON_INVALID": "Mã giảm giá không đúng hoặc đã hết hạn.",
+  "COUPON_NOT_APPLICABLE": "Mã này không áp dụng cho gói bạn chọn.",
+  "COUPON_USED_UP": "Mã này đã hết lượt dùng.",
+  "COUPON_ALREADY_USED": "Bạn đã dùng mã này rồi.",
+  "TRIAL_NOT_ELIGIBLE": "Bản dùng thử chỉ dành cho tài khoản chưa từng có gói VIP."
 }

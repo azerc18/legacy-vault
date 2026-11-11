@@ -52,6 +52,19 @@ public class Subscription {
     @Builder.Default
     private boolean reminderSent = false;
 
+    // Việc 6: Owner đã hủy gia hạn; vẫn giữ VIP tới expiresAt rồi về FREE, không hoàn tiền
+    @Column(name = "cancel_at_period_end", nullable = false)
+    @Builder.Default
+    private boolean cancelAtPeriodEnd = false;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    // Việc 4: gói dùng thử miễn phí (mỗi tài khoản một lần)
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean trial = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

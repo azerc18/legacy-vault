@@ -164,6 +164,11 @@ public class AuditDescriptionBuilder {
             case PAYMENT_EXPIRED -> "An unpaid checkout expired.";
             case PAYMENT_REFUNDED -> "An administrator refunded a subscription payment.";
             case ADMIN_VIP_GRANTED -> "An administrator granted VIP days.";
+            case SUBSCRIPTION_CANCELLED -> "Turned off renewal; VIP stays until the end of the period.";
+            case SUBSCRIPTION_RESUMED -> "Turned renewal back on.";
+            case COUPON_CREATED -> "An administrator created a discount code.";
+            case COUPON_UPDATED -> "An administrator changed a discount code.";
+            case TRIAL_STARTED -> "Started the free VIP trial.";
             default -> "Performed action: " + log.getAction();
         };
     }

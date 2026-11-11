@@ -21,9 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,6 +37,7 @@ public class AdminPaymentService {
     static final int MAX_PAGE_SIZE = 100;
     static final int MAX_EXPORT_ROWS = 10_000;
     static final String PROVIDER_VNPAY = "VNPAY";
+    private static final List<PaymentStatus> PAID = List.of(PaymentStatus.SUCCESS, PaymentStatus.REFUNDED);
 
     @PersistenceContext
     private EntityManager em;
@@ -131,6 +134,7 @@ public class AdminPaymentService {
         if (rows.isEmpty()) return List.of();
         List<UUID> userIds = rows.stream().map(p -> p.getUser().getId()).distinct().toList();
         Map<UUID, String> currentPlan = currentPlanCodes(userIds);
+        Set<String> reused = reusedCoupons(rows);
         return rows.stream().map(p -> {
             SubscriptionPlan plan = p.getPlan();
             return AdminPaymentResponse.builder()
@@ -150,9 +154,39 @@ public class AdminPaymentService {
                     .paidAt(p.getPaidAt())
                     .refundedAt(p.getRefundedAt())
                     .refundReason(p.getRefundReason())
+                    .couponCode(p.getCouponCode())
+                    .discountVnd(p.getDiscountVnd())
+                    .couponReused(p.getCouponCode() != null && PAID.contains(p.getStatus())
+                            && reused.contains(couponKey(p.getUser().getId(), p.getCouponCode())))
                     .currentPlanCode(currentPlan.getOrDefault(p.getUser().getId(), SubscriptionPlan.CODE_FREE))
                     .build();
         }).toList();
+    }
+
+    /**
+     * Review #256 nit: cặp (user, mã) có từ hai giao dịch đã thu tiền trở lên, tức là lần trả sau đã ghi audit
+     * {@code COUPON_REUSED}. Hiện ngay trên trang Thanh toán để admin khỏi phải lọc audit log.
+     */
+    Set<String> reusedCoupons(List<PaymentTransaction> rows) {
+        List<UUID> ids = rows.stream().filter(p -> p.getCouponCode() != null)
+                .map(p -> p.getUser().getId()).distinct().toList();
+        if (ids.isEmpty()) return Set.of();
+        List<Object[]> pairs = em.createQuery("""
+                        SELECT p.user.id, UPPER(p.couponCode) FROM PaymentTransaction p
+                        WHERE p.user.id IN :ids AND p.couponCode IS NOT NULL AND p.status IN :paid
+                        GROUP BY p.user.id, UPPER(p.couponCode)
+                        HAVING COUNT(p) > 1
+                        """, Object[].class)
+                .setParameter("ids", ids)
+                .setParameter("paid", PAID)
+                .getResultList();
+        Set<String> out = new HashSet<>();
+        for (Object[] r : pairs) out.add(couponKey((UUID) r[0], (String) r[1]));
+        return out;
+    }
+
+    private static String couponKey(UUID userId, String code) {
+        return userId + "|" + code.trim().toUpperCase(Locale.ROOT);
     }
 
     /** Gói trả phí còn hạn của từng user (nếu nhiều gói ACTIVE thì lấy gói hết hạn muộn nhất). */

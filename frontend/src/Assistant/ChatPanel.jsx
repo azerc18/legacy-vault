@@ -1,10 +1,13 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { assistantApi } from '../api/assistantApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon } from '../Owner/ownerUi.jsx';
 import ChibiAvatar from './ChibiAvatar.jsx';
 import { COSTUMES } from './costumes.js';
+
+// Cùng chunk 3D với con cú ngoài màn hình nên không tải thêm gì
+const ChibiAvatar3D = React.lazy(() => import('./ChibiAvatar3D.jsx'));
 
 export const WELCOME = { role: 'assistant', content: "Hi! I'm Vaulty. Ask me how to use LegacyVault." };
 const MAX_HISTORY = 10;   // khớp @Size(max = 10) ở ChatRequest
@@ -186,7 +189,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                         const avatarAction = i === lastAssistant ? (fresh ? 'talk' : 'live') : 'idle';
                         return (
                             <div key={i} className="relative flex items-end gap-2">
-                                <ChibiAvatar mini action={avatarAction} />
+                                <Suspense fallback={<ChibiAvatar mini action={avatarAction} />}><ChibiAvatar3D mini action={avatarAction} costume={costume} /></Suspense>
                                 <div className={`lv-glass-inline max-w-[80%] px-3 py-2 rounded-2xl rounded-bl-sm text-on-surface text-sm leading-relaxed break-words${fresh ? ' reply-fresh glow-ring glow-ring--once' : ''}`}>
                                     <MessageContent text={m.content} animate={fresh} />
                                 </div>
@@ -199,7 +202,7 @@ export default function ChatPanel({ messages, setMessages, onClose, onReply, onT
                     })}
                     {sending && (
                         <div className="flex items-end gap-2" aria-live="polite" aria-label="Vaulty is typing">
-                            <ChibiAvatar mini action="think" />
+                            <Suspense fallback={<ChibiAvatar mini action="think" />}><ChibiAvatar3D mini action="think" costume={costume} /></Suspense>
                             <div className="lv-glass-inline px-3 py-3 rounded-2xl rounded-bl-sm text-on-surface-variant flex gap-1 glow-ring glow-ring--loop">
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />

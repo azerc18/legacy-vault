@@ -552,28 +552,52 @@ public class EmailSender {
 
     /** N12: gói đã hết hạn. Không @Async, người gọi tự bắt lỗi từng mail như mail nhắc trước hạn. */
     public void sendSubscriptionExpiredNotice(String to, String fullName, String planName) {
+        sendSubscriptionExpiredNotice(to, fullName, planName, null);
+    }
+
+    /** Việc 6: có planCode thì nút trong mail là "Gia hạn 1 chạm" mở thẳng Billing với gói đó. */
+    public void sendSubscriptionExpiredNotice(String to, String fullName, String planName, String planCode) {
         AppLanguage lang = languageResolver.forEmail(to);
         List<String> paras = new ArrayList<>();
         paras.add(MailMessages.get(lang, "mail.greeting", displayName(fullName, to)));
         paras.add(MailMessages.get(lang, "mail.subExpired.body", planName));
         String base = frontendBase();
         if (base != null) {
-            paras.add(MailMessages.get(lang, "mail.subExpiry.button") + ": " + base + "/pricing");
+            paras.add(planCode != null
+                    ? MailMessages.get(lang, "mail.subExpiry.renew") + ": " + renewUrl(base, planCode)
+                    : MailMessages.get(lang, "mail.subExpiry.button") + ": " + base + "/pricing");
         }
         sendKeyed(to, lang, Style.URGENT, "mail.subExpired", paras);
     }
 
     // T1: Nhắc Owner trước 7 ngày khi gói VIP sắp hết hạn
     public void sendSubscriptionExpiryReminder(String to, String ownerName, String planName, LocalDateTime expiresAt) {
+        sendSubscriptionExpiryReminder(to, ownerName, planName, null, expiresAt, false);
+    }
+
+    /**
+     * Việc 6: nhắc trước hạn kèm nút "Gia hạn 1 chạm". {@code cancelled} = Owner đã tắt gia hạn, nên nội dung nói
+     * rõ gói sẽ kết thúc vào ngày đó và đổi ý thì gia hạn bằng nút trong mail.
+     */
+    public void sendSubscriptionExpiryReminder(String to, String ownerName, String planName, String planCode,
+                                               LocalDateTime expiresAt, boolean cancelled) {
         AppLanguage lang = languageResolver.forEmail(to);
         String base = frontendBase();
         List<String> paras = new ArrayList<>();
         paras.add(MailMessages.get(lang, "mail.greeting", ownerDisplayName(ownerName, to)));
-        paras.add(MailMessages.get(lang, "mail.subExpiry.body", planName, formatDeadline(expiresAt)));
+        paras.add(MailMessages.get(lang, cancelled ? "mail.subExpiry.cancelledBody" : "mail.subExpiry.body",
+                planName, formatDeadline(expiresAt)));
         if (base != null) {
+            if (planCode != null) {
+                paras.add(MailMessages.get(lang, "mail.subExpiry.renew") + ": " + renewUrl(base, planCode));
+            }
             paras.add(MailMessages.get(lang, "mail.subExpiry.button") + ": " + base + "/billing");
         }
         sendKeyed(to, lang, Style.URGENT, "mail.subExpiry", paras);
+    }
+
+    private static String renewUrl(String base, String planCode) {
+        return base + "/billing?renew=" + java.net.URLEncoder.encode(planCode, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     // N6: đăng nhập từ thiết bị chưa từng dùng

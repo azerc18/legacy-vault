@@ -50,6 +50,7 @@ class PaymentServicePaypalTest {
     @Mock private VnpayClient vnpayClient;
     @Mock private PaypalClient paypalClient;
     @Mock private AuditLogService auditLogService;
+    @Mock private CouponService couponService;
 
     private PaymentServiceImpl service;
     private User owner;
@@ -59,7 +60,7 @@ class PaymentServicePaypalTest {
     @BeforeEach
     void setUp() {
         service = new PaymentServiceImpl(userRepository, planRepository, subscriptionRepository, transactionRepository,
-                entitlementService, vnpayClient, mock(VnpayProperties.class), paypalClient, auditLogService);
+                entitlementService, vnpayClient, mock(VnpayProperties.class), paypalClient, auditLogService, couponService);
         owner = User.builder().id(UUID.randomUUID()).email("owner@example.com").build();
         plan = SubscriptionPlan.builder().code("VIP_MONTH").priceVnd(99_000L).durationDays(30).build();
         tx = PaymentTransaction.builder()

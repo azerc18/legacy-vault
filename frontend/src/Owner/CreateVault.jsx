@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {Navigate, useNavigate} from 'react-router-dom';
 import {getUser} from '../auth/auth.js';
@@ -28,12 +28,22 @@ export default function CreateVault() {
     const [beneficiaries, setBeneficiaries] = useState([emptyBeneficiary()]);
     const [showSecret, setShowSecret] = useState({});
     const [error, setError] = useState('');
+    // errorAt: chỗ hiện lỗi (null = cạnh nút tạo két): 'name' | 'beneficiaries' | 'asset-<số thứ tự từ 0>'
+    const [errorAt, setErrorAt] = useState(null);
+    const errorRef = useRef(null);
     const [loading, setLoading] = useState(false);
     // Két đã tạo nhưng một số tài sản theo schema lưu lỗi: không cho gửi lại (tránh tạo trùng két)
     const [partial, setPartial] = useState(null);
     const schemas = useAssetSchemas();   // null = đang tải, [] = lỗi -> dùng form cũ (1 ô bí mật)
 
+    // Có lỗi mới thì cuộn tới đúng chỗ lỗi để người dùng thấy ngay
+    useEffect(() => {
+        if (error) errorRef.current?.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }, [error, errorAt]);
+
     if (!user) return <Navigate to="/login" replace/>;
+    const fail = (msg, at = null) => { setError(msg); setErrorAt(at); };
+    const errorBox = (at) => (error && errorAt === at ? <div ref={errorRef} role="alert"><Alert>{error}</Alert></div> : null);
 
     const updateAsset = (i, field, value) =>
         setAssets((list) => list.map((a, idx) => (idx === i ? {...a, [field]: value} : a)));
@@ -67,24 +77,26 @@ export default function CreateVault() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setErrorAt(null);
         // BE không validate name/secret nên FE phải chặn trước
-        if (!name.trim()) return setError(t('create.errors.nameRequired'));
+        if (!name.trim()) return fail(t('create.errors.nameRequired'), 'name');
         // Tài sản có schema (N3) nhập theo từng trường; không có schema thì dùng 1 ô bí mật như cũ
         const filled = assets
             .map((a, i) => ({...a, index: i + 1, schema: schemaOf(schemas, a.assetType)}))
             .filter((a) => a.assetName.trim() || a.secret.trim() || hasFieldValues(a.fields));
         for (const a of filled) {
-            if (!a.assetName.trim()) return setError(t('create.errors.assetIncomplete'));
+            const at = `asset-${a.index - 1}`;
+            if (!a.assetName.trim()) return fail(t('create.errors.assetIncomplete'), at);
             if (a.schema) {
                 const msg = validateFields(a.schema, a.fields, false);
-                if (msg) return setError(`${t('create.assetItem', {index: a.index})}: ${msg}`);
-            } else if (!a.secret.trim()) return setError(t('create.errors.assetIncomplete'));
+                if (msg) return fail(msg, at);
+            } else if (!a.secret.trim()) return fail(t('create.errors.assetIncomplete'), at);
         }
         // N1: người thụ hưởng bắt buộc, không trùng nhau, không trùng chính Owner
         const emails = beneficiaries.map((b) => b.email.trim().toLowerCase()).filter(Boolean);
-        if (emails.length === 0) return setError(t('create.errors.beneficiaryRequired'));
-        if (new Set(emails).size !== emails.length) return setError(t('create.errors.duplicateEmail'));
-        if (emails.includes((user.email || '').toLowerCase())) return setError(t('create.errors.selfBeneficiary'));
+        if (emails.length === 0) return fail(t('create.errors.beneficiaryRequired'), 'beneficiaries');
+        if (new Set(emails).size !== emails.length) return fail(t('create.errors.duplicateEmail'), 'beneficiaries');
+        if (emails.includes((user.email || '').toLowerCase())) return fail(t('create.errors.selfBeneficiary'), 'beneficiaries');
 
         // Phân bổ từng tài sản: bỏ người đã bị xoá/đổi email khỏi lựa chọn rồi kiểm tra như form thêm tài sản
         const keys = new Set(allocBeneficiaries.map((b) => b.id));
@@ -97,7 +109,7 @@ export default function CreateVault() {
         for (const a of filled) {
             a.allocation = cleanAllocation(a.allocation);
             const msg = validateAllocation(a.allocation, canSplitPercent(a.schema), t);
-            if (msg) return setError(`${t('create.assetItem', {index: a.index})}: ${msg}`);
+            if (msg) return fail(msg, `asset-${a.index - 1}`);
         }
         // Tài sản có phân bổ riêng cũng phải thêm sau khi két có id người thụ hưởng
         const hasAlloc = (a) => a.allocation.mode !== 'ALL';
@@ -173,7 +185,7 @@ export default function CreateVault() {
             }
             navigate(`/owner/vaults/${vault.id}`, {state: {created: true}});
         } catch (err) {
-            setError(getErrorMessage(err, t('create.errors.createFailed')));
+            fail(getErrorMessage(err, t('create.errors.createFailed')));
         } finally {
             setLoading(false);
         }
@@ -182,8 +194,6 @@ export default function CreateVault() {
     return (
         <OwnerLayout title={t('create.title')} subtitle={t('create.subtitle')}>
             <form onSubmit={handleSubmit} className="space-y-6">
-                <Alert>{error}</Alert>
-
                 <div data-tour="vault-info">
                 <Card title={t('create.detailsTitle')} icon="inventory_2">
                     <div className="space-y-4">
@@ -192,6 +202,7 @@ export default function CreateVault() {
                             <input value={name} maxLength={100} onChange={(e) => setName(e.target.value)}
                                    placeholder={t('create.namePlaceholder')} className={`${inputClass} mt-1`}/>
                         </label>
+                        {errorBox('name')}
                         <label className="block">
                             <span className="text-sm font-semibold text-on-surface-variant">{t('create.descriptionLabel')}</span>
                             <textarea rows={2} maxLength={500} value={description}
@@ -225,6 +236,7 @@ export default function CreateVault() {
                                 </div>
                             </div>
                         ))}
+                        {errorBox('beneficiaries')}
                         <button type="button" disabled={beneficiaries.length >= 10} onClick={() => setBeneficiaries((l) => [...l, emptyBeneficiary()])} className={btnOutline}>
                             <Icon name="add" className="text-[18px]" /> {t('create.addBeneficiary')}
                         </button>
@@ -348,6 +360,7 @@ export default function CreateVault() {
                                                onChange={(e) => updateAsset(i, 'notes', e.target.value)}
                                                placeholder={t('create.notesPlaceholder')} className={inputClass}/>
                                     </div>
+                                    {errorBox(`asset-${i}`)}
                                 </div>
                             </fieldset>
                         ))}
@@ -371,6 +384,8 @@ export default function CreateVault() {
                         </button>
                     </div>
                 )}
+
+                {errorBox(null)}
 
                 <div className="flex justify-end gap-3 pb-28">
                     <button type="button" onClick={() => navigate('/owner/vaults')} className={btnOutline}>

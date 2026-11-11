@@ -40,6 +40,7 @@ import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
 import AdminAlerts from './Admin/AdminAlerts.jsx';
 import AdminDashboard from './Admin/AdminDashboard.jsx';
 import AdminPayments from './Admin/AdminPayments.jsx';
+import AdminRevenue from './Admin/AdminRevenue.jsx';
 import AdminPlans from './Admin/AdminPlans.jsx';
 import AdminNotifications from './Admin/AdminNotifications.jsx';
 import AdminBeneficiaryLocks from './Admin/AdminBeneficiaryLocks.jsx';
@@ -122,6 +123,7 @@ function App() {
                 <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
                 <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
                 <Route path="/admin/payments" element={guard(ADMIN, <AdminPayments />)} />
+                <Route path="/admin/revenue" element={guard(ADMIN, <AdminRevenue />)} />
                 <Route path="/admin/plans" element={guard(ADMIN, <AdminPlans />)} />
                 <Route path="/admin/notifications" element={guard(ADMIN, <AdminNotifications />)} />
                 <Route path="/admin/beneficiary-locks" element={guard(ADMIN, <AdminBeneficiaryLocks />)} />

@@ -77,7 +77,7 @@ export function Card({title, icon, children, className = ''}) {
 }
 
 // Hộp xác nhận (dùng cho thay thế người thụ hưởng / executor, xoá vault)
-export function ConfirmDialog({open, title, message, confirmLabel, danger, busy, onConfirm, onCancel}) {
+export function ConfirmDialog({open, title, message, confirmLabel, cancelLabel, danger, busy, onConfirm, onCancel}) {
     const {t} = useTranslation(['vault', 'common']);
     if (!open) return null;
     return createPortal(
@@ -87,7 +87,7 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
                 <h3 className="font-title-lg text-title-lg font-bold text-on-surface dark:text-white">{title}</h3>
                 <p className="mt-2 text-sm text-on-surface-variant dark:text-white/70">{message}</p>
                 <div className="mt-6 flex justify-end gap-3">
-                    <button onClick={onCancel} className={btnOutline}>{t('common:actions.cancel')}</button>
+                    <button onClick={onCancel} className={btnOutline}>{cancelLabel || t('common:actions.cancel')}</button>
                     <button onClick={onConfirm} disabled={busy} className={danger ? btnDanger : btnPrimary}>
                         {busy ? t('ui.pleaseWait') : (confirmLabel || t('common:actions.confirm'))}
                     </button>
@@ -95,6 +95,19 @@ export function ConfirmDialog({open, title, message, confirmLabel, danger, busy,
             </div>
         </div>,
         document.body
+    );
+}
+
+// Trang đang tải: khung kính mờ giữ chỗ có vệt sáng chạy ngang, không hiện chữ "Đang tải…" (chữ chỉ dành cho trình đọc màn hình)
+export function LoadingSkeleton({label = '', rows = 3}) {
+    return (
+        <div role="status" aria-busy="true" className="space-y-4">
+            {label && <span className="sr-only">{label}</span>}
+            <div className="lv-skeleton p-5 space-y-3" aria-hidden="true">
+                <div className="lv-skeleton-bar h-5 w-44"/>
+                {Array.from({length: rows}, (_, i) => <div key={i} className="lv-skeleton h-12"/>)}
+            </div>
+        </div>
     );
 }
 

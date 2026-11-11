@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
-import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager, ReasonDialog, Stamp, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 import UserDrawer from './UserDrawer.jsx';
@@ -85,7 +85,7 @@ export default function AdminAlerts() {
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
 
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')}/>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon={status === 'OPEN' ? 'verified' : 'notifications_off'}
                             title={status === 'OPEN' ? t('alerts.empty.openTitle') : t('alerts.empty.ackTitle')}

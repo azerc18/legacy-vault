@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Icon, Alert, formatDate, inputClass } from '../Owner/ownerUi.jsx';
+import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Pager, Stamp, StatCard, formatVnd, toneOf } from './adminUi.jsx';
 import UserDrawer from './UserDrawer.jsx';
@@ -115,7 +115,7 @@ export default function AdminPayments() {
 
             <Alert>{error}</Alert>
             <Alert type="success">{success}</Alert>
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')}/>}
             {data && rows.length === 0 && (
                 <EmptyState bordered icon="receipt_long" title={t('payments.empty.title')} text={filtered ? t('payments.empty.filtered') : t('payments.empty.text')} />
             )}
@@ -149,7 +149,17 @@ export default function AdminPayments() {
                                     <p className="font-semibold">{p.planName || p.planCode}</p>
                                     <p className="text-[11px] text-outline">{t('payments.currentPlan', { plan: p.currentPlanCode })}</p>
                                 </td>
-                                <td data-label={t('payments.cols.amount')} className="lv-num font-semibold">{formatVnd(p.amountVnd)}</td>
+                                <td data-label={t('payments.cols.amount')} className="lv-num font-semibold">
+                                    {formatVnd(p.amountVnd)}
+                                    {p.couponCode && (
+                                        <p className="text-[11px] font-normal text-outline">{t('payments.coupon', { code: p.couponCode, discount: formatVnd(p.discountVnd) })}</p>
+                                    )}
+                                    {p.couponReused && (
+                                        <p className="text-[11px] font-semibold text-error flex items-center gap-1" title={t('payments.couponReusedHint')}>
+                                            <Icon name="warning" className="text-[14px]" />{t('payments.couponReused')}
+                                        </p>
+                                    )}
+                                </td>
                                 <td data-label={t('payments.cols.status')}>
                                     <Stamp tone={toneOf(p.status)}>{t(`payments.status.${p.status}`, { defaultValue: p.status })}</Stamp>
                                     {p.refundedAt && (
