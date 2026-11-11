@@ -47,8 +47,10 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrService {
 
-    private static final int CONNECT_TIMEOUT_MS = 5000;
-    private static final int READ_TIMEOUT_MS = 15000;
+    private static final int PRIMARY_CONNECT_TIMEOUT_MS = 5000;
+    private static final int PRIMARY_READ_TIMEOUT_MS = 25000;
+    private static final int BACKUP_CONNECT_TIMEOUT_MS = 3000;
+    private static final int BACKUP_READ_TIMEOUT_MS = 15000;
     private static final int MAX_OUTPUT_TOKENS = 2048;
     private static final int MAX_CALLS_PER_MINUTE = 5;
     private static final long CACHE_TTL_SECONDS = 30 * 60;
@@ -249,14 +251,16 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
         if ("gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank()) {
             try {
-                return callGeminiVisionOcr(plainBytes, expectedOwnerName, model, apiKey);
+                return callGeminiVisionOcr(plainBytes, expectedOwnerName, model, apiKey,
+                        PRIMARY_CONNECT_TIMEOUT_MS, PRIMARY_READ_TIMEOUT_MS);
             } catch (Exception primaryEx) {
-                log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Attempting fallback to backup model...",
-                        model, fileName, primaryEx.getMessage());
-                if (backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
+                log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Retryable: {}",
+                        model, fileName, primaryEx.getMessage(), isRetryable(primaryEx));
+                if (isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                     try {
                         String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
-                        DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName, backupModel, keyToUse);
+                        DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName,
+                                backupModel, keyToUse, BACKUP_CONNECT_TIMEOUT_MS, BACKUP_READ_TIMEOUT_MS);
                         log.info("Backup Gemini Vision OCR model '{}' succeeded for document '{}'", backupModel, fileName);
                         return backupResult;
                     } catch (Exception backupEx) {
@@ -307,10 +311,42 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                 .build();
     }
 
-    private DeathCertificateOcrResponseDto callGeminiVisionOcr(byte[] plainBytes, String expectedOwnerName, String targetModel, String targetApiKey) throws Exception {
+    /**
+     * Chỉ chuyển sang model dự phòng khi lỗi có thể giải quyết được bằng việc đổi model / gọi lại:
+     * 429 (hết quota / rate limit), 5xx (server error phía Google), hoặc lỗi mạng / timeout.
+     * Không retry với 400 (Bad Request - sai API key, file lỗi, prompt vi phạm policy...) hoặc 401/403.
+     */
+    static boolean isRetryable(Throwable ex) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 10) {
+            if (current instanceof org.springframework.web.client.HttpStatusCodeException hsce) {
+                int status = hsce.getStatusCode().value();
+                return status == 429 || hsce.getStatusCode().is5xxServerError();
+            }
+            if (current instanceof org.springframework.web.client.ResourceAccessException) {
+                return true;
+            }
+            if (current instanceof java.util.concurrent.TimeoutException
+                    || current instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
+    }
+
+    DeathCertificateOcrResponseDto callGeminiVisionOcr(
+            byte[] plainBytes,
+            String expectedOwnerName,
+            String targetModel,
+            String targetApiKey,
+            int connectTimeoutMs,
+            int readTimeoutMs) throws Exception {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
-        factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT_MS));
+        factory.setConnectTimeout(Duration.ofMillis(connectTimeoutMs));
+        factory.setReadTimeout(Duration.ofMillis(readTimeoutMs));
 
         RestClient restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
@@ -382,11 +418,10 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     }
 
     /**
-     * Phân tích JSON trả về từ Gemini Vision API.
-     * Trường thiếu sẽ giữ nguyên là null (không bao giờ điền giá trị bịa),
-     * hasOfficialSeal mặc định false, ownerNameMatched mặc định false nếu không đọc được tên.
+     * Phòng thủ loại bỏ code fence markdown (```json ... ```) nếu Gemini trả về định dạng bọc code,
+     * dù request đã cấu hình responseMimeType: application/json.
      */
-        static String cleanJsonContent(String raw) {
+    static String cleanJsonContent(String raw) {
         if (raw == null) {
             return "{}";
         }
@@ -402,6 +437,11 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         return cleaned.trim();
     }
 
+    /**
+     * Phân tích JSON trả về từ Gemini Vision API.
+     * Trường thiếu sẽ giữ nguyên là null (không bao giờ điền giá trị bịa),
+     * hasOfficialSeal mặc định false, ownerNameMatched mặc định false nếu không đọc được tên.
+     */
     DeathCertificateOcrResponseDto parseGeminiJson(String rawJson, String expectedOwnerName) throws Exception {
         String cleanJson = cleanJsonContent(rawJson);
         JsonNode extracted = objectMapper.readTree(cleanJson);

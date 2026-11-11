@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.assistantservice;
 
 import com.ltld.app.legacyvault.dto.assistantdto.ChatMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -23,22 +24,33 @@ public class GeminiAiClient implements AiClient {
     private final String model;
     private final String backupModel;
 
+    @Autowired
     public GeminiAiClient(@Value("${app.ai.gemini.api-key}") String apiKey,
                           @Value("${app.ai.gemini.backup-api-key:}") String backupApiKey,
                           @Value("${app.ai.gemini.model:gemini-3.6-flash}") String model,
                           @Value("${app.ai.gemini.backup-model:gemini-3.5-flash}") String backupModel) {
+        this(apiKey, backupApiKey, model, backupModel, RestClient.builder().requestFactory(timeouts()));
+    }
+
+    GeminiAiClient(String apiKey,
+                   String backupApiKey,
+                   String model,
+                   String backupModel,
+                   RestClient.Builder builder) {
         this.apiKey = apiKey;
         this.backupApiKey = backupApiKey;
         this.model = model;
         this.backupModel = backupModel;
+        this.client = builder
+                .baseUrl("https://generativelanguage.googleapis.com/v1beta")
+                .build();
+    }
 
+    private static SimpleClientHttpRequestFactory timeouts() {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
         factory.setReadTimeout(Duration.ofSeconds(15));
-        this.client = RestClient.builder()
-                .baseUrl("https://generativelanguage.googleapis.com/v1beta")
-                .requestFactory(factory)
-                .build();
+        return factory;
     }
 
     @Override
@@ -53,9 +65,9 @@ public class GeminiAiClient implements AiClient {
         try {
             return executeChat(model, apiKey, body);
         } catch (Exception primaryEx) {
-            log.warn("Primary Gemini model '{}' failed for Vaulty chat: {}. Attempting fallback to backup model...",
-                    model, primaryEx.getMessage());
-            if (backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
+            log.warn("Primary Gemini model '{}' failed for Vaulty chat: {}. Retryable: {}",
+                    model, primaryEx.getMessage(), isRetryable(primaryEx));
+            if (isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                 try {
                     String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
                     String reply = executeChat(backupModel, keyToUse, body);
@@ -82,6 +94,32 @@ public class GeminiAiClient implements AiClient {
         var content = res.candidates().get(0).content();
         if (content == null || content.parts() == null || content.parts().isEmpty()) return "";
         return content.parts().get(0).text();
+    }
+
+    /**
+     * Chỉ chuyển sang model dự phòng khi lỗi có thể giải quyết được bằng việc đổi model / gọi lại:
+     * 429 (hết quota / rate limit), 5xx (server error phía Google), hoặc lỗi mạng / timeout.
+     * Không retry với 400 (Bad Request - sai API key, prompt vi phạm policy...) hoặc 401/403.
+     */
+    static boolean isRetryable(Throwable ex) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < 10) {
+            if (current instanceof org.springframework.web.client.HttpStatusCodeException hsce) {
+                int status = hsce.getStatusCode().value();
+                return status == 429 || hsce.getStatusCode().is5xxServerError();
+            }
+            if (current instanceof org.springframework.web.client.ResourceAccessException) {
+                return true;
+            }
+            if (current instanceof java.util.concurrent.TimeoutException
+                    || current instanceof java.net.SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
     }
 
     record GeminiResponse(List<Candidate> candidates) {}
