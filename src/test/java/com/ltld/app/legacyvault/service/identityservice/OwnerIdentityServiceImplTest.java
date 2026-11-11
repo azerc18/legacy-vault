@@ -65,7 +65,8 @@ class OwnerIdentityServiceImplTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new OwnerIdentityServiceImpl(userRepository, identityRepository, otpRepository, dmsConfigRepository,
-                cryptoService, otpGenerator, otpHasher, auditLogService, uploadedDocumentValidator, ocrClient,
+                cryptoService, otpGenerator, otpHasher, new com.ltld.app.legacyvault.utility.IdentityHasher(),
+                auditLogService, uploadedDocumentValidator, ocrClient,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         ReflectionTestUtils.setField(service, "smsSandbox", true);
         userId = UUID.randomUUID();
@@ -77,6 +78,7 @@ class OwnerIdentityServiceImplTest {
         when(identityRepository.findByCitizenIdHash(anyString())).thenReturn(Optional.empty());
         when(dmsConfigRepository.findByOwnerId(userId)).thenReturn(Optional.empty());
         when(cryptoService.encrypt(anyString())).thenAnswer(inv -> "enc:" + inv.getArgument(0));
+        when(cryptoService.decrypt(anyString())).thenAnswer(inv -> ((String) inv.getArgument(0)).substring(4));
         when(otpGenerator.generate()).thenReturn("123456");
     }
 
@@ -245,6 +247,25 @@ class OwnerIdentityServiceImplTest {
     }
 
     @Test
+    void sendPhoneOtp_smsNotConfigured_failsBeforeCreatingCode() {
+        ReflectionTestUtils.setField(service, "smsSandbox", false);
+
+        assertCode(() -> service.sendPhoneOtp(userId, "0912345678"), ErrorCode.SERVICE_UNAVAILABLE);
+        verifyNoInteractions(otpRepository, otpGenerator);
+    }
+
+    @Test
+    void verifyPhoneOtp_auditRecordsSandboxMode() {
+        PhoneOtpChallenge c = challenge("+84386123456", "654321");
+        when(otpRepository.findByUserIdForUpdate(userId)).thenReturn(Optional.of(c));
+
+        service.verifyPhoneOtp(userId, "654321");
+
+        verify(auditLogService).log(eq(AuditAction.OWNER_PHONE_VERIFIED), eq(AuditResult.SUCCESS), eq(userId),
+                anyString(), isNull(), eq("User"), eq(userId.toString()), eq("sandbox=true"));
+    }
+
+    @Test
     void sendPhoneOtp_invalidPhone_isRejected() {
         assertCode(() -> service.sendPhoneOtp(userId, "01681234567"), ErrorCode.PHONE_INVALID);
     }
@@ -352,6 +373,17 @@ class OwnerIdentityServiceImplTest {
     }
 
     // ------------------------------------------------------------ death certificate match
+
+    @Test
+    void matchDocumentId_doesNotDependOnHashKey() {
+        // Hash lưu bằng một khoá khác (vd. khoá đã bị đổi): đối chiếu vẫn đúng vì so bản giải mã
+        OwnerIdentity identity = OwnerIdentity.builder().user(user)
+                .citizenIdEncrypted("enc:" + CCCD).citizenIdHash("hash-from-an-old-key").build();
+        when(identityRepository.findByUserId(userId)).thenReturn(Optional.of(identity));
+
+        assertThat(service.matchDocumentId(userId, CCCD)).isEqualTo(OwnerIdMatch.MATCHED);
+        assertThat(service.matchDocumentId(userId, "025123456")).isEqualTo(OwnerIdMatch.UNVERIFIABLE);
+    }
 
     @Test
     void matchDocumentId_comparesCitizenIdAndOldId() {

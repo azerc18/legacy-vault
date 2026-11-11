@@ -46,11 +46,9 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
     static final int MIN_AGE = 18;
     private static final int OCR_MAX_CALLS_PER_MINUTE = 5;
 
-    // "Muối" cố định cho HMAC số giấy tờ: cùng số luôn ra cùng hash để tra trùng
-    private static final UUID CITIZEN_ID_NS = UUID.nameUUIDFromBytes(
-            "legacyvault/owner-identity/citizen-id".getBytes(StandardCharsets.UTF_8));
-    private static final UUID OLD_ID_NS = UUID.nameUUIDFromBytes(
-            "legacyvault/owner-identity/old-id".getBytes(StandardCharsets.UTF_8));
+    // Loại giấy tờ trong HMAC (IdentityHasher): cùng số luôn ra cùng hash để tra trùng
+    private static final String CITIZEN_ID_KIND = "citizen-id";
+    private static final String OLD_ID_KIND = "old-id";
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter CARD_DATE = DateTimeFormatter.ofPattern("d/M/uuuu");
 
@@ -61,6 +59,7 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
     private final CryptoService cryptoService;
     private final OtpGenerator otpGenerator;
     private final OtpHasher otpHasher;
+    private final IdentityHasher identityHasher;
     private final AuditLogService auditLogService;
     private final UploadedDocumentValidator uploadedDocumentValidator;
     private final CitizenIdOcrClient ocrClient;
@@ -163,6 +162,10 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
         User user = loadUserForUpdate(userId);
         ensureNotLocked(userId);
         VnPhoneNumber phone = parsePhone(rawPhone);
+        if (!smsSandbox) {
+            // Chưa có nhà cung cấp SMS thật: không tạo mã, không giả vờ đã gửi
+            throw new UserProfileException(ErrorCode.SERVICE_UNAVAILABLE, "SMS delivery is not configured");
+        }
         Instant now = clock.instant();
 
         PhoneOtpChallenge c = otpRepository.findByUserIdForUpdate(userId).orElse(null);
@@ -193,12 +196,8 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
         c.setWindowSendCount(c.getWindowSendCount() + 1);
         otpRepository.save(c);
 
-        if (!smsSandbox) {
-            // Chưa có nhà cung cấp SMS thật: không giả vờ đã gửi
-            throw new UserProfileException(ErrorCode.SERVICE_UNAVAILABLE, "SMS delivery is not configured");
-        }
         auditLogService.log(AuditAction.OWNER_PHONE_OTP_SENT, AuditResult.SUCCESS, user.getId(), user.getEmail(),
-                null, "User", userId.toString(), "carrier=" + phone.carrier());
+                null, "User", userId.toString(), "carrier=" + phone.carrier() + ";sandbox=" + smsSandbox);
         return PhoneOtpResponse.builder()
                 .maskedPhone(phone.masked())
                 .carrier(phone.carrier())
@@ -236,7 +235,10 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
         user.setPhoneVerifiedAt(now);
         userRepository.save(user);
         otpRepository.delete(c);
-        auditLogService.success(AuditAction.OWNER_PHONE_VERIFIED, user.getId(), user.getEmail());
+        // sandbox=true: mã hiện trên màn hình, chưa chứng minh được Owner giữ số này. Khi nối SMS thật,
+        // lọc audit này để yêu cầu các số đã xác minh ở chế độ thử nghiệm xác minh lại.
+        auditLogService.log(AuditAction.OWNER_PHONE_VERIFIED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
+                null, "User", userId.toString(), "sandbox=" + smsSandbox);
 
         // Theo dõi gian lận: một số đã xác minh dùng cho nhiều tài khoản (người nhà dùng chung là hợp lệ, chỉ ghi log)
         long others = userRepository.countByPhoneNumberAndPhoneVerifiedAtIsNotNullAndIdNot(c.getPhoneE164(), userId);
@@ -347,16 +349,17 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
         if (identity == null) {
             return OwnerIdMatch.OWNER_NOT_VERIFIED;
         }
+        // So bản giải mã trong bộ nhớ (không qua HMAC) để đổi khoá hash không làm mọi giấy chứng tử bị báo lệch.
+        // Số giải mã không được trả ra ngoài hay ghi log.
         if (digits.length() == 12) {
-            return hashCitizenId(digits).equals(identity.getCitizenIdHash())
-                    ? OwnerIdMatch.MATCHED : OwnerIdMatch.MISMATCHED;
+            String stored = decryptOrNull(identity.getCitizenIdEncrypted());
+            if (stored == null) return OwnerIdMatch.UNVERIFIABLE;
+            return constantTimeEquals(digits, stored) ? OwnerIdMatch.MATCHED : OwnerIdMatch.MISMATCHED;
         }
         if (digits.length() == 9) {
-            if (identity.getOldIdHash() == null) {
-                return OwnerIdMatch.UNVERIFIABLE;
-            }
-            return hashOldId(digits).equals(identity.getOldIdHash())
-                    ? OwnerIdMatch.MATCHED : OwnerIdMatch.MISMATCHED;
+            String stored = decryptOrNull(identity.getOldIdEncrypted());
+            if (stored == null) return OwnerIdMatch.UNVERIFIABLE;
+            return constantTimeEquals(digits, stored) ? OwnerIdMatch.MATCHED : OwnerIdMatch.MISMATCHED;
         }
         return OwnerIdMatch.UNVERIFIABLE;
     }
@@ -436,11 +439,25 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
     }
 
     private String hashCitizenId(String digits) {
-        return otpHasher.hash(CITIZEN_ID_NS, digits);
+        return identityHasher.hash(CITIZEN_ID_KIND, digits);
     }
 
     private String hashOldId(String digits) {
-        return otpHasher.hash(OLD_ID_NS, digits);
+        return identityHasher.hash(OLD_ID_KIND, digits);
+    }
+
+    private String decryptOrNull(String cipherText) {
+        if (cipherText == null) return null;
+        try {
+            return cryptoService.decrypt(cipherText);
+        } catch (Exception e) {
+            log.warn("Cannot decrypt stored identity number: {}", e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        return java.security.MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
     private String encrypt(String plain) {

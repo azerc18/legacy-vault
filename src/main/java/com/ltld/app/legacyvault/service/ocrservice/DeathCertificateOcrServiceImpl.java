@@ -224,7 +224,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
             case MISMATCHED -> {
                 // Họ tên trùng nhưng số giấy tờ khác: rất có thể là người khác trùng tên, hoặc giấy bị sửa
                 warnings.add(0, "LƯU Ý ĐỊNH DANH: Số CCCD/CMND trên tài liệu (" + result.getIdNumber()
-                        + ") không khớp với CCCD Chủ két đã xác minh trong hệ thống.");
+                        + ") không khớp với CCCD Chủ két đã xác minh trong hệ thống. Số trên giấy do AI đọc nên có thể"
+                        + " sai một chữ số: hãy so lại bằng mắt với giấy gốc trước khi từ chối.");
                 if (result.getSuggestedRejectionCode() == null
                         || !"SUSPECTED_FORGERY".equals(result.getSuggestedRejectionCode())) {
                     result.setSuggestedRejectionCode("INFO_MISMATCH");
@@ -239,7 +240,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                         + "Hãy kiểm tra lại bạn có tải đúng giấy tờ của Chủ két không. "
                         + (result.getExecutorSuggestion() == null ? "" : result.getExecutorSuggestion()));
                 result.setVerifierSuggestion("Gợi ý cho Verifier: Số CCCD/CMND trên giấy không khớp với CCCD Chủ két đã xác minh, "
-                        + "cân nhắc lý do \"Thông tin không khớp\". "
+                        + "hãy so lại bằng mắt số trên giấy gốc (AI có thể đọc sai) rồi mới cân nhắc lý do \"Thông tin không khớp\". "
                         + (result.getVerifierSuggestion() == null ? "" : result.getVerifierSuggestion()));
             }
             case NOT_ON_DOCUMENT -> warnings.add("LƯU Ý ĐỊNH DANH: Không đọc được số CCCD/CMND trên tài liệu, "

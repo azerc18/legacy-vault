@@ -133,6 +133,8 @@ class AccountDeletionServiceImplTest {
         assertThat(user.getEmail()).isEqualTo("deleted-" + user.getId() + "@deleted.invalid");
         assertThat(user.getFullName()).isEqualTo("Deleted user");
         assertThat(user.getPhoneNumber()).isNull();
+        assertThat(user.getKycLevel()).isEqualTo(com.ltld.app.legacyvault.enums.KycLevel.NONE);
+        verify(ownerIdentityRepository).deleteByUserId(user.getId());
         assertThat(user.getAvatarPath()).isNull();
         assertThat(user.getPasswordHash()).isEqualTo("NEW-HASH");
         assertThat(user.getDeletedAt()).isNotNull();

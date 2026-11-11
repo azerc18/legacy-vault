@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.dto.accountdto.AccountDeletionCheckResponse;
 import com.ltld.app.legacyvault.dto.accountdto.DeleteAccountRequest;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.KycLevel;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsStatus;
@@ -132,6 +133,7 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         user.setFullName(DELETED_NAME);
         user.setPhoneNumber(null);
         user.setPhoneVerifiedAt(null);
+        user.setKycLevel(KycLevel.NONE);   // dữ liệu CCCD bị xoá bên dưới nên mức xác minh về NONE
         user.setPasswordHash(passwordEncoder.encode(randomSecret()));
         user.setAvatarPath(null);
         user.setAvatarUpdatedAt(now);
