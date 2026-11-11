@@ -170,7 +170,8 @@
       "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",
       "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản",
       "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành",
-      "rolesMenu": "Vai trò…", "grantVip": "Tặng VIP"
+      "rolesMenu": "Vai trò…", "grantVip": "Tặng VIP",
+      "simulateOverdue": "Giả quá hạn (demo)", "simulateOverdueHint": "Chỉ dùng khi demo: giả Owner này bỏ lỡ check-in. Khoảng 20 giây sau hệ thống chạy luồng thật (hỏi người xác nhận, hoặc kích hoạt nếu không có ai)."
     },
     "grantVip": {"title": "Tặng VIP", "message": "Cộng thêm ngày VIP cho {{email}}. Nếu đang có VIP thì cộng vào hạn hiện tại, nếu không thì tính từ bây giờ.", "days": "Số ngày (1–365)", "preset_one": "{{count}} ngày", "preset_other": "{{count}} ngày", "reasonPlaceholder": "Lý do (bắt buộc, ví dụ: bù sự cố thanh toán)", "confirm": "Tặng VIP", "success": "Đã tặng {{count}} ngày VIP cho {{email}}, hạn mới {{date}}."},
     "success": {
@@ -180,7 +181,8 @@
       "revoke": "Đã gỡ {{role}} khỏi {{email}}.",
       "suspend": "Đã tạm dừng Dead Man's Switch của {{email}}.",
       "resume": "Đã tiếp tục Dead Man's Switch của {{email}}.",
-      "rescue": "{{executor}} giờ là người thi hành của {{email}} và sẽ nhận email kích hoạt trong vài phút."
+      "rescue": "{{executor}} giờ là người thi hành của {{email}} và sẽ nhận email kích hoạt trong vài phút.",
+      "simulateOverdue": "{{email}} đã quá hạn. Trạng thái sẽ cập nhật sau khoảng 20 giây."
     },
     "dialog": {
       "lock": { "title": "Khoá tài khoản này?", "message": "{{email}} sẽ không thể đăng nhập.", "confirm": "Khoá" },
@@ -189,7 +191,8 @@
       "revoke": { "title": "Gỡ vai trò {{role}}?", "message": "{{email}} sẽ mất quyền {{role}}.", "confirm": "Gỡ" },
       "suspend": { "title": "Tạm dừng Dead Man's Switch?", "message": "Bộ đếm của {{email}} sẽ dừng cho đến khi được tiếp tục. Chủ kho không thể tự tiếp tục.", "confirm": "Tạm dừng" },
       "resume": { "title": "Tiếp tục Dead Man's Switch?", "message": "Bộ đếm của {{email}} sẽ chạy lại.", "confirm": "Tiếp tục" },
-      "rescue": { "title": "Chỉ định người thi hành khẩn cấp?", "message": "Dead Man's Switch của {{email}} đã kích hoạt nhưng không có người thi hành nào hoạt động được. Người bạn nhập sẽ trở thành người thi hành chính ngay lập tức và phải có tài khoản LegacyVault đã xác minh.", "confirm": "Chỉ định & kích hoạt" }
+      "rescue": { "title": "Chỉ định người thi hành khẩn cấp?", "message": "Dead Man's Switch của {{email}} đã kích hoạt nhưng không có người thi hành nào hoạt động được. Người bạn nhập sẽ trở thành người thi hành chính ngay lập tức và phải có tài khoản LegacyVault đã xác minh.", "confirm": "Chỉ định & kích hoạt" },
+      "simulateOverdue": { "title": "Giả Owner quá hạn check-in?", "message": "Chỉ dùng khi demo. Hạn check-in của {{email}} bị đẩy về quá khứ. Khoảng 20 giây sau người xác nhận sẽ được hỏi; nếu không có ai (hoặc đợt này đã được hoãn 1 lần) thì DMS KÍCH HOẠT và không quay lại được.", "confirm": "Giả quá hạn" }
     }
   },
 

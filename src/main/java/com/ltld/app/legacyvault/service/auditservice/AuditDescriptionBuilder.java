@@ -21,7 +21,8 @@ public class AuditDescriptionBuilder {
 
     // FR-05 (Q42): hành động nội bộ của Admin, ẩn khỏi nhật ký Owner và nhật ký Vault
     public static final Set<AuditAction> OWNER_HIDDEN_ACTIONS = Collections.unmodifiableSet(
-            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN));
+            EnumSet.of(AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN,
+                    AuditAction.DMS_DEMO_OVERDUE_SIMULATED));
 
     // F6: Danh sách các hành động truy cập được hiển thị minh bạch trong tab "Who accessed" của Owner
     public static final Set<AuditAction> ESTATE_ACCESS_ACTIONS = Collections.unmodifiableSet(EnumSet.of(
@@ -150,6 +151,7 @@ public class AuditDescriptionBuilder {
             // O5: detail chứa reason do Admin nhập nên không nối
             case DMS_SUSPENDED -> "An administrator suspended the Dead Man's Switch.";
             case DMS_RESUMED -> "An administrator resumed the Dead Man's Switch and started a new check-in cycle.";
+            case DMS_DEMO_OVERDUE_SIMULATED -> "An administrator simulated an overdue check-in for a demo.";
             case EXECUTOR_ASSIGNED -> "Assigned an executor.";
             case EXECUTOR_REPLACED -> "Changed the executor.";
             case EXECUTOR_ASSIGNED_BY_ADMIN -> "An administrator assigned an executor because none was available.";

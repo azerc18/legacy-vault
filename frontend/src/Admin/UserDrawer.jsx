@@ -1,6 +1,7 @@
 // A3: ngăn kéo chi tiết người dùng (GET /api/admin/users/{id}). Mở từ trang Người dùng, Kho, Thanh toán, Cảnh báo.
 // Thao tác nhanh dùng lại API sẵn có: khoá / mở khoá tài khoản, tạm dừng / tiếp tục DMS.
-import React, { useCallback, useEffect, useState } from 'react';
+// Demo: nút "Giả quá hạn" chỉ hiện khi server bật APP_DEMO_TOOLS_ENABLED, DMS của Owner đang ACTIVE và Owner còn két.
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
@@ -45,9 +46,21 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
     const [u, setU] = useState(null);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [dialog, setDialog] = useState(null);   // 'lock' | 'unlock' | 'suspend' | 'resume'
+    const [dialog, setDialog] = useState(null);   // 'lock' | 'unlock' | 'suspend' | 'resume' | 'simulateOverdue'
     const [busy, setBusy] = useState(false);
     const [granting, setGranting] = useState(false);    // Việc 3: hộp thoại tặng VIP
+    const [demoTools, setDemoTools] = useState(false);  // Demo: cờ APP_DEMO_TOOLS_ENABLED của server
+    const refreshTimer = useRef(null);
+
+    // Hỏi 1 lần mỗi lần mở; lỗi (server cũ chưa có API) coi như tắt
+    useEffect(() => {
+        if (!userId) return undefined;
+        let alive = true;
+        adminApi.demoTools()
+            .then((r) => { if (alive) setDemoTools(!!r?.dmsSimulateOverdue); })
+            .catch(() => { if (alive) setDemoTools(false); });
+        return () => { alive = false; clearTimeout(refreshTimer.current); };
+    }, [userId]);
 
     const load = useCallback(() => {
         if (!userId) return;
@@ -81,6 +94,12 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
             if (kind === 'unlock') res = await adminApi.updateStatus(u.id, 'ACTIVE');
             if (kind === 'suspend') await adminApi.suspendDms(u.id, reason);
             if (kind === 'resume') await adminApi.resumeDms(u.id);
+            if (kind === 'simulateOverdue') {
+                await adminApi.simulateOverdue(u.id);
+                // Job DMS quét mỗi ~20 giây: hẹn tải lại để thấy PENDING_CONFIRMATION / TRIGGERED
+                clearTimeout(refreshTimer.current);
+                refreshTimer.current = setTimeout(load, 25000);
+            }
             setSuccess(t(`users.success.${kind}`, { email: u.email }));
             if (res && onChanged) onChanged(res);
             load();
@@ -143,6 +162,12 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                 {!isMe && u.status === 'LOCKED' && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
                                 {isOwner && u.dmsStatus === 'ACTIVE' && <button className={btn} onClick={() => setDialog('suspend')}><Icon name="pause_circle" className="text-[16px]" />{t('users.actions.suspend')}</button>}
                                 {isOwner && u.dmsStatus === 'SUSPENDED' && <button className={btn} onClick={() => setDialog('resume')}><Icon name="play_circle" className="text-[16px]" />{t('users.actions.resume')}</button>}
+                                {demoTools && isOwner && u.dmsStatus === 'ACTIVE' && u.vaults?.length > 0 && (
+                                    <button className={`${btn} border-dashed text-error`} title={t('users.actions.simulateOverdueHint')}
+                                            onClick={() => setDialog('simulateOverdue')}>
+                                        <Icon name="science" className="text-[16px]" />{t('users.actions.simulateOverdue')}
+                                    </button>
+                                )}
                                 {isOwner && <button className={btn} onClick={() => setGranting(true)}><Icon name="workspace_premium" className="text-[16px]" />{t('users.actions.grantVip')}</button>}
                                 <Link to={`/admin/audit-logs?actorEmail=${encodeURIComponent(u.email)}`} className={btn}><Icon name="history" className="text-[16px]" />{t('drawer.allLogs')}</Link>
                                 <Link to={`/admin/payments?email=${encodeURIComponent(u.email)}`} className={btn}><Icon name="receipt_long" className="text-[16px]" />{t('drawer.payments')}</Link>
@@ -237,7 +262,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                 title={dialog && u ? t(`users.dialog.${dialog}.title`) : ''}
                 message={dialog && u ? t(`users.dialog.${dialog}.message`, { email: u.email }) : ''}
                 confirmLabel={dialog ? t(`users.dialog.${dialog}.confirm`) : ''}
-                danger={dialog === 'lock' || dialog === 'suspend'}
+                danger={dialog === 'lock' || dialog === 'suspend' || dialog === 'simulateOverdue'}
                 askReason={dialog === 'lock' || dialog === 'suspend'}
                 busy={busy}
                 onConfirm={confirm}
