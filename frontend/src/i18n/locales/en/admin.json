@@ -67,7 +67,7 @@
     "currentPlan": "Current plan: {{plan}}",
     "receipt": "Receipt",
     "status": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired" },
-    "summary": { "revenue": "Total revenue", "filtered": "For the current filters", "allTime": "All time" },
+    "summary": { "revenue": "Total revenue", "filtered": "For the current filters", "allTime": "All time", "expiredFoot_one": "{{count}} abandoned checkout closed", "expiredFoot_other": "{{count}} abandoned checkouts closed" },
     "cols": { "time": "Time", "user": "User", "plan": "Plan", "amount": "Amount", "status": "Status", "provider": "Gateway" },
     "empty": { "title": "No payments yet", "text": "Plan upgrade payments will appear here.", "filtered": "No payments match these filters. Try removing some." }
   },

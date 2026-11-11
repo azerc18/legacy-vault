@@ -11,4 +11,6 @@ public class AdminPaymentSummaryResponse {
     private long successCount;
     private long pendingCount;
     private long failedCount;
+    /** Đơn chưa trả tiền đã tự đóng (bỏ ngang / bị thay bằng đơn mới). */
+    private long expiredCount;
 }

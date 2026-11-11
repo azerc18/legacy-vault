@@ -155,11 +155,84 @@ class PendingPaymentReconcileTest {
     }
 
     @Test
-    void vnpay_foundButUnfinished_expires() {
-        doReturn(queryResponse("00", "01", 99_000L)).when(vnpayClient).postQuery(any());
+    void vnpay_failedAtGateway_expires() {
+        doReturn(queryResponse("00", "02", 99_000L)).when(vnpayClient).postQuery(any());
 
         assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.EXPIRED);
-        assertThat(tx.getVnpResponseCode()).isEqualTo("TIMEOUT_01");
+        assertThat(tx.getVnpResponseCode()).isEqualTo("TIMEOUT_02");
+    }
+
+    // Review #251 m3: 01/04/05/06/07 là còn đang xử lý, tiền có thể vẫn về -> chờ tới giveUpAfter mới đóng
+    @Test
+    void vnpay_stillProcessing_waitsUntilGiveUp() {
+        for (String status : List.of("01", "04", "05", "06", "07")) {
+            tx.setStatus(PaymentStatus.PENDING);
+            tx.setVnpResponseCode(null);
+            tx.setCreatedAt(now.minusMinutes(45));
+            doReturn(queryResponse("00", status, 99_000L)).when(vnpayClient).postQuery(any());
+
+            assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.STILL_PENDING);
+            assertThat(tx.getStatus()).isEqualTo(PaymentStatus.PENDING);
+
+            tx.setCreatedAt(now.minusHours(25));
+            assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.EXPIRED);
+            assertThat(tx.getVnpResponseCode()).isEqualTo("TIMEOUT_" + status);
+        }
+    }
+
+    // Review #251 M1: trả đơn 1, IPN lỡ, bấm thanh toán lại -> đơn 1 thành EXPIRED (SUPERSEDED). Job vẫn hỏi lại
+    // VNPay cho đơn 1 và kích hoạt gói.
+    @Test
+    void vnpay_supersededOrderPaidButIpnMissed_isRecheckedAndActivates() {
+        tx.setStatus(PaymentStatus.EXPIRED);
+        tx.setVnpResponseCode("SUPERSEDED");
+        tx.setCreatedAt(now.minusMinutes(5));
+        doReturn(queryResponse("00", "00", 99_000L)).when(vnpayClient).postQuery(any());
+
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.ACTIVATED);
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(subscriptionRepository).save(any(Subscription.class));
+    }
+
+    @Test
+    void vnpay_recheckOfExpiredOrder_notPaid_changesNothing() {
+        tx.setStatus(PaymentStatus.EXPIRED);
+        tx.setVnpResponseCode("SUPERSEDED");
+        for (Map<String, Object> answer : List.of(queryResponse("91", "", 0L), queryResponse("00", "02", 99_000L))) {
+            doReturn(answer).when(vnpayClient).postQuery(any());
+            assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.SKIPPED);
+        }
+        doThrow(new RuntimeException("timeout")).when(vnpayClient).postQuery(any());
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.SKIPPED);
+
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        assertThat(tx.getVnpResponseCode()).isEqualTo("SUPERSEDED");
+        verify(auditLogService, never()).log(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void vnpay_expiredOrderOlderThanGiveUp_isNotQueriedAgain() {
+        tx.setStatus(PaymentStatus.EXPIRED);
+        tx.setCreatedAt(now.minusHours(25));
+
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.SKIPPED);
+        verify(vnpayClient, never()).postQuery(any());
+    }
+
+    // Review #251 n1: IPN báo thất bại cho đơn đã EXPIRED thì giữ EXPIRED, không ghi PAYMENT_FAILED
+    @Test
+    void vnpay_failureIpnForExpiredOrder_staysExpired() {
+        tx.setStatus(PaymentStatus.EXPIRED);
+        Map<String, String> params = new HashMap<>();
+        params.put("vnp_TxnRef", VnpayClient.toTxnRef(tx.getId()));
+        params.put("vnp_Amount", "9900000");
+        params.put("vnp_ResponseCode", "24");
+        params.put("vnp_TransactionStatus", "02");
+        params.put("vnp_SecureHash", vnpayClient.signParams(params));
+
+        assertThat(service.handleVnpayIpn(params).get("RspCode")).isEqualTo("00");
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
+        verify(auditLogService, never()).log(eq(AuditAction.PAYMENT_FAILED), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -204,7 +277,7 @@ class PendingPaymentReconcileTest {
         tx.setGatewayTxnRef("ORDER1");
         tx.setAmountUsdCents(390L);
         when(paypalClient.isConfigured()).thenReturn(true);
-        when(paypalClient.getOrderStatus("ORDER1")).thenReturn("APPROVED");
+        when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("APPROVED", null));
         when(paypalClient.capture("ORDER1")).thenReturn(new PaypalClient.Capture(true, "COMPLETED", "CAP1", "USD", 390L));
 
         assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.ACTIVATED);
@@ -216,10 +289,40 @@ class PendingPaymentReconcileTest {
         tx.setProvider(PaymentProvider.PAYPAL);
         tx.setGatewayTxnRef("ORDER1");
         when(paypalClient.isConfigured()).thenReturn(true);
-        when(paypalClient.getOrderStatus("ORDER1")).thenReturn("PAYER_ACTION_REQUIRED");
+        when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("PAYER_ACTION_REQUIRED", null));
 
         assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.EXPIRED);
         verify(paypalClient, never()).capture(any());
+    }
+
+    // Review #251 m1: order đã COMPLETED (capture xong nhưng DB chưa ghi) -> đọc kết quả có sẵn, không capture lại
+    @Test
+    void paypal_alreadyCompleted_usesExistingCaptureWithoutCapturingAgain() {
+        tx.setProvider(PaymentProvider.PAYPAL);
+        tx.setGatewayTxnRef("ORDER1");
+        tx.setAmountUsdCents(390L);
+        when(paypalClient.isConfigured()).thenReturn(true);
+        when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("COMPLETED",
+                new PaypalClient.Capture(true, "COMPLETED", "CAP1", "USD", 390L)));
+
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.ACTIVATED);
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(tx.getVnpTransactionNo()).isEqualTo("CAP1");
+        verify(paypalClient, never()).capture(any());
+    }
+
+    @Test
+    void paypal_recheckOfExpiredOrder_declinedCapture_staysExpired() {
+        tx.setProvider(PaymentProvider.PAYPAL);
+        tx.setGatewayTxnRef("ORDER1");
+        tx.setAmountUsdCents(390L);
+        tx.setStatus(PaymentStatus.EXPIRED);
+        when(paypalClient.isConfigured()).thenReturn(true);
+        when(paypalClient.getOrder("ORDER1")).thenReturn(new PaypalClient.OrderSnapshot("APPROVED", null));
+        when(paypalClient.capture("ORDER1")).thenReturn(PaypalClient.Capture.declined("HTTP_422"));
+
+        assertThat(service.reconcilePending(tx.getId(), now, GIVE_UP)).isEqualTo(ReconcileOutcome.SKIPPED);
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.EXPIRED);
     }
 
     @Test
@@ -294,11 +397,17 @@ class PendingPaymentReconcileTest {
                 eq(now.minusMinutes(30)), any())).thenReturn(List.of(a, b));
         when(paymentService.reconcilePending(a, now, GIVE_UP)).thenThrow(new IllegalStateException("db"));
         when(paymentService.reconcilePending(b, now, GIVE_UP)).thenReturn(ReconcileOutcome.EXPIRED);
+        // Đơn EXPIRED chưa trả trong 24h gần nhất cũng được hỏi lại (review #251 M1)
+        UUID superseded = UUID.randomUUID();
+        when(transactionRepository.findUnpaidIdsByStatusAndCreatedAtSince(eq(PaymentStatus.EXPIRED),
+                eq(now.minus(GIVE_UP)), any())).thenReturn(List.of(superseded));
+        when(paymentService.reconcilePending(superseded, now, GIVE_UP)).thenReturn(ReconcileOutcome.ACTIVATED);
 
         PendingPaymentReconciler job = new PendingPaymentReconciler(transactionRepository, paymentService,
                 Duration.ofMinutes(30), GIVE_UP, 50);
         Map<ReconcileOutcome, Integer> counts = job.reconcile(now);
 
-        assertThat(counts).containsEntry(ReconcileOutcome.STILL_PENDING, 1).containsEntry(ReconcileOutcome.EXPIRED, 1);
+        assertThat(counts).containsEntry(ReconcileOutcome.STILL_PENDING, 1).containsEntry(ReconcileOutcome.EXPIRED, 1)
+                .containsEntry(ReconcileOutcome.ACTIVATED, 1);
     }
 }

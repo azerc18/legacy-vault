@@ -22,6 +22,9 @@ import java.util.UUID;
  *
  * <p>Mỗi đơn chạy trong transaction riêng của {@link PaymentService#reconcilePending}, có khóa dòng nên không
  * đụng IPN về cùng lúc. VNPay huỷ phiên sau 15 phút, nên mặc định chỉ đụng tới đơn cũ hơn 30 phút.
+ *
+ * <p>Đơn EXPIRED chưa thu tiền trong {@code give-up-after} gần nhất cũng được hỏi lại (chỉ để kích hoạt nếu cổng
+ * báo đã trả), vì checkout lại sẽ đóng ngay đơn cũ mà người mua có thể đã trả nhưng IPN bị lỡ.
  */
 @Slf4j
 @Component
@@ -53,9 +56,22 @@ public class PendingPaymentReconciler {
     }
 
     public Map<ReconcileOutcome, Integer> reconcile(LocalDateTime now) {
-        List<UUID> ids = paymentTransactionRepository.findIdsByStatusAndCreatedAtBefore(
-                PaymentStatus.PENDING, now.minus(pendingTimeout), PageRequest.of(0, batchSize));
         Map<ReconcileOutcome, Integer> counts = new EnumMap<>(ReconcileOutcome.class);
+        // Đơn đã đóng trước: hỏi lại trước, để đơn vừa đóng ở lượt này đợi tới lượt sau mới hỏi lại
+        List<UUID> expired = paymentTransactionRepository.findUnpaidIdsByStatusAndCreatedAtSince(
+                PaymentStatus.EXPIRED, now.minus(giveUpAfter), PageRequest.of(0, batchSize));
+        List<UUID> pending = paymentTransactionRepository.findIdsByStatusAndCreatedAtBefore(
+                PaymentStatus.PENDING, now.minus(pendingTimeout), PageRequest.of(0, batchSize));
+        run(expired, now, counts);
+        run(pending, now, counts);
+        if (!expired.isEmpty() || !pending.isEmpty()) {
+            log.info("Reconcile: checked {} stale pending and {} recent expired payment(s): {}",
+                    pending.size(), expired.size(), counts);
+        }
+        return counts;
+    }
+
+    private void run(List<UUID> ids, LocalDateTime now, Map<ReconcileOutcome, Integer> counts) {
         for (UUID id : ids) {
             ReconcileOutcome outcome;
             try {
@@ -66,9 +82,5 @@ public class PendingPaymentReconciler {
             }
             counts.merge(outcome, 1, Integer::sum);
         }
-        if (!ids.isEmpty()) {
-            log.info("Reconcile: checked {} stale pending payment(s): {}", ids.size(), counts);
-        }
-        return counts;
     }
 }
