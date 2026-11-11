@@ -123,6 +123,7 @@ app:
     provider: ${AI_PROVIDER:mock}
     gemini:
       api-key: ${GEMINI_API_KEY:}
+      backup-api-key: ${GEMINI_BACKUP_API_KEY:}
       model: ${GEMINI_MODEL:gemini-3.6-flash}
       backup-model: ${GEMINI_BACKUP_MODEL:gemini-3.5-flash}
     ocr:

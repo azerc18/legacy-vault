@@ -64,6 +64,7 @@ class DeathCertificateOcrServiceImplTest {
         );
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");
+        ReflectionTestUtils.setField(ocrService, "backupApiKey", "");
         ReflectionTestUtils.setField(ocrService, "model", "gemini-3.6-flash");
         ReflectionTestUtils.setField(ocrService, "backupModel", "gemini-3.5-flash");
         ReflectionTestUtils.setField(ocrService, "demoScenariosEnabled", false);

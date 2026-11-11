@@ -18,22 +18,27 @@ import java.util.Map;
 public class GeminiAiClient implements AiClient {
 
     private final RestClient client;
+    private final String apiKey;
+    private final String backupApiKey;
     private final String model;
     private final String backupModel;
 
     public GeminiAiClient(@Value("${app.ai.gemini.api-key}") String apiKey,
+                          @Value("${app.ai.gemini.backup-api-key:}") String backupApiKey,
                           @Value("${app.ai.gemini.model:gemini-3.6-flash}") String model,
                           @Value("${app.ai.gemini.backup-model:gemini-3.5-flash}") String backupModel) {
+        this.apiKey = apiKey;
+        this.backupApiKey = backupApiKey;
+        this.model = model;
+        this.backupModel = backupModel;
+
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(10));
         factory.setReadTimeout(Duration.ofSeconds(30));
         this.client = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
-                .defaultHeader("x-goog-api-key", apiKey)
                 .requestFactory(factory)
                 .build();
-        this.model = model;
-        this.backupModel = backupModel;
     }
 
     @Override
@@ -46,13 +51,14 @@ public class GeminiAiClient implements AiClient {
                 "generationConfig", Map.of("temperature", 0.4, "maxOutputTokens", 2048));
 
         try {
-            return executeChat(model, body);
+            return executeChat(model, apiKey, body);
         } catch (Exception primaryEx) {
             log.warn("Primary Gemini model '{}' failed for Vaulty chat: {}. Attempting fallback to backup model...",
                     model, primaryEx.getMessage());
             if (backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                 try {
-                    String reply = executeChat(backupModel, body);
+                    String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
+                    String reply = executeChat(backupModel, keyToUse, body);
                     log.info("Backup Gemini model '{}' succeeded for Vaulty chat", backupModel);
                     return reply;
                 } catch (Exception backupEx) {
@@ -64,9 +70,10 @@ public class GeminiAiClient implements AiClient {
         }
     }
 
-    private String executeChat(String targetModel, Map<String, Object> body) {
+    private String executeChat(String targetModel, String targetApiKey, Map<String, Object> body) {
         GeminiResponse res = client.post()
                 .uri("/models/{model}:generateContent", targetModel)
+                .header("x-goog-api-key", targetApiKey)
                 .body(body)
                 .retrieve()
                 .body(GeminiResponse.class);

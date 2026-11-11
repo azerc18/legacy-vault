@@ -84,6 +84,9 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     @Value("${app.ai.gemini.api-key:}")
     private String apiKey;
 
+    @Value("${app.ai.gemini.backup-api-key:}")
+    private String backupApiKey;
+
     @Value("${app.ai.gemini.model:gemini-3.6-flash}")
     private String model;
 
@@ -246,13 +249,14 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
         if ("gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank()) {
             try {
-                return callGeminiVisionOcr(plainBytes, expectedOwnerName, model);
+                return callGeminiVisionOcr(plainBytes, expectedOwnerName, model, apiKey);
             } catch (Exception primaryEx) {
                 log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Attempting fallback to backup model...",
                         model, fileName, primaryEx.getMessage());
                 if (backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                     try {
-                        DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName, backupModel);
+                        String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
+                        DeathCertificateOcrResponseDto backupResult = callGeminiVisionOcr(plainBytes, expectedOwnerName, backupModel, keyToUse);
                         log.info("Backup Gemini Vision OCR model '{}' succeeded for document '{}'", backupModel, fileName);
                         return backupResult;
                     } catch (Exception backupEx) {
@@ -303,14 +307,14 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                 .build();
     }
 
-    private DeathCertificateOcrResponseDto callGeminiVisionOcr(byte[] plainBytes, String expectedOwnerName, String targetModel) throws Exception {
+    private DeathCertificateOcrResponseDto callGeminiVisionOcr(byte[] plainBytes, String expectedOwnerName, String targetModel, String targetApiKey) throws Exception {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
         factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT_MS));
 
         RestClient restClient = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
-                .defaultHeader("x-goog-api-key", apiKey)
+                .defaultHeader("x-goog-api-key", targetApiKey)
                 .requestFactory(factory)
                 .build();
 
