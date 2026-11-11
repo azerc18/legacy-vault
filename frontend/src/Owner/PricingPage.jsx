@@ -126,7 +126,8 @@ export default function PricingPage() {
                 </div>
             )}
 
-            {providers.length > 1 && (
+            {/* Hiện cả khi chỉ bật 1 cổng để người dùng luôn thấy logo cổng sẽ dùng */}
+            {providers.length > 0 && (
                 <fieldset className="mb-6">
                     <legend className="text-sm font-medium mb-2">{t('pricing.providerLabel')}</legend>
                     <div className="flex flex-wrap gap-4">
