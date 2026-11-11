@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
-import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout } from './ownerUi.jsx';
+import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout, LoadingSkeleton } from './ownerUi.jsx';
 import RenewalPanel from './RenewalPanel.jsx';
 
 // Việc 2: một dòng "đã dùng / hạn mức"; vượt hạn mức (VIP hết hạn) tô đỏ, chạm hạn mức tô vàng
@@ -93,19 +93,7 @@ export default function BillingPage() {
             <Alert>{error}</Alert>
 
             {loading ? (
-                <div role="status" aria-busy="true" className="space-y-6">
-                    <span className="sr-only">{t('billing.loading')}</span>
-                    <div className="lv-skeleton p-5 space-y-4" aria-hidden="true">
-                        <div className="lv-skeleton-bar h-5 w-44" />
-                        <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-                            {[0, 1, 2, 3].map((i) => <div key={i} className="lv-skeleton h-20" />)}
-                        </div>
-                    </div>
-                    <div className="lv-skeleton p-5 space-y-3" aria-hidden="true">
-                        <div className="lv-skeleton-bar h-5 w-36" />
-                        {[0, 1, 2].map((i) => <div key={i} className="lv-skeleton h-12" />)}
-                    </div>
-                </div>
+                <LoadingSkeleton label={t('billing.loading')} />
             ) : (
                 <div className="space-y-6">
                     {sub && (

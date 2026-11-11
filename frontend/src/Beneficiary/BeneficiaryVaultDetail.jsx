@@ -36,6 +36,8 @@ export default function BeneficiaryVaultDetail() {
     const [documents, setDocuments] = useState([]);
     const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
     const [progress, setProgress] = useState(null);   // ClaimProgressResponse (N2-notify)
+    // Tăng mỗi lần xem / tải tài sản thành công, để Tiến độ và khung Đóng hồ sơ tải lại số "đã xem"
+    const [accessVersion, setAccessVersion] = useState(0);
     const [declineResult, setDeclineResult] = useState(null);   // DeclineClaimResponse (X1: stalledAssets)
 
     // Map lỗi BE -> trạng thái màn hình
@@ -154,11 +156,17 @@ export default function BeneficiaryVaultDetail() {
                         onError={(e) => handleAccessError(e)}
                     />
                     <ProgressPanel progress={progress} />
-                    <AssetList vaultId={vaultId} assets={assets} onError={(e) => handleAccessError(e)} />
+                    <AssetList
+                        vaultId={vaultId}
+                        assets={assets}
+                        onError={(e) => handleAccessError(e)}
+                        onAccessed={() => { setAccessVersion((n) => n + 1); loadProgress(); }}
+                    />
                     <DocumentList vaultId={vaultId} documents={documents} onError={(e) => handleAccessError(e)} />
                     <DossierCard vaultId={vaultId} onError={(e) => handleAccessError(e)} />
                     <CloseVault
                         vaultId={vaultId}
+                        accessVersion={accessVersion}
                         hasJoint={assets.some((a) => a.consensus)}
                         onClosed={(res) => {
                             setVault((v) => ({ ...v, vaultStatus: res.vaultStatus, claimStatus: res.claimStatus, claimedAt: res.claimedAt }));
@@ -314,7 +322,7 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 }
 
 /* ---------- Bước 2a: tài sản (FR-17 xem, FR-18 tải) ---------- */
-function AssetList({ vaultId, assets, onError, readOnly = false }) {
+function AssetList({ vaultId, assets, onError, onAccessed = () => {}, readOnly = false }) {
     const { t } = useTranslation('beneficiary');
     const label = useEnumLabels();
     const [detail, setDetail] = useState(null);
@@ -342,14 +350,14 @@ function AssetList({ vaultId, assets, onError, readOnly = false }) {
 
     const view = async (asset) => {
         setBusyId(asset.id);
-        try { setDetail(await beneficiaryApi.getAsset(vaultId, asset.id)); }
+        try { setDetail(await beneficiaryApi.getAsset(vaultId, asset.id)); onAccessed(); }
         catch (err) { onError(err); }
         finally { setBusyId(null); }
     };
 
     const download = async (asset) => {
         setBusyId(asset.id);
-        try { await beneficiaryApi.downloadAsset(vaultId, asset.id, asset.assetName); }
+        try { await beneficiaryApi.downloadAsset(vaultId, asset.id, asset.assetName); onAccessed(); }
         catch (err) { onError(err); }
         finally { setBusyId(null); }
     };
@@ -657,9 +665,10 @@ function DossierCard({ vaultId, onError }) {
 }
 
 /* ---------- Bước 3: đóng hồ sơ (FR-19) ---------- */
-function CloseVault({ vaultId, hasJoint, onClosed, onError }) {
+function CloseVault({ vaultId, accessVersion = 0, hasJoint, onClosed, onError }) {
     const { t } = useTranslation('beneficiary');
     const [preview, setPreview] = useState(null);
+    const previewOpen = preview !== null;
     const [ack, setAck] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -670,6 +679,12 @@ function CloseVault({ vaultId, hasJoint, onClosed, onError }) {
         catch (err) { onError(err); }
         finally { setLoading(false); }
     };
+
+    // Khung đang mở mà Beneficiary vừa xem / tải thêm tài sản: tải lại số "đã xem" (giữ ô xác nhận đã tick)
+    useEffect(() => {
+        if (!previewOpen || accessVersion === 0) return;
+        beneficiaryApi.closePreview(vaultId).then(setPreview).catch(() => {});
+    }, [accessVersion]); // eslint-disable-line react-hooks/exhaustive-deps -- chỉ chạy khi có lượt xem/tải mới
 
     const confirm = async () => {
         setError(''); setLoading(true);
@@ -711,7 +726,12 @@ function CloseVault({ vaultId, hasJoint, onClosed, onError }) {
                         </ul>
                     )}
                     {noneViewed ? (
-                        <Alert type="warning">{t('close.mustView')}</Alert>
+                        <>
+                            <Alert type="warning">{t('close.mustView')}</Alert>
+                            <div className="mt-5 flex gap-3">
+                                <button onClick={() => setPreview(null)} className={btnOutline}>{t('close.cancel')}</button>
+                            </div>
+                        </>
                     ) : (
                         <>
                             {needAck && (

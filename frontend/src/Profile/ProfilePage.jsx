@@ -9,7 +9,7 @@ import { useVipStatus } from '../Common/useVipStatus.js';
 import { getErrorMessage } from '../api/http.js';
 import { updateStoredUser, logout } from '../auth/auth.js';
 import { useToast } from '../Common/Toast.jsx';
-import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline } from '../Owner/ownerUi.jsx';
+import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
 import SharedPasswordInput from '../Common/PasswordInput.jsx';
 import { isPasswordValid } from '../Common/passwordPolicy.js';
@@ -354,7 +354,7 @@ export default function ProfilePage() {
                 <PageTitle back={{ to: '/home', label: t('back') }} title={t('title')} />
 
                 <Alert>{error}</Alert>
-                {!profile && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+                {!profile && !error && <LoadingSkeleton label={t('loading')} />}
 
                 {profile && (
                     <ReducedMotionConfig remount>

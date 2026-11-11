@@ -98,15 +98,12 @@ export function ConfirmDialog({open, title, message, confirmLabel, cancelLabel, 
     );
 }
 
-// Trang đang tải: khung kính mờ giữ chỗ có vệt sáng chạy ngang, không hiện chữ "Đang tải…" (chữ chỉ dành cho trình đọc màn hình)
-export function LoadingSkeleton({label = '', rows = 3}) {
+// Trang đang tải: không hiện chữ hay khung giữ chỗ nào. Chỉ đánh dấu data-lv-loading để dải tiêu đề trang (.lv-page-hero)
+// chạy một vệt sáng ngang như ánh sáng lướt qua mặt kính (CSS ở materials.css). Chữ chỉ dành cho trình đọc màn hình.
+export function LoadingSkeleton({label = ''}) {
     return (
-        <div role="status" aria-busy="true" className="space-y-4">
+        <div role="status" aria-busy="true" data-lv-loading="">
             {label && <span className="sr-only">{label}</span>}
-            <div className="lv-skeleton p-5 space-y-3" aria-hidden="true">
-                <div className="lv-skeleton-bar h-5 w-44"/>
-                {Array.from({length: rows}, (_, i) => <div key={i} className="lv-skeleton h-12"/>)}
-            </div>
         </div>
     );
 }

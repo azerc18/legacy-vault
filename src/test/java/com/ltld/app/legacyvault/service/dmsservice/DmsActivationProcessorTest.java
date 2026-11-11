@@ -18,6 +18,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
@@ -71,6 +72,7 @@ class DmsActivationProcessorTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     // X2 (m6): tham số constructor mới; mock trả false (chưa có confirmer) nên luồng kích hoạt cũ giữ nguyên.
     @Mock private DmsConfirmerService dmsConfirmerService;
+    @Mock private VaultRepository vaultRepository;
 
     private DmsActivationProcessor processor;
 
@@ -88,7 +90,8 @@ class DmsActivationProcessorTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository giữ nguyên.
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
-                auditLogService, executorNotificationService, userRepository, eventPublisher, dmsConfirmerService);
+                auditLogService, executorNotificationService, userRepository, eventPublisher, dmsConfirmerService,
+                vaultRepository);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -114,6 +117,7 @@ class DmsActivationProcessorTest {
         when(executorAssignmentRepository.findByOwnerIdAndExecutorType(ownerId, ExecutorType.BACKUP))
                 .thenReturn(Optional.of(backup));
         when(executorAssignmentRepository.findAllByOwnerId(ownerId)).thenReturn(List.of(primary, backup));
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(true);
     }
 
     private ExecutorAssignment assignment(User owner, UUID userId, String email, ExecutorType type) {
@@ -148,6 +152,33 @@ class DmsActivationProcessorTest {
     }
 
     // ---------- trigger ----------
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> DMS tạm dừng: quá hạn cũng không trigger, không kích hoạt Executor")
+    void trigger_ownerWithoutVault_doesNothing() {
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        processor.trigger(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(config.getTriggeredAt()).isNull();
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(dmsConfigRepository, never()).save(any());
+        verifyNoInteractions(dmsCheckinRepository, auditLogService, dmsConfirmerService);
+    }
+
+    @Test
+    @DisplayName("Owner đã xoá hết vault -> hết 72h chờ xác nhận chéo cũng không trigger")
+    void expiredConfirmation_ownerWithoutVault_doesNothing() {
+        config.setStatus(DmsStatus.PENDING_CONFIRMATION);
+        when(vaultRepository.existsByOwnerId(ownerId)).thenReturn(false);
+
+        processor.processExpiredConfirmation(config.getId(), now);
+
+        assertThat(config.getStatus()).isEqualTo(DmsStatus.PENDING_CONFIRMATION);
+        assertThat(primary.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verifyNoInteractions(dmsCheckinRepository, auditLogService);
+    }
 
     @Test
     @DisplayName("FR-07: DMS quá hạn -> TRIGGERED, Primary ACTIVE và nhận thông báo SENT")

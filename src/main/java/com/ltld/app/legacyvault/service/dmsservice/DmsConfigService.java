@@ -50,6 +50,12 @@ public interface DmsConfigService {
     boolean isHandoverStarted(UUID ownerId);
 
     /**
+     * Owner vừa tạo vault đầu tiên sau khi đã xoá hết vault (DMS đang tạm dừng): bắt đầu chu kỳ check-in mới từ lúc này.
+     * Chưa cấu hình DMS, đã TRIGGERED hoặc SUSPENDED thì không làm gì. Nơi gọi PHẢI đang trong transaction (MANDATORY).
+     */
+    void restartCycleAfterFirstVaultCreated(UUID ownerId);
+
+    /**
      * Q28/O5: Admin tạm dừng DMS của Owner (ACTIVE -> SUSPENDED), dùng cho A5. Nơi gọi PHẢI kiểm quyền ADMIN.
      * Khóa DmsConfig (PESSIMISTIC_FORCE_INCREMENT) để không chạy đua với trigger FR-07 / nhắc check-in / leo thang;
      * các job đó chỉ quét DMS ACTIVE nên bỏ qua Owner bị tạm dừng.

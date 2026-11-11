@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,7 @@ public class DmsReminderProcessor {
 
     private final DmsConfigRepository dmsConfigRepository;
     private final DmsCheckinRepository dmsCheckinRepository;
+    private final VaultRepository vaultRepository;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
 
     /**
@@ -45,6 +47,10 @@ public class DmsReminderProcessor {
         // Kiểm tra lại trong transaction: Owner có thể vừa check-in hoặc DMS vừa bị kích hoạt.
         if (config == null || config.getStatus() != DmsStatus.ACTIVE
                 || config.getNextReminderAt() == null || config.getNextReminderAt().isAfter(now)) {
+            return Optional.empty();
+        }
+        // Owner đã xoá hết vault: DMS tạm dừng, không nhắc. Tạo vault mới sẽ bắt đầu chu kỳ mới.
+        if (!vaultRepository.existsByOwnerId(config.getOwner().getId())) {
             return Optional.empty();
         }
         LocalDateTime cycleAnchor = cycleAnchor(config);

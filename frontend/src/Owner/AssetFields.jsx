@@ -40,6 +40,9 @@ export const OPTION_LABEL = {
 // ("10.000.000", "10,000,000", "10 000 000"). Dạng khác giữ nguyên để báo lỗi rõ thay vì đổi số im lặng:
 // "1.5" / "0.5" / "12,5" bị báo lỗi, không biến thành 15 / 5 / 125. FE và BE (AssetFieldsValidator) cùng một luật số nguyên.
 const INT_RE = /^\d+$/;
+// Giá trị tiền hợp lệ: số nguyên không có số 0 thừa ở đầu (chặn "0000000", "0123"; nhận "0" để tài sản cũ có giá trị 0 vẫn sửa được),
+// tối đa 15 chữ số. BE (AssetFieldsValidator) cùng luật.
+const VALUE_RE = /^(0|[1-9]\d{0,14})$/;
 const GROUPED_RE = /^\d{1,3}([.,\s]\d{3})+$/;
 export const normalizeNumber = (raw) => {
     const v = (raw || '').trim();
@@ -86,9 +89,54 @@ export function fieldError(f, raw) {
     const v = (raw || '').trim();
     if (!v) return '';
     const label = t(`assetFields.labels.${f.key}`, { defaultValue: f.label });
-    if (f.type === 'NUMBER' && !INT_RE.test(normalizeNumber(v))) return t('assetFields.errors.numberInvalid', { label });
+    if (f.type === 'NUMBER') {
+        const n = normalizeNumber(v);
+        if (!INT_RE.test(n)) return t('assetFields.errors.numberInvalid', { label });
+        if (!VALUE_RE.test(n)) return t('assetFields.errors.numberRange', { label });
+    }
     if (f.pattern && !new RegExp(f.pattern).test(v)) return t('assetFields.errors.fieldInvalid', { label });
     return '';
+}
+
+// Lỗi của từng ô (key -> thông báo), gồm cả "bắt buộc" của ô còn trống. Dùng để báo lỗi ngay tại ô.
+export function fieldProblems(schema, values, isEdit) {
+    const t = i18n.getFixedT(null, 'vault');
+    const out = {};
+    for (const f of schema.fields) {
+        const v = (values[f.key] || '').trim();
+        if (!v) {
+            if (f.required && !(isEdit && f.sensitive)) {
+                out[f.key] = t('assetFields.errors.fieldRequired', { label: t(`assetFields.labels.${f.key}`, { defaultValue: f.label }) });
+            }
+            continue;
+        }
+        const bad = fieldError(f, v);
+        if (bad) out[f.key] = bad;
+    }
+    return out;
+}
+
+// Cuộn tới ô lỗi đầu tiên (aria-invalid) và đưa con trỏ vào đó, để người dùng không phải tự tìm chỗ sai
+export function focusFirstInvalid(root = document) {
+    requestAnimationFrame(() => {
+        const el = root.querySelector('[aria-invalid="true"]');
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (typeof el.focus === 'function') el.focus({ preventScroll: true });
+    });
+}
+
+// Ô dùng để đặt tên tài sản: tên tổ chức / nền tảng, KHÔNG dùng số tài khoản, username hay email. Tên tài sản không mã hoá
+// và còn hiện ở chuông, mail, trang người thụ hưởng, nên chỉ lấy thông tin chung như "Vietcombank", "Gmail", "MetaMask".
+const NAME_SOURCE_KEYS = ['institutionName', 'walletProvider', 'platform', 'documentTitle'];
+
+// Tên tài sản tự đặt cho các loại không phải "Khác": "<Loại> – <tên tổ chức / nền tảng>", ví dụ "Tài khoản ngân hàng – Vietcombank",
+// "Tài khoản email – Gmail". Nền tảng "Other" hoặc chưa nhập thì chỉ dùng tên loại.
+export function deriveAssetName(typeLabel, schema, fields) {
+    const keys = new Set((schema?.fields || []).map((f) => f.key));
+    const key = NAME_SOURCE_KEYS.find((k) => keys.has(k) && (fields?.[k] || '').trim());
+    const v = key ? fields[key].trim() : '';
+    return (v && v !== 'Other' ? `${typeLabel} – ${v}` : typeLabel).slice(0, 200);
 }
 
 // Trả về thông báo lỗi đầu tiên hoặc ''
@@ -129,7 +177,7 @@ const MECHANISM_ICON = {
 // Form nhập theo schema: phần nhận diện (công khai) xếp lưới 2 cột, phần bí mật gom vào khung "niêm phong".
 // Mỗi ô có nhãn, ví dụ (placeholder) và gợi ý lấy từ i18n assetFields.examples / assetFields.hints (không có thì bỏ trống).
 // part: 'all' (mặc định) | 'main' (ô công khai) | 'sealed' (khung niêm phong) để hộp thoại rộng chia hai cột
-export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = 'asset-field', part = 'all' }) {
+export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = 'asset-field', part = 'all', showErrors = false }) {
     const { t } = useTranslation('vault');
     const [shown, setShown] = useState({});
     const [touched, setTouched] = useState({});
@@ -146,7 +194,9 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
         const v = values[f.key] || '';
         // Không dùng thuộc tính required của trình duyệt: hàng tài sản để trống phải được bỏ qua, validateFields lo phần kiểm tra
         // Báo lỗi kiểu dữ liệu ngay khi gõ sai (ô đã có giá trị) hoặc khi rời ô
-        const err = (touched[f.key] || v) ? fieldError(f, v) : '';
+        const needed = f.required && !(isEdit && f.sensitive);
+        const err = (touched[f.key] || v || showErrors) ? (fieldError(f, v) || (!v.trim() && needed && (touched[f.key] || showErrors)
+            ? t('assetFields.errors.fieldRequired', { label: translatedLabel }) : '')) : '';
         const errId = err ? `${id}-err` : undefined;
         // Chỉ mô tả bằng phần tử đang hiển thị: lỗi thay chỗ gợi ý
         const describedBy = err ? errId : (hint ? hintId : undefined);
@@ -164,7 +214,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
                     {translatedLabel}{f.required && <span className="text-primary"> *</span>}
                 </label>
                 {f.type === 'SELECT' && (
-                    <select {...common} className={inputClass}>
+                    <select {...common} className={inputClass + errCls}>
                         <option value="">{t('ui.select')}</option>
                         {f.options.map((o) => (
                             <option key={o} value={o}>
@@ -198,7 +248,7 @@ export function AssetFieldsForm({ schema, values, onChange, isEdit, idPrefix = '
                 )}
                 {err
                     // role="alert" chỉ khi đã rời ô; đang gõ thì aria-live polite để trình đọc màn hình không đọc lại từng phím
-                    ? <p id={errId} role={touched[f.key] ? 'alert' : undefined} aria-live={touched[f.key] ? undefined : 'polite'}
+                    ? <p id={errId} role={touched[f.key] || showErrors ? 'alert' : undefined} aria-live={touched[f.key] || showErrors ? undefined : 'polite'}
                          className="mt-1.5 text-xs font-semibold text-error">{err}</p>
                     : hint && <p id={hintId} className="mt-1.5 text-xs text-on-surface-variant">{hint}</p>}
             </div>

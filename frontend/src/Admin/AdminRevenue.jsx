@@ -4,7 +4,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { useTranslation } from 'react-i18next';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
-import { Alert } from '../Owner/ownerUi.jsx';
+import { Alert, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Dossier, StatCard, formatVnd } from './adminUi.jsx';
 
 const RANGES = ['30d', '12m'];
@@ -239,7 +239,7 @@ export default function AdminRevenue() {
     return (
         <AdminLayout title={t('revenue.title')} subtitle={t('revenue.subtitle')} actions={toggle}>
             <Alert>{error}</Alert>
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
+            {!data && !error && <LoadingSkeleton label={t('loading')} />}
             {data && (
                 <>
                     <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4 mb-6">

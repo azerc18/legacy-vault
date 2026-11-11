@@ -26,6 +26,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.NotificationRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.security.JwtConfig;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -77,6 +78,7 @@ class DmsConfirmerServiceImplTest {
     @Mock private ApplicationEventPublisher eventPublisher;
     @Mock private EmailSender emailSender;
     @Mock private EntitlementService entitlementService;
+    @Mock private VaultRepository vaultRepository;
 
     private DmsActivationProcessor processor;
     private DmsConfirmerServiceImpl confirmerService;
@@ -107,8 +109,10 @@ class DmsConfirmerServiceImplTest {
                 executorNotificationService,
                 userRepository,
                 eventPublisher,
-                lazyConfirmer
+                lazyConfirmer,
+                vaultRepository
         );
+        when(vaultRepository.existsByOwnerId(any())).thenReturn(true);
 
         confirmerService = new DmsConfirmerServiceImpl(
                 dmsConfigRepository,

@@ -646,6 +646,8 @@ class ExecutorManagementIntegrationTest {
         ownerIds.add(owner.getId());
         UUID configId = null;
         if (nextCheckinDueAt != null) {
+            // Owner có DMS phải còn vault: không còn vault thì DMS tạm dừng, không trigger.
+            vaultRepository.save(Vault.builder().owner(owner).name("Vault " + owner.getFullName()).build());
             configId = dmsConfigRepository.save(DmsConfig.builder()
                     .owner(owner)
                     .backupActivationWaitDays(14)

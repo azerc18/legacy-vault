@@ -45,12 +45,15 @@ public enum ErrorCode {
 
     // Executor / DMS / Vault
     DMS_NOT_TRIGGERED(HttpStatus.CONFLICT),
+    DMS_CHECKIN_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
     EXECUTOR_NOT_ACTIVE(HttpStatus.FORBIDDEN),
     VAULT_STATE_CONFLICT(HttpStatus.CONFLICT),
     CHECKIN_TOKEN_INVALID(HttpStatus.BAD_REQUEST),
     CONFIRMER_TOKEN_INVALID(HttpStatus.BAD_REQUEST),
     REMINDER_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
     EMERGENCY_REQUEST_EXISTS(HttpStatus.CONFLICT),
+    // Owner đã xoá hết vault: DMS tạm dừng, check-in không thành công
+    DMS_NO_VAULT(HttpStatus.CONFLICT),
 
     // Verifier
     INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),

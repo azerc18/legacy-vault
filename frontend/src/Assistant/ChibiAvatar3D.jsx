@@ -963,6 +963,7 @@ function Owl3D({ action, costume }) {
                 raf = requestAnimationFrame(loop);
                 const t = performance.now() / 1000;
                 if (document.hidden) { last = t; return; }   // tab ẩn thì không vẽ
+                if (t - last < 0.028) return;                // tối đa ~30 khung/giây: con cú nhỏ, đủ mượt mà đỡ tốn GPU
                 update(t, Math.min(t - last, 0.05), mouse.x, mouse.y);
                 last = t;
                 renderer.render(rig.scene, camera);

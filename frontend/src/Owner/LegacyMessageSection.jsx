@@ -6,11 +6,14 @@ import { getErrorMessage } from '../api/http.js';
 import { Card, Icon, Alert, ConfirmDialog, formatDate, inputClass, btnPrimary, btnOutline } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
+import { VipChip, VipLocked } from '../Common/VipLock.jsx';
+import { useVipStatus } from '../Common/useVipStatus.js';
 
 const textareaCls = 'w-full mt-1 px-4 py-2.5 rounded-xl border border-outline-variant/40 dark:border-white/15 bg-surface-container-lowest dark:bg-[#131c31] text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40 focus:outline-none focus:border-primary';
 
 export default function LegacyMessageSection({ vaultId, beneficiaries = [], editable }) {
     const { t } = useTranslation(['vault', 'common']);
+    const vip = useVipStatus();
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -128,8 +131,10 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
         }
     };
 
+    // FREE và chưa có lời nhắn nào: hiện mờ + khoá (bấm mở hộp nâng cấp). Đã có lời nhắn thì vẫn xem/sửa được, không làm mờ.
     return (
-        <Card title={t('detail.messages.title', { count: messages.length })} icon="mark_email_unread">
+        <VipLocked locked={vip === false && messages.length === 0 && !loading}>
+        <Card title={<>{t('detail.messages.title', { count: messages.length })} <VipChip className="ml-1" /></>} icon="mark_email_unread">
             <Alert>{error}</Alert>
             <p className="text-sm text-on-surface-variant mb-4">
                 {t('detail.messages.subtitle')}
@@ -365,5 +370,6 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                 onCancel={() => setDeleting(null)}
             />
         </Card>
+        </VipLocked>
     );
 }

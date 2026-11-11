@@ -6,6 +6,7 @@
     "submitting": "Checking in…",
     "missingToken": "This page needs the check-in link from your reminder email. Please open the link in the email again, or sign in to check in manually.",
     "hint": "Opening this page does not check you in. Only pressing the button does.",
+    "qrIntro": "You just scanned the QR code in your reminder email. Press the button below to confirm you're OK. You don't need to sign in.",
     "submitFailed": "Could not check in right now. Please try again."
   },
   "done": {
@@ -18,8 +19,12 @@
       "TOKEN_INVALID": "This check-in link is invalid, expired, already used, or from an earlier reminder cycle.",
       "TRIGGERED": "Your Dead Man's Switch has already started the handover process, so check-in is no longer possible.",
       "SUSPENDED": "Your Dead Man's Switch is currently suspended by an administrator. Please contact an admin.",
-      "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration."
+      "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration.",
+      "NO_VAULT": "You have no vault yet, so the check-in was not successful. Sign in and create a vault first."
     },
+    "autoClose_one": "This page will close in {{count}} second.",
+    "autoClose_other": "This page will close in {{count}} seconds.",
+    "closeManually": "All done, you can close this page now.",
     "nextDue": "Next check-in due:",
     "openDms": "Open Dead Man's Switch",
     "backHome": "Back to Home"

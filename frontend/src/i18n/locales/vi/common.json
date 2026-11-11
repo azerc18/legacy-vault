@@ -1,5 +1,6 @@
 {
   "header": { "collapseSidebar": "Thu gọn thanh bên", "expandSidebar": "Mở rộng thanh bên", "userHome": "Trang người dùng", "logout": "Đăng xuất" },
+  "vip": { "chip": "VIP", "lockedLabel": "Dành cho gói VIP", "upgradeMessage": "Tính năng này chỉ dùng được với gói VIP. Nâng cấp để mở khoá." },
   "nav": {"home": "Trang chủ", "profile": "Hồ sơ", "estates": "Di sản", "requests": "Yêu cầu", "history": "Lịch sử", "myVaults": "Két sắt của tôi", "guide": "Hướng dẫn", "dms": "Dead Man's Switch", "executors": "Người thi hành", "activity": "Nhật ký hoạt động", "billing": "Gói thuê bao & VIP", "admin": "Quản trị"},
   "actions": { "back": "Quay lại", "save": "Lưu", "cancel": "Huỷ", "confirm": "Xác nhận", "retry": "Thử lại", "close": "Đóng" },
   "notifications": {
