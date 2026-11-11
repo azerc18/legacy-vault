@@ -63,5 +63,10 @@
   "MFA_CHALLENGE_EXPIRED": "Your sign-in session expired. Please sign in again.",
   "GOOGLE_LOGIN_DISABLED": "Google sign-in is not enabled.",
   "GOOGLE_TOKEN_INVALID": "Google could not confirm your sign-in. Please try again.",
-  "GOOGLE_EMAIL_NOT_VERIFIED": "Your Google account email is not verified."
+  "GOOGLE_EMAIL_NOT_VERIFIED": "Your Google account email is not verified.",
+  "COUPON_INVALID": "This discount code is wrong or has expired.",
+  "COUPON_NOT_APPLICABLE": "This code does not apply to the plan you chose.",
+  "COUPON_USED_UP": "This code has been fully used.",
+  "COUPON_ALREADY_USED": "You have already used this code.",
+  "TRIAL_NOT_ELIGIBLE": "The free trial is only for accounts that never had VIP."
 }

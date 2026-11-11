@@ -50,6 +50,7 @@ const AdminAuditLogs = lazy(() => import('./Admin/AdminAuditLogs.jsx'));
 const AdminAlerts = lazy(() => import('./Admin/AdminAlerts.jsx'));
 const AdminDashboard = lazy(() => import('./Admin/AdminDashboard.jsx'));
 const AdminPayments = lazy(() => import('./Admin/AdminPayments.jsx'));
+const AdminRevenue = lazy(() => import('./Admin/AdminRevenue.jsx'));
 const AdminPlans = lazy(() => import('./Admin/AdminPlans.jsx'));
 const AdminNotifications = lazy(() => import('./Admin/AdminNotifications.jsx'));
 const AdminBeneficiaryLocks = lazy(() => import('./Admin/AdminBeneficiaryLocks.jsx'));
@@ -127,6 +128,7 @@ function App() {
                 <Route path="/admin/audit-logs" element={guard(ADMIN, <AdminAuditLogs />)} />
                 <Route path="/admin/alerts" element={guard(ADMIN, <AdminAlerts />)} />
                 <Route path="/admin/payments" element={guard(ADMIN, <AdminPayments />)} />
+                <Route path="/admin/revenue" element={guard(ADMIN, <AdminRevenue />)} />
                 <Route path="/admin/plans" element={guard(ADMIN, <AdminPlans />)} />
                 <Route path="/admin/notifications" element={guard(ADMIN, <AdminNotifications />)} />
                 <Route path="/admin/beneficiary-locks" element={guard(ADMIN, <AdminBeneficiaryLocks />)} />

@@ -229,21 +229,24 @@ public class AdminInsightService {
 
     @Transactional(readOnly = true)
     public AdminChartsResponse getCharts() {
-        LocalDate today = LocalDate.now();
+        // Ngày theo giờ Việt Nam (review #257 m1): server Azure chạy UTC, paidAt lưu theo giờ server
+        ZoneId zone = AdminRevenueService.VN_ZONE;
+        ZoneId server = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zone);
 
-        // Doanh thu theo ngày thanh toán (giờ server, như paidAt), đủ 30 ngày kể cả ngày không có giao dịch
+        // Doanh thu theo ngày thanh toán, đủ 30 ngày kể cả ngày không có giao dịch
         LocalDate firstDay = today.minusDays(REVENUE_DAYS - 1L);
         Map<LocalDate, Long> revenue = new LinkedHashMap<>();
         for (LocalDate d = firstDay; !d.isAfter(today); d = d.plusDays(1)) revenue.put(d, 0L);
         em.createQuery("SELECT p.paidAt, p.amountVnd FROM PaymentTransaction p WHERE p.status = :st AND p.paidAt >= :from",
                         Object[].class)
-                .setParameter("st", PaymentStatus.SUCCESS).setParameter("from", firstDay.atStartOfDay())
+                .setParameter("st", PaymentStatus.SUCCESS)
+                .setParameter("from", firstDay.atStartOfDay(zone).withZoneSameInstant(server).toLocalDateTime())
                 .getResultList()
-                .forEach(r -> revenue.computeIfPresent(((LocalDateTime) r[0]).toLocalDate(),
+                .forEach(r -> revenue.computeIfPresent(AdminRevenueService.toVn((LocalDateTime) r[0], server).toLocalDate(),
                         (k, v) -> v + ((Number) r[1]).longValue()));
 
-        // Người dùng mới theo tuần (thứ Hai đầu tuần); createdAt là Instant -> đổi theo múi giờ server
-        ZoneId zone = ZoneId.systemDefault();
+        // Người dùng mới theo tuần (thứ Hai đầu tuần); createdAt là Instant -> đổi sang giờ VN
         LocalDate thisMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate firstMonday = thisMonday.minusWeeks(USER_WEEKS - 1L);
         Map<LocalDate, Long> users = new LinkedHashMap<>();

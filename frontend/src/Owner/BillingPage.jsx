@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatStorage } from '../i18n/format.js';
 import { Alert, btnPrimary, Card, formatDate, Icon, OwnerLayout, LoadingSkeleton } from './ownerUi.jsx';
+import RenewalPanel from './RenewalPanel.jsx';
 
 // Việc 2: một dòng "đã dùng / hạn mức"; vượt hạn mức (VIP hết hạn) tô đỏ, chạm hạn mức tô vàng
 function UsageMeter({ icon, label, used, max, display }) {
@@ -40,6 +41,10 @@ export default function BillingPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [downloadingId, setDownloadingId] = useState(null);
+    // Việc 6: mail nhắc mở /billing?renew=VIP_MONTH -> cuộn tới và làm nổi khối gia hạn
+    const [params] = useSearchParams();
+    const renewCode = params.get('renew');
+    const renewRef = useRef(null);
 
     const handleDownloadReceipt = async (txId) => {
         setError('');
@@ -64,6 +69,12 @@ export default function BillingPage() {
         // Không chặn trang nếu lỗi: thiếu thẻ mức sử dụng vẫn xem được gói và lịch sử
         paymentApi.getMyUsage().then(setUsage).catch(() => setUsage(null));
     }, [t]);
+
+    useEffect(() => {
+        if (!loading && renewCode && renewRef.current) {
+            renewRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [loading, renewCode]);
 
     const over = usage?.overLimit ?? [];
 
@@ -97,6 +108,11 @@ export default function BillingPage() {
                                         {sub.vip && (
                                             <span className="text-xs px-2 py-0.5 rounded-full bg-primary text-on-primary">
                                                 {t('billing.current.vip')}
+                                            </span>
+                                        )}
+                                        {sub.trial && (
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">
+                                                {t('billing.current.trial')}
                                             </span>
                                         )}
                                     </div>
@@ -141,6 +157,9 @@ export default function BillingPage() {
                                         })}
                                     </div>
                                 </div>
+                            </div>
+                            <div className="mt-4">
+                                <RenewalPanel ref={renewRef} sub={sub} renewCode={renewCode} highlight={!!renewCode} onChange={setSub} />
                             </div>
                         </Card>
                     )}
@@ -226,7 +245,14 @@ export default function BillingPage() {
                                                 <td className="py-3 pr-4 font-semibold">
                                                     {tx.planName || tx.planCode}
                                                 </td>
-                                                <td className="py-3 pr-4">{formatVnd(tx.amountVnd)}</td>
+                                                <td className="py-3 pr-4">
+                                                    {formatVnd(tx.amountVnd)}
+                                                    {tx.couponCode && (
+                                                        <span className="block text-xs text-on-surface-variant">
+                                                            {t('billing.history.coupon', { code: tx.couponCode, discount: formatVnd(tx.discountVnd) })}
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="py-3 pr-4">
                                                     <span
                                                         title={tx.status === 'EXPIRED' ? t('billing.history.expiredHint') : undefined}

@@ -90,6 +90,12 @@ public enum ErrorCode {
     PLAN_LIMIT_REACHED(HttpStatus.FORBIDDEN),
     PAYMENT_SIGNATURE_INVALID(HttpStatus.BAD_REQUEST),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST),
+    // Việc 4: mã giảm giá / dùng thử
+    COUPON_INVALID(HttpStatus.BAD_REQUEST),
+    COUPON_NOT_APPLICABLE(HttpStatus.BAD_REQUEST),
+    COUPON_USED_UP(HttpStatus.CONFLICT),
+    COUPON_ALREADY_USED(HttpStatus.CONFLICT),
+    TRIAL_NOT_ELIGIBLE(HttpStatus.CONFLICT),
     STORAGE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
 
     private final HttpStatus status;
