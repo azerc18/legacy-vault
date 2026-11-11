@@ -6,7 +6,7 @@ import { getErrorMessage } from '../api/http.js';
 import { Alert, btnPrimary, Card, Icon } from './ownerUi.jsx';
 
 // Nhãn nút dài nên xuống 2 dòng trên điện thoại: bỏ chiều cao cố định h-11 để nút cao theo chữ, dấu không chạm viền
-const confirmButtonClass = `${btnPrimary.replace('h-11', 'min-h-11')} w-full mt-2 py-2.5 leading-snug text-center`;
+const confirmButtonClass = `${btnPrimary.replace('h-11', 'min-h-11')} w-full mt-2 py-2 leading-snug text-center`;
 
 // F2: trang công khai mở từ link trong email nhắc. Mở trang KHÔNG gọi API (trình quét link của hộp thư có thể
 // tự mở link); chỉ check-in khi Owner bấm nút.
