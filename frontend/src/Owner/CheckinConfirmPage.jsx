@@ -7,22 +7,27 @@ import { Alert, btnPrimary, Card, Icon } from './ownerUi.jsx';
 
 // F2: trang công khai mở từ link trong email nhắc. Mở trang KHÔNG gọi API (trình quét link của hộp thư có thể
 // tự mở link); chỉ check-in khi Owner bấm nút.
+// via=qr (link trong ảnh QR của mail) cũng phải bấm nút: nhiều bộ lọc mail doanh nghiệp đọc QR trong ảnh rồi mở
+// link bằng trình duyệt có chạy JS; nếu tự check-in thì mỗi mail nhắc sẽ check-in hộ và DMS không bao giờ kích hoạt.
+// Khác biệt duy nhất: câu chữ hợp điện thoại, và trang kết quả tự đóng sau 5 giây.
 export default function CheckinConfirmPage() {
     const { t } = useTranslation('checkin');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token') || '';
+    const fromQr = searchParams.get('via') === 'qr';
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    const submit = async () => {
-        setError('');
-        setSubmitting(true);
+    // Gọi API và chuyển trang kết quả; trả về câu lỗi khi cần ở lại trang để bấm lại.
+    const send = async () => {
         try {
             const res = await dmsCheckinApi.checkInWithToken(token);
             const params = new URLSearchParams({ status: 'success' });
             if (res?.checkinDueAt) params.set('nextDue', res.checkinDueAt);
+            if (fromQr) params.set('via', 'qr');
             navigate(`/dms/checkin-done?${params.toString()}`, { replace: true });
+            return null;
         } catch (err) {
             // BE trả data.reason khi token / trạng thái DMS không cho check-in: kết quả cuối, sang trang kết quả.
             // Không có reason (mất mạng, lỗi máy chủ): ở lại để bấm lại.
@@ -30,12 +35,22 @@ export default function CheckinConfirmPage() {
             if (reason) {
                 navigate(`/dms/checkin-done?${new URLSearchParams({ status: 'error', reason }).toString()}`,
                     { replace: true });
-                return;
+                return null;
             }
-            setError(getErrorMessage(err, t('confirm.submitFailed')));
+            return getErrorMessage(err, t('confirm.submitFailed'));
+        }
+    };
+
+    const submit = async () => {
+        setError('');
+        setSubmitting(true);
+        const message = await send();
+        if (message) {
+            setError(message);
             setSubmitting(false);
         }
     };
+
 
     return (
         <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center px-5 py-12">
@@ -51,7 +66,9 @@ export default function CheckinConfirmPage() {
                     <p className="mt-3 text-sm text-on-surface-variant text-center">{t('confirm.missingToken')}</p>
                 ) : (
                     <>
-                        <p className="mt-3 text-sm text-on-surface-variant">{t('confirm.intro')}</p>
+                        <p className="mt-3 text-sm text-on-surface-variant">
+                            {fromQr ? t('confirm.qrIntro') : t('confirm.intro')}
+                        </p>
                         <div className="mt-4">
                             <Alert>{error}</Alert>
                         </div>

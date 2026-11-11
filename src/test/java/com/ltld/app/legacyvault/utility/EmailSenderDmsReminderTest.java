@@ -2,7 +2,10 @@ package com.ltld.app.legacyvault.utility;
 
 import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.service.userservice.UserLanguageResolver;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimePart;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -97,6 +100,46 @@ class EmailSenderDmsReminderTest {
         emailSender.sendDmsCheckinReminder("owner@example.com",
                 LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3, "token");
 
-        assertThat(sentMessage().getText()).doesNotContain("/dms/checkin");
+        SentMail mail = sentMessage();
+        assertThat(mail.getText()).doesNotContain("/dms/checkin");
+        assertThat(mail.getHtml()).doesNotContain("cid:");
+    }
+
+    @Test
+    @DisplayName("QR: mail nhắc có link thì kèm ảnh QR inline (cid) của cùng link, bản chữ trơn không có QR")
+    void checkinReminder_withToken_embedsInlineQr() throws Exception {
+        ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://legacyvault.test");
+
+        emailSender.sendDmsCheckinReminder("owner@example.com",
+                LocalDateTime.of(2026, 11, 1, 2, 0), LocalDateTime.of(2026, 11, 8, 2, 0), 1, 3, "tok");
+
+        ArgumentCaptor<MimeMessage> captor = ArgumentCaptor.forClass(MimeMessage.class);
+        verify(javaMailSender).send(captor.capture());
+        MimeMessage message = captor.getValue();
+        SentMail mail = SentMail.of(message);
+        assertThat(mail.getHtml()).contains("src=\"cid:dms-checkin-qr\"");
+        assertThat(mail.getText()).doesNotContain("cid:");
+
+        Part qr = findPart(message, "image/png");
+        assertThat(qr).isNotNull();
+        assertThat(((MimePart) qr).getContentID()).isEqualTo("<dms-checkin-qr>");
+        byte[] png = qr.getInputStream().readAllBytes();
+        assertThat(png).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
+    }
+
+    private static Part findPart(Part part, String mimeType) throws Exception {
+        if (part.isMimeType(mimeType)) {
+            return part;
+        }
+        if (part.isMimeType("multipart/*")) {
+            Multipart mp = (Multipart) part.getContent();
+            for (int i = 0; i < mp.getCount(); i++) {
+                Part found = findPart(mp.getBodyPart(i), mimeType);
+                if (found != null) {
+                    return found;
+                }
+            }
+        }
+        return null;
     }
 }
