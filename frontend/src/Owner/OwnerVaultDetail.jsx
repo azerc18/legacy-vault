@@ -7,7 +7,7 @@ import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
-    ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger,
+    ASSET_ICON, ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger,
 } from './ownerUi.jsx';
 import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
