@@ -34,6 +34,10 @@ public class User {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    // Lần cuối số điện thoại được xác minh bằng OTP SMS; đổi số thì đặt lại null
+    @Column(name = "phone_verified_at")
+    private Instant phoneVerifiedAt;
+
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 

@@ -15,11 +15,20 @@ async function loadState() {
         // 404 = chưa cấu hình DMS (nếu BE đổi sang trả { configured:false } thì cũng xử lý bên dưới)
         ownerApi.getDms().catch((e) => { if (e.response?.status === 404) return null; throw e; }),
     ]);
-    return { vaults, executors: executors ?? [], dms: dms && dms.configured !== false ? dms : null };
+    return {
+        vaults,
+        executors: executors ?? [],
+        dms: dms && dms.configured !== false ? dms : null,
+        // KYC: chỉ có khi DMS chưa cấu hình (BE trả identityVerified cùng configured=false)
+        identityVerified: dms && dms.configured === false ? dms.identityVerified !== false : true,
+    };
 }
 
 // Trả về danh sách bước còn thiếu, theo đúng thứ tự BE bắt buộc: Executor -> DMS. Rỗng = không cần banner.
-export function computeIssues({ vaults, executors, dms }, t) {
+// Bỏ phần ?query để so với pathname hiện tại
+const pathOf = (to) => (to || '').split('?')[0];
+
+export function computeIssues({ vaults, executors, dms, identityVerified = true }, t) {
     if (vaults.length === 0) return [];                  // chưa có gì để bảo vệ
     if (dms?.status === 'TRIGGERED') return [];          // bàn giao đã bắt đầu, banner không còn ý nghĩa
 
@@ -31,8 +40,13 @@ export function computeIssues({ vaults, executors, dms }, t) {
     } else if (dms && dms.hasUsableExecutor === false) {
         issues.push({ key: 'executor', critical: true, text: t('banner.issues.unusableExecutor'), cta: t('banner.issues.unusableExecutorCta'), to: '/owner/executors' });
     }
+    if (!dms && !identityVerified) {
+        // KYC: bật DMS lần đầu cần xác minh danh tính; làm được ngay, không phụ thuộc Executor
+        issues.push({ key: 'identity', critical: true, text: t('identity:banner.text'), cta: t('identity:banner.cta'), to: '/owner/identity?returnTo=/owner/dms' });
+    }
     if (!dms) {
-        issues.push({ key: 'dms', critical: true, text: t('banner.issues.noDms'), cta: t('banner.issues.noDmsCta'), to: '/owner/dms', needs: hasPrimary ? null : 'executor' });
+        issues.push({ key: 'dms', critical: true, text: t('banner.issues.noDms'), cta: t('banner.issues.noDmsCta'), to: '/owner/dms',
+            needs: !hasPrimary ? 'executor' : (!identityVerified ? 'identity' : null) });
     } else if (dms.status === 'SUSPENDED') {
         issues.push({ key: 'dms', critical: true, text: t('banner.issues.dmsSuspended'), to: null });
     }
@@ -50,7 +64,7 @@ export function computeIssues({ vaults, executors, dms }, t) {
 }
 
 export default function ProtectionBanner() {
-    const { t } = useTranslation('vault');
+    const { t } = useTranslation(['vault', 'identity']);
     const [state, setState] = useState(null);
     const { pathname } = useLocation();
 
@@ -93,7 +107,7 @@ export default function ProtectionBanner() {
                                 </span>
                                 <span className="flex flex-wrap items-baseline gap-x-2">
                                     <span className={i.needs ? 'opacity-60' : ''}>{i.text}{i.needs ? t('banner.afterStep1') : ''}</span>
-                                    {i.to && !i.needs && i !== next && pathname !== i.to && (
+                                    {i.to && !i.needs && i !== next && pathname !== pathOf(i.to) && (
                                         <Link to={i.to} className="font-semibold underline underline-offset-2 whitespace-nowrap">{i.cta}</Link>
                                     )}
                                 </span>
@@ -101,7 +115,7 @@ export default function ProtectionBanner() {
                         ))}
                     </ol>
                 </div>
-                {next && pathname !== next.to && (
+                {next && pathname !== pathOf(next.to) && (
                     <Link to={next.to}
                           className="shrink-0 h-10 px-4 rounded-xl bg-primary text-on-primary text-sm font-bold inline-flex items-center gap-2 hover:opacity-90 lv-pill">
                         {next.cta} <Icon name="arrow_forward" className="text-[18px]" />

@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.exception.VaultException;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
 import com.ltld.app.legacyvault.utility.OtpGenerator;
 import com.ltld.app.legacyvault.utility.OtpHasher;
+import com.ltld.app.legacyvault.utility.VnPhoneNumber;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,7 +43,6 @@ public class EWalletAssetVerifier implements AssetVerifier {
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(2500))
             .build();
-    private static final Pattern VN_PHONE_PATTERN = Pattern.compile("^(0|\\+84)(3|5|7|8|9)\\d{8}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
     private static final Pattern PAYPAL_EMAIL_JSON = Pattern.compile("\"value\"\\s*:\\s*\"([^\"@]+@[^\"]+)\"|"
             + "\"email\"\\s*:\\s*\"([^\"@]+@[^\"]+)\"");
@@ -299,31 +299,16 @@ public class EWalletAssetVerifier implements AssetVerifier {
             throw new VaultException("Phone number (usernameOrHandle) is required for e-wallet SMS verification",
                     HttpStatus.BAD_REQUEST);
         }
-        String normalized = raw.replaceAll("[\\s.\\-()]", "");
-        if (!VN_PHONE_PATTERN.matcher(normalized).matches()) {
-            throw new VaultException(
-                    "Invalid Vietnamese mobile phone number format (expected 03x/05x/07x/08x/09x or +84...)",
+        try {
+            return VnPhoneNumber.parse(raw).national();
+        } catch (VnPhoneNumber.InvalidVnPhoneException e) {
+            throw new VaultException("Invalid Vietnamese mobile phone number: " + e.getMessage(),
                     HttpStatus.BAD_REQUEST);
         }
-        if (normalized.startsWith("+84")) {
-            return "0" + normalized.substring(3);
-        }
-        return normalized;
     }
 
     public static String detectVietnameseCarrier(String normalizedLocalPhone) {
-        if (normalizedLocalPhone == null || normalizedLocalPhone.length() < 3) {
-            return "Unknown";
-        }
-        String prefix = normalizedLocalPhone.substring(0, 3);
-        return switch (prefix) {
-            case "086", "096", "097", "098", "032", "033", "034", "035", "036", "037", "038", "039" -> "Viettel";
-            case "088", "091", "094", "081", "082", "083", "084", "085" -> "VinaPhone";
-            case "089", "090", "093", "070", "076", "077", "078", "079" -> "MobiFone";
-            case "092", "056", "058" -> "Vietnamobile";
-            case "099", "059" -> "Gmobile";
-            default -> "Vietnam Mobile";
-        };
+        return VnPhoneNumber.tryParse(normalizedLocalPhone).map(VnPhoneNumber::carrier).orElse("Unknown");
     }
 
     static String maskPhone(String phone) {

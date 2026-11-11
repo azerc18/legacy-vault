@@ -24,6 +24,7 @@
         "executorsAssigned": "Chỉ định cả người thi hành chính và người thi hành dự phòng",
         "dmsActive": "Bật Dead Man's Switch",
         "safetyNetConfigured": "Chỉ định người thụ hưởng dự phòng hoặc người xác nhận chéo DMS",
-        "recentReview": "Rà soát hoặc check-in hồ sơ di sản trong 6 tháng gần nhất"
+        "recentReview": "Rà soát hoặc check-in hồ sơ di sản trong 6 tháng gần nhất",
+        "identityVerified": "Xác minh danh tính để bật Dead Man's Switch"
     }
 }

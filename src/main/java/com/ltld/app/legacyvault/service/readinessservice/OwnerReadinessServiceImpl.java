@@ -13,6 +13,7 @@ import com.ltld.app.legacyvault.repository.DigitalAssetRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.LegalDocumentRepository;
+import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultBeneficiaryRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService;
@@ -58,6 +59,7 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
     private final ExecutorAssignmentRepository executorAssignmentRepository;
     private final DmsConfigRepository dmsConfigRepository;
     private final AssetVerificationService assetVerificationService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -156,6 +158,14 @@ public class OwnerReadinessServiceImpl implements OwnerReadinessService {
         items.add(item("PRIMARY_AND_BACKUP_EXECUTOR", "executorsAssigned",
                 "Assign both a Primary Executor and a Backup Executor",
                 hasPrimary && hasBackup, 15, "/owner/executors"));
+
+        // KYC: xác minh danh tính là điều kiện bật DMS lần đầu. 0 điểm (điểm đã tính ở tiêu chí DMS), chỉ để nhắc Owner.
+        boolean identityVerified = userRepository.findById(ownerId)
+                .map(u -> u.getKycLevel() != null && u.getKycLevel() != KycLevel.NONE)
+                .orElse(false);
+        items.add(item("IDENTITY_VERIFIED", "identityVerified",
+                "Verify your identity to enable the Dead Man's Switch",
+                identityVerified, 0, "/owner/identity"));
 
         // 5. Đã bật Dead Man's Switch (ACTIVE) (+15đ)
         boolean dmsActive = dmsOpt.map(d -> d.getStatus() == DmsStatus.ACTIVE).orElse(false);

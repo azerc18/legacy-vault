@@ -8,6 +8,8 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.identityservice.OwnerIdentityService;
+import com.ltld.app.legacyvault.enums.OwnerIdMatch;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAccessGuard;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
@@ -77,6 +79,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
+    private final OwnerIdentityService ownerIdentityService;
 
     private final Map<String, CachedOcrEntry> verifierCache = new ConcurrentHashMap<>();
     private final Map<String, Deque<Long>> rateLimitBuckets = new ConcurrentHashMap<>();
@@ -115,7 +118,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
             ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
             return new ExecutorContext(
                     ownerNameOf(assignment.getOwner() != null ? assignment.getOwner().getFullName() : null),
-                    assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null);
+                    assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null,
+                    assignment.getOwner() != null ? assignment.getOwner().getId() : null);
         });
         byte[] plainBytes = uploadedDocumentValidator.readAndValidate(file);
         String ownerFullName = ctx.ownerFullName();
@@ -129,6 +133,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "death-certificate.pdf";
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, originalFilename, ownerFullName);
+        attachOwnerIdMatch(result, ctx.ownerId());
 
         recordAudit(actorId, executorLogin, "ExecutorAssignment", assignmentId.toString(), result);
         return result;
@@ -140,7 +145,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
             LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
             return new VerifierContext(
                     ownerNameOf(request.getOwner() != null ? request.getOwner().getFullName() : null),
-                    request.getDeathCertificateFileUrlEncrypted());
+                    request.getDeathCertificateFileUrlEncrypted(),
+                    request.getOwner() != null ? request.getOwner().getId() : null);
         });
         String ownerFullName = ctx.ownerFullName();
         String cacheKey = requestId + ":" + String.valueOf(ctx.fileUrlEncrypted());
@@ -160,6 +166,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         byte[] plainBytes = readDecryptedDocument(ctx.fileUrlEncrypted(), requestId);
         String documentRef = "verification-request-" + requestId;
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, documentRef, ownerFullName);
+        attachOwnerIdMatch(result, ctx.ownerId());
 
         if (ENGINE_GEMINI.equals(result.getEngineSource())) {
             if (verifierCache.size() >= MAX_IN_MEMORY_KEYS) {
@@ -182,9 +189,70 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         return fullName != null ? fullName : "Chủ két";
     }
 
-    private record ExecutorContext(String ownerFullName, UUID actorId) {}
+    private record ExecutorContext(String ownerFullName, UUID actorId, UUID ownerId) {}
 
-    private record VerifierContext(String ownerFullName, String fileUrlEncrypted) {}
+    private record VerifierContext(String ownerFullName, String fileUrlEncrypted, UUID ownerId) {}
+
+    /**
+     * KYC: đối chiếu số CCCD / CMND AI đọc được trên giấy chứng tử với CCCD Owner đã xác minh (so HMAC, không giải mã).
+     * Chỉ là gợi ý cho Executor / Legal Verifier, không tự quyết định. Lỗi tra cứu thì bỏ qua, không làm hỏng kết quả OCR.
+     */
+    private void attachOwnerIdMatch(DeathCertificateOcrResponseDto result, UUID ownerId) {
+        if (result == null || ENGINE_UNAVAILABLE.equals(result.getEngineSource())) {
+            return;
+        }
+        OwnerIdMatch match;
+        try {
+            match = ownerIdentityService.matchDocumentId(ownerId, result.getIdNumber());
+        } catch (RuntimeException e) {
+            log.warn("Owner ID match failed for owner {}: {}", ownerId, e.getClass().getSimpleName());
+            return;
+        }
+        if (match != null) {
+            applyOwnerIdMatch(result, match);
+        }
+    }
+
+    /**
+     * Đưa kết quả đối chiếu CCCD vào cảnh báo, điểm tin cậy và gợi ý từ chối (giống cách xử lý họ tên lệch).
+     * Không in số CCCD của Owner ra kết quả.
+     */
+    static void applyOwnerIdMatch(DeathCertificateOcrResponseDto result, OwnerIdMatch match) {
+        result.setOwnerIdMatch(match.name());
+        List<String> warnings = result.getWarnings() == null ? new ArrayList<>() : new ArrayList<>(result.getWarnings());
+        switch (match) {
+            case MATCHED -> { /* bằng chứng mạnh, không cần cảnh báo */ }
+            case MISMATCHED -> {
+                // Họ tên trùng nhưng số giấy tờ khác: rất có thể là người khác trùng tên, hoặc giấy bị sửa
+                warnings.add(0, "LƯU Ý ĐỊNH DANH: Số CCCD/CMND trên tài liệu (" + result.getIdNumber()
+                        + ") không khớp với CCCD Chủ két đã xác minh trong hệ thống. Số trên giấy do AI đọc nên có thể"
+                        + " sai một chữ số: hãy so lại bằng mắt với giấy gốc trước khi từ chối.");
+                if (result.getSuggestedRejectionCode() == null
+                        || !"SUSPECTED_FORGERY".equals(result.getSuggestedRejectionCode())) {
+                    result.setSuggestedRejectionCode("INFO_MISMATCH");
+                }
+                if (result.getConfidenceScore() != null) {
+                    result.setConfidenceScore(Math.min(result.getConfidenceScore(), 40));
+                }
+                if (result.getDeathProofRelevancePercent() != null) {
+                    result.setDeathProofRelevancePercent(Math.min(result.getDeathProofRelevancePercent(), 40));
+                }
+                result.setExecutorSuggestion("Cảnh báo cố vấn: Số CCCD/CMND trên giấy không khớp với CCCD Chủ két đã xác minh. "
+                        + "Hãy kiểm tra lại bạn có tải đúng giấy tờ của Chủ két không. "
+                        + (result.getExecutorSuggestion() == null ? "" : result.getExecutorSuggestion()));
+                result.setVerifierSuggestion("Gợi ý cho Verifier: Số CCCD/CMND trên giấy không khớp với CCCD Chủ két đã xác minh, "
+                        + "hãy so lại bằng mắt số trên giấy gốc (AI có thể đọc sai) rồi mới cân nhắc lý do \"Thông tin không khớp\". "
+                        + (result.getVerifierSuggestion() == null ? "" : result.getVerifierSuggestion()));
+            }
+            case NOT_ON_DOCUMENT -> warnings.add("LƯU Ý ĐỊNH DANH: Không đọc được số CCCD/CMND trên tài liệu, "
+                    + "chưa đối chiếu được với CCCD Chủ két; chỉ đối chiếu theo họ tên.");
+            case UNVERIFIABLE -> warnings.add("LƯU Ý ĐỊNH DANH: Số giấy tờ trên tài liệu không đối chiếu được "
+                    + "(Chủ két không khai CMND cũ, hoặc số không đúng định dạng 9/12 chữ số).");
+            case OWNER_NOT_VERIFIED -> warnings.add("LƯU Ý ĐỊNH DANH: Chủ két chưa xác minh CCCD trong hệ thống "
+                    + "nên chỉ đối chiếu được theo họ tên.");
+        }
+        result.setWarnings(warnings);
+    }
 
     private void recordAudit(UUID actorId, String email, String targetType, String targetId, DeathCertificateOcrResponseDto result) {
         if (auditLogService == null) {

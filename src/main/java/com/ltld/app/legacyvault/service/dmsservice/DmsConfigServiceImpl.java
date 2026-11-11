@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
+import com.ltld.app.legacyvault.enums.KycLevel;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.exception.DmsCheckinLinkException;
 import com.ltld.app.legacyvault.exception.DmsException;
@@ -54,6 +55,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
     static final String ALREADY_SUSPENDED_MESSAGE = "The Dead Man's Switch is already suspended.";
     static final String NOT_SUSPENDED_MESSAGE = "The Dead Man's Switch is not suspended.";
+    static final String KYC_REQUIRED_MESSAGE =
+            "Verify your identity before enabling the Dead Man's Switch.";
     // Executor chỉ được tính khi đã đồng ý lời mời (ExecutorActivationRule)
     static final String NO_PRIMARY_EXECUTOR_MESSAGE = "Assign a primary executor and wait for them to accept "
             + "the invitation before enabling the Dead Man's Switch.";
@@ -93,6 +96,9 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                         // Cùng điều kiện bật DMS lần đầu của upsertConfig.
                         .hasUsableExecutor(executorAssignmentRepository.findAllByOwnerId(ownerId).stream()
                                 .anyMatch(ExecutorActivationRule::isUsablePrimary))
+                        .identityVerified(userRepository.findById(ownerId)
+                                .map(u -> u.getKycLevel() != null && u.getKycLevel() != KycLevel.NONE)
+                                .orElse(false))
                         .build());
     }
 
@@ -139,6 +145,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
         User owner = existing != null ? existing.getOwner() : userRepository.findById(ownerId)
                 .orElseThrow(() -> new DmsException("Owner not found.", HttpStatus.NOT_FOUND));
+        // KYC: bật DMS lần đầu phải xác minh danh tính (CCCD + số điện thoại). DMS đã bật từ trước giữ nguyên.
+        if (existing == null && (owner.getKycLevel() == null || owner.getKycLevel() == KycLevel.NONE)) {
+            throw new DmsException(ErrorCode.KYC_REQUIRED, KYC_REQUIRED_MESSAGE);
+        }
         DmsConfig config = existing != null ? existing : DmsConfig.builder()
                 .owner(owner)
                 .backupActivationWaitDays(DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS)

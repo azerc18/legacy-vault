@@ -34,6 +34,7 @@ const OwnerVaults = lazy(() => import('./Owner/OwnerVaults.jsx'));
 const CreateVault = lazy(() => import('./Owner/CreateVault.jsx'));
 const OwnerVaultDetail = lazy(() => import('./Owner/OwnerVaultDetail.jsx'));
 const DeadMansSwitch = lazy(() => import('./Owner/DeadMansSwitch.jsx'));
+const IdentityVerification = lazy(() => import('./Owner/IdentityVerification.jsx'));
 const OwnerExecutors = lazy(() => import('./Owner/OwnerExecutors.jsx'));
 const OwnerActivity = lazy(() => import('./Owner/OwnerActivity.jsx'));
 const DmsConfirmationResultPage = lazy(() => import('./Owner/DmsConfirmationResultPage.jsx'));
@@ -99,6 +100,7 @@ function App() {
                 <Route path="/owner/vaults/new" element={guard(OWNER, <CreateVault />)} />
                 <Route path="/owner/vaults/:vaultId" element={guard(OWNER, <OwnerVaultDetail />)} />
                 <Route path="/owner/dms" element={guard(OWNER, <DeadMansSwitch />)} />
+                <Route path="/owner/identity" element={guard(OWNER, <IdentityVerification />)} />
                 <Route path="/owner/executors" element={guard(OWNER, <OwnerExecutors />)} />
                 <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
                 <Route path="/pricing" element={guard(OWNER, <PricingPage />)} />

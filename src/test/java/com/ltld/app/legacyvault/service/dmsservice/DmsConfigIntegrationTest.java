@@ -652,6 +652,8 @@ class DmsConfigIntegrationTest {
 
     private User user(String name) {
         return userRepository.save(User.builder()
+                // KYC: Owner phải xác minh danh tính mới bật DMS lần đầu
+                .kycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC)
                 .email(name + "@example.com")
                 .fullName(name)
                 .passwordHash("not-used")

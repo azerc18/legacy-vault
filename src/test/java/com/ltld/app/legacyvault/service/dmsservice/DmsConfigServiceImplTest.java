@@ -87,7 +87,9 @@ class DmsConfigServiceImplTest {
     @BeforeEach
     void setUp() {
         ownerId = UUID.randomUUID();
-        owner = User.builder().id(ownerId).email("owner@example.test").build();
+        // Mặc định Owner đã xác minh danh tính (KYC BASIC); test KYC đặt lại NONE
+        owner = User.builder().id(ownerId).email("owner@example.test")
+                .kycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC).build();
         adminId = UUID.randomUUID();
 
         when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
@@ -300,6 +302,39 @@ class DmsConfigServiceImplTest {
         service.upsertConfig(ownerId, request(30, 7, 3));
 
         assertThat(savedConfig().getTriggerDeferrals()).isZero();
+    }
+
+    @Test
+    @DisplayName("KYC: bật DMS lần đầu khi chưa xác minh danh tính -> KYC_REQUIRED, không ghi gì")
+    void upsert_firstEnable_withoutKyc_throwsKycRequired() {
+        owner.setKycLevel(com.ltld.app.legacyvault.enums.KycLevel.NONE);
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, request(30, 7, 3)))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getErrorCode())
+                .isEqualTo(com.ltld.app.legacyvault.exception.ErrorCode.KYC_REQUIRED);
+        verify(dmsConfigRepository, never()).saveAndFlush(any(DmsConfig.class));
+        verifyNoInteractions(dmsCheckinRepository, auditLogService);
+    }
+
+    @Test
+    @DisplayName("KYC: DMS đã bật từ trước khi có KYC -> vẫn lưu cấu hình được (không tự tắt của Owner cũ)")
+    void upsert_existingConfig_withoutKyc_stillSaves() {
+        owner.setKycLevel(com.ltld.app.legacyvault.enums.KycLevel.NONE);
+        existingConfig(DmsStatus.ACTIVE);
+
+        DmsConfigService.UpsertResult result = service.upsertConfig(ownerId, request(30, 7, 3));
+
+        assertThat(result.created()).isFalse();
+    }
+
+    @Test
+    @DisplayName("KYC: getConfig khi chưa cấu hình báo identityVerified = false nếu Owner chưa xác minh")
+    void getConfig_withoutConfig_reportsIdentityNotVerified() {
+        owner.setKycLevel(com.ltld.app.legacyvault.enums.KycLevel.NONE);
+        executors();
+
+        assertThat(service.getConfig(ownerId).getIdentityVerified()).isFalse();
     }
 
     @Test
@@ -688,8 +723,9 @@ class DmsConfigServiceImplTest {
 
         assertThat(response.getConfigured()).isFalse();
         assertThat(response.getHasUsableExecutor()).isEqualTo(expected);
+        assertThat(response.getIdentityVerified()).isTrue();
         assertThat(response).usingRecursiveComparison()
-                .ignoringFields("configured", "hasUsableExecutor")
+                .ignoringFields("configured", "hasUsableExecutor", "identityVerified")
                 .isEqualTo(new DmsConfigResponse());
         verifyNothingWritten();
     }

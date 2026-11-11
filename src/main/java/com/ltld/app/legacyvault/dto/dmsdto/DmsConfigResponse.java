@@ -37,4 +37,6 @@ public class DmsConfigResponse {
     // Owner còn ít nhất 1 vault không. false = đã xoá hết vault: DMS tạm dừng (không nhắc, không kích hoạt,
     // không check-in được); tạo vault mới sẽ bắt đầu chu kỳ mới. Chưa cấu hình (configured = false) thì null.
     private Boolean hasVault;
+    // Chưa cấu hình: Owner đã xác minh danh tính (KYC) chưa, cũng là điều kiện bật DMS lần đầu. Đã cấu hình: null.
+    private Boolean identityVerified;
 }

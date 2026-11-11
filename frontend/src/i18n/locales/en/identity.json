@@ -1,0 +1,144 @@
+{
+  "title": "Identity verification",
+  "subtitle": "Verify with your citizen ID card and phone number to enable the Dead Man's Switch.",
+  "loading": "Loading verification details…",
+  "locked": "The Dead Man's Switch is being activated, so identity details cannot be changed.",
+  "saved": "Identity verified.",
+  "actions": {
+    "continue": "Continue",
+    "back": "Back",
+    "save": "Confirm and save",
+    "saving": "Saving…"
+  },
+  "summary": {
+    "title": "Verified identity",
+    "source": "Verified by",
+    "verifiedAt": "Verified at",
+    "update": "Update details"
+  },
+  "source": {
+    "QR": "Scanning the QR code on the card",
+    "OCR": "AI reading of the card photo",
+    "MANUAL": "Manual entry"
+  },
+  "gender": {
+    "MALE": "Male",
+    "FEMALE": "Female"
+  },
+  "consent": {
+    "title": "Personal data processing terms",
+    "purpose": "Your citizen ID is used to cross-check your death certificate when an executor or legal verifier reviews it.",
+    "stored": "The ID number is encrypted before it is stored and only shown partially (e.g. 0792••••3456).",
+    "notStored": "LegacyVault does not store the card image or your full address, only your province or city.",
+    "rights": "You can update the details at any time before the switch is activated. Deleting your account permanently deletes this data.",
+    "agree": "I agree that LegacyVault processes the personal data above under Decree 13/2023/ND-CP on personal data protection."
+  },
+  "method": {
+    "title": "Choose how to enter your ID details",
+    "hint": "Scanning the QR code on the front of a chip-based card is the fastest and most accurate option.",
+    "recommended": "Recommended",
+    "qr": { "label": "Scan ID QR code", "desc": "Use your camera to scan the QR code on the front of the card." },
+    "camera": { "label": "Take a photo", "desc": "Photograph the front of the card with your phone." },
+    "upload": { "label": "Upload a photo", "desc": "Pick an existing photo of the front of the card." },
+    "manual": { "label": "Enter manually", "desc": "Type in the details printed on the card." },
+    "aiConsent": "If the QR code cannot be read from the photo, I agree to send the card photo to an AI service (Google Gemini) to read it. The photo is not stored.",
+    "needAiConsent": "No QR code was found in the photo. Tick the box to let AI read it, retake the photo with the QR code clearly visible, or enter the details manually.",
+    "qrFoundInPhoto": "The QR code was read from the photo; nothing was sent to AI.",
+    "reading": "Reading details…"
+  },
+  "scan": {
+    "aim": "Fit the QR code in the top-right corner of the card's front inside the frame.",
+    "notCitizenQr": "This QR code is not the one on a citizen ID card.",
+    "unsupported": "This browser cannot use the camera. Use Take a photo or Upload a photo instead.",
+    "denied": "Camera access was not allowed. Allow the camera for this site and try again.",
+    "noCamera": "Could not open the camera. Use Take a photo or Upload a photo instead."
+  },
+  "review": {
+    "title": "Review and edit",
+    "hint": {
+      "QR": "Read from the QR code. Check before saving.",
+      "OCR": "AI may misread the photo, especially accented letters. Compare carefully with your card before saving.",
+      "MANUAL": "Enter the details exactly as printed on the card."
+    },
+    "warnings": {
+      "PROVINCE_NOT_DETECTED": "Could not detect your province or city. Please pick one from the list.",
+      "NOT_A_CITIZEN_ID_CARD": "This does not look like the front of a citizen ID card. Please check.",
+      "CITIZEN_ID_UNREADABLE": "The ID number could not be read clearly. Please re-enter it.",
+      "DATE_OF_BIRTH_UNREADABLE": "The date of birth could not be read clearly. Please re-enter it."
+    },
+    "errors": {
+      "citizenIdLength": "The ID number must have exactly 12 digits.",
+      "citizenIdProvince": "The first 3 digits are not a valid province code.",
+      "citizenIdYear": "The ID number does not match the year of birth (digits 5–6 are the last two digits of the birth year).",
+      "citizenIdGender": "The ID number does not match the gender (digit 4 encodes gender).",
+      "oldIdLength": "The old ID number must have 9 digits.",
+      "nameLength": "Full name must be 2–100 characters.",
+      "dobRequired": "Please enter your date of birth.",
+      "dobInvalid": "Invalid date of birth.",
+      "underage": "You must be at least 18 to enable the Dead Man's Switch.",
+      "genderRequired": "Please choose a gender.",
+      "provinceRequired": "Please choose your province or city.",
+      "phoneFirst": "Please verify your phone number before saving."
+    }
+  },
+  "fields": {
+    "citizenId": "Citizen ID number",
+    "citizenIdHint": "The 12 digits printed on the card.",
+    "oldId": "Old ID number (if any)",
+    "oldIdHint": "9 digits. Helps when a death certificate shows the old ID number.",
+    "fullName": "Full name",
+    "dateOfBirth": "Date of birth",
+    "gender": "Gender",
+    "province": "Province / city of residence",
+    "provinceHint": "From the list of 34 provinces and cities effective 1 July 2025.",
+    "phone": "Phone number",
+    "choose": "— Choose —"
+  },
+  "phone": {
+    "title": "Verify your phone number",
+    "send": "Send code",
+    "resend": "Resend code",
+    "resendIn": "Resend in {{seconds}}s",
+    "normalized": "The code will be sent to {{phone}}",
+    "sent": "A 6-digit code was sent to {{phone}} ({{carrier}}).",
+    "sandbox": "Test mode (no real SMS sent): the code is {{code}}",
+    "verify": "Confirm",
+    "verified": "Phone number verified.",
+    "ready": "Phone number {{phone}} is verified.",
+    "reverify": "To change verified details, confirm your phone number with a new code.",
+    "errors": {
+      "EMPTY": "Please enter a phone number.",
+      "INVALID_CHARACTERS": "A phone number may only contain digits and a leading +.",
+      "FOREIGN": "Only Vietnamese mobile numbers are supported for now.",
+      "LANDLINE": "Landline numbers cannot receive SMS codes. Please use a mobile number.",
+      "LEGACY_11_DIGIT": "11-digit numbers were converted to 10 digits in 2018.",
+      "LEGACY_11_DIGIT_SUGGEST": "11-digit numbers were converted to 10 digits in 2018. Your new number may be {{suggestion}}.",
+      "INVALID_LENGTH": "Vietnamese mobile numbers have 10 digits (e.g. 0912 345 678).",
+      "INVALID_PREFIX": "This is not a Vietnamese mobile prefix.",
+      "codeFormat": "The code has 6 digits.",
+      "send": "Could not send the code.",
+      "verify": "Could not verify the code."
+    }
+  },
+  "nameMismatch": {
+    "title": "Name differs from your account",
+    "message": "The name on the card is \"{{card}}\" but your account name is \"{{account}}\". Update your account name to match the card?",
+    "confirm": "Update and save"
+  },
+  "why": {
+    "title": "Why verify?",
+    "dms": "The Dead Man's Switch hands over your estate when you stop checking in, so we need to be sure the account belongs to a real person.",
+    "deathCertificate": "When a death certificate is submitted, the ID number on it is cross-checked with the one you verified.",
+    "encrypted": "The ID number is encrypted, and each ID can be linked to only one account."
+  },
+  "errors": {
+    "load": "Could not load verification details.",
+    "qr": "Could not read the QR code.",
+    "image": "Could not read the card photo.",
+    "save": "Could not save the verification."
+  },
+  "banner": {
+    "text": "Verify your identity to enable the Dead Man's Switch",
+    "cta": "Verify now"
+  }
+}

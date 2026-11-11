@@ -53,6 +53,8 @@ class AccountDeletionServiceImplTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditLogService auditLogService;
     @Mock private FileStorageService fileStorageService;
+    @Mock private com.ltld.app.legacyvault.repository.OwnerIdentityRepository ownerIdentityRepository;
+    @Mock private com.ltld.app.legacyvault.repository.PhoneOtpChallengeRepository phoneOtpChallengeRepository;
     @InjectMocks private AccountDeletionServiceImpl service;
 
     private User user;
@@ -131,6 +133,8 @@ class AccountDeletionServiceImplTest {
         assertThat(user.getEmail()).isEqualTo("deleted-" + user.getId() + "@deleted.invalid");
         assertThat(user.getFullName()).isEqualTo("Deleted user");
         assertThat(user.getPhoneNumber()).isNull();
+        assertThat(user.getKycLevel()).isEqualTo(com.ltld.app.legacyvault.enums.KycLevel.NONE);
+        verify(ownerIdentityRepository).deleteByUserId(user.getId());
         assertThat(user.getAvatarPath()).isNull();
         assertThat(user.getPasswordHash()).isEqualTo("NEW-HASH");
         assertThat(user.getDeletedAt()).isNotNull();

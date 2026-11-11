@@ -24,6 +24,7 @@
         "executorsAssigned": "Assign both a Primary Executor and a Backup Executor",
         "dmsActive": "Activate your Dead Man's Switch",
         "safetyNetConfigured": "Add a contingent beneficiary or DMS trusted confirmers",
-        "recentReview": "Review or check in on your estate within the last 6 months"
+        "recentReview": "Review or check in on your estate within the last 6 months",
+        "identityVerified": "Verify your identity to enable the Dead Man's Switch"
     }
 }

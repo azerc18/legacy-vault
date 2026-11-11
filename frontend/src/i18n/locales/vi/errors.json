@@ -68,5 +68,17 @@
   "COUPON_NOT_APPLICABLE": "Mã này không áp dụng cho gói bạn chọn.",
   "COUPON_USED_UP": "Mã này đã hết lượt dùng.",
   "COUPON_ALREADY_USED": "Bạn đã dùng mã này rồi.",
-  "TRIAL_NOT_ELIGIBLE": "Bản dùng thử chỉ dành cho tài khoản chưa từng có gói VIP."
+  "TRIAL_NOT_ELIGIBLE": "Bản dùng thử chỉ dành cho tài khoản chưa từng có gói VIP.",
+  "PHONE_INVALID": "Số điện thoại không phải số di động Việt Nam hợp lệ.",
+  "PHONE_NOT_VERIFIED": "Vui lòng xác minh số điện thoại bằng mã OTP.",
+  "PROFILE_LOCKED_BY_KYC": "Bạn đã xác minh danh tính. Hãy đổi họ tên hoặc số điện thoại ở trang Xác minh danh tính.",
+  "KYC_REQUIRED": "Vui lòng xác minh danh tính trước khi bật Dead Man's Switch.",
+  "KYC_CONSENT_REQUIRED": "Vui lòng đồng ý điều khoản xử lý dữ liệu cá nhân.",
+  "CITIZEN_ID_INVALID": "Thông tin CCCD không hợp lệ hoặc không khớp năm sinh / giới tính.",
+  "CITIZEN_ID_TAKEN": "Số CCCD này đã được dùng cho một tài khoản khác.",
+  "CITIZEN_QR_INVALID": "Mã QR không phải mã trên CCCD.",
+  "IDENTITY_NAME_MISMATCH": "Họ tên trên CCCD khác họ tên tài khoản.",
+  "IDENTITY_UNDERAGE": "Bạn cần đủ 18 tuổi để bật Dead Man's Switch.",
+  "IDENTITY_LOCKED": "Dead Man's Switch đang được kích hoạt nên không thể sửa thông tin danh tính.",
+  "IDENTITY_OCR_UNAVAILABLE": "Chưa đọc được ảnh CCCD lúc này. Hãy quét mã QR hoặc nhập tay."
 }

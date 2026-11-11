@@ -37,7 +37,10 @@
       "nameLength": "Full name must be 2–100 characters.",
       "phone": "Phone number is not valid.",
       "failed": "Could not update profile."
-    }
+    },
+    "phoneHint": "Optional. A 10-digit Vietnamese mobile number.",
+    "kycLocked": "Your name and phone number are tied to your verified identity.",
+    "kycLockedCta": "Change them on the Identity verification page"
   },
   "password": {
     "title": "Change password",

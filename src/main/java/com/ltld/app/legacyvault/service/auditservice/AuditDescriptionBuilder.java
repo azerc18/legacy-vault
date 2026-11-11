@@ -173,6 +173,13 @@ public class AuditDescriptionBuilder {
             case COUPON_CREATED -> "An administrator created a discount code.";
             case COUPON_UPDATED -> "An administrator changed a discount code.";
             case TRIAL_STARTED -> "Started the free VIP trial.";
+            // KYC Owner: detail chứa nguồn dữ liệu (QR / OCR / MANUAL), không có số CCCD
+            case OWNER_IDENTITY_VERIFIED -> "Verified identity with a citizen ID card.";
+            case OWNER_IDENTITY_UPDATED -> "Updated identity information.";
+            case OWNER_PHONE_OTP_SENT -> "Sent a phone verification code.";
+            case OWNER_PHONE_VERIFIED -> isFailure(log)
+                    ? "Phone verification code was incorrect."
+                    : "Verified the phone number.";
             default -> "Performed action: " + log.getAction();
         };
     }
