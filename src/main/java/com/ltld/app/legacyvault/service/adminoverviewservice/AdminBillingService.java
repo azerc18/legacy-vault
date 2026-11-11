@@ -84,6 +84,8 @@ public class AdminBillingService {
             LocalDateTime base = sub.getExpiresAt() != null && sub.getExpiresAt().isAfter(now) ? sub.getExpiresAt() : now;
             sub.setExpiresAt(base.plusDays(days));
             sub.setReminderSent(false);
+            // Review #256 m2: ngày được tặng không còn là dùng thử (trang Billing thôi hiện "Đang dùng thử")
+            sub.setTrial(false);
             if (sub.getPlan() == null || !sub.getPlan().isVip()) {
                 sub.setPlan(vipPlan());
             }

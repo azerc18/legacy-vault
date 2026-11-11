@@ -73,7 +73,7 @@ public enum AuditAction {
     // Việc 6: Owner hủy gia hạn cuối kỳ / bật lại
     SUBSCRIPTION_CANCELLED, SUBSCRIPTION_RESUMED,
     // Việc 4: mã giảm giá và dùng thử
-    COUPON_CREATED, COUPON_UPDATED, TRIAL_STARTED,
+    COUPON_CREATED, COUPON_UPDATED, COUPON_REUSED, TRIAL_STARTED,
     // X1: người thụ hưởng đồng ý mở tài sản JOINT_CONSENSUS
     ASSET_CONSENSUS_APPROVED,
     // F5: Executor cập nhật checklist xử lý tài khoản số

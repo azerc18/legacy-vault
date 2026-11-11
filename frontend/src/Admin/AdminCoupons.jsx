@@ -124,7 +124,7 @@ export default function AdminCoupons({ plans }) {
                                     <td data-label={t('coupons.cols.percent')} className="lv-num font-semibold">-{c.percentOff}%</td>
                                     <td data-label={t('coupons.cols.plan')}>{c.planCode ? (vipPlans.find((p) => p.code === c.planCode)?.name ?? c.planCode) : t('coupons.form.allPlans')}</td>
                                     <td data-label={t('coupons.cols.used')} className="lv-num">{c.redeemedCount}{c.maxRedemptions != null ? ` / ${c.maxRedemptions}` : ''}</td>
-                                    <td data-label={t('coupons.cols.until')} className="whitespace-nowrap">{c.validUntil ? formatDate(c.validUntil) : t('coupons.noEnd')}</td>
+                                    <td data-label={t('coupons.cols.until')} className="whitespace-nowrap">{c.validUntil ? formatDate(`${c.validUntil}T00:00:00`) : t('coupons.noEnd')}</td>
                                     <td data-label={t('coupons.cols.status')}><Stamp tone={tone[st]}>{t(`coupons.state.${st}`)}</Stamp></td>
                                     <td className="text-right">
                                         <button onClick={() => toggle(c)} disabled={busy === c.id}

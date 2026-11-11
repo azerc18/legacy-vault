@@ -348,7 +348,7 @@ public class PaymentServiceImpl implements PaymentService {
         SubscriptionPlan plan = tx.getPlan();
         activateOrExtendSubscription(user, plan, now);
         if (tx.getCouponCode() != null) {
-            couponService.redeem(tx.getCouponCode());
+            couponService.redeem(tx);
         }
         auditLogService.log(
                 AuditAction.PAYMENT_SUCCEEDED,
@@ -644,6 +644,8 @@ public class PaymentServiceImpl implements PaymentService {
             // Việc 6: trả tiền gia hạn nghĩa là muốn dùng tiếp, nên bỏ cờ hủy cuối kỳ
             existing.setCancelAtPeriodEnd(false);
             existing.setCancelledAt(null);
+            // Review #256 m2: trả tiền trong lúc dùng thử thì kỳ này là kỳ trả phí, không còn là dùng thử
+            existing.setTrial(false);
             existing.setExpiresAt(baseTime.plusDays(durationDays));
             subscriptionRepository.save(existing);
         } else {

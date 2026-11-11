@@ -82,7 +82,7 @@
     "noEnd": "Không hạn",
     "enable": "Bật lại",
     "disable": "Tắt mã",
-    "form": { "code": "Mã", "percent": "Giảm %", "plan": "Áp dụng cho", "allPlans": "Mọi gói VIP", "max": "Số lượt", "until": "Hết hạn sau ngày", "note": "Ghi chú", "notePlaceholder": "Ví dụ: khuyến mãi Tết, chỉ gửi nhóm khách cũ", "create": "Tạo mã", "hint": "Mã 3–40 ký tự chữ, số, - hoặc _. Giảm tối đa 90%; muốn tặng miễn phí thì dùng nút Tặng VIP trong hồ sơ người dùng. Tạo rồi thì không sửa được mã và %, chỉ tắt / bật." },
+    "form": { "code": "Mã", "percent": "Giảm %", "plan": "Áp dụng cho", "allPlans": "Mọi gói VIP", "max": "Số lượt", "until": "Hết hạn sau ngày", "note": "Ghi chú", "notePlaceholder": "Ví dụ: khuyến mãi Tết, chỉ gửi nhóm khách cũ", "create": "Tạo mã", "hint": "Mã 3–40 ký tự chữ, số, - hoặc _. Giảm tối đa 90%; muốn tặng miễn phí thì dùng nút Tặng VIP trong hồ sơ người dùng. Nên đặt mã từ 8 ký tự, khó đoán (ví dụ TET2027-VIP), vì mỗi tài khoản chỉ được nhập sai 10 lần trong 10 phút. Ngày hết hạn tính theo giờ Việt Nam. Tạo rồi thì không sửa được mã và %, chỉ tắt / bật." },
     "cols": { "code": "Mã", "percent": "Giảm", "plan": "Gói", "used": "Đã dùng", "until": "Hạn", "status": "Trạng thái" },
     "state": { "on": "Đang dùng", "off": "Đã tắt", "expired": "Hết hạn", "usedUp": "Hết lượt" }
   },

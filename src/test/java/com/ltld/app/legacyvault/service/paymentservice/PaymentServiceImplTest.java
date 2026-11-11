@@ -243,7 +243,7 @@ class PaymentServiceImplTest {
         );
     }
 
-    // Việc 6: Owner đã hủy gia hạn rồi trả tiền gia hạn -> cờ hủy cuối kỳ được bỏ, hạn cộng nối tiếp
+    // Việc 6: Owner đã hủy gia hạn (đang dùng thử) rồi trả tiền gia hạn -> bỏ cờ hủy cuối kỳ và cờ dùng thử, hạn cộng nối tiếp
     @Test
     void handleVnpayIpn_renewAfterCancel_clearsCancelFlagAndExtends() {
         UUID txId = UUID.randomUUID();
@@ -253,7 +253,7 @@ class PaymentServiceImplTest {
         Subscription running = Subscription.builder()
                 .id(UUID.randomUUID()).user(owner).plan(vipMonthPlan).status(SubscriptionStatus.ACTIVE)
                 .startedAt(oldExpiry.minusDays(30)).expiresAt(oldExpiry)
-                .cancelAtPeriodEnd(true).cancelledAt(java.time.LocalDateTime.now().minusDays(2)).build();
+                .cancelAtPeriodEnd(true).cancelledAt(java.time.LocalDateTime.now().minusDays(2)).trial(true).build();
 
         when(paymentTransactionRepository.findByIdForUpdate(txId)).thenReturn(Optional.of(tx));
         when(userRepository.findByIdForUpdate(owner.getId())).thenReturn(Optional.of(owner));
@@ -272,6 +272,8 @@ class PaymentServiceImplTest {
         assertEquals("00", paymentService.handleVnpayIpn(params).get("RspCode"));
         assertEquals(false, running.isCancelAtPeriodEnd());
         assertEquals(null, running.getCancelledAt());
+        // review #256 m2: trả tiền trong lúc dùng thử thì kỳ này không còn là dùng thử
+        assertEquals(false, running.isTrial());
         assertEquals(oldExpiry.plusDays(30), running.getExpiresAt());
     }
 
@@ -500,6 +502,6 @@ class PaymentServiceImplTest {
         params.put("vnp_SecureHash", vnpayClient.signParams(params));
 
         assertEquals("00", paymentService.handleVnpayIpn(params).get("RspCode"));
-        verify(couponService).redeem("TET2027");
+        verify(couponService).redeem(tx);
     }
 }

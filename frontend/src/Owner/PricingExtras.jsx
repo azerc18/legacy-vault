@@ -34,7 +34,7 @@ export function CouponBox({ coupon, onApply }) {
                     <span>
                         {t('pricing.coupon.applied', { code: coupon.code, percent: coupon.percentOff })}
                         {coupon.validUntil && (
-                            <span className="text-on-surface-variant"> · {t('pricing.coupon.until', { date: formatDate(coupon.validUntil) })}</span>
+                            <span className="text-on-surface-variant"> · {t('pricing.coupon.until', { date: formatDate(`${coupon.validUntil}T00:00:00`) })}</span>
                         )}
                     </span>
                 </p>

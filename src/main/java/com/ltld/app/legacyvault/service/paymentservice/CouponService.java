@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.coupondto.CouponPreviewResponse;
 import com.ltld.app.legacyvault.dto.coupondto.CouponQuote;
 import com.ltld.app.legacyvault.dto.coupondto.CreateCouponRequest;
 import com.ltld.app.legacyvault.entity.Coupon;
+import com.ltld.app.legacyvault.entity.PaymentTransaction;
 import com.ltld.app.legacyvault.entity.SubscriptionPlan;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -16,11 +17,20 @@ import com.ltld.app.legacyvault.repository.PaymentTransactionRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionPlanRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -32,9 +42,14 @@ import java.util.UUID;
  * vì vậy hai người thanh toán cùng lúc lượt cuối có thể vượt {@code maxRedemptions} một chút (chấp nhận được, vì
  * người đã trả tiền luôn được nhận gói).
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CouponService {
+
+    static final int MAX_FAILED_GUESSES = 10;
+    static final int GUESS_WINDOW_MINUTES = 10;
+    static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     static final long MIN_FINAL_VND = 10_000L;
     /** Giao dịch đã thu tiền: tính là đã dùng mã (kể cả đã hoàn, để không lách bằng cách xin hoàn rồi dùng lại). */
@@ -44,6 +59,7 @@ public class CouponService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final AuditLogService auditLogService;
+    private final Map<UUID, Deque<Instant>> failedGuesses = new ConcurrentHashMap<>();
 
     public static String normalize(String code) {
         return code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
@@ -70,15 +86,36 @@ public class CouponService {
         if (plans.isEmpty()) {
             throw new BusinessException(ErrorCode.COUPON_NOT_APPLICABLE, "This code does not apply to any plan.");
         }
-        return new CouponPreviewResponse(coupon.getCode(), coupon.getPercentOff(), coupon.getValidUntil(), plans);
+        return new CouponPreviewResponse(coupon.getCode(), coupon.getPercentOff(), lastValidDay(coupon.getValidUntil()),
+                plans);
     }
 
-    /** Gọi khi giao dịch có mã được ghi SUCCESS. */
+    /**
+     * Gọi khi giao dịch có mã vừa được ghi SUCCESS (đã lưu). Tiền đã thu nên không bao giờ từ chối ở bước này.
+     *
+     * <p>Review #256 m1: người mua có thể mở nhiều đơn cùng mã (nhiều tab, bấm thanh toán lại; đơn cũ thành EXPIRED
+     * nhưng vẫn trả được) rồi trả hết. Khi tài khoản đã có giao dịch khác cùng mã đã thu tiền thì không cộng lượt lần
+     * nữa (không vượt maxRedemptions vì cùng một người) và ghi audit {@code COUPON_REUSED} để admin xem và hoàn tiền
+     * nếu cần.
+     */
     @Transactional
-    public void redeem(String code) {
-        if (code != null && !code.isBlank()) {
-            couponRepository.incrementRedeemed(normalize(code));
+    public void redeem(PaymentTransaction tx) {
+        String code = tx.getCouponCode();
+        if (code == null || code.isBlank()) {
+            return;
         }
+        UUID userId = tx.getUser() != null ? tx.getUser().getId() : null;
+        long used = userId == null ? 1
+                : paymentTransactionRepository.countByUserIdAndCouponCodeIgnoreCaseAndStatusIn(userId, normalize(code), USED);
+        if (used > 1) {
+            log.warn("Coupon {} paid again by user {} on payment {}: money kept, redemption not counted twice",
+                    normalize(code), userId, tx.getId());
+            auditLogService.log(AuditAction.COUPON_REUSED, AuditResult.FAILURE, userId,
+                    tx.getUser() != null ? tx.getUser().getEmail() : null, "PaymentTransaction", tx.getId().toString(),
+                    normalize(code) + " used again by the same account; review and refund if needed");
+            return;
+        }
+        couponRepository.incrementRedeemed(normalize(code));
     }
 
     static CouponQuote price(Coupon coupon, SubscriptionPlan plan) {
@@ -94,10 +131,12 @@ public class CouponService {
     }
 
     private Coupon usableCoupon(UUID userId, String rawCode, LocalDateTime now) {
+        checkGuessRate(userId);
         String code = normalize(rawCode);
         Coupon coupon = code.isEmpty() ? null : couponRepository.findByCodeIgnoreCase(code).orElse(null);
         if (coupon == null || !coupon.isActive()
                 || (coupon.getValidUntil() != null && !coupon.getValidUntil().isAfter(now))) {
+            recordFailedGuess(userId);
             throw new BusinessException(ErrorCode.COUPON_INVALID, "This code is not valid or has expired.");
         }
         if (coupon.getMaxRedemptions() != null && coupon.getRedeemedCount() >= coupon.getMaxRedemptions()) {
@@ -108,6 +147,47 @@ public class CouponService {
             throw new BusinessException(ErrorCode.COUPON_ALREADY_USED, "You have already used this code.");
         }
         return coupon;
+    }
+
+    /**
+     * Review #256 n1: chặn đoán mã. Tối đa {@value #MAX_FAILED_GUESSES} lần nhập mã không tồn tại/hết hạn trong
+     * {@value #GUESS_WINDOW_MINUTES} phút cho mỗi tài khoản. Lưu trong bộ nhớ (mất khi restart), giống giới hạn của
+     * trợ lý Vaulty.
+     */
+    private void checkGuessRate(UUID userId) {
+        Deque<Instant> q = userId == null ? null : failedGuesses.get(userId);
+        if (q == null) {
+            return;
+        }
+        synchronized (q) {
+            Instant cutoff = Instant.now().minus(Duration.ofMinutes(GUESS_WINDOW_MINUTES));
+            while (!q.isEmpty() && q.peekFirst().isBefore(cutoff)) q.pollFirst();
+            if (q.size() >= MAX_FAILED_GUESSES) {
+                throw new BusinessException(ErrorCode.TOO_MANY_ATTEMPTS,
+                        "Too many invalid codes. Please wait a few minutes.");
+            }
+        }
+    }
+
+    private void recordFailedGuess(UUID userId) {
+        if (userId == null) {
+            return;
+        }
+        Deque<Instant> q = failedGuesses.computeIfAbsent(userId, k -> new ArrayDeque<>());
+        synchronized (q) {
+            q.addLast(Instant.now());
+        }
+    }
+
+    /** Ngày cuối cùng mã còn dùng được (giờ VN), tính từ mốc hết hạn đã lưu theo giờ server. */
+    public static LocalDate lastValidDay(LocalDateTime validUntil) {
+        return validUntil == null ? null : validUntil.atZone(ZoneId.systemDefault()).withZoneSameInstant(VN_ZONE)
+                .minusNanos(1).toLocalDate();
+    }
+
+    /** Hết ngày {@code day} theo giờ VN, đổi về giờ server để so với {@code LocalDateTime.now()}. */
+    static LocalDateTime endOfVnDay(LocalDate day) {
+        return day.plusDays(1).atStartOfDay(VN_ZONE).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
     }
 
     // ---- Admin ----
@@ -132,7 +212,8 @@ public class CouponService {
                 throw new BusinessException(ErrorCode.BAD_REQUEST, "Codes only apply to VIP plans.");
             }
         }
-        LocalDateTime validUntil = req.validUntil() == null ? null : req.validUntil().plusDays(1).atStartOfDay();
+        // Review #256 n2: "hết ngày 31/12" theo giờ VN, không theo giờ server (Azure chạy UTC)
+        LocalDateTime validUntil = req.validUntil() == null ? null : endOfVnDay(req.validUntil());
         if (validUntil != null && !validUntil.isAfter(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "The end date is already in the past.");
         }
