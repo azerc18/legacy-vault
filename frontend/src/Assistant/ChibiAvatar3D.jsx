@@ -1036,6 +1036,7 @@ function snapshotOwl(costume) {
                 const m = o.material;
                 if (m) (Array.isArray(m) ? m : [m]).forEach((xx) => { xx.map?.dispose?.(); xx.gradientMap?.dispose?.(); xx.dispose(); });
             });
+            renderer.forceContextLoss();
             renderer.dispose();
         }
     });

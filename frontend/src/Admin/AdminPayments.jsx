@@ -114,12 +114,8 @@ export default function AdminPayments() {
             </form>
 
             <Alert>{error}</Alert>
-<<<<<<< HEAD
             <Alert type="success">{success}</Alert>
-            {!data && !error && <p className="text-on-surface-variant">{t('loading')}</p>}
-=======
             {!data && !error && <LoadingSkeleton label={t('loading')}/>}
->>>>>>> c502f946 (feat(ui): skeleton loading on all pages, inline create-vault errors, costume avatar in chat, plainer verification text, check-in mail wording, wider VIP owl glow)
             {data && rows.length === 0 && (
                 <EmptyState bordered icon="receipt_long" title={t('payments.empty.title')} text={filtered ? t('payments.empty.filtered') : t('payments.empty.text')} />
             )}
