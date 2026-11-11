@@ -138,9 +138,53 @@ class AdminBillingServiceTest {
         assertThat(tx.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
         assertThat(tx.getRefundRef()).isEqualTo("14000099");
         assertThat(tx.getRefundReason()).isEqualTo("Khách yêu cầu");
-        assertThat(sub.getExpiresAt()).isEqualTo(expiry.minusDays(30));
+        // Trả 2 ngày trước, gói 30 ngày: còn 28 ngày chưa dùng -> trừ 28 ngày (review #254 m2)
+        assertThat(sub.getExpiresAt()).isCloseTo(expiry.minusDays(28), within(5, ChronoUnit.SECONDS));
         assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
         verify(auditLogService).log(eq(AuditAction.PAYMENT_REFUNDED), any(), eq(adminId), any(), any(), any(), any());
+    }
+
+    // Review #254 m2: kỳ của giao dịch cũ đã dùng hết -> không trừ vào kỳ gia hạn mới hơn
+    @Test
+    void refund_fullyUsedOldPayment_keepsCurrentExpiry() {
+        tx.setPaidAt(LocalDateTime.now().minusDays(40));
+        LocalDateTime expiry = LocalDateTime.now().plusDays(20);
+        Subscription sub = activeSub(expiry);
+
+        service.refund(adminId, tx.getId(), new RefundPaymentRequest("Hoàn giao dịch cũ", false));
+
+        assertThat(tx.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(sub.getExpiresAt()).isEqualTo(expiry);
+        assertThat(sub.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+    }
+
+    @Test
+    void unusedPart_isClampedBetweenZeroAndPlanLength() {
+        LocalDateTime now = LocalDateTime.of(2026, 11, 11, 12, 0);
+        tx.setPaidAt(now.minusDays(10));
+        assertThat(AdminBillingService.unusedPart(tx, now)).isEqualTo(java.time.Duration.ofDays(20));
+        tx.setPaidAt(now.minusDays(31));
+        assertThat(AdminBillingService.unusedPart(tx, now)).isZero();
+        tx.setPaidAt(now.plusDays(3));   // đồng hồ lệch: không trừ quá số ngày gói
+        assertThat(AdminBillingService.unusedPart(tx, now)).isEqualTo(java.time.Duration.ofDays(30));
+    }
+
+    // Review #254 m3: thông báo chỉ gửi sau commit; n1: audit tặng VIP có email admin
+    @Test
+    void grant_notifiesOnlyAfterCommit_andAuditsAdminEmail() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.grantVip(adminId, owner.getId(), new GrantVipRequest(7, "Bù lỗi"));
+            verify(inAppNotifier, never()).toUser(any(), any());
+
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(inAppNotifier).toUser(eq(owner.getId()), any());
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+        verify(auditLogService).log(eq(AuditAction.ADMIN_VIP_GRANTED), any(), eq(adminId), eq("admin@lv.local"),
+                any(), any(), any());
     }
 
     @Test
