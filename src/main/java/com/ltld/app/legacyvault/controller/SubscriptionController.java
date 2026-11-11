@@ -1,7 +1,9 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.paymentdto.PlanUsageResponse;
 import com.ltld.app.legacyvault.dto.paymentdto.SubscriptionMeResponse;
 import com.ltld.app.legacyvault.service.paymentservice.PaymentService;
+import com.ltld.app.legacyvault.service.paymentservice.PlanUsageService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ import java.util.UUID;
 public class SubscriptionController {
 
     private final PaymentService paymentService;
+    private final PlanUsageService planUsageService;
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<SubscriptionMeResponse>> getMySubscription(Principal principal) {
@@ -31,5 +34,13 @@ public class SubscriptionController {
                 "Subscription retrieved successfully",
                 paymentService.getMySubscription(userId)));
     }
-}
 
+    /** Việc 2: đã dùng bao nhiêu so với hạn mức gói, và mục nào đang vượt (sau khi VIP hết hạn). */
+    @GetMapping("/me/usage")
+    public ResponseEntity<ApiResponse<PlanUsageResponse>> getMyUsage(Principal principal) {
+        UUID userId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success(
+                "Plan usage retrieved successfully",
+                planUsageService.getUsage(userId)));
+    }
+}

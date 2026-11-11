@@ -37,6 +37,10 @@ public interface LegacyMessageRepository extends JpaRepository<LegacyMessage, UU
     @Query("SELECT COALESCE(SUM(m.attachmentSize), 0) FROM LegacyMessage m WHERE m.vault.owner.id = :ownerId")
     long sumAttachmentSizeByOwnerId(@Param("ownerId") UUID ownerId);
 
+    /** Việc 2: số lời nhắn di sản của Owner (trang Billing hiện mức sử dụng). */
+    @Query("SELECT COUNT(m) FROM LegacyMessage m WHERE m.vault.owner.id = :ownerId")
+    long countByOwnerId(@Param("ownerId") UUID ownerId);
+
     List<LegacyMessage> findByVaultIdAndStatus(UUID vaultId, LegacyMessageStatus status);
 
     @Query("SELECT m FROM LegacyMessage m JOIN FETCH m.vault v " +

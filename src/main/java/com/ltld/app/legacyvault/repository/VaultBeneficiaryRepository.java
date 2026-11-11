@@ -70,6 +70,10 @@ public interface VaultBeneficiaryRepository extends JpaRepository<VaultBeneficia
 
     long countByVaultId(UUID vaultId);   // N2-owner: PUT cũ chỉ hợp lệ khi vault có ≤ 1 người
 
+    /** Việc 2: số người thụ hưởng của từng vault thuộc Owner (để biết vault đông nhất so với hạn mức gói). */
+    @Query("SELECT COUNT(b) FROM VaultBeneficiary b WHERE b.vault.owner.id = :ownerId GROUP BY b.vault.id")
+    List<Long> countPerVaultByOwnerId(@Param("ownerId") UUID ownerId);
+
     // Xoá tài khoản: còn là người thụ hưởng (đã gắn tài khoản) ở két chưa hoàn tất nào không,
     // trừ dòng đã từ chối / nhường. Két CLAIMED / ARCHIVED_LOCKED đã xong nên không chặn.
     @Query("""
