@@ -114,8 +114,10 @@ function App() {
                 {/* Executor */}
                 <Route path="/executor/home" element={guard(EXECUTOR, <ExecutorHome />)} />
                 <Route path="/executor/cases/:assignmentId" element={guard(EXECUTOR, <ExecutorCase />)} />
-                {/* Lời mời: chỉ cần đăng nhập — JWT của phiên cũ có thể chưa mang role EXECUTOR vừa được cấp */}
-                <Route path="/executor/invitations/:assignmentId" element={<ExecutorInvitation />} />
+                {/* Lời mời: chỉ cần đăng nhập — JWT của phiên cũ có thể chưa mang role EXECUTOR vừa được cấp.
+                    guard(null, ...) truyền state.from nên mở link trong mail lúc chưa đăng nhập thì sau khi
+                    đăng nhập sẽ quay lại đúng lời mời. */}
+                <Route path="/executor/invitations/:assignmentId" element={guard(null, <ExecutorInvitation />)} />
 
                 {/* Legal Verifier */}
                 <Route path="/verifier/home" element={guard(VERIFIER, <VerifierHome />)} />

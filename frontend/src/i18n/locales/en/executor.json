@@ -70,6 +70,7 @@
     "notFoundTitle": "Invitation not found",
     "notFoundText": "The link is wrong, the invitation was withdrawn, or it is not for the account you are signed in with.",
     "backHome": "Back to executor home",
+    "backUserHome": "Back to my home",
     "loadError": "Could not load the invitation.",
     "respondError": "Could not send your answer. Please try again."
   },

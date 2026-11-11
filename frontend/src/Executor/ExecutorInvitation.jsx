@@ -1,16 +1,18 @@
 // Lời mời làm Người thi hành: người được Owner chỉ định tự đồng ý hoặc từ chối.
-// Mở từ link trong email mời hoặc từ chuông thông báo. Cần đăng nhập, KHÔNG cần role EXECUTOR trong JWT
-// (phiên đăng nhập cũ có thể chưa mang role vừa được cấp); BE tự kiểm lời mời có thuộc người gọi không.
+// Mở từ link trong email mời hoặc từ chuông thông báo. Route bọc bằng RequireRole không truyền roles:
+// chỉ cần đăng nhập (phiên cũ có thể chưa mang role EXECUTOR vừa được cấp) và chưa đăng nhập thì quay lại
+// đúng trang này sau khi đăng nhập; BE tự kiểm lời mời có thuộc người gọi không.
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useParams } from 'react-router-dom';
-import { getUser } from '../auth/auth.js';
+import { Link, useParams } from 'react-router-dom';
+import { updateStoredUser } from '../auth/auth.js';
 import { getErrorMessage } from '../api/http.js';
 import { executorApi } from '../api/executorApi.js';
+import { userApi, toStoredUser } from '../api/userApi.js';
 import AppHeader, { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 import GlassSurface from '../Common/GlassSurface.jsx';
 import { formatDate } from '../i18n/format.js';
-import { Alert, Icon, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
+import { Alert, Icon, inputClass, btnPrimary, btnOutline, btnDanger, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 // Owner chưa có tên thì hiện email
 const ownerName = (inv) => inv?.ownerFullName || inv?.ownerEmail;
@@ -28,7 +30,6 @@ function Duty({ icon, children }) {
 export default function ExecutorInvitation() {
     const { t } = useTranslation('executor');
     const { assignmentId } = useParams();
-    const user = getUser();
 
     const [invitation, setInvitation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -44,16 +45,16 @@ export default function ExecutorInvitation() {
             setInvitation(await executorApi.getInvitation(assignmentId));
             setError('');
         } catch (err) {
-            setError(getErrorMessage(err, t('invitation.loadError')));
+            // 404 = link sai / đã bị thu hồi / không phải lời mời của mình: hiện thẻ "Không tìm thấy lời mời"
+            // thay vì câu lỗi thô của BE.
             setInvitation(null);
+            setError(err?.response?.status === 404 ? '' : getErrorMessage(err, t('invitation.loadError')));
         } finally {
             setLoading(false);
         }
     }, [assignmentId, t]);
 
     useEffect(() => { load(); }, [load]);
-
-    if (!user) return <Navigate to="/login" replace />;
 
     const respond = async (accept) => {
         setBusy(accept ? 'accept' : 'decline');
@@ -65,6 +66,13 @@ export default function ExecutorInvitation() {
             setInvitation(updated);
             setDeclining(false);
             setResult(accept ? 'accepted' : 'declined');
+            if (accept) {
+                // Phiên đăng nhập cũ chưa có role EXECUTOR: nạp lại hồ sơ để menu và route /executor/home
+                // mở được ngay, không phải đăng xuất rồi đăng nhập lại.
+                try {
+                    updateStoredUser(toStoredUser(await userApi.getMe()));
+                } catch { /* không chặn luồng: vẫn còn nút về trang chủ */ }
+            }
         } catch (err) {
             setError(getErrorMessage(err, t('invitation.respondError')));
             // Owner vừa thu hồi / DMS vừa kích hoạt: tải lại để hiện đúng trạng thái mới
@@ -94,8 +102,9 @@ export default function ExecutorInvitation() {
                             <Icon name="link_off" className="text-[40px] text-outline" />
                             <h1 className="mt-3 font-title-lg text-title-lg">{t('invitation.notFoundTitle')}</h1>
                             <p className="mt-2 text-sm text-on-surface-variant">{t('invitation.notFoundText')}</p>
-                            <Link to="/executor/home" className={`${btnOutline} mt-6 inline-flex`}>
-                                {t('invitation.backHome')}
+                            {/* Người mở link có thể chưa/không còn là Người thi hành -> về trang chủ tài khoản */}
+                            <Link to="/home" className={`${btnOutline} mt-6 inline-flex`}>
+                                {t('invitation.backUserHome')}
                             </Link>
                         </GlassSurface>
                     )}
@@ -124,8 +133,14 @@ export default function ExecutorInvitation() {
                                             {t('invitation.respondedAt', { date: formatDate(invitation.respondedAt, true) })}
                                         </p>
                                     )}
-                                    <Link to="/executor/home" className={`${btnPrimary} mt-6 inline-flex`}>
-                                        <Icon name="home" className="text-[18px]" /> {t('invitation.backHome')}
+                                    {/* Đồng ý -> vào khu Người thi hành (hồ sơ vừa được nạp lại nên có role);
+                                        Từ chối -> không còn là Người thi hành nữa, về trang chủ tài khoản. */}
+                                    <Link
+                                        to={accepted ? '/executor/home' : '/home'}
+                                        className={`${btnPrimary} mt-6 inline-flex`}
+                                    >
+                                        <Icon name="home" className="text-[18px]" />
+                                        {accepted ? t('invitation.backHome') : t('invitation.backUserHome')}
                                     </Link>
                                 </div>
                             ) : (
@@ -206,7 +221,7 @@ export default function ExecutorInvitation() {
                                                 <button
                                                     onClick={() => respond(false)}
                                                     disabled={busy !== ''}
-                                                    className={`${btnPrimary} bg-error text-on-error hover:bg-error`}
+                                                    className={btnDanger}
                                                 >
                                                     <Icon name="person_off" className="text-[18px]" />
                                                     {busy === 'decline' ? t('saving') : t('invitation.declineConfirmButton')}

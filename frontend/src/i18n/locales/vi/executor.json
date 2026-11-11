@@ -70,6 +70,7 @@
     "notFoundTitle": "Không tìm thấy lời mời",
     "notFoundText": "Liên kết không đúng, lời mời đã bị thu hồi, hoặc lời mời không dành cho tài khoản bạn đang đăng nhập.",
     "backHome": "Về trang người thi hành",
+    "backUserHome": "Về trang chủ",
     "loadError": "Không tải được lời mời.",
     "respondError": "Chưa gửi được phản hồi. Vui lòng thử lại."
   },
