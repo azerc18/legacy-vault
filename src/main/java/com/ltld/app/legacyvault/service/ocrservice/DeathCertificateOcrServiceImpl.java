@@ -8,6 +8,7 @@ import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
+import com.ltld.app.legacyvault.service.identityservice.OwnerIdentityService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAccessGuard;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
@@ -74,6 +75,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     private final ObjectMapper objectMapper;
     private final AuditLogService auditLogService;
     private final PlatformTransactionManager transactionManager;
+    private final OwnerIdentityService ownerIdentityService;
 
     private final Map<String, CachedOcrEntry> verifierCache = new ConcurrentHashMap<>();
     private final Map<String, Deque<Long>> rateLimitBuckets = new ConcurrentHashMap<>();
@@ -106,7 +108,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
             ExecutorAssignment assignment = executorAccessGuard.requireActiveAssignment(assignmentId, executorLogin);
             return new ExecutorContext(
                     ownerNameOf(assignment.getOwner() != null ? assignment.getOwner().getFullName() : null),
-                    assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null);
+                    assignment.getExecutorUser() != null ? assignment.getExecutorUser().getId() : null,
+                    assignment.getOwner() != null ? assignment.getOwner().getId() : null);
         });
         byte[] plainBytes = uploadedDocumentValidator.readAndValidate(file);
         String ownerFullName = ctx.ownerFullName();
@@ -120,6 +123,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
         String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "death-certificate.pdf";
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, originalFilename, ownerFullName);
+        attachOwnerIdMatch(result, ctx.ownerId());
 
         recordAudit(actorId, executorLogin, "ExecutorAssignment", assignmentId.toString(), result);
         return result;
@@ -131,7 +135,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
             LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
             return new VerifierContext(
                     ownerNameOf(request.getOwner() != null ? request.getOwner().getFullName() : null),
-                    request.getDeathCertificateFileUrlEncrypted());
+                    request.getDeathCertificateFileUrlEncrypted(),
+                    request.getOwner() != null ? request.getOwner().getId() : null);
         });
         String ownerFullName = ctx.ownerFullName();
         String cacheKey = requestId + ":" + String.valueOf(ctx.fileUrlEncrypted());
@@ -151,6 +156,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         byte[] plainBytes = readDecryptedDocument(ctx.fileUrlEncrypted(), requestId);
         String documentRef = "verification-request-" + requestId;
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, documentRef, ownerFullName);
+        attachOwnerIdMatch(result, ctx.ownerId());
 
         if (ENGINE_GEMINI.equals(result.getEngineSource())) {
             if (verifierCache.size() >= MAX_IN_MEMORY_KEYS) {
@@ -173,9 +179,24 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         return fullName != null ? fullName : "Chủ két";
     }
 
-    private record ExecutorContext(String ownerFullName, UUID actorId) {}
+    private record ExecutorContext(String ownerFullName, UUID actorId, UUID ownerId) {}
 
-    private record VerifierContext(String ownerFullName, String fileUrlEncrypted) {}
+    private record VerifierContext(String ownerFullName, String fileUrlEncrypted, UUID ownerId) {}
+
+    /**
+     * KYC: đối chiếu số CCCD / CMND AI đọc được trên giấy chứng tử với CCCD Owner đã xác minh (so HMAC, không giải mã).
+     * Chỉ là gợi ý cho Executor / Legal Verifier, không tự quyết định. Lỗi tra cứu thì bỏ qua, không làm hỏng kết quả OCR.
+     */
+    private void attachOwnerIdMatch(DeathCertificateOcrResponseDto result, UUID ownerId) {
+        if (result == null || ENGINE_UNAVAILABLE.equals(result.getEngineSource())) {
+            return;
+        }
+        try {
+            result.setOwnerIdMatch(ownerIdentityService.matchDocumentId(ownerId, result.getIdNumber()).name());
+        } catch (RuntimeException e) {
+            log.warn("Owner ID match failed for owner {}: {}", ownerId, e.getClass().getSimpleName());
+        }
+    }
 
     private void recordAudit(UUID actorId, String email, String targetType, String targetId, DeathCertificateOcrResponseDto result) {
         if (auditLogService == null) {

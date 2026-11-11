@@ -66,5 +66,17 @@
   "COUPON_NOT_APPLICABLE": "This code does not apply to the plan you chose.",
   "COUPON_USED_UP": "This code has been fully used.",
   "COUPON_ALREADY_USED": "You have already used this code.",
-  "TRIAL_NOT_ELIGIBLE": "The free trial is only for accounts that never had VIP."
+  "TRIAL_NOT_ELIGIBLE": "The free trial is only for accounts that never had VIP.",
+  "PHONE_INVALID": "This is not a valid Vietnamese mobile number.",
+  "PHONE_NOT_VERIFIED": "Please verify your phone number with a code.",
+  "PROFILE_LOCKED_BY_KYC": "Your identity is verified. Change your name or phone number on the Identity verification page.",
+  "KYC_REQUIRED": "Please verify your identity before enabling the Dead Man's Switch.",
+  "KYC_CONSENT_REQUIRED": "Please agree to the personal data processing terms.",
+  "CITIZEN_ID_INVALID": "The ID details are invalid or do not match the birth year / gender.",
+  "CITIZEN_ID_TAKEN": "This citizen ID is already linked to another account.",
+  "CITIZEN_QR_INVALID": "This is not the QR code on a citizen ID card.",
+  "IDENTITY_NAME_MISMATCH": "The name on the card differs from your account name.",
+  "IDENTITY_UNDERAGE": "You must be at least 18 to enable the Dead Man's Switch.",
+  "IDENTITY_LOCKED": "The Dead Man's Switch is being activated, so identity details cannot be changed.",
+  "IDENTITY_OCR_UNAVAILABLE": "The card photo cannot be read right now. Scan the QR code or enter the details manually."
 }

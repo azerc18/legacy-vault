@@ -130,10 +130,91 @@ class UserProfileServiceImplTest {
         UserProfileResponse res = service.updateMe(userId, updateRequest("  Tran Thi B  ", " 0912 345 678 "));
 
         assertEquals("Tran Thi B", u.getFullName());
-        assertEquals("0912 345 678", u.getPhoneNumber());
+        // Số mới được chuẩn hoá về E.164
+        assertEquals("+84912345678", u.getPhoneNumber());
         assertEquals("Tran Thi B", res.getFullName());
         verify(userRepository).save(u);
         verify(auditLogService).success(AuditAction.PROFILE_UPDATED, userId, "owner@example.com");
+    }
+
+    @Test
+    void updateMe_invalidVietnamesePhone_throwsPhoneInvalid_andSavesNothing() {
+        User u = user();
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        UserProfileException ex = assertThrows(UserProfileException.class,
+                () -> service.updateMe(userId, updateRequest("Nguyen Van A", "01681234567")));
+
+        assertEquals(com.ltld.app.legacyvault.exception.ErrorCode.PHONE_INVALID, ex.getErrorCode());
+        assertEquals("0901234567", u.getPhoneNumber());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMe_unchangedLegacyPhone_isKeptAsIs_soNameCanStillBeEdited() {
+        User u = user();
+        u.setPhoneNumber("12345678");   // số cũ không đúng chuẩn, lưu trước khi siết quy tắc
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        service.updateMe(userId, updateRequest("Nguyen Van B", "12345678"));
+
+        assertEquals("12345678", u.getPhoneNumber());
+        assertEquals("Nguyen Van B", u.getFullName());
+    }
+
+    @Test
+    void updateMe_samePhoneDifferentFormat_keepsStoredValueAndVerification() {
+        User u = user();
+        Instant verifiedAt = Instant.parse("2026-11-01T00:00:00Z");
+        u.setPhoneNumber("+84901234567");
+        u.setPhoneVerifiedAt(verifiedAt);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        service.updateMe(userId, updateRequest("Nguyen Van A", "0901 234 567"));
+
+        assertEquals("+84901234567", u.getPhoneNumber());
+        assertEquals(verifiedAt, u.getPhoneVerifiedAt());
+    }
+
+    @Test
+    void updateMe_newPhone_resetsPhoneVerification() {
+        User u = user();
+        u.setPhoneVerifiedAt(Instant.parse("2026-11-01T00:00:00Z"));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        service.updateMe(userId, updateRequest("Nguyen Van A", "0912345678"));
+
+        assertEquals("+84912345678", u.getPhoneNumber());
+        assertNull(u.getPhoneVerifiedAt());
+    }
+
+    @Test
+    void updateMe_kycVerified_changingNameOrPhone_throwsProfileLocked() {
+        User u = user();
+        u.setKycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        UserProfileException nameEx = assertThrows(UserProfileException.class,
+                () -> service.updateMe(userId, updateRequest("Someone Else", "0901234567")));
+        UserProfileException phoneEx = assertThrows(UserProfileException.class,
+                () -> service.updateMe(userId, updateRequest("Nguyen Van A", "0912345678")));
+
+        assertEquals(com.ltld.app.legacyvault.exception.ErrorCode.PROFILE_LOCKED_BY_KYC, nameEx.getErrorCode());
+        assertEquals(com.ltld.app.legacyvault.exception.ErrorCode.PROFILE_LOCKED_BY_KYC, phoneEx.getErrorCode());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMe_kycVerified_languageOnly_isAllowed() {
+        User u = user();
+        u.setKycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+        UpdateProfileRequest req = updateRequest("Nguyen Van A", "0901234567");
+        req.setPreferredLanguage("en");
+
+        service.updateMe(userId, req);
+
+        verify(userRepository).save(u);
     }
 
     @Test

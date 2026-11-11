@@ -51,7 +51,9 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
                 "AND a.entityId IN (SELECT c.id FROM DmsConfig c WHERE c.owner.id = :ownerId)) " +
                 "OR (a.entityType = :assignmentType " +
                 "AND a.entityId IN (SELECT e.id FROM ExecutorAssignment e WHERE e.owner.id = :ownerId)))) " +
-                "OR (a.action = com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETED " +
+                "OR (a.action IN (com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETED, " +
+                "com.ltld.app.legacyvault.enums.AuditAction.OWNER_IDENTITY_VERIFIED, com.ltld.app.legacyvault.enums.AuditAction.OWNER_IDENTITY_UPDATED, " +
+                "com.ltld.app.legacyvault.enums.AuditAction.OWNER_PHONE_VERIFIED) " +
                 "AND a.actor.id = :ownerId)) " +
                 "AND a.action NOT IN :hiddenActions " +
                 "AND a.createdAt >= :startDate " +
@@ -63,7 +65,9 @@ public interface AuditLogRepository extends Repository<AuditLog, UUID> {
                      "AND a.entityId IN (SELECT c.id FROM DmsConfig c WHERE c.owner.id = :ownerId)) " +
                      "OR (a.entityType = :assignmentType " +
                      "AND a.entityId IN (SELECT e.id FROM ExecutorAssignment e WHERE e.owner.id = :ownerId)))) " +
-                     "OR (a.action = com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETED " +
+                     "OR (a.action IN (com.ltld.app.legacyvault.enums.AuditAction.VAULT_DELETED, " +
+                     "com.ltld.app.legacyvault.enums.AuditAction.OWNER_IDENTITY_VERIFIED, com.ltld.app.legacyvault.enums.AuditAction.OWNER_IDENTITY_UPDATED, " +
+                     "com.ltld.app.legacyvault.enums.AuditAction.OWNER_PHONE_VERIFIED) " +
                      "AND a.actor.id = :ownerId)) " +
                      "AND a.action NOT IN :hiddenActions " +
                      "AND a.createdAt >= :startDate " +

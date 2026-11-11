@@ -53,6 +53,7 @@ class OwnerReadinessServiceImplTest {
     @Mock private ExecutorAssignmentRepository executorAssignmentRepository;
     @Mock private DmsConfigRepository dmsConfigRepository;
     @Mock private AssetVerificationService assetVerificationService;
+    @Mock private com.ltld.app.legacyvault.repository.UserRepository userRepository;
 
     @InjectMocks
     private OwnerReadinessServiceImpl readinessService;
@@ -142,7 +143,9 @@ class OwnerReadinessServiceImplTest {
         assertEquals(100, res.getMaxScore());
         assertEquals("AT_RISK", res.getGrade());
         assertEquals(0, res.getCompletedItems());
-        assertEquals(7, res.getTotalItems());
+        assertEquals(8, res.getTotalItems());
+        assertFalse(item(res, "IDENTITY_VERIFIED").isDone());
+        assertEquals(0, item(res, "IDENTITY_VERIFIED").getPoints());
         assertEquals("/owner/vaults/new", item(res, "MASTER_VAULT_AND_ASSET").getFixUrl());
         verifyNoInteractions(digitalAssetRepository, vaultBeneficiaryRepository,
                 assetAllocationRepository, legalDocumentRepository);
@@ -156,12 +159,15 @@ class OwnerReadinessServiceImplTest {
         DigitalAsset crypto = asset(v, AssetType.CRYPTO_WALLET);
         stubEstate(List.of(v), List.of(bank, crypto), List.of(v.getId()),
                 List.of(bank.getId(), crypto.getId()), List.of(v.getId()));
+        when(userRepository.findById(ownerId)).thenReturn(java.util.Optional.of(
+                com.ltld.app.legacyvault.entity.User.builder().id(ownerId)
+                        .kycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC).build()));
 
         ReadinessResponse res = readinessService.evaluateReadiness(ownerId);
 
         assertEquals(100, res.getScore());
         assertEquals("EXCELLENT", res.getGrade());
-        assertEquals(7, res.getCompletedItems());
+        assertEquals(8, res.getCompletedItems());
         assertTrue(res.getItems().stream().allMatch(ReadinessItemResponse::isDone));
         assertEquals("items.assetBeneficiaryAllocated", item(res, "ASSET_BENEFICIARY_ALLOCATED").getTitleKey());
     }

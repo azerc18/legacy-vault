@@ -18,6 +18,9 @@ import java.util.UUID;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByEmail(String email);
+
+    // KYC: theo dõi một số điện thoại đã xác minh gắn với nhiều tài khoản
+    long countByPhoneNumberAndPhoneVerifiedAtIsNotNullAndIdNot(String phoneNumber, UUID id);
     Optional<User> findByEmail(String email);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.email = :email")

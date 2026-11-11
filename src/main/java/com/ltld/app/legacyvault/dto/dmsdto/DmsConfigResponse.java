@@ -34,4 +34,6 @@ public class DmsConfigResponse {
     // null khi DMS đã TRIGGERED: bàn giao đã bắt đầu nên câu hỏi này không còn ý nghĩa.
     // Chưa cấu hình (configured = false): có Executor chính chưa REVOKED không, tức điều kiện bật DMS lần đầu.
     private Boolean hasUsableExecutor;
+    // Chưa cấu hình: Owner đã xác minh danh tính (KYC) chưa, cũng là điều kiện bật DMS lần đầu. Đã cấu hình: null.
+    private Boolean identityVerified;
 }

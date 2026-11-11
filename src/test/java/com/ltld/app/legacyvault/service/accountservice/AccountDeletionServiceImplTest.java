@@ -53,6 +53,8 @@ class AccountDeletionServiceImplTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditLogService auditLogService;
     @Mock private FileStorageService fileStorageService;
+    @Mock private com.ltld.app.legacyvault.repository.OwnerIdentityRepository ownerIdentityRepository;
+    @Mock private com.ltld.app.legacyvault.repository.PhoneOtpChallengeRepository phoneOtpChallengeRepository;
     @InjectMocks private AccountDeletionServiceImpl service;
 
     private User user;

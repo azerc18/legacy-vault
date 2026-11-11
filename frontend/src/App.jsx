@@ -21,6 +21,7 @@ import OwnerVaults from './Owner/OwnerVaults.jsx';
 import CreateVault from './Owner/CreateVault.jsx';
 import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
 import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
+import IdentityVerification from './Owner/IdentityVerification.jsx';
 import OwnerExecutors from './Owner/OwnerExecutors.jsx';
 import OwnerActivity from './Owner/OwnerActivity.jsx';
 import DmsConfirmationResultPage from './Owner/DmsConfirmationResultPage.jsx';
@@ -93,6 +94,7 @@ function App() {
                 <Route path="/owner/vaults/new" element={guard(OWNER, <CreateVault />)} />
                 <Route path="/owner/vaults/:vaultId" element={guard(OWNER, <OwnerVaultDetail />)} />
                 <Route path="/owner/dms" element={guard(OWNER, <DeadMansSwitch />)} />
+                <Route path="/owner/identity" element={guard(OWNER, <IdentityVerification />)} />
                 <Route path="/owner/executors" element={guard(OWNER, <OwnerExecutors />)} />
                 <Route path="/owner/activity" element={guard(OWNER, <OwnerActivity />)} />
                 <Route path="/pricing" element={guard(OWNER, <PricingPage />)} />

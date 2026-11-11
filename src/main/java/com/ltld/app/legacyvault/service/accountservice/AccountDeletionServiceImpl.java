@@ -14,6 +14,8 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
+import com.ltld.app.legacyvault.repository.OwnerIdentityRepository;
+import com.ltld.app.legacyvault.repository.PhoneOtpChallengeRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.MfaBackupCodeRepository;
 import com.ltld.app.legacyvault.repository.SubscriptionRepository;
@@ -69,6 +71,8 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
     private final FileStorageService fileStorageService;
+    private final OwnerIdentityRepository ownerIdentityRepository;
+    private final PhoneOtpChallengeRepository phoneOtpChallengeRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -127,6 +131,7 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         user.setEmail("deleted-" + user.getId() + DELETED_EMAIL_DOMAIN);
         user.setFullName(DELETED_NAME);
         user.setPhoneNumber(null);
+        user.setPhoneVerifiedAt(null);
         user.setPasswordHash(passwordEncoder.encode(randomSecret()));
         user.setAvatarPath(null);
         user.setAvatarUpdatedAt(now);
@@ -142,6 +147,9 @@ public class AccountDeletionServiceImpl implements AccountDeletionService {
         userRepository.save(user);
 
         mfaBackupCodeRepository.deleteByUserId(userId);
+        // Dữ liệu CCCD là dữ liệu cá nhân nhạy cảm: xoá hẳn, đồng thời giải phóng số CCCD cho tài khoản mới
+        ownerIdentityRepository.deleteByUserId(userId);
+        phoneOtpChallengeRepository.deleteById(userId);
         tokenService.revokeAllUserTokens(userId, RevokedReason.LOGOUT);
 
         // Không còn két nhưng DMS vẫn có thể đang chạy -> dừng để không gửi nhắc check-in

@@ -1,0 +1,144 @@
+{
+  "title": "Xác minh danh tính",
+  "subtitle": "Xác minh bằng Căn cước công dân và số điện thoại để bật Dead Man's Switch.",
+  "loading": "Đang tải thông tin xác minh…",
+  "locked": "Dead Man's Switch đang được kích hoạt nên không thể sửa thông tin danh tính.",
+  "saved": "Đã xác minh danh tính.",
+  "actions": {
+    "continue": "Tiếp tục",
+    "back": "Quay lại",
+    "save": "Xác nhận và lưu",
+    "saving": "Đang lưu…"
+  },
+  "summary": {
+    "title": "Danh tính đã xác minh",
+    "source": "Cách xác minh",
+    "verifiedAt": "Thời điểm xác minh",
+    "update": "Cập nhật thông tin"
+  },
+  "source": {
+    "QR": "Quét mã QR trên CCCD",
+    "OCR": "Đọc ảnh CCCD bằng AI",
+    "MANUAL": "Tự nhập"
+  },
+  "gender": {
+    "MALE": "Nam",
+    "FEMALE": "Nữ"
+  },
+  "consent": {
+    "title": "Điều khoản xử lý dữ liệu cá nhân",
+    "purpose": "Thông tin CCCD dùng để đối chiếu khi Người thi hành hoặc Cán bộ xác minh kiểm tra giấy chứng tử của bạn.",
+    "stored": "Số CCCD được mã hoá trước khi lưu; khi hiển thị chỉ hiện một phần (ví dụ 0792••••3456).",
+    "notStored": "LegacyVault không lưu ảnh CCCD và không lưu địa chỉ thường trú, chỉ lưu tỉnh/thành nơi ở.",
+    "rights": "Bạn có thể cập nhật thông tin bất kỳ lúc nào trước khi DMS kích hoạt. Khi xoá tài khoản, dữ liệu CCCD bị xoá hẳn.",
+    "agree": "Tôi đồng ý để LegacyVault xử lý dữ liệu cá nhân nêu trên theo Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân."
+  },
+  "method": {
+    "title": "Chọn cách nhập thông tin CCCD",
+    "hint": "Quét mã QR ở mặt trước CCCD gắn chip là cách nhanh và chính xác nhất.",
+    "recommended": "Khuyên dùng",
+    "qr": { "label": "Quét QR CCCD", "desc": "Dùng camera quét mã QR ở mặt trước thẻ." },
+    "camera": { "label": "Chụp ảnh", "desc": "Chụp mặt trước thẻ bằng điện thoại." },
+    "upload": { "label": "Tải ảnh", "desc": "Chọn ảnh mặt trước thẻ có sẵn trên máy." },
+    "manual": { "label": "Nhập tay", "desc": "Tự điền các thông tin trên thẻ." },
+    "aiConsent": "Nếu ảnh không đọc được mã QR, tôi đồng ý gửi ảnh CCCD cho dịch vụ AI (Google Gemini) để đọc thông tin. Ảnh không được lưu lại.",
+    "needAiConsent": "Không tìm thấy mã QR trong ảnh. Hãy tích ô đồng ý gửi ảnh cho AI đọc, hoặc chụp lại rõ mã QR, hoặc nhập tay.",
+    "qrFoundInPhoto": "Đã đọc được mã QR trong ảnh, không cần gửi ảnh cho AI.",
+    "reading": "Đang đọc thông tin…"
+  },
+  "scan": {
+    "aim": "Đưa mã QR ở góc trên bên phải mặt trước CCCD vào giữa khung.",
+    "notCitizenQr": "Mã QR này không phải mã trên CCCD.",
+    "unsupported": "Trình duyệt không hỗ trợ camera. Hãy dùng Chụp ảnh hoặc Tải ảnh.",
+    "denied": "Bạn chưa cho phép dùng camera. Hãy cấp quyền camera cho trang này rồi thử lại.",
+    "noCamera": "Không mở được camera. Hãy dùng Chụp ảnh hoặc Tải ảnh."
+  },
+  "review": {
+    "title": "Xem lại và sửa thông tin",
+    "hint": {
+      "QR": "Thông tin đọc từ mã QR. Kiểm tra lại trước khi lưu.",
+      "OCR": "Thông tin do AI đọc từ ảnh có thể sai, nhất là chữ có dấu. Hãy so kỹ với thẻ trước khi lưu.",
+      "MANUAL": "Điền đúng như trên thẻ CCCD."
+    },
+    "warnings": {
+      "PROVINCE_NOT_DETECTED": "Chưa xác định được tỉnh/thành nơi ở. Hãy chọn trong danh sách.",
+      "NOT_A_CITIZEN_ID_CARD": "Ảnh có vẻ không phải mặt trước CCCD. Hãy kiểm tra lại.",
+      "CITIZEN_ID_UNREADABLE": "Không đọc rõ số CCCD. Hãy nhập lại.",
+      "DATE_OF_BIRTH_UNREADABLE": "Không đọc rõ ngày sinh. Hãy nhập lại."
+    },
+    "errors": {
+      "citizenIdLength": "Số CCCD phải có đúng 12 chữ số.",
+      "citizenIdProvince": "3 số đầu CCCD không phải mã tỉnh hợp lệ.",
+      "citizenIdYear": "Số CCCD không khớp năm sinh (số thứ 5–6 là 2 số cuối năm sinh).",
+      "citizenIdGender": "Số CCCD không khớp giới tính (số thứ 4 mã hoá giới tính).",
+      "oldIdLength": "Số CMND cũ phải có 9 chữ số.",
+      "nameLength": "Họ tên phải từ 2 đến 100 ký tự.",
+      "dobRequired": "Vui lòng nhập ngày sinh.",
+      "dobInvalid": "Ngày sinh không hợp lệ.",
+      "underage": "Bạn cần đủ 18 tuổi để bật Dead Man's Switch.",
+      "genderRequired": "Vui lòng chọn giới tính.",
+      "provinceRequired": "Vui lòng chọn tỉnh/thành nơi ở.",
+      "phoneFirst": "Vui lòng xác minh số điện thoại trước khi lưu."
+    }
+  },
+  "fields": {
+    "citizenId": "Số CCCD",
+    "citizenIdHint": "12 chữ số in trên thẻ.",
+    "oldId": "Số CMND cũ (nếu có)",
+    "oldIdHint": "9 chữ số. Giúp đối chiếu khi giấy chứng tử ghi số CMND cũ.",
+    "fullName": "Họ và tên",
+    "dateOfBirth": "Ngày sinh",
+    "gender": "Giới tính",
+    "province": "Tỉnh/thành nơi ở",
+    "provinceHint": "Theo danh sách 34 tỉnh, thành từ 01/07/2025.",
+    "phone": "Số điện thoại",
+    "choose": "— Chọn —"
+  },
+  "phone": {
+    "title": "Xác minh số điện thoại",
+    "send": "Gửi mã",
+    "resend": "Gửi lại mã",
+    "resendIn": "Gửi lại sau {{seconds}} giây",
+    "normalized": "Sẽ gửi mã tới {{phone}}",
+    "sent": "Đã gửi mã 6 số tới {{phone}} ({{carrier}}).",
+    "sandbox": "Chế độ thử nghiệm (chưa gửi SMS thật): mã là {{code}}",
+    "verify": "Xác nhận",
+    "verified": "Đã xác minh số điện thoại.",
+    "ready": "Số điện thoại {{phone}} đã được xác minh.",
+    "reverify": "Để sửa thông tin đã xác minh, hãy nhận mã mới qua số điện thoại.",
+    "errors": {
+      "EMPTY": "Vui lòng nhập số điện thoại.",
+      "INVALID_CHARACTERS": "Số điện thoại chỉ gồm chữ số, có thể có dấu + ở đầu.",
+      "FOREIGN": "Hiện chỉ hỗ trợ số di động Việt Nam.",
+      "LANDLINE": "Số máy bàn không nhận được mã SMS. Vui lòng dùng số di động.",
+      "LEGACY_11_DIGIT": "Số 11 chữ số đã chuyển sang 10 chữ số từ năm 2018.",
+      "LEGACY_11_DIGIT_SUGGEST": "Số 11 chữ số đã chuyển sang 10 chữ số từ năm 2018. Số mới có thể là {{suggestion}}.",
+      "INVALID_LENGTH": "Số di động Việt Nam có 10 chữ số (ví dụ 0912 345 678).",
+      "INVALID_PREFIX": "Đầu số này không phải đầu số di động Việt Nam.",
+      "codeFormat": "Mã xác minh gồm 6 chữ số.",
+      "send": "Không gửi được mã.",
+      "verify": "Không xác minh được mã."
+    }
+  },
+  "nameMismatch": {
+    "title": "Họ tên khác với tài khoản",
+    "message": "Họ tên trên CCCD là \"{{card}}\" nhưng họ tên tài khoản là \"{{account}}\". Cập nhật họ tên tài khoản theo CCCD?",
+    "confirm": "Cập nhật và lưu"
+  },
+  "why": {
+    "title": "Vì sao cần xác minh?",
+    "dms": "Dead Man's Switch bàn giao di sản khi bạn không còn check-in, nên cần chắc chắn chủ tài khoản là người thật.",
+    "deathCertificate": "Khi có giấy chứng tử, hệ thống đối chiếu số CCCD trên giấy với số bạn đã xác minh.",
+    "encrypted": "Số CCCD được mã hoá, mỗi CCCD chỉ gắn với một tài khoản."
+  },
+  "errors": {
+    "load": "Không tải được thông tin xác minh.",
+    "qr": "Không đọc được mã QR.",
+    "image": "Không đọc được ảnh CCCD.",
+    "save": "Không lưu được thông tin xác minh."
+  },
+  "banner": {
+    "text": "Xác minh danh tính để bật Dead Man's Switch",
+    "cta": "Xác minh ngay"
+  }
+}

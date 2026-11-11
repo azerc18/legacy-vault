@@ -47,6 +47,9 @@ class DeathCertificateOcrServiceImplTest {
     @Mock
     private PlatformTransactionManager transactionManager;
 
+    @org.mockito.Mock
+    private com.ltld.app.legacyvault.service.identityservice.OwnerIdentityService ownerIdentityService;
+
     private DeathCertificateOcrServiceImpl ocrService;
 
     @BeforeEach
@@ -60,7 +63,8 @@ class DeathCertificateOcrServiceImplTest {
                 cryptoService,
                 new ObjectMapper(),
                 auditLogService,
-                transactionManager
+                transactionManager,
+                ownerIdentityService
         );
         ReflectionTestUtils.setField(ocrService, "aiProvider", "mock");
         ReflectionTestUtils.setField(ocrService, "apiKey", "");

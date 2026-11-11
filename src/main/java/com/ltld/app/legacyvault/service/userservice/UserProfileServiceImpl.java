@@ -8,6 +8,8 @@ import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.KycLevel;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.exception.UserProfileException;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
@@ -17,6 +19,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
+import com.ltld.app.legacyvault.utility.VnPhoneNumber;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,6 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -56,9 +60,19 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Transactional
     public UserProfileResponse updateMe(UUID userId, UpdateProfileRequest request) {
         User user = load(userId);
-        user.setFullName(request.getFullName().trim());
-        String phone = request.getPhoneNumber();
-        user.setPhoneNumber(phone == null || phone.isBlank() ? null : phone.trim());
+        String newName = request.getFullName().trim();
+        String newPhone = normalizePhoneIfChanged(user.getPhoneNumber(), request.getPhoneNumber());
+        // Đã xác minh danh tính: họ tên và số điện thoại gắn với CCCD / OTP, chỉ đổi qua trang Xác minh danh tính
+        if (user.getKycLevel() != null && user.getKycLevel() != KycLevel.NONE
+                && (!newName.equals(user.getFullName()) || !Objects.equals(newPhone, user.getPhoneNumber()))) {
+            throw new UserProfileException(ErrorCode.PROFILE_LOCKED_BY_KYC,
+                    "Your identity is verified; update your name or phone number from the identity verification page");
+        }
+        user.setFullName(newName);
+        if (!Objects.equals(newPhone, user.getPhoneNumber())) {
+            user.setPhoneNumber(newPhone);
+            user.setPhoneVerifiedAt(null);
+        }
         if (request.getPreferredLanguage() != null) {
             user.setPreferredLanguage(AppLanguage.fromTag(request.getPreferredLanguage()));
         }
@@ -200,6 +214,29 @@ public class UserProfileServiceImpl implements UserProfileService {
         });
     }
 
+    /**
+     * Trả số sẽ lưu. Số không đổi so với DB (kể cả số cũ chưa đúng chuẩn) thì giữ nguyên để không chặn việc sửa tên;
+     * số mới phải là số di động Việt Nam hợp lệ và được lưu dạng E.164.
+     */
+    static String normalizePhoneIfChanged(String stored, String requested) {
+        if (requested == null || requested.isBlank()) {
+            return null;
+        }
+        String trimmed = requested.trim();
+        if (trimmed.equals(stored)) {
+            return stored;
+        }
+        try {
+            String e164 = VnPhoneNumber.parse(trimmed).e164();
+            if (stored != null && VnPhoneNumber.tryParse(stored).map(VnPhoneNumber::e164).filter(e164::equals).isPresent()) {
+                return stored;   // cùng số, chỉ khác cách viết
+            }
+            return e164;
+        } catch (VnPhoneNumber.InvalidVnPhoneException e) {
+            throw new UserProfileException(ErrorCode.PHONE_INVALID, e.getMessage());
+        }
+    }
+
     private User load(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
@@ -218,6 +255,8 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .hasAvatar(u.getAvatarPath() != null)
                 .avatarUpdatedAt(u.getAvatarUpdatedAt())
                 .mfaEnabled(u.isMfaEnabled())
+                .kycLevel((u.getKycLevel() != null ? u.getKycLevel() : KycLevel.NONE).name())
+                .phoneVerified(u.getPhoneVerifiedAt() != null)
                 .preferredLanguage((u.getPreferredLanguage() != null ? u.getPreferredLanguage() : AppLanguage.DEFAULT).tag())
                 .build();
     }

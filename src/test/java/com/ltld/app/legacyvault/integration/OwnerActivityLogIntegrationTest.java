@@ -343,6 +343,8 @@ class OwnerActivityLogIntegrationTest extends MySqlTestContainer{
 
     private User user(String name) {
         User user = userRepository.save(User.builder()
+                // KYC: Owner phải xác minh danh tính mới bật DMS lần đầu
+                .kycLevel(com.ltld.app.legacyvault.enums.KycLevel.BASIC)
                 .email(name + "@example.com")
                 .fullName(name)
                 .passwordHash("not-used")

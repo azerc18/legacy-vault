@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import InfoTip from '../Common/InfoTip.jsx';
 import { useToast } from '../Common/Toast.jsx';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
-import { getErrorMessage } from '../api/http.js';
+import { getErrorCode, getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary } from './ownerUi.jsx';
 
 // Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
@@ -13,6 +13,24 @@ const LIMITS = {
     checkinIntervalDays: { min: 1, max: 365 },
     gracePeriodDays: { min: 1, max: 90 },
     reminderCount: { min: 1, max: 10 },
+};
+
+// KYC: lưu tạm cấu hình đang nhập khi phải sang trang Xác minh danh tính, để quay lại vẫn còn
+const DRAFT_KEY = 'lv:dms-draft';
+const IDENTITY_URL = '/owner/identity?returnTo=/owner/dms';
+const readDraft = () => {
+    try {
+        const raw = sessionStorage.getItem(DRAFT_KEY);
+        sessionStorage.removeItem(DRAFT_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+};
+const saveDraft = (form) => {
+    try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(form));
+    } catch { /* trình duyệt chặn storage: chỉ mất bản nháp */ }
 };
 
 // Nhãn trạng thái ở dms.status.<STATUS>
@@ -25,8 +43,9 @@ const STATUS = {
 };
 
 export default function DeadMansSwitch() {
-    const { t } = useTranslation('dms');
+    const { t } = useTranslation(['dms', 'identity']);
     const toast = useToast();
+    const navigate = useNavigate();
     const user = getUser();
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
@@ -42,6 +61,10 @@ export default function DeadMansSwitch() {
     const applyConfig = (c) => {
         setConfig(c);
         if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        else {
+            const draft = readDraft();
+            if (draft) setForm((f) => ({ ...f, ...draft }));
+        }
     };
 
     // X2: chỉ tải danh sách confirmer khi DMS đã cấu hình (chưa cấu hình thì BE không có DmsConfig để gắn)
@@ -91,6 +114,12 @@ export default function DeadMansSwitch() {
             loadConfirmers(saved);
             toast.success(t('dms.saved'));
         } catch (err) {
+            // KYC: chưa xác minh danh tính -> giữ cấu hình đang nhập rồi sang trang xác minh, xong quay lại đây
+            if (getErrorCode(err) === 'KYC_REQUIRED') {
+                saveDraft(form);
+                navigate(IDENTITY_URL);
+                return;
+            }
             setError(getErrorMessage(err, t('dms.errors.save')));
         } finally {
             setSaving(false);
@@ -158,6 +187,12 @@ export default function DeadMansSwitch() {
             <Alert>{error}</Alert>
             {needVault && (
                 <p className="-mt-2 mb-4 text-sm"><Link to="/owner/vaults/new" className="text-secondary font-semibold">{t('dms.createVaultFirst')}</Link></p>
+            )}
+            {config && !configured && config.identityVerified === false && (
+                <Alert type="warning">
+                    {t('identity:banner.text')}{' '}
+                    <Link to={IDENTITY_URL} onClick={() => saveDraft(form)} className="font-semibold underline">{t('identity:banner.cta')}</Link>
+                </Alert>
             )}
             {noExecutor && (
                 <Alert type="warning">
