@@ -9,6 +9,7 @@ import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.identityservice.OwnerIdentityService;
+import com.ltld.app.legacyvault.enums.OwnerIdMatch;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAccessGuard;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
@@ -191,11 +192,56 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         if (result == null || ENGINE_UNAVAILABLE.equals(result.getEngineSource())) {
             return;
         }
+        OwnerIdMatch match;
         try {
-            result.setOwnerIdMatch(ownerIdentityService.matchDocumentId(ownerId, result.getIdNumber()).name());
+            match = ownerIdentityService.matchDocumentId(ownerId, result.getIdNumber());
         } catch (RuntimeException e) {
             log.warn("Owner ID match failed for owner {}: {}", ownerId, e.getClass().getSimpleName());
+            return;
         }
+        if (match != null) {
+            applyOwnerIdMatch(result, match);
+        }
+    }
+
+    /**
+     * Đưa kết quả đối chiếu CCCD vào cảnh báo, điểm tin cậy và gợi ý từ chối (giống cách xử lý họ tên lệch).
+     * Không in số CCCD của Owner ra kết quả.
+     */
+    static void applyOwnerIdMatch(DeathCertificateOcrResponseDto result, OwnerIdMatch match) {
+        result.setOwnerIdMatch(match.name());
+        List<String> warnings = result.getWarnings() == null ? new ArrayList<>() : new ArrayList<>(result.getWarnings());
+        switch (match) {
+            case MATCHED -> { /* bằng chứng mạnh, không cần cảnh báo */ }
+            case MISMATCHED -> {
+                // Họ tên trùng nhưng số giấy tờ khác: rất có thể là người khác trùng tên, hoặc giấy bị sửa
+                warnings.add(0, "LƯU Ý ĐỊNH DANH: Số CCCD/CMND trên tài liệu (" + result.getIdNumber()
+                        + ") không khớp với CCCD Chủ két đã xác minh trong hệ thống.");
+                if (result.getSuggestedRejectionCode() == null
+                        || !"SUSPECTED_FORGERY".equals(result.getSuggestedRejectionCode())) {
+                    result.setSuggestedRejectionCode("INFO_MISMATCH");
+                }
+                if (result.getConfidenceScore() != null) {
+                    result.setConfidenceScore(Math.min(result.getConfidenceScore(), 40));
+                }
+                if (result.getDeathProofRelevancePercent() != null) {
+                    result.setDeathProofRelevancePercent(Math.min(result.getDeathProofRelevancePercent(), 40));
+                }
+                result.setExecutorSuggestion("Cảnh báo cố vấn: Số CCCD/CMND trên giấy không khớp với CCCD Chủ két đã xác minh. "
+                        + "Hãy kiểm tra lại bạn có tải đúng giấy tờ của Chủ két không. "
+                        + (result.getExecutorSuggestion() == null ? "" : result.getExecutorSuggestion()));
+                result.setVerifierSuggestion("Gợi ý cho Verifier: Số CCCD/CMND trên giấy không khớp với CCCD Chủ két đã xác minh, "
+                        + "cân nhắc lý do \"Thông tin không khớp\". "
+                        + (result.getVerifierSuggestion() == null ? "" : result.getVerifierSuggestion()));
+            }
+            case NOT_ON_DOCUMENT -> warnings.add("LƯU Ý ĐỊNH DANH: Không đọc được số CCCD/CMND trên tài liệu, "
+                    + "chưa đối chiếu được với CCCD Chủ két; chỉ đối chiếu theo họ tên.");
+            case UNVERIFIABLE -> warnings.add("LƯU Ý ĐỊNH DANH: Số giấy tờ trên tài liệu không đối chiếu được "
+                    + "(Chủ két không khai CMND cũ, hoặc số không đúng định dạng 9/12 chữ số).");
+            case OWNER_NOT_VERIFIED -> warnings.add("LƯU Ý ĐỊNH DANH: Chủ két chưa xác minh CCCD trong hệ thống "
+                    + "nên chỉ đối chiếu được theo họ tên.");
+        }
+        result.setWarnings(warnings);
     }
 
     private void recordAudit(UUID actorId, String email, String targetType, String targetId, DeathCertificateOcrResponseDto result) {

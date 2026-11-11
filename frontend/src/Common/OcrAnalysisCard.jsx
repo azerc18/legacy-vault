@@ -55,7 +55,10 @@ export default function OcrAnalysisCard({
     const isUnrelatedDoc = category === 'UNRELATED_DOCUMENT';
     const isValidCert = category === 'VALID_DEATH_CERTIFICATE';
     const isSuspectedForgery = data.suggestedRejectionCode === 'SUSPECTED_FORGERY';
-    const isFullyValid = isValidCert && matched && !isSuspectedForgery;
+    // KYC: đối chiếu số CCCD/CMND trên giấy với CCCD Chủ két đã xác minh (null với kết quả cũ / AI không chạy)
+    const idMatch = data.ownerIdMatch || null;
+    const idMismatch = idMatch === 'MISMATCHED';
+    const isFullyValid = isValidCert && matched && !isSuspectedForgery && !idMismatch;
     const warnings = Array.isArray(data.warnings) ? data.warnings : [];
 
     const imageQualityScore = typeof data.imageQualityScore === 'number' ? data.imageQualityScore : null;
@@ -78,6 +81,11 @@ export default function OcrAnalysisCard({
         badgeText = t('ocr.mismatchBadge');
         badgeClass = 'bg-red-600 text-white';
         badgeIcon = 'warning';
+        containerClass = 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20';
+    } else if (idMismatch) {
+        badgeText = t('ocr.idMismatchBadge');
+        badgeClass = 'bg-red-600 text-white';
+        badgeIcon = 'badge';
         containerClass = 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20';
     } else if (isSuspectedForgery) {
         badgeText = t('ocr.forgeryBadge');
@@ -139,8 +147,16 @@ export default function OcrAnalysisCard({
             label: t('ocr.idNumber'),
             value: data.idNumber,
             mono: true,
-            danger: isSuspectedForgery,
+            highlight: idMatch === 'MATCHED',
+            danger: isSuspectedForgery || idMismatch,
         },
+        ...(idMatch ? [{
+            label: t('ocr.idMatchLabel'),
+            value: t(`ocr.idMatch.${idMatch}`),
+            highlight: idMatch === 'MATCHED',
+            danger: idMismatch,
+            warning: !['MATCHED', 'MISMATCHED'].includes(idMatch),
+        }] : []),
         { label: t('ocr.deathTime'), value: data.dateOfDeath },
         {
             label: t('ocr.deathPlace'),

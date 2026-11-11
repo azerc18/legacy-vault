@@ -236,6 +236,15 @@
     "sealMissing": "Chưa nhận diện rõ dấu đỏ",
     "warningsTitle": "Lưu ý & Phân tích chi tiết từ AI",
     "applyNoteBtn": "Chèn tóm tắt gợi ý AI vào Ghi chú nộp hồ sơ",
-    "suggestRejectBtn": "Áp dụng nhanh lý do từ chối gợi ý vào biểu mẫu (Tùy chọn)"
+    "suggestRejectBtn": "Áp dụng nhanh lý do từ chối gợi ý vào biểu mẫu (Tùy chọn)",
+    "idMismatchBadge": "Cảnh báo: Số CCCD trên giấy không khớp CCCD Chủ két",
+    "idMatchLabel": "Đối chiếu CCCD Chủ két",
+    "idMatch": {
+      "MATCHED": "Khớp CCCD Chủ két đã xác minh",
+      "MISMATCHED": "Không khớp CCCD Chủ két đã xác minh",
+      "NOT_ON_DOCUMENT": "Giấy không ghi (hoặc không đọc được) số CCCD/CMND",
+      "UNVERIFIABLE": "Không đối chiếu được số giấy tờ trên giấy",
+      "OWNER_NOT_VERIFIED": "Chủ két chưa xác minh CCCD, chỉ đối chiếu theo họ tên"
+    }
   }
 }
