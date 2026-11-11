@@ -208,6 +208,16 @@ class CouponServiceTest {
         assertThat(service.preview(UUID.randomUUID(), "TET2027").percentOff()).isEqualTo(20);
     }
 
+    // Review #256 nit: tài khoản không còn lần sai nào trong cửa sổ thì không giữ entry trong map
+    @Test
+    void accountWithoutWrongCodes_isNotTracked() {
+        coupon("TET2027", 20);
+        service.preview(userId, "TET2027");
+        assertThat(service.trackedGuessAccounts()).isZero();
+        assertThatThrownBy(() -> service.preview(userId, "NOPE"));
+        assertThat(service.trackedGuessAccounts()).isEqualTo(1);
+    }
+
     @Test
     void validCodes_doNotCountTowardTheLimit() {
         coupon("TET2027", 20);

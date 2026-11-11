@@ -32,6 +32,8 @@ public class AdminPaymentResponse {
     // Việc 4
     private String couponCode;
     private Long discountVnd;
+    // Review #256 nit: tài khoản đã trả từ hai giao dịch trở lên với cùng mã này (audit COUPON_REUSED); admin xem để hoàn
+    private boolean couponReused;
     // Gói đang dùng hiện tại của user (FREE nếu không có gói trả phí còn hạn)
     private String currentPlanCode;
 }
