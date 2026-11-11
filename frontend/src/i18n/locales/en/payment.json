@@ -74,6 +74,27 @@
       "statusLabel": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired", "REFUNDED": "Refunded" },
       "expiredHint": "This unpaid checkout was closed automatically. If you were charged, it is still credited when the payment gateway reports back."
     },
+    "usage": {
+      "title": "Usage",
+      "vaults": "Vaults",
+      "beneficiaries": "Beneficiaries (largest vault)",
+      "beneficiariesHint": "The beneficiary limit applies to each vault; the number shown is your vault with the most people.",
+      "storage": "Encrypted storage",
+      "messages": "Legacy messages",
+      "messagesOn": "Your plan can create audio / video messages.",
+      "messagesOff": "The Free plan cannot create new messages. Existing messages are kept and still delivered.",
+      "overTitle": "You are over the limits of your current plan",
+      "overTitleLapsed": "Your VIP plan expired on {{date}}; the account is now on Free",
+      "overList": "Over the limit: {{items}}.",
+      "policy": "All your data is kept: you can still view, edit and delete it, and your legacy is still delivered when triggered. You just cannot add more of the items above until you renew VIP or go back under the limit.",
+      "renew": "Renew VIP",
+      "feature": {
+        "MULTIPLE_VAULTS": "number of vaults",
+        "BENEFICIARY_LIMIT": "beneficiaries per vault",
+        "STORAGE": "storage",
+        "LEGACY_MESSAGES": "legacy messages"
+      }
+    },
     "errors": {
       "loadFailed": "Could not load billing information.",
       "receiptFailed": "Could not download the invoice."
