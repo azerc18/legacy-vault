@@ -152,4 +152,43 @@ class PaypalClientTest {
 
         assertThatThrownBy(() -> client.capture("ORDER1")).isInstanceOf(HttpServerErrorException.class);
     }
+
+    // Review #251 m1: GET order đã COMPLETED trả luôn kết quả capture để job không capture lại
+    @Test
+    void getOrder_completed_returnsExistingCapture() {
+        expectToken();
+        server.expect(requestTo(BASE + "/v2/checkout/orders/ORDER1"))
+                .andRespond(withSuccess("""
+                        {"id":"ORDER1","status":"COMPLETED","purchase_units":[{"payments":{"captures":[
+                          {"id":"CAP1","status":"COMPLETED","amount":{"currency_code":"USD","value":"3.90"}}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        PaypalClient.OrderSnapshot order = client.getOrder("ORDER1");
+
+        assertThat(order.status()).isEqualTo("COMPLETED");
+        assertThat(order.capture().completed()).isTrue();
+        assertThat(order.capture().captureId()).isEqualTo("CAP1");
+        assertThat(order.capture().cents()).isEqualTo(390L);
+    }
+
+    @Test
+    void getOrder_approved_hasNoCaptureYet() {
+        expectToken();
+        server.expect(requestTo(BASE + "/v2/checkout/orders/ORDER1"))
+                .andRespond(withSuccess("{\"id\":\"ORDER1\",\"status\":\"APPROVED\"}", MediaType.APPLICATION_JSON));
+
+        PaypalClient.OrderSnapshot order = client.getOrder("ORDER1");
+
+        assertThat(order.status()).isEqualTo("APPROVED");
+        assertThat(order.capture()).isNull();
+    }
+
+    @Test
+    void getOrder_missing_isNotFound() {
+        expectToken();
+        server.expect(requestTo(BASE + "/v2/checkout/orders/GONE"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+
+        assertThat(client.getOrder("GONE").status()).isEqualTo("NOT_FOUND");
+    }
 }

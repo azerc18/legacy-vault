@@ -75,10 +75,11 @@ public class VnpayClient {
         this(properties, "http://localhost:5173");
     }
 
+    // Chỉ dùng cho querydr / refund (gọi khi đang giữ khóa dòng của đơn), nên để ngắn: tổng tối đa ~15 giây
     private static SimpleClientHttpRequestFactory timeouts() {
         var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofSeconds(20));
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
         return factory;
     }
 
