@@ -6,6 +6,7 @@
     "submitting": "Đang check-in…",
     "missingToken": "Trang này cần link check-in trong email nhắc. Hãy mở lại link trong email, hoặc đăng nhập để check-in thủ công.",
     "hint": "Mở trang này chưa check-in cho bạn. Chỉ khi bấm nút thì mới check-in.",
+    "qrSubmitting": "Đang check-in từ mã QR, vui lòng chờ…",
     "submitFailed": "Chưa check-in được lúc này. Vui lòng thử lại."
   },
   "done": {
@@ -20,6 +21,8 @@
       "SUSPENDED": "Dead Man's Switch đang bị quản trị viên tạm dừng. Vui lòng liên hệ quản trị viên.",
       "NOT_CONFIGURED": "Dead Man's Switch chưa được thiết lập nên không có gì để check-in. Vui lòng đăng nhập và lưu cấu hình."
     },
+    "autoClose": "Trang sẽ tự đóng sau {{count}} giây.",
+    "closeManually": "Đã xong, bạn có thể đóng trang này.",
     "nextDue": "Hạn check-in tiếp theo:",
     "openDms": "Mở Dead Man's Switch",
     "backHome": "Về trang chủ"

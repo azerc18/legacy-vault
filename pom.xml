@@ -140,6 +140,12 @@
             <artifactId>totp</artifactId>
             <version>1.7.1</version>
         </dependency>
+        <!-- QR trong mail nhắc check-in DMS (QrCodeImage); totp cũng kéo zxing nhưng khai báo rõ để không phụ thuộc gián tiếp -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
         <dependency>
             <groupId>com.github.librepdf</groupId>
             <artifactId>openpdf</artifactId>

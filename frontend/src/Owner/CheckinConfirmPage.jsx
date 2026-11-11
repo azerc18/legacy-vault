@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dmsCheckinApi } from '../api/dmsCheckinApi.js';
@@ -7,22 +7,29 @@ import { Alert, btnPrimary, Card, Icon } from './ownerUi.jsx';
 
 // F2: trang công khai mở từ link trong email nhắc. Mở trang KHÔNG gọi API (trình quét link của hộp thư có thể
 // tự mở link); chỉ check-in khi Owner bấm nút.
+// Ngoại lệ via=qr: link nằm trong ẢNH QR của mail (trình quét hộp thư không đọc ảnh), Owner đã chủ động quét bằng
+// điện thoại nên trang tự check-in ngay khi mở, rồi trang kết quả tự đóng sau 5 giây.
 export default function CheckinConfirmPage() {
     const { t } = useTranslation('checkin');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token') || '';
-    const [submitting, setSubmitting] = useState(false);
+    const fromQr = searchParams.get('via') === 'qr';
+    // Quét QR thì coi như đang gửi ngay từ đầu (không setState đồng bộ trong effect)
+    const [submitting, setSubmitting] = useState(fromQr && Boolean(token));
     const [error, setError] = useState('');
+    // Token chỉ dùng 1 lần: chặn effect chạy 2 lần (StrictMode) gửi trùng rồi báo "link đã dùng"
+    const autoSent = useRef(false);
 
-    const submit = async () => {
-        setError('');
-        setSubmitting(true);
+    // Gọi API và chuyển trang kết quả; trả về câu lỗi khi cần ở lại trang để bấm lại.
+    const send = async () => {
         try {
             const res = await dmsCheckinApi.checkInWithToken(token);
             const params = new URLSearchParams({ status: 'success' });
             if (res?.checkinDueAt) params.set('nextDue', res.checkinDueAt);
+            if (fromQr) params.set('via', 'qr');
             navigate(`/dms/checkin-done?${params.toString()}`, { replace: true });
+            return null;
         } catch (err) {
             // BE trả data.reason khi token / trạng thái DMS không cho check-in: kết quả cuối, sang trang kết quả.
             // Không có reason (mất mạng, lỗi máy chủ): ở lại để bấm lại.
@@ -30,12 +37,33 @@ export default function CheckinConfirmPage() {
             if (reason) {
                 navigate(`/dms/checkin-done?${new URLSearchParams({ status: 'error', reason }).toString()}`,
                     { replace: true });
-                return;
+                return null;
             }
-            setError(getErrorMessage(err, t('confirm.submitFailed')));
+            return getErrorMessage(err, t('confirm.submitFailed'));
+        }
+    };
+
+    const submit = async () => {
+        setError('');
+        setSubmitting(true);
+        const message = await send();
+        if (message) {
+            setError(message);
             setSubmitting(false);
         }
     };
+
+    useEffect(() => {
+        if (!fromQr || !token || autoSent.current) return;
+        autoSent.current = true;
+        send().then((message) => {
+            if (message) {
+                setError(message);
+                setSubmitting(false);
+            }
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy một lần khi mở trang từ QR
+    }, []);
 
     return (
         <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center px-5 py-12">
@@ -51,7 +79,9 @@ export default function CheckinConfirmPage() {
                     <p className="mt-3 text-sm text-on-surface-variant text-center">{t('confirm.missingToken')}</p>
                 ) : (
                     <>
-                        <p className="mt-3 text-sm text-on-surface-variant">{t('confirm.intro')}</p>
+                        <p className="mt-3 text-sm text-on-surface-variant">
+                            {fromQr && submitting ? t('confirm.qrSubmitting') : t('confirm.intro')}
+                        </p>
                         <div className="mt-4">
                             <Alert>{error}</Alert>
                         </div>

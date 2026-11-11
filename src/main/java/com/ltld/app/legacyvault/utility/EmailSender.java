@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.utility.MailHtml.Style;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailPreparationException;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class EmailSender {
@@ -31,6 +33,9 @@ public class EmailSender {
     private final int OTP_EXPIRE_SECONDS = 300;
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DEADLINE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    // QR trong mail nhắc check-in: Content-ID của ảnh inline và cạnh ảnh PNG (hiển thị 168px, sinh gấp đôi cho màn hình nét)
+    private static final String CHECKIN_QR_CID = "dms-checkin-qr";
+    private static final int CHECKIN_QR_PX = 336;
     @Value("${app.frontend.base-url:}")
     private String frontendBaseUrl;
     /** Địa chỉ người gửi hiển thị, ví dụ "LegacyVault <no-reply@legacyvault.codes>". Trống thì dùng tài khoản SMTP. */
@@ -394,6 +399,8 @@ public class EmailSender {
     /**
      * F2: nhắc Owner check-in kèm link một chạm tới trang FE /dms/checkin; mở link chỉ hiện trang,
      * Owner bấm nút "I'm OK" thì mới check-in. checkinToken null/rỗng -> mail như cũ, không kèm link.
+     * Kèm mã QR (ảnh inline) của cùng link thêm via=qr: Owner đọc mail trên máy tính quét bằng điện thoại thì trang
+     * tự check-in, không cần bấm. Nút trong mail vẫn phải bấm. Sinh QR lỗi thì vẫn gửi mail có nút, không kèm QR.
      */
     public void sendDmsCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
                                        int reminderNumber, int reminderCount, String checkinToken) {
@@ -401,16 +408,26 @@ public class EmailSender {
         String base = frontendBase();
         List<String> paras = new ArrayList<>();
         paras.add(MailMessages.get(lang, "mail.dmsReminder.p1", formatDeadline(checkinDueAt), formatDeadline(triggerAt)));
+        byte[] qrPng = null;
         if (base != null && checkinToken != null && !checkinToken.isBlank()) {
+            String checkinUrl = base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8);
             paras.add(MailMessages.get(lang, "mail.dmsReminder.link"));
-            paras.add(MailMessages.get(lang, "mail.dmsReminder.button") + ": "
-                    + base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8));
+            paras.add(MailMessages.get(lang, "mail.dmsReminder.button") + ": " + checkinUrl);
+            try {
+                // via=qr: trang FE tự check-in khi mở từ QR (trình quét hộp thư không đọc ảnh nên không tự mở link này)
+                qrPng = QrCodeImage.png(checkinUrl + "&via=qr", CHECKIN_QR_PX);
+            } catch (RuntimeException e) {
+                log.warn("DMS reminder QR could not be generated, sending without QR: {}", e.getMessage());
+            }
         }
         paras.add(MailMessages.get(lang, "mail.dmsReminder.p2", reminderNumber, reminderCount));
         deliver(email, lang, Style.URGENT,
                 MailMessages.get(lang, "mail.dmsReminder.subject", reminderNumber, reminderCount),
                 MailMessages.get(lang, "mail.dmsReminder.title", reminderNumber, reminderCount),
-                paras, null, null);
+                paras, null, null, null, null,
+                qrPng == null ? null : CHECKIN_QR_CID,
+                qrPng == null ? null : MailMessages.get(lang, "mail.dmsReminder.qr"),
+                qrPng);
     }
 
     /**
@@ -723,8 +740,17 @@ public class EmailSender {
     private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
                          List<String> paragraphs, String code, String footerNote,
                          String pdfName, byte[] pdf) {
+        deliver(to, lang, style, subject, title, paragraphs, code, footerNote, pdfName, pdf, null, null, null);
+    }
+
+    /** qrCid + qrPng: ảnh QR inline (Content-ID qrCid) hiển thị dưới nút đầu tiên của thư. */
+    private void deliver(String to, AppLanguage lang, Style style, String subject, String title,
+                         List<String> paragraphs, String code, String footerNote,
+                         String pdfName, byte[] pdf, String qrCid, String qrCaption, byte[] qrPng) {
         String brand = MailMessages.get(lang, "mail.brand");
-        String html = MailHtml.render(style, title, paragraphs, code, footerNote, brand);
+        boolean withQr = qrCid != null && qrPng != null;
+        String html = MailHtml.render(style, title, paragraphs, code, footerNote, brand,
+                withQr ? qrCid : null, qrCaption);
         String text = MailHtml.renderText(title, paragraphs, code, footerNote);
         try {
             MimeMessage message = javaMailSender.createMimeMessage();
@@ -735,6 +761,10 @@ public class EmailSender {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(text, html);
+            // addInline phải gọi SAU setText
+            if (withQr) {
+                helper.addInline(qrCid, new org.springframework.core.io.ByteArrayResource(qrPng), "image/png");
+            }
             if (pdf != null) {
                 helper.addAttachment(pdfName, new org.springframework.core.io.ByteArrayResource(pdf), "application/pdf");
             }

@@ -6,6 +6,7 @@
     "submitting": "Checking in…",
     "missingToken": "This page needs the check-in link from your reminder email. Please open the link in the email again, or sign in to check in manually.",
     "hint": "Opening this page does not check you in. Only pressing the button does.",
+    "qrSubmitting": "Checking you in from the QR code, please wait…",
     "submitFailed": "Could not check in right now. Please try again."
   },
   "done": {
@@ -20,6 +21,8 @@
       "SUSPENDED": "Your Dead Man's Switch is currently suspended by an administrator. Please contact an admin.",
       "NOT_CONFIGURED": "Your Dead Man's Switch is not set up, so there is nothing to check in to. Please sign in and save the configuration."
     },
+    "autoClose": "This page will close in {{count}} seconds.",
+    "closeManually": "All done, you can close this page now.",
     "nextDue": "Next check-in due:",
     "openDms": "Open Dead Man's Switch",
     "backHome": "Back to Home"

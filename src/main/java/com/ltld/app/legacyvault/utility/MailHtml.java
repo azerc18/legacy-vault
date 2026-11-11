@@ -70,6 +70,19 @@ public final class MailHtml {
      */
     public static String render(Style style, String title, List<String> paragraphs, String code,
                                 String footerNote, String brandTag) {
+        return render(style, title, paragraphs, code, footerNote, brandTag, null, null);
+    }
+
+    /**
+     * Như {@link #render(Style, String, List, String, String, String)}, thêm một mã QR (ảnh inline qua cid)
+     * ngay dưới nút đầu tiên. qrCid null/rỗng thì không có QR.
+     *
+     * @param qrCid     Content-ID của ảnh QR đính kèm inline (không có tiền tố "cid:")
+     * @param qrCaption dòng chữ nhỏ phía trên mã QR
+     */
+    public static String render(Style style, String title, List<String> paragraphs, String code,
+                                String footerNote, String brandTag, String qrCid, String qrCaption) {
+        boolean qrPending = qrCid != null && !qrCid.isBlank();
         String accent = style.accent();
         boolean hasCode = code != null && !code.isBlank();
         StringBuilder h = new StringBuilder(6144);
@@ -117,7 +130,12 @@ public final class MailHtml {
             }
             Matcher m = LABELLED_LINK.matcher(p.trim());
             if (m.matches()) {
-                h.append(inset(button(m.group(2), m.group(1))));
+                String inner = button(m.group(2), m.group(1));
+                if (qrPending) {
+                    inner += qrBlock(qrCid, qrCaption);
+                    qrPending = false;
+                }
+                h.append(inset(inner));
             } else {
                 h.append("<div style=\"font-family:").append(FONT).append(";color:").append(TEXT)
                         .append(";font-size:15px;line-height:23px;padding-top:20px;\">").append(linkify(p)).append("</div>");
@@ -180,6 +198,20 @@ public final class MailHtml {
         return "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"margin-top:26px;\">"
                 + "<tr><td align=\"center\" bgcolor=\"" + INSET + "\" style=\"background:" + INSET + ";border:1px solid " + RULE
                 + ";border-radius:8px;padding:28px 20px;\">" + inner + "</td></tr></table>";
+    }
+
+    /** Mã QR nằm dưới nút, trên nền trắng để camera điện thoại đọc được cả khi hộp thư ở chế độ tối. */
+    private static String qrBlock(String cid, String caption) {
+        StringBuilder b = new StringBuilder();
+        if (caption != null && !caption.isBlank()) {
+            b.append("<div style=\"font-family:").append(FONT).append(";color:").append(MUTED)
+                    .append(";font-size:13px;line-height:20px;padding:22px 0 12px;\">").append(esc(caption)).append("</div>");
+        }
+        b.append("<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" align=\"center\"><tr>")
+                .append("<td bgcolor=\"#ffffff\" style=\"background:#ffffff;border-radius:8px;padding:8px;\">")
+                .append("<img src=\"cid:").append(esc(cid)).append("\" width=\"168\" height=\"168\" alt=\"QR check-in\" ")
+                .append("style=\"display:block;border:0;width:168px;height:168px;\"></td></tr></table>");
+        return b.toString();
     }
 
     /** Mỗi chữ số một ô. */

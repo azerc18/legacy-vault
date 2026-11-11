@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import { btnOutline, btnPrimary, Card, formatDate, Icon } from './ownerUi.jsx';
@@ -11,6 +11,24 @@ export default function CheckinDonePage() {
     const isSuccess = searchParams.get('status') === 'success';
     const nextDue = searchParams.get('nextDue');
     const reason = searchParams.get('reason');
+    // Check-in từ mã QR thành công: đếm ngược 5 giây rồi thử đóng tab
+    const autoClose = isSuccess && searchParams.get('via') === 'qr';
+    const [secondsLeft, setSecondsLeft] = useState(5);
+    const [closeBlocked, setCloseBlocked] = useState(false);
+
+    useEffect(() => {
+        if (!autoClose || secondsLeft <= 0) return undefined;
+        const id = setTimeout(() => setSecondsLeft(secondsLeft - 1), 1000);
+        return () => clearTimeout(id);
+    }, [autoClose, secondsLeft]);
+
+    useEffect(() => {
+        if (!autoClose || secondsLeft > 0) return undefined;
+        // Trình duyệt chỉ cho đóng tab do script mở; tab mở từ app camera thường bị chặn -> báo người dùng tự đóng
+        window.close();
+        const id = setTimeout(() => setCloseBlocked(true), 500);
+        return () => clearTimeout(id);
+    }, [autoClose, secondsLeft]);
 
     // m5: lý do BE trả (data.reason) -> câu riêng trong namespace checkin; lạ hoặc thiếu thì dùng câu chung.
     // Gợi ý "đăng nhập để check-in thủ công" chỉ đúng khi lỗi nằm ở link (TOKEN_INVALID).
@@ -45,6 +63,12 @@ export default function CheckinDonePage() {
                         <span className="text-on-surface-variant">{t('done.nextDue')} </span>
                         <span className="font-label-lg text-on-surface">{formatDate(nextDue, true)}</span>
                     </div>
+                )}
+
+                {autoClose && (
+                    <p className="mt-4 text-sm text-on-surface-variant" role="status">
+                        {closeBlocked ? t('done.closeManually') : t('done.autoClose', { count: secondsLeft })}
+                    </p>
                 )}
 
                 <div className="mt-6 flex flex-wrap justify-center gap-3">
