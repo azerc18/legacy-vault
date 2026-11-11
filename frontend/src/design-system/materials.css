@@ -627,8 +627,11 @@ html.dark,
   position: fixed;
   left: 0;
   top: 0;
-  width: 120px;
-  height: 120px;
+  --lv-aura-size: 120px;
+  width: var(--lv-aura-size);
+  height: var(--lv-aura-size);
+  /* Dời tâm về góc trên-trái: JS chỉ cần translate3d(x, y) theo toạ độ chuột, kích thước chỉ khai báo ở đây */
+  margin: calc(var(--lv-aura-size) / -2) 0 0 calc(var(--lv-aura-size) / -2);
   border-radius: 9999px;
   pointer-events: none;
   z-index: 45;

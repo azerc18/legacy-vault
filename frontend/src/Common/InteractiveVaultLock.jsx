@@ -24,7 +24,6 @@ const DIAL_TICKS_24 = Array.from({ length: 24 }, (_, i) => i * 15);
 // Các tấm kính có hiệu ứng đốm sáng: chỉ tấm nằm dưới con trỏ được bật (.lv-glass-lit)
 const GLASS_SELECTOR =
     '.lv-side, .lv-dossier, .lv-page-hero, .lv-glass, .lv-glass-clear, .lv-glass-regular, .lv-glass-thick, .lv-glass-tinted, .lv-glass-secure, .lv-surface-standard, .lv-surface-secure, .bg-surface-container-lowest.rounded-2xl, .bg-surface-container-lowest.rounded-3xl';
-const AURA_RADIUS = 60;   // khớp kích thước .lv-cursor-aura (120px) trong materials.css
 
 const ARCHETYPE_ORDER = ['AUTO', 'ADMIN', 'VIP', 'FREE', 'VERIFIER', 'EXECUTOR', 'BENEFICIARY'];
 
@@ -228,7 +227,6 @@ export default function InteractiveVaultLock({
     // mọi tấm kính mỗi khung hình: chỉ tấm kính ĐANG nằm dưới con trỏ được bật sáng (lớp .lv-glass-lit + --gx/--gy).
     const auraRef = useRef(null);
     const litRef = useRef(null);
-    const nearRef = useRef(false);
 
     useEffect(() => {
         const reduced =
@@ -308,13 +306,8 @@ export default function InteractiveVaultLock({
 
             if (sentinel) {
                 // Cú nền: ghi thẳng transform, không qua React (trước đây setState mỗi khung hình làm vẽ lại cả SVG lớn).
-                // State chỉ đổi khi con trỏ vào/ra vùng 85px quanh cú (mở càng khoá ở trang công khai).
+                // Bản nền không dùng isShackleOpen / góc quay nên không cần cập nhật state.
                 el.style.transform = `perspective(900px) translate3d(${pullX}px, ${pullY}px, 0) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
-                const near = dist < 85;
-                if (near !== nearRef.current) {
-                    nearRef.current = near;
-                    setCursor((c) => ({ ...c, distance: near ? 0 : 999 }));
-                }
                 return;
             }
 
@@ -337,8 +330,9 @@ export default function InteractiveVaultLock({
                 if (e.pointerType === 'touch') {
                     aura.classList.remove('is-on');
                 } else {
-                    // Ghi ngay trong sự kiện (không chờ khung hình sau) để đốm sáng bám sát con trỏ
-                    aura.style.transform = `translate3d(${px - AURA_RADIUS}px, ${py - AURA_RADIUS}px, 0)`;
+                    // Ghi ngay trong sự kiện (không chờ khung hình sau) để đốm sáng bám sát con trỏ.
+                    // Tâm đốm sáng nằm ở góc trên-trái nhờ margin âm trong CSS (--lv-aura-size), nên chỉ cần dời tới toạ độ chuột.
+                    aura.style.transform = `translate3d(${px}px, ${py}px, 0)`;
                     aura.classList.add('is-on');
                 }
             }
