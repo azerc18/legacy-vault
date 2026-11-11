@@ -7,7 +7,7 @@ import { CountingNumber } from '@animate-ui/react/primitives/texts/counting-numb
 import { useMotionTokens } from '@animate-ui/react/utils/motion';
 import { ownerApi } from '../api/ownerApi.js';
 import { paymentApi } from '../api/paymentApi.js';
-import { Card, Icon } from '../Owner/ownerUi.jsx';
+import { Card, Icon, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 const initials = (name = '') =>
     name.trim().split(/\s+/).slice(-2).map((w) => w[0]?.toUpperCase() || '').join('') || '?';
@@ -70,7 +70,7 @@ export default function LegacyOverviewCard() {
     }, []);
 
     if (!data) {
-        return <Card title={t('legacy.title')} icon="family_restroom"><p className="text-sm text-on-surface-variant">{t('loading')}</p></Card>;
+        return <Card title={t('legacy.title')} icon="family_restroom"><LoadingSkeleton label={t('loading')} /></Card>;
     }
 
     const { vaults, executors, dms, confirmers, sub } = data;

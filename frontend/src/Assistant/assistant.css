@@ -24,9 +24,10 @@
 .lv-assistant--dragging .lv-assistant-handle { cursor: grabbing; }
 .lv-assistant--dragging .lv-assistant-launcher { transform: scale(1.06); }
 
-/* Cú của tài khoản VIP: hào quang vàng phía sau và một đốm sáng bay quanh */
-.lv-assistant-launcher--vip { position: relative; isolation: isolate; }
-.lv-assistant-launcher--vip::before {
+/* Hào quang vàng phía sau cú và một đốm sáng bay quanh: chỉ ở giao diện tối, như nhau cho VIP và gói thường.
+   Giao diện sáng: chỉ có con cú, không phát sáng. */
+.lv-assistant-launcher { position: relative; isolation: isolate; }
+html.dark .lv-assistant-launcher::before {
     content: '';
     position: absolute;
     inset: -14% -30% -8%;
@@ -35,7 +36,7 @@
     background: radial-gradient(circle, rgba(255, 205, 100, 0.62) 0%, rgba(255, 150, 70, 0.28) 45%, transparent 70%);
     animation: lv-owl-halo 2.8s ease-in-out infinite;
 }
-.lv-assistant-launcher--vip::after {
+html.dark .lv-assistant-launcher::after {
     content: '✦';
     position: absolute;
     top: 8%;
@@ -62,7 +63,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .lv-assistant-launcher--vip::before, .lv-assistant-launcher--vip::after { animation: none; }
+    .lv-assistant-launcher::before, .lv-assistant-launcher::after { animation: none; }
 }
 
 /* Điện thoại: cú nhỏ lại để không che nội dung (zoom thu cả vùng bấm, transform thì không) */
@@ -165,14 +166,3 @@
     .glow-ring::after, .spark { display: none; }
 }
 
-/* Giao diện sáng: hào quang nhạt trên nền trắng gần như không thấy, nên dùng màu hổ phách đậm hơn và thêm bóng sáng quanh cú */
-html:not(.dark) .lv-assistant-launcher--vip {
-    filter: drop-shadow(0 0 12px rgba(240, 140, 20, 0.6));
-}
-html:not(.dark) .lv-assistant-launcher--vip::before {
-    background: radial-gradient(circle, rgba(255, 168, 36, 0.78) 0%, rgba(255, 120, 30, 0.42) 48%, transparent 74%);
-}
-html:not(.dark) .lv-assistant-launcher--vip::after {
-    color: #e68a00;
-    text-shadow: 0 0 8px rgba(230, 138, 0, 0.9);
-}

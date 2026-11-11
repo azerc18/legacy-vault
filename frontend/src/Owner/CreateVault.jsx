@@ -4,7 +4,7 @@ import {Navigate, useNavigate} from 'react-router-dom';
 import {getUser} from '../auth/auth.js';
 import {ownerApi} from '../api/ownerApi.js';
 import {getErrorMessage} from '../api/http.js';
-import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline} from './ownerUi.jsx';
+import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btnOutline, LoadingSkeleton} from './ownerUi.jsx';
 import {AssetTypeIcon} from './assetArt.jsx';
 import {AssetFieldsForm, cleanFields, deriveAssetName, fieldProblems, focusFirstInvalid, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
 import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
@@ -322,7 +322,7 @@ export default function CreateVault() {
 
                                     <div data-tour="asset-fields">
                                     {schemas === null ? (
-                                        <div className="h-24 rounded-xl bg-surface-container-low animate-pulse" aria-hidden="true"/>
+                                        <LoadingSkeleton/>
                                     ) : schemaOf(schemas, a.assetType) ? (
                                         <AssetFieldsForm schema={schemaOf(schemas, a.assetType)} values={a.fields}
                                                          onChange={(k, v) => setAssetField(i, k, v)} isEdit={false}

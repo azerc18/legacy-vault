@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -207,7 +208,7 @@ export default function VerificationRequestDetail() {
         }
     };
 
-    if (loading) return <div className="p-8">{t('loading')}</div>;
+    if (loading) return <LoadingSkeleton label={t('loading')} />;
     if (!req) {
         return (
             <div className="p-8">

@@ -1,56 +1,59 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AnimateUIProvider } from '@animate-ui/react/provider';
 import Dashboard from './Dashboard.jsx';
-import UserHome from './UserHome.jsx';
 import Login from './LogInLogOut/Login.jsx';
-import Register from './LogInLogOut/Register.jsx';
-import VerifyEmail from './LogInLogOut/VerifyEmail.jsx';
-import ForgotPassword from './LogInLogOut/ForgotPassword.jsx';
-import ResetPassword from './LogInLogOut/ResetPassword.jsx';
-import LegalVerifierDashboard from './LegalVerifier/LegalVerifierDashboard.jsx';
-import VerificationRequestDetail from './LegalVerifier/VerificationRequestDetail.jsx';
-import VerificationHistory from './LegalVerifier/VerificationHistory.jsx';
-import VerifierHome from './LegalVerifier/VerifierHome.jsx';
-import ExecutorHome from './Executor/ExecutorHome.jsx';
-import ExecutorCase from './Executor/ExecutorCase.jsx';
-import BeneficiaryVaults from './Beneficiary/BeneficiaryVaults.jsx';
-import BeneficiaryVaultDetail from './Beneficiary/BeneficiaryVaultDetail.jsx';
-import BeneficiaryGuide from './Beneficiary/BeneficiaryGuide.jsx';
-import OwnerVaults from './Owner/OwnerVaults.jsx';
-import CreateVault from './Owner/CreateVault.jsx';
-import OwnerVaultDetail from './Owner/OwnerVaultDetail.jsx';
-import DeadMansSwitch from './Owner/DeadMansSwitch.jsx';
-import OwnerExecutors from './Owner/OwnerExecutors.jsx';
-import OwnerActivity from './Owner/OwnerActivity.jsx';
-import DmsConfirmationResultPage from './Owner/DmsConfirmationResultPage.jsx';
-import DmsConfirmPage from './Owner/DmsConfirmPage.jsx';
-import PricingPage from './Owner/PricingPage.jsx';
-import BillingPage from './Owner/BillingPage.jsx';
-import PaymentResultPage from './Owner/PaymentResultPage.jsx';
-import CheckinDonePage from './Owner/CheckinDonePage.jsx';
-import CheckinConfirmPage from './Owner/CheckinConfirmPage.jsx';
-import AdminUsers from './Admin/AdminUsers.jsx';
-import AdminVaults from './Admin/AdminVaults.jsx';
 import RequireRole from './Common/RequireRole.jsx';
 import NotFound from './Common/NotFound.jsx';
-import ProfilePage from './Profile/ProfilePage.jsx';
-import AdminRoles from './Admin/AdminRoles.jsx';
-import AdminAuditLogs from './Admin/AdminAuditLogs.jsx';
-import AdminAlerts from './Admin/AdminAlerts.jsx';
-import AdminDashboard from './Admin/AdminDashboard.jsx';
-import AdminPayments from './Admin/AdminPayments.jsx';
-import AdminPlans from './Admin/AdminPlans.jsx';
-import AdminNotifications from './Admin/AdminNotifications.jsx';
-import AdminBeneficiaryLocks from './Admin/AdminBeneficiaryLocks.jsx';
 import AssistantWidget from './Assistant/AssistantWidget.jsx';
 import PlanLimitUpgradeDialog from './Common/PlanLimitUpgradeDialog.jsx'; // T1 (m6)
 import InteractiveVaultLock from './Common/InteractiveVaultLock.jsx';
 import IdleLogout from './Common/IdleLogout.jsx'; // Hồ sơ > Tuỳ chọn: tự đăng xuất khi rảnh
 import SpotlightTour from './Common/SpotlightTour.jsx';
 import DemoBanner from './Common/DemoBanner.jsx';
-import DemoEntry from './Common/DemoEntry.jsx';
 import { useTranslation } from 'react-i18next';
+
+// Tách code theo trang: chỉ tải JS của trang đang mở thay vì cả app (trước đây ~1,4MB một lần).
+// Trang công khai hay vào nhất (landing, đăng nhập) vẫn tải sẵn.
+const UserHome = lazy(() => import('./UserHome.jsx'));
+const Register = lazy(() => import('./LogInLogOut/Register.jsx'));
+const VerifyEmail = lazy(() => import('./LogInLogOut/VerifyEmail.jsx'));
+const ForgotPassword = lazy(() => import('./LogInLogOut/ForgotPassword.jsx'));
+const ResetPassword = lazy(() => import('./LogInLogOut/ResetPassword.jsx'));
+const LegalVerifierDashboard = lazy(() => import('./LegalVerifier/LegalVerifierDashboard.jsx'));
+const VerificationRequestDetail = lazy(() => import('./LegalVerifier/VerificationRequestDetail.jsx'));
+const VerificationHistory = lazy(() => import('./LegalVerifier/VerificationHistory.jsx'));
+const VerifierHome = lazy(() => import('./LegalVerifier/VerifierHome.jsx'));
+const ExecutorHome = lazy(() => import('./Executor/ExecutorHome.jsx'));
+const ExecutorCase = lazy(() => import('./Executor/ExecutorCase.jsx'));
+const BeneficiaryVaults = lazy(() => import('./Beneficiary/BeneficiaryVaults.jsx'));
+const BeneficiaryVaultDetail = lazy(() => import('./Beneficiary/BeneficiaryVaultDetail.jsx'));
+const BeneficiaryGuide = lazy(() => import('./Beneficiary/BeneficiaryGuide.jsx'));
+const OwnerVaults = lazy(() => import('./Owner/OwnerVaults.jsx'));
+const CreateVault = lazy(() => import('./Owner/CreateVault.jsx'));
+const OwnerVaultDetail = lazy(() => import('./Owner/OwnerVaultDetail.jsx'));
+const DeadMansSwitch = lazy(() => import('./Owner/DeadMansSwitch.jsx'));
+const OwnerExecutors = lazy(() => import('./Owner/OwnerExecutors.jsx'));
+const OwnerActivity = lazy(() => import('./Owner/OwnerActivity.jsx'));
+const DmsConfirmationResultPage = lazy(() => import('./Owner/DmsConfirmationResultPage.jsx'));
+const DmsConfirmPage = lazy(() => import('./Owner/DmsConfirmPage.jsx'));
+const PricingPage = lazy(() => import('./Owner/PricingPage.jsx'));
+const BillingPage = lazy(() => import('./Owner/BillingPage.jsx'));
+const PaymentResultPage = lazy(() => import('./Owner/PaymentResultPage.jsx'));
+const CheckinDonePage = lazy(() => import('./Owner/CheckinDonePage.jsx'));
+const CheckinConfirmPage = lazy(() => import('./Owner/CheckinConfirmPage.jsx'));
+const AdminUsers = lazy(() => import('./Admin/AdminUsers.jsx'));
+const AdminVaults = lazy(() => import('./Admin/AdminVaults.jsx'));
+const ProfilePage = lazy(() => import('./Profile/ProfilePage.jsx'));
+const AdminRoles = lazy(() => import('./Admin/AdminRoles.jsx'));
+const AdminAuditLogs = lazy(() => import('./Admin/AdminAuditLogs.jsx'));
+const AdminAlerts = lazy(() => import('./Admin/AdminAlerts.jsx'));
+const AdminDashboard = lazy(() => import('./Admin/AdminDashboard.jsx'));
+const AdminPayments = lazy(() => import('./Admin/AdminPayments.jsx'));
+const AdminPlans = lazy(() => import('./Admin/AdminPlans.jsx'));
+const AdminNotifications = lazy(() => import('./Admin/AdminNotifications.jsx'));
+const AdminBeneficiaryLocks = lazy(() => import('./Admin/AdminBeneficiaryLocks.jsx'));
+const DemoEntry = lazy(() => import('./Common/DemoEntry.jsx'));
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
 const guard = (roles, el) => <RequireRole roles={roles}>{el}</RequireRole>;
@@ -69,6 +72,8 @@ function App() {
                 <DemoBanner />
                 <IdleLogout />
                 <InteractiveVaultLock variant="sentinel" />
+                {/* fallback rỗng: không hiện chữ "Đang tải"; trang tải rất nhanh vì chỉ là một phần nhỏ */}
+                <Suspense fallback={null}>
                 <Routes>
                 {/* Công khai */}
                 <Route path="/" element={<Dashboard />} />
@@ -130,6 +135,7 @@ function App() {
 
                 <Route path="*" element={<NotFound />} />
             </Routes>
+                </Suspense>
             <AssistantWidget />
             <PlanLimitUpgradeDialog />
             <SpotlightTour />

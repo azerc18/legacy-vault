@@ -23,6 +23,7 @@
   "MFA_REQUIRED": "Enter your two-factor authentication code.",
   "MFA_INVALID_CODE": "The two-factor code is incorrect.",
   "DMS_NOT_TRIGGERED": "The Dead Man's Switch has not been triggered yet.",
+  "DMS_CHECKIN_TOO_SOON": "You just checked in. Please try again in a few minutes.",
   "DMS_NO_VAULT": "No vault exists, so the check-in did not go through. Create a vault first.",
   "EXECUTOR_NOT_ACTIVE": "Your executor role is not active for this estate.",
   "CHECKIN_TOKEN_INVALID": "This check-in link is invalid or has expired.",

@@ -8,7 +8,7 @@
   "pricing": {
     "title": "Plans & Pricing",
     "subtitle": "Protect your digital estate with specialized vaults, contingent beneficiaries, proportional (%) allocation, and 5 GB encrypted storage.",
-    "back": "Billing & Subscription",
+    "back": "Billing & VIP",
     "currentPlan": "Current plan:",
     "expires": "Expires {{date}}",
     "viewBilling": "View billing history",
@@ -41,7 +41,7 @@
     }
   },
   "billing": {
-    "title": "Billing & Subscription",
+    "title": "Billing & VIP",
     "subtitle": "Manage your LegacyVault plan, entitlements, and payment history.",
     "extendVip": "Extend VIP",
     "upgradeToVip": "Upgrade to VIP",
