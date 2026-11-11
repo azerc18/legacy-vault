@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.entity.AuditLog;
 import com.ltld.app.legacyvault.entity.DmsCheckin;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.entity.Vault;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.DmsCheckinType;
 import com.ltld.app.legacyvault.enums.DmsStatus;
@@ -15,6 +16,7 @@ import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.DmsCheckinRepository;
 import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsOneClickCheckinService;
 import org.junit.jupiter.api.AfterEach;
@@ -62,6 +64,7 @@ class DmsOneClickCheckinIntegrationTest extends MySqlTestContainer {
     @Autowired private DmsConfigRepository dmsConfigRepository;
     @Autowired private DmsCheckinRepository dmsCheckinRepository;
     @Autowired private UserRepository userRepository;
+    @Autowired private VaultRepository vaultRepository;
     @Autowired private AuditLogRepository auditLogRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
 
@@ -75,6 +78,8 @@ class DmsOneClickCheckinIntegrationTest extends MySqlTestContainer {
         User owner = userRepository.save(User.builder().email("owner-" + tag + "@example.com").fullName("Owner")
                 .passwordHash("not-used").status(UserStatus.ACTIVE).build());
         ownerId = owner.getId();
+        // Check-in trong app yêu cầu Owner còn ít nhất 1 vault (DMS_NO_VAULT)
+        vaultRepository.save(Vault.builder().owner(owner).name("Vault " + tag).build());
         initialCheckin = LocalDateTime.now().minusDays(28).truncatedTo(ChronoUnit.SECONDS);
         configId = dmsConfigRepository.save(DmsConfig.builder()
                 .owner(owner)
@@ -94,6 +99,7 @@ class DmsOneClickCheckinIntegrationTest extends MySqlTestContainer {
                 "%ownerId=" + ownerId + "%");
         dmsCheckinRepository.deleteAll(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(configId));
         dmsConfigRepository.deleteById(configId);
+        vaultRepository.deleteAll(vaultRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId));
         userRepository.deleteById(ownerId);
     }
 
