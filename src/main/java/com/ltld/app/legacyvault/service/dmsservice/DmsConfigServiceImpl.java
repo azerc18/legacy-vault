@@ -59,6 +59,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
             + "Assign an executor before saving the Dead Man's Switch configuration.";
     static final String NO_VAULT_MESSAGE =
             "You have no vault yet, so the check-in was not successful. Create a vault first.";
+    static final String SIMULATE_NOT_ACTIVE_MESSAGE =
+            "Only an active Dead Man's Switch can be made overdue.";
     static final String RESUME_NO_ACTIVATION_TARGET_MESSAGE =
             "The owner has no executor available to receive the handover; the Dead Man's Switch cannot be resumed.";
 
@@ -363,6 +365,24 @@ public class DmsConfigServiceImpl implements DmsConfigService {
 
         auditByAdmin(AuditAction.DMS_RESUMED, adminId, config, "nextCheckinDueAt=" + config.getNextCheckinDueAt());
         return toResponse(config, executors);
+    }
+
+    @Override
+    @Transactional
+    public DmsConfigResponse simulateOverdueByAdmin(UUID ownerId, UUID adminId) {
+        DmsConfig config = findConfigForUpdate(ownerId);
+        if (config.getStatus() != DmsStatus.ACTIVE) {
+            throw new DmsException(SIMULATE_NOT_ACTIVE_MESSAGE, HttpStatus.CONFLICT);
+        }
+        LocalDateTime previousDueAt = config.getNextCheckinDueAt();
+        // Chỉ đổi 2 cột như lệnh SQL demo; giữ lịch nhắc và bộ đếm ALIVE để job chạy đúng luồng thật.
+        config.setNextCheckinDueAt(LocalDateTime.now().minusMinutes(1));
+        config.setRemindersSent(Math.max(config.getRemindersSent(), 1));
+        config = dmsConfigRepository.saveAndFlush(config);
+
+        auditByAdmin(AuditAction.DMS_DEMO_OVERDUE_SIMULATED, adminId, config,
+                "previousDueAt=" + previousDueAt + ", confirmationDeferrals=" + config.getConfirmationDeferrals());
+        return toResponse(config);
     }
 
     private DmsConfig findConfig(UUID ownerId) {

@@ -177,7 +177,8 @@
       "grant": "Make {{role}}", "revoke": "Remove {{role}}",
       "lock": "Lock account", "unlock": "Unlock account",
       "suspend": "Suspend DMS", "resume": "Resume DMS", "rescue": "Assign executor",
-      "rolesMenu": "Roles…", "grantVip": "Grant VIP"
+      "rolesMenu": "Roles…", "grantVip": "Grant VIP",
+      "simulateOverdue": "Simulate overdue (demo)", "simulateOverdueHint": "Demo only: makes this owner miss the check-in. About 20 seconds later the system runs the real flow (asks the trusted confirmers, or triggers the switch if there are none)."
     },
     "grantVip": {"title": "Grant VIP", "message": "Add VIP days to {{email}}. Added to the current expiry if VIP is active, otherwise counted from now.", "days": "Days (1–365)", "preset_one": "{{count}} day", "preset_other": "{{count}} days", "reasonPlaceholder": "Reason (required, e.g. make up for a payment issue)", "confirm": "Grant VIP", "success": "Granted {{count}} VIP day(s) to {{email}}; new expiry {{date}}."},
     "success": {
@@ -187,7 +188,8 @@
       "revoke": "{{role}} removed from {{email}}.",
       "suspend": "Dead Man's Switch of {{email}} suspended.",
       "resume": "Dead Man's Switch of {{email}} resumed.",
-      "rescue": "{{executor}} is now the executor of {{email}} and will receive an activation email within a few minutes."
+      "rescue": "{{executor}} is now the executor of {{email}} and will receive an activation email within a few minutes.",
+      "simulateOverdue": "{{email}} is now overdue. The status updates in about 20 seconds."
     },
     "dialog": {
       "lock": { "title": "Lock this account?", "message": "{{email}} will not be able to sign in.", "confirm": "Lock" },
@@ -196,7 +198,8 @@
       "revoke": { "title": "Remove {{role}}?", "message": "{{email}} will lose {{role}} access.", "confirm": "Remove" },
       "suspend": { "title": "Suspend Dead Man's Switch?", "message": "The switch of {{email}} will stop counting until resumed. The owner cannot resume it.", "confirm": "Suspend" },
       "resume": { "title": "Resume Dead Man's Switch?", "message": "The switch of {{email}} will start counting again.", "confirm": "Resume" },
-      "rescue": { "title": "Assign an emergency executor?", "message": "The Dead Man's Switch of {{email}} has been triggered, but no executor can act. The person you enter becomes the primary executor immediately and must have a verified LegacyVault account.", "confirm": "Assign & activate" }
+      "rescue": { "title": "Assign an emergency executor?", "message": "The Dead Man's Switch of {{email}} has been triggered, but no executor can act. The person you enter becomes the primary executor immediately and must have a verified LegacyVault account.", "confirm": "Assign & activate" },
+      "simulateOverdue": { "title": "Simulate an overdue check-in?", "message": "Demo only. The check-in deadline of {{email}} moves to the past. About 20 seconds later the trusted confirmers are asked; if there are none (or a confirmer already postponed this round), the switch TRIGGERS and this cannot be undone.", "confirm": "Simulate" }
     }
   },
 

@@ -1035,6 +1035,73 @@ class DmsConfigServiceImplTest {
         verifyLockedLookupOnly();
     }
 
+    // ---------- simulateOverdueByAdmin (demo) ----------
+
+    @Test
+    @DisplayName("Demo: Admin giả quá hạn -> hạn trigger về quá khứ, remindersSent >= 1, vẫn ACTIVE, audit DMS_DEMO_OVERDUE_SIMULATED")
+    void simulateOverdueByAdmin_active_movesDeadlineToPastAndAudits() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        existing.setRemindersSent(0);
+        LocalDateTime previousDueAt = existing.getNextCheckinDueAt();
+        LocalDateTime nextReminder = existing.getNextReminderAt();
+
+        DmsConfigResponse response = service.simulateOverdueByAdmin(ownerId, adminId);
+
+        assertThat(response.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(existing.getStatus()).isEqualTo(DmsStatus.ACTIVE);
+        assertThat(existing.getNextCheckinDueAt()).isBefore(LocalDateTime.now());
+        assertThat(existing.getRemindersSent()).isEqualTo(1);
+        assertThat(existing.getNextReminderAt()).isEqualTo(nextReminder);
+
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        InOrder order = inOrder(dmsConfigRepository, auditLogService);
+        order.verify(dmsConfigRepository).saveAndFlush(existing);
+        order.verify(auditLogService).log(eq(AuditAction.DMS_DEMO_OVERDUE_SIMULATED), eq(AuditResult.SUCCESS),
+                eq(adminId), eq("admin@example.test"), isNull(),
+                eq(DmsActivationProcessor.ENTITY_DMS_CONFIG), eq(existing.getId().toString()), detail.capture());
+        assertThat(detail.getValue())
+                .startsWith("ownerId=" + ownerId)
+                .contains("previousDueAt=" + previousDueAt)
+                .contains("confirmationDeferrals=0");
+        verify(dmsConfigRepository, never()).findByOwnerId(any());
+    }
+
+    @Test
+    @DisplayName("Demo: remindersSent đã > 1 thì giữ nguyên")
+    void simulateOverdueByAdmin_keepsHigherReminderCount() {
+        DmsConfig existing = lockedConfig(DmsStatus.ACTIVE);
+        existing.setRemindersSent(2);
+
+        service.simulateOverdueByAdmin(ownerId, adminId);
+
+        assertThat(existing.getRemindersSent()).isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = DmsStatus.class, names = {"PENDING_CONFIRMATION", "TRIGGERED", "SUSPENDED"})
+    @DisplayName("Demo: DMS không ACTIVE -> 409, không ghi gì")
+    void simulateOverdueByAdmin_notActive_returns409(DmsStatus status) {
+        DmsConfig existing = lockedConfig(status);
+        LocalDateTime dueAt = existing.getNextCheckinDueAt();
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .hasMessage(DmsConfigServiceImpl.SIMULATE_NOT_ACTIVE_MESSAGE)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(existing.getNextCheckinDueAt()).isEqualTo(dueAt);
+        verifyLockedLookupOnly();
+    }
+
+    @Test
+    @DisplayName("Demo: chưa có DmsConfig -> 404")
+    void simulateOverdueByAdmin_noConfig_returns404() {
+        when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.simulateOverdueByAdmin(ownerId, adminId))
+                .isInstanceOf(DmsException.class)
+                .extracting(e -> ((DmsException) e).getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
     private DmsConfig lockedConfig(DmsStatus status) {
         DmsConfig config = existingConfig(status);
         when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.of(config));

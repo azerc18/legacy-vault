@@ -112,7 +112,7 @@ class OwnerActivityLogServiceImplTest {
 
         assertThat(hidden).containsExactlyInAnyOrder(
                 AuditAction.ADMIN_VAULT_VIEWED, AuditAction.DMS_SUSPENDED, AuditAction.DMS_RESUMED,
-                AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN);
+                AuditAction.EXECUTOR_ASSIGNED_BY_ADMIN, AuditAction.DMS_DEMO_OVERDUE_SIMULATED);
         assertThatThrownBy(() -> hidden.add(AuditAction.VAULT_CREATED))
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> hidden.remove(AuditAction.DMS_SUSPENDED))

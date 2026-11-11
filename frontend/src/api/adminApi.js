@@ -72,6 +72,10 @@ export const adminApi = {
     resumeDms: (ownerId) => http.put(`/admin/dms/${ownerId}/resume`).then(unwrap),
     // B-01b: chỉ dùng khi user.executorRescueNeeded = true. 409 nếu Owner vẫn còn Executor dùng được.
     rescueExecutor: (ownerId, email) => http.post(`/admin/dms/${ownerId}/executor`, { email }).then(unwrap),
+    // Demo: chỉ có khi server bật APP_DEMO_TOOLS_ENABLED. demoTools -> { dmsSimulateOverdue: boolean }
+    demoTools: () => http.get('/admin/demo/tools').then(unwrap),
+    // Đẩy hạn check-in của Owner về quá khứ; job DMS (~20 giây) chạy tiếp luồng thật. 404 khi cờ tắt, 409 nếu không ACTIVE.
+    simulateOverdue: (ownerId) => http.post(`/admin/demo/dms/${ownerId}/simulate-overdue`).then(unwrap),
 
     /* ---------- Vault ---------- */
     // status: ACTIVE | UNLOCKED | CLAIMED | ARCHIVED_LOCKED; mặc định sắp xếp mới nhất trước
