@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrService {
 
     private static final int CONNECT_TIMEOUT_MS = 5000;
-    private static final int READ_TIMEOUT_MS = 25000;
+    private static final int READ_TIMEOUT_MS = 15000;
     private static final int MAX_OUTPUT_TOKENS = 2048;
     private static final int MAX_CALLS_PER_MINUTE = 5;
     private static final long CACHE_TTL_SECONDS = 30 * 60;
@@ -386,8 +386,25 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
      * Trường thiếu sẽ giữ nguyên là null (không bao giờ điền giá trị bịa),
      * hasOfficialSeal mặc định false, ownerNameMatched mặc định false nếu không đọc được tên.
      */
+        static String cleanJsonContent(String raw) {
+        if (raw == null) {
+            return "{}";
+        }
+        String cleaned = raw.trim();
+        if (cleaned.startsWith("```json")) {
+            cleaned = cleaned.substring(7);
+        } else if (cleaned.startsWith("```")) {
+            cleaned = cleaned.substring(3);
+        }
+        if (cleaned.endsWith("```")) {
+            cleaned = cleaned.substring(0, cleaned.length() - 3);
+        }
+        return cleaned.trim();
+    }
+
     DeathCertificateOcrResponseDto parseGeminiJson(String rawJson, String expectedOwnerName) throws Exception {
-        JsonNode extracted = objectMapper.readTree(rawJson);
+        String cleanJson = cleanJsonContent(rawJson);
+        JsonNode extracted = objectMapper.readTree(cleanJson);
 
         String rawCategory = textOrNull(extracted, "documentCategory");
         String category;

@@ -258,4 +258,10 @@ class DeathCertificateOcrServiceImplTest {
         assertThat(result.getEngineSource()).isEqualTo("UNAVAILABLE");
         assertThat(result.getUnavailableMessage()).contains("Chưa phân tích được bằng AI");
     }
+    @Test
+    void cleanJsonContent_stripsMarkdownCodeFences() {
+        String fenced = "```json\n{\"documentCategory\":\"VALID_DEATH_CERTIFICATE\"}\n```";
+        String cleaned = DeathCertificateOcrServiceImpl.cleanJsonContent(fenced);
+        assertThat(cleaned).isEqualTo("{\"documentCategory\":\"VALID_DEATH_CERTIFICATE\"}");
+    }
 }

@@ -33,8 +33,8 @@ public class GeminiAiClient implements AiClient {
         this.backupModel = backupModel;
 
         var factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofSeconds(30));
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(15));
         this.client = RestClient.builder()
                 .baseUrl("https://generativelanguage.googleapis.com/v1beta")
                 .requestFactory(factory)
