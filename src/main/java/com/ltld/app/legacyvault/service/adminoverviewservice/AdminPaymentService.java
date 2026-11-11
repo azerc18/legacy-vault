@@ -70,6 +70,7 @@ public class AdminPaymentService {
                 .pendingCount(counts.getOrDefault(PaymentStatus.PENDING, 0L))
                 .failedCount(counts.getOrDefault(PaymentStatus.FAILED, 0L))
                 .expiredCount(counts.getOrDefault(PaymentStatus.EXPIRED, 0L))
+                .refundedCount(counts.getOrDefault(PaymentStatus.REFUNDED, 0L))
                 .build();
     }
 
@@ -121,6 +122,11 @@ public class AdminPaymentService {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
+    /** Việc 3: một dòng giao dịch (sau khi hoàn tiền) theo cùng định dạng danh sách. */
+    public AdminPaymentResponse describe(PaymentTransaction tx) {
+        return toResponses(List.of(tx)).get(0);
+    }
+
     private List<AdminPaymentResponse> toResponses(List<PaymentTransaction> rows) {
         if (rows.isEmpty()) return List.of();
         List<UUID> userIds = rows.stream().map(p -> p.getUser().getId()).distinct().toList();
@@ -136,12 +142,14 @@ public class AdminPaymentService {
                     .planName(plan != null ? plan.getName() : null)
                     .amountVnd(p.getAmountVnd())
                     .status(p.getStatus())
-                    .provider(PROVIDER_VNPAY)
+                    .provider(p.getProvider() != null ? p.getProvider().name() : PROVIDER_VNPAY)
                     .providerTransactionNo(p.getVnpTransactionNo())
                     .bankCode(p.getVnpBankCode())
                     .responseCode(p.getVnpResponseCode())
                     .createdAt(p.getCreatedAt())
                     .paidAt(p.getPaidAt())
+                    .refundedAt(p.getRefundedAt())
+                    .refundReason(p.getRefundReason())
                     .currentPlanCode(currentPlan.getOrDefault(p.getUser().getId(), SubscriptionPlan.CODE_FREE))
                     .build();
         }).toList();

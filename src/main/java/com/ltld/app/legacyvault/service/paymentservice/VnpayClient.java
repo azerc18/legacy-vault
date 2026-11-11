@@ -75,7 +75,7 @@ public class VnpayClient {
         this(properties, "http://localhost:5173");
     }
 
-    // Chỉ dùng cho querydr (job đối soát gọi khi đang giữ khóa dòng của đơn), nên để ngắn: tổng tối đa ~15 giây
+    // Chỉ dùng cho querydr / refund (gọi khi đang giữ khóa dòng của đơn), nên để ngắn: tổng tối đa ~15 giây
     private static SimpleClientHttpRequestFactory timeouts() {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofSeconds(5));
@@ -331,6 +331,69 @@ public class VnpayClient {
             return QueryResult.unreachable("empty response");
         }
         return toQueryResult(response);
+    }
+
+    /** Kết quả hoàn tiền (vnp_Command=refund). {@code ok} chỉ khi VNPay trả 00 và chữ ký phản hồi đúng. */
+    public record RefundResult(boolean ok, String responseCode, String message, String transactionNo) {
+    }
+
+    /**
+     * Việc 3: hoàn toàn bộ số tiền một giao dịch VNPay (vnp_TransactionType=02).
+     *
+     * @param createdAt  giờ tạo đơn gốc (vnp_TransactionDate phải bằng vnp_CreateDate lúc thanh toán)
+     * @param createBy   người thực hiện (email admin)
+     */
+    public RefundResult refund(UUID txnId, long amountVnd, String transactionNo, LocalDateTime createdAt, String createBy) {
+        ensureConfigured();
+        ZonedDateTime now = ZonedDateTime.now(VN_ZONE);
+        String requestId = UUID.randomUUID().toString().replace("-", "");
+        String txnRef = toTxnRef(txnId);
+        String amount = String.valueOf(amountVnd * 100L);
+        String transactionDate = toVnTime(createdAt).format(VNP_TIME_FMT);
+        String createDate = now.format(VNP_TIME_FMT);
+        String ip = "127.0.0.1";
+        String info = sanitizeOrderInfo("Hoan tien LegacyVault " + txnRef, txnId);
+        String by = createBy == null || createBy.isBlank() ? "admin" : createBy.trim();
+        String txnNo = transactionNo == null ? "" : transactionNo.trim();
+
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("vnp_RequestId", requestId);
+        body.put("vnp_Version", "2.1.0");
+        body.put("vnp_Command", "refund");
+        body.put("vnp_TmnCode", tmnCode);
+        body.put("vnp_TransactionType", "02");
+        body.put("vnp_TxnRef", txnRef);
+        body.put("vnp_Amount", amount);
+        body.put("vnp_OrderInfo", info);
+        body.put("vnp_TransactionNo", txnNo);
+        body.put("vnp_TransactionDate", transactionDate);
+        body.put("vnp_CreateBy", by);
+        body.put("vnp_CreateDate", createDate);
+        body.put("vnp_IpAddr", ip);
+        body.put("vnp_SecureHash", hmacSha512(hashSecret, String.join("|", requestId, "2.1.0", "refund", tmnCode,
+                "02", txnRef, amount, txnNo, transactionDate, by, createDate, ip, info)));
+
+        Map<String, Object> r;
+        try {
+            r = postQuery(body);
+        } catch (RuntimeException ex) {
+            log.warn("VNPay refund for {} failed: {}", txnRef, ex.getMessage());
+            return new RefundResult(false, null, ex.getMessage(), null);
+        }
+        if (r == null || r.isEmpty()) {
+            return new RefundResult(false, null, "empty response", null);
+        }
+        String code = str(r, "vnp_ResponseCode");
+        String hashData = String.join("|",
+                str(r, "vnp_ResponseId"), str(r, "vnp_Command"), code, str(r, "vnp_Message"),
+                str(r, "vnp_TmnCode"), str(r, "vnp_TxnRef"), str(r, "vnp_Amount"), str(r, "vnp_BankCode"),
+                str(r, "vnp_PayDate"), str(r, "vnp_TransactionNo"), str(r, "vnp_TransactionType"),
+                str(r, "vnp_TransactionStatus"), str(r, "vnp_OrderInfo"));
+        String received = str(r, "vnp_SecureHash");
+        boolean signed = !received.isBlank() && MessageDigest.isEqual(
+                hmacSha512(hashSecret, hashData).getBytes(StandardCharsets.UTF_8),
+                received.trim().toLowerCase().getBytes(StandardCharsets.UTF_8));
+        return new RefundResult("00".equals(code) && signed, code, str(r, "vnp_Message"), str(r, "vnp_TransactionNo"));
     }
 
     /** Tách riêng để test thay bằng phản hồi giả, không gọi mạng. */

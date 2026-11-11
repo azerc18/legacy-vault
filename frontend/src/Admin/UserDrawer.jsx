@@ -8,6 +8,7 @@ import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
 import { ReasonDialog, Stamp, toneOf } from './adminUi.jsx';
+import { GrantVipDialog } from './BillingDialogs.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
 import { tEnum } from '../i18n/format.js';
 
@@ -46,6 +47,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
     const [success, setSuccess] = useState('');
     const [dialog, setDialog] = useState(null);   // 'lock' | 'unlock' | 'suspend' | 'resume'
     const [busy, setBusy] = useState(false);
+    const [granting, setGranting] = useState(false);    // Việc 3: hộp thoại tặng VIP
 
     const load = useCallback(() => {
         if (!userId) return;
@@ -90,6 +92,20 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
         }
     };
 
+    const confirmGrant = async ({ days, reason }) => {
+        setBusy(true); setError(''); setSuccess('');
+        try {
+            const res = await adminApi.grantVip(u.id, days, reason);
+            setSuccess(t('users.grantVip.success', { email: u.email, count: days, date: formatDate(res?.expiresAt) }));
+            load();
+        } catch (e) {
+            setError(getErrorMessage(e, t('actionFailed')));
+        } finally {
+            setBusy(false);
+            setGranting(false);
+        }
+    };
+
     const btn = 'h-9 px-3 rounded-xl border border-outline-variant text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-surface-container-low disabled:opacity-60';
 
     return (
@@ -127,6 +143,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                 {!isMe && u.status === 'LOCKED' && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
                                 {isOwner && u.dmsStatus === 'ACTIVE' && <button className={btn} onClick={() => setDialog('suspend')}><Icon name="pause_circle" className="text-[16px]" />{t('users.actions.suspend')}</button>}
                                 {isOwner && u.dmsStatus === 'SUSPENDED' && <button className={btn} onClick={() => setDialog('resume')}><Icon name="play_circle" className="text-[16px]" />{t('users.actions.resume')}</button>}
+                                {isOwner && <button className={btn} onClick={() => setGranting(true)}><Icon name="workspace_premium" className="text-[16px]" />{t('users.actions.grantVip')}</button>}
                                 <Link to={`/admin/audit-logs?actorEmail=${encodeURIComponent(u.email)}`} className={btn}><Icon name="history" className="text-[16px]" />{t('drawer.allLogs')}</Link>
                                 <Link to={`/admin/payments?email=${encodeURIComponent(u.email)}`} className={btn}><Icon name="receipt_long" className="text-[16px]" />{t('drawer.payments')}</Link>
                             </div>
@@ -211,6 +228,9 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                     )}
                 </div>
             </aside>
+
+            <GrantVipDialog open={granting && !!u} email={u?.email} busy={busy}
+                            onConfirm={confirmGrant} onCancel={() => setGranting(false)} />
 
             <ReasonDialog
                 open={!!dialog}

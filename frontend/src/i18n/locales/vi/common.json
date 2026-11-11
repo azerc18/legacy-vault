@@ -49,7 +49,9 @@
       "SUBSCRIPTION_EXPIRING": "Gói {{plan}} của bạn sẽ hết hạn vào {{expiresAt}}. Gia hạn để giữ quyền lợi VIP.",
       "SUBSCRIPTION_EXPIRED": "Gói {{plan}} của bạn đã hết hạn.",
       "CLAIM_DEADLINE_REMINDER": "Nhắc nhở: vui lòng phản hồi phần của bạn trong két sắt \"{{vault}}\" của {{owner}} trước {{deadlineAt}}.",
-      "VAULT_ARCHIVED": "Két sắt \"{{vault}}\" đã được lưu trữ vì quá hạn nhận."
+      "VAULT_ARCHIVED": "Két sắt \"{{vault}}\" đã được lưu trữ vì quá hạn nhận.",
+      "SUBSCRIPTION_GRANTED": "Quản trị viên đã tặng bạn {{days}} ngày VIP. Hạn mới: {{expiresAt}}.",
+      "PAYMENT_REFUNDED": "Giao dịch {{plan}} ({{amount}} ₫) đã được hoàn tiền."
     }
   },
   "language": { "label": "Ngôn ngữ", "en": "EN", "vi": "VI" },

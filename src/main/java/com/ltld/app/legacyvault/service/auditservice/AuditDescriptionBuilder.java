@@ -162,6 +162,8 @@ public class AuditDescriptionBuilder {
             case PAYMENT_SUCCEEDED -> "Subscription payment succeeded.";
             case PAYMENT_FAILED -> "Subscription payment failed.";
             case PAYMENT_EXPIRED -> "An unpaid checkout expired.";
+            case PAYMENT_REFUNDED -> "An administrator refunded a subscription payment.";
+            case ADMIN_VIP_GRANTED -> "An administrator granted VIP days.";
             default -> "Performed action: " + log.getAction();
         };
     }

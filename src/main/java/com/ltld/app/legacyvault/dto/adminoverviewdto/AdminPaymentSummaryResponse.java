@@ -13,4 +13,6 @@ public class AdminPaymentSummaryResponse {
     private long failedCount;
     /** Đơn chưa trả tiền đã tự đóng (bỏ ngang / bị thay bằng đơn mới). */
     private long expiredCount;
+    /** Việc 3: giao dịch đã hoàn tiền (không còn tính vào doanh thu). */
+    private long refundedCount;
 }

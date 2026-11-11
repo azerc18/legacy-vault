@@ -38,6 +38,8 @@ const TYPE_META = {
     PAYMENT_SUCCEEDED: ['workspace_premium', 'success'],
     SUBSCRIPTION_EXPIRING: ['hourglass_bottom', 'warning'],
     SUBSCRIPTION_EXPIRED: ['hourglass_disabled', 'danger'],
+    SUBSCRIPTION_GRANTED: ['redeem', 'success'],
+    PAYMENT_REFUNDED: ['undo', 'warning'],
     CLAIM_DEADLINE_REMINDER: ['event_upcoming', 'warning'],
     VAULT_ARCHIVED: ['inventory_2', 'warning'],
 };
@@ -110,6 +112,8 @@ async function targetOf(n) {
             return ifRole('OWNER', n.params?.vaultId ? `/owner/vaults/${n.params.vaultId}` : '/owner/vaults');
         case 'PAYMENT_SUCCEEDED':
         case 'SUBSCRIPTION_EXPIRING':
+        case 'SUBSCRIPTION_GRANTED':
+        case 'PAYMENT_REFUNDED':
             return ifRole('OWNER', '/billing');
         case 'SUBSCRIPTION_EXPIRED':
             return ifRole('OWNER', '/pricing');

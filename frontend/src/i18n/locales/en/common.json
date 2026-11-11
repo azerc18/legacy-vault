@@ -49,7 +49,9 @@
       "SUBSCRIPTION_EXPIRING": "Your {{plan}} plan expires on {{expiresAt}}. Renew to keep your VIP benefits.",
       "SUBSCRIPTION_EXPIRED": "Your {{plan}} plan has expired.",
       "CLAIM_DEADLINE_REMINDER": "Reminder: please respond to your share of the vault \"{{vault}}\" of {{owner}} before {{deadlineAt}}.",
-      "VAULT_ARCHIVED": "The vault \"{{vault}}\" was archived because the claim period expired."
+      "VAULT_ARCHIVED": "The vault \"{{vault}}\" was archived because the claim period expired.",
+      "SUBSCRIPTION_GRANTED": "An administrator gave you {{days}} VIP day(s). New expiry: {{expiresAt}}.",
+      "PAYMENT_REFUNDED": "Your {{plan}} payment ({{amount}} ₫) was refunded."
     }
   },
   "language": { "label": "Language", "en": "EN", "vi": "VI" },

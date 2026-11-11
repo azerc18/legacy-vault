@@ -130,7 +130,7 @@ export const STATUS_TONE = {
     // DMS
     SUSPENDED: 'warn', TRIGGERED: 'danger', PENDING_CONFIRMATION: 'warn',
     // thanh toán
-    SUCCESS: 'ok', FAILED: 'danger',
+    SUCCESS: 'ok', FAILED: 'danger', REFUNDED: 'warn',
     // audit
     FAILURE: 'danger',
     // cảnh báo
