@@ -47,10 +47,10 @@ public class InheritanceDossierPdfService {
             TransferMechanism.LEGAL_CLAIM_DOSSIER, "Hồ sơ khai nhận pháp lý",
             TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY, "Chuyển giao khoá mật mã",
             TransferMechanism.EXECUTOR_DISPOSITION, "Người thi hành xử lý theo di nguyện");
+    // JOINT_CONSENSUS cũ đã được migration chuyển sang PROPORTIONAL + consensusThreshold
     private static final Map<AllocationMode, String> MODE = Map.of(
             AllocationMode.EXCLUSIVE, "Độc quyền",
-            AllocationMode.PROPORTIONAL, "Theo tỷ lệ",
-            AllocationMode.JOINT_CONSENSUS, "Đồng thuận chung");
+            AllocationMode.PROPORTIONAL, "Theo tỷ lệ");
     private static final Map<DocumentType, String> DOC_TYPE = Map.of(
             DocumentType.WILL, "Di chúc",
             DocumentType.OWNERSHIP_PAPER, "Giấy tờ sở hữu",
@@ -220,6 +220,7 @@ public class InheritanceDossierPdfService {
                 String modeText = a.mode() == null
                         ? "Chung cho mọi người thụ hưởng"
                         : MODE.getOrDefault(a.mode(), String.valueOf(a.mode()));
+                if (a.consensusCondition() != null) modeText += "\n(" + a.consensusCondition() + ")";
                 t.addCell(cell(modeText, regular, 9));
                 t.addCell(cell(percent(a.sharePercent()), regular, 9));
             }

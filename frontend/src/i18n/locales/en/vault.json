@@ -142,14 +142,12 @@
         "mode": {
           "ALL": "All beneficiaries",
           "EXCLUSIVE": "One beneficiary",
-          "PROPORTIONAL": "Split by percentage",
-          "JOINT_CONSENSUS": "K-of-N joint approval"
+          "PROPORTIONAL": "Split by percentage"
         },
         "modeHint": {
           "ALL": "Every beneficiary of this vault can see this asset (default).",
           "EXCLUSIVE": "Only one person receives this asset. You can name a backup who receives it if that person declines.",
-          "PROPORTIONAL": "Split between several people by percentage; shares must total 100%. Only for assets that need a legal claim.",
-          "JOINT_CONSENSUS": "The asset opens only when enough people in the chosen group approve together. Editing the allocation (even its note) re-splits the key and clears earlier approvals."
+          "PROPORTIONAL": "Split among several recipients by %, totalling 100%. Assets without a legal claim dossier (crypto wallets, e-wallets…) require a K-of-N condition."
         },
         "recipientPlaceholder": "Choose the recipient",
         "contingent": "Backup beneficiary (optional)",
@@ -160,18 +158,24 @@
         "totalOk": "Adds up to 100%",
         "totalOver": "Total is {{total}}%, {{diff}}% too much. It must be exactly 100%.",
         "totalUnder": "Total is {{total}}%, {{diff}}% short. It must be exactly 100%.",
+        "condition": {
+          "title": "Unlock condition",
+          "none": "None: each recipient gets their share as soon as the vault opens",
+          "kOfN": "Require K of the N recipients to agree",
+          "hint": "The asset opens only when the chosen number of recipients agree. Editing the allocation (even the note) re-splits the key and clears earlier approvals."
+        },
         "thresholdPlaceholder": "Approvals needed",
         "thresholdOption": "{{k}} of {{n}} people",
         "notePlaceholder": "Note about this allocation (optional)",
         "vipNote": "Options marked VIP (percentage split, joint approval, backup beneficiary) need the VIP plan. The free plan can still give the asset to everyone or to one person.",
         "subtitle": "Choose who receives this asset and how.",
-        "proportionalUnavailable": "Percentage split is only available for assets that need a legal claim (bank accounts, exchange accounts, documents), so this asset type does not offer it.",
+        "proportionalNeedsConsensus": "This asset type has no legal claim dossier, so proportional shares require a K-of-N condition; the percentages are for record only.",
         "summary": {
           "ALL": "All beneficiaries",
           "EXCLUSIVE": "Only {{name}}",
           "EXCLUSIVE_BACKUP": "Only {{name}} (backup: {{backup}})",
           "PROPORTIONAL": "Split: {{list}}",
-          "JOINT_CONSENSUS": "Joint approval {{k}}/{{n}}: {{list}}"
+          "PROPORTIONAL_CONSENSUS": "Shares: {{list}} · needs {{k}}/{{n}} to agree"
         },
         "errors": {
           "pickOne": "Choose exactly one recipient.",

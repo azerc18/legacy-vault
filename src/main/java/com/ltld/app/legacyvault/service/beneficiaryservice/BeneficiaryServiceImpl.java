@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.TransferMechanism;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -39,6 +40,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -450,7 +452,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
                 .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
 
-        // X1: tiến độ đồng thuận của các tài sản JOINT_CONSENSUS (1 query cho cả vault)
+        // X1: tiến độ đồng thuận của các tài sản có điều kiện K-of-N (1 query cho cả vault)
         UUID myId = me.getId();
         Map<UUID, JointConsensusService.Info> consensus = jointConsensusService.infoByAsset(
                 assetAllocationRepository.findByAssetIdIn(visible.stream().map(DigitalAsset::getId).toList()), myId);
@@ -636,7 +638,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .filter(a -> !hidden.contains(a.getId()))
                 .map(a -> {
                     AssetAllocation al = mine.get(a.getId());
-                    boolean proportional = al != null && al.getMode() == AllocationMode.PROPORTIONAL;
                     boolean viaFallback = al != null && al.getEffectiveBeneficiary() != null
                             && !al.getBeneficiary().getId().equals(me.getId());
                     return ClaimProgressResponse.AssetProgress.builder()
@@ -644,7 +645,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                             .assetType(a.getAssetType())
                             .assetName(a.getAssetName())
                             .allocationMode(al != null ? al.getMode() : null)
-                            .sharePercent(proportional ? al.getSharePercent() : null)
+                            .sharePercent(al != null && al.getMode() == AllocationMode.PROPORTIONAL ? meaningfulShare(al, a) : null)
                             .reassignedToMe(viaFallback)
                             .viewed(!unviewedIds.contains(a.getId()))
                             .build();
@@ -772,7 +773,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     "This asset is not allocated to you.");
         }
 
-        // X1: tài sản JOINT_CONSENSUS chỉ mở khi đủ K người đồng ý (chặn trước khi giải mã)
+        // X1: tài sản có điều kiện K-of-N chỉ mở khi đủ K người đồng ý (chặn trước khi giải mã)
         jointConsensusService.assertReached(asset.getId());
 
         DecryptedAsset decrypted;
@@ -1037,8 +1038,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Map<UUID, Integer> reassignedCounts = new LinkedHashMap<>();
         List<AssetAllocation> held = assetAllocationRepository.findHeldBy(vaultId, me.getId());
         for (AssetAllocation allocation : held) {
-            if (allocation.getMode() == AllocationMode.JOINT_CONSENSUS) {
-                continue; // joint không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
+            if (JointConsensusService.isConsensusRow(allocation)) {
+                continue; // K-of-N không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
             }
             VaultBeneficiary next = allocation.getContingentBeneficiary();
             if (next != null && !next.getId().equals(me.getId()) && canReceive(vaultId, next)) {
@@ -1059,7 +1060,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
         stalled += (int) held.stream()
-                .filter(a -> a.getMode() == AllocationMode.JOINT_CONSENSUS)
+                .filter(JointConsensusService::isConsensusRow)
                 .map(a -> a.getAsset().getId())
                 .distinct()
                 .filter(id -> jointConsensusService.isStalled(assetAllocationRepository.findByAssetId(id)))
@@ -1278,12 +1279,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                             a.getAssetType(),
                             TransferMechanisms.resolve(a.getTransferMechanism(), a.getAssetType()),
                             al != null ? al.getMode() : null,
-                            al != null ? al.getSharePercent() : null,
+                            al != null ? meaningfulShare(al, a) : null,
                             al != null ? al.getNote() : null,
                             al != null && !al.getBeneficiary().getId().equals(me.getId()),
                             dossierFields(a),
                             vs == null ? null : new InheritanceDossierData.Verification(
-                                    vs.status(), vs.method(), vs.provider(), vs.verifiedAt()));
+                                    vs.status(), vs.method(), vs.provider(), vs.verifiedAt()),
+                            consensusCondition(al, a));
                 })
                 .toList();
         // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
@@ -1423,5 +1425,25 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     private static String mask(String key, String v) {
         return DOSSIER_MASKED_KEYS.contains(key) && v.length() > 4 ? "****" + v.substring(v.length() - 4) : v;
+    }
+
+    /**
+     * Tỷ lệ chỉ có nghĩa với tài sản khai nhận pháp lý. Tài sản khác (ví crypto, email, MXH…) dùng chia tỷ lệ
+     * chỉ để đặt điều kiện K-of-N, % khi đó chỉ để ghi nhận nên không hiện cho người thụ hưởng / trong hồ sơ PDF.
+     */
+    private static BigDecimal meaningfulShare(AssetAllocation al, DigitalAsset asset) {
+        if (al.getMode() == AllocationMode.PROPORTIONAL
+                && TransferMechanisms.resolve(asset.getTransferMechanism(), asset.getAssetType())
+                        != TransferMechanism.LEGAL_CLAIM_DOSSIER) {
+            return null;
+        }
+        return al.getSharePercent();
+    }
+
+    /** Câu mô tả điều kiện K-of-N cho hồ sơ PDF, null nếu tài sản không có điều kiện này. */
+    private String consensusCondition(AssetAllocation al, DigitalAsset asset) {
+        if (al == null || al.getConsensusThreshold() == null) return null;
+        int total = assetAllocationRepository.findByAssetId(asset.getId()).size();
+        return "Cần " + al.getConsensusThreshold() + "/" + total + " người thụ hưởng cùng đồng ý mới mở được tài sản";
     }
 }

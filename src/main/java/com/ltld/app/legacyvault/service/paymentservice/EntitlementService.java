@@ -22,7 +22,7 @@ public interface EntitlementService {
 
     /**
      * Kiểm tra quyền sử dụng phân bổ nâng cao (Chia tỷ lệ % PROPORTIONAL, Người nhận dự phòng contingentBeneficiary,
-     * và từ đợt 2: Đồng thuận K-of-N JOINT_CONSENSUS / Shamir X1).
+     * và từ đợt 2: Đồng thuận K-of-N / Shamir X1).
      */
     void assertCanUseAdvancedAllocation(UUID ownerId);
 

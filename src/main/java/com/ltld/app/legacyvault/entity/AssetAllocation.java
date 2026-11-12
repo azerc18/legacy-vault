@@ -53,7 +53,7 @@ public class AssetAllocation {
     @Column(name = "allocation_note", columnDefinition = "TEXT")
     private String note;
 
-    // X1 (JOINT_CONSENSUS): cần consensusThreshold người đồng ý thì mới mở tài sản
+    // X1 (K-of-N, chỉ đặt cùng PROPORTIONAL): cần consensusThreshold người đồng ý thì mới mở tài sản
     @Column(name = "consensus_threshold")
     private Integer consensusThreshold;
 

@@ -24,7 +24,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * X1: đồng thuận K-of-N cho tài sản JOINT_CONSENSUS.
+ * X1: đồng thuận K-of-N cho tài sản có điều kiện K-of-N.
  * Mỗi người nhận có 1 phần khóa Shamir (lưu mã hóa). Tài sản chỉ được mở khi có ít nhất K người đồng ý
  * VÀ ghép K phần khóa của họ ra đúng khóa gốc (so hash), tức dữ liệu phân bổ không bị sửa trái phép.
  */
@@ -51,13 +51,18 @@ public class JointConsensusService {
         }
     }
 
-    /** Tài sản có phải JOINT_CONSENSUS không (mọi dòng phân bổ cùng một mode). */
+    /** Tài sản có điều kiện K-of-N không: các dòng phân bổ mang ngưỡng đồng thuận (PROPORTIONAL + threshold). */
     public boolean isJoint(List<AssetAllocation> rows) {
-        return !rows.isEmpty() && rows.get(0).getMode() == AllocationMode.JOINT_CONSENSUS;
+        return !rows.isEmpty() && isConsensusRow(rows.get(0));
+    }
+
+    /** Dòng phân bổ thuộc tài sản có điều kiện K-of-N. */
+    public static boolean isConsensusRow(AssetAllocation row) {
+        return row.getConsensusThreshold() != null;
     }
 
     // Người nhận còn hiệu lực: chưa từ chối / từ bỏ. Phần đồng ý của người đã từ chối không được đếm.
-    // Lưu ý: JOINT_CONSENSUS không có người dự phòng nên so theo getBeneficiary(), không cần effectiveBeneficiary.
+    // Lưu ý: tài sản K-of-N không có người dự phòng nên so theo getBeneficiary(), không cần effectiveBeneficiary.
     // Nếu sau này cho phép dự phòng cho joint thì phải đổi sang effectiveBeneficiary ở mọi chỗ trong lớp này.
     private static boolean alive(AssetAllocation r) {
         BeneficiaryInviteStatus st = r.getBeneficiary().getStatus();
@@ -90,7 +95,7 @@ public class JointConsensusService {
     public int approveAllHeldBy(UUID vaultId, VaultBeneficiary me) {
         int count = 0;
         for (AssetAllocation r : assetAllocationRepository.findHeldBy(vaultId, me.getId())) {
-            if (r.getMode() == AllocationMode.JOINT_CONSENSUS && r.getConsensusApprovedAt() == null) {
+            if (isConsensusRow(r) && r.getConsensusApprovedAt() == null) {
                 r.setConsensusApprovedAt(LocalDateTime.now());
                 assetAllocationRepository.save(r);
                 count++;
@@ -118,7 +123,7 @@ public class JointConsensusService {
                 .collect(Collectors.toMap(Map.Entry::getKey, e -> infoOf(e.getValue(), myBeneficiaryId)));
     }
 
-    /** Chặn xem/tải nếu tài sản JOINT_CONSENSUS chưa đủ K đồng ý. Tài sản thường thì bỏ qua. */
+    /** Chặn xem/tải nếu tài sản có điều kiện K-of-N chưa đủ K đồng ý. Tài sản thường thì bỏ qua. */
     public void assertReached(UUID assetId) {
         List<AssetAllocation> rows = assetAllocationRepository.findByAssetId(assetId);
         if (!isJoint(rows)) {

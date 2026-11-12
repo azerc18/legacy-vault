@@ -7,21 +7,17 @@ import { useVipStatus } from '../Common/useVipStatus.js';
 import { Icon, inputClass } from './ownerUi.jsx';
 
 // N2-FE: phân bổ tài sản cho nhiều người thụ hưởng (khớp DigitalAssetRequest.AllocationRequest)
-export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL', 'JOINT_CONSENSUS'];
+// K-of-N không còn là một kiểu phân chia: là ĐIỀU KIỆN tuỳ chọn của "Chia theo tỷ lệ" (consensus + threshold)
+export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL'];
 // Chế độ thuộc gói VIP (PlanFeature.ADVANCED_ALLOCATION ở BE), cùng với người dự phòng của EXCLUSIVE
-const VIP_MODES = ['PROPORTIONAL', 'JOINT_CONSENSUS'];
+const VIP_MODES = ['PROPORTIONAL'];
 
-// Chế độ hợp lệ cho loại tài sản đang chọn. BE chỉ cho chia % (PROPORTIONAL) với tài sản cần hồ sơ pháp lý
-// (transfer mechanism LEGAL_CLAIM_DOSSIER); các chế độ còn lại dùng được cho mọi loại. Loại không hợp lệ thì ẩn
-// hẳn khỏi danh sách; chỉ giữ lại khi chính nó đang được chọn (để select không trống, nút lưu sẽ báo lỗi).
-export const availableModes = (allowProportional, currentMode) =>
-    MODES.filter((m) => m !== 'PROPORTIONAL' || allowProportional || currentMode === 'PROPORTIONAL');
 
 const textareaCls = 'w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 const SHARE_RE = /^\d{1,3}(\.\d{1,2})?$/;                    // tối đa 2 chữ số thập phân (cột decimal(5,2))
 const cents = (s) => Math.round(parseFloat(s) * 100);         // so sánh bằng số nguyên để khỏi sai số số thực
 
-export const emptyAllocation = () => ({ mode: 'ALL', selected: [], shares: {}, contingentId: '', threshold: '', note: '' });
+export const emptyAllocation = () => ({ mode: 'ALL', selected: [], shares: {}, contingentId: '', consensus: false, threshold: '', note: '' });
 
 // Dựng form từ tài sản trong danh sách (DigitalAssetResponse.allocations; rỗng = mặc định thuộc tất cả)
 export function allocationFromAsset(asset) {
@@ -29,14 +25,18 @@ export function allocationFromAsset(asset) {
     if (rows.length === 0) return emptyAllocation();
     const first = rows[0];
     return {
-        mode: first.mode,
+        // Dữ liệu cũ JOINT_CONSENSUS đã được migration chuyển sang PROPORTIONAL; phòng khi còn sót thì vẫn hiểu là chia tỷ lệ
+        mode: first.mode === 'JOINT_CONSENSUS' ? 'PROPORTIONAL' : first.mode,
         selected: rows.map((r) => r.beneficiaryId),
         shares: Object.fromEntries(rows.map((r) => [r.beneficiaryId, r.sharePercent != null ? String(r.sharePercent) : ''])),
         contingentId: first.contingentBeneficiaryId || '',
+        consensus: first.consensusThreshold != null,
         threshold: first.consensusThreshold != null ? String(first.consensusThreshold) : '',
         note: first.note || '',
     };
 }
+
+const hasConsensus = (a) => a.mode === 'PROPORTIONAL' && !!a.consensus;
 
 // Chỉ giữ phần có nghĩa với mode đang chọn, để so sánh "có đổi không"
 const norm = (a) => {
@@ -46,7 +46,7 @@ const norm = (a) => {
         selected: ids,
         shares: a.mode === 'PROPORTIONAL' ? Object.fromEntries(ids.map((id) => [id, Number(a.shares[id])])) : null,
         contingentId: a.mode === 'EXCLUSIVE' ? a.contingentId : '',
-        threshold: a.mode === 'JOINT_CONSENSUS' ? String(a.threshold) : '',
+        threshold: hasConsensus(a) ? String(a.threshold) : '',
         note: (a.note || '').trim(),
     };
 };
@@ -61,7 +61,8 @@ export function validateAllocation(a, allowProportional, t) {
             if (a.contingentId && a.contingentId === a.selected[0]) return err('backupSame');
             return '';
         case 'PROPORTIONAL': {
-            if (!allowProportional) return err('proportionalNotAllowed');
+            // Tài sản không pháp lý: chỉ chia tỷ lệ khi có điều kiện K-of-N
+            if (!allowProportional && !a.consensus) return err('proportionalNotAllowed');
             if (n < 2) return err('pickTwo');
             let total = 0;
             for (const id of a.selected) {
@@ -69,12 +70,12 @@ export function validateAllocation(a, allowProportional, t) {
                 if (!SHARE_RE.test(s) || cents(s) <= 0 || cents(s) > 10000) return err('shareInvalid');
                 total += cents(s);
             }
-            return total === 10000 ? '' : err('shareTotal');
-        }
-        case 'JOINT_CONSENSUS': {
-            if (n < 2) return err('pickTwo');
-            const th = Number(a.threshold);
-            return Number.isInteger(th) && th >= 2 && th <= n ? '' : err('thresholdInvalid');
+            if (total !== 10000) return err('shareTotal');
+            if (hasConsensus(a)) {
+                const th = Number(a.threshold);
+                if (!(Number.isInteger(th) && th >= 2 && th <= n)) return err('thresholdInvalid');
+            }
+            return '';
         }
         default:
             return '';
@@ -94,7 +95,7 @@ export function allocationBody(a, initial, isEdit) {
             ...(a.mode === 'EXCLUSIVE' && a.contingentId ? { contingentBeneficiaryId: a.contingentId } : {}),
         })),
         note: a.note.trim() || null,
-        ...(a.mode === 'JOINT_CONSENSUS' ? { threshold: Number(a.threshold) } : {}),
+        ...(hasConsensus(a) ? { threshold: Number(a.threshold) } : {}),
     };
 }
 
@@ -113,10 +114,12 @@ export function allocationSummary(asset, beneficiaries, t) {
             return first.contingentBeneficiaryId
                 ? s('EXCLUSIVE_BACKUP', { name: nameOf(first.beneficiaryId), backup: nameOf(first.contingentBeneficiaryId) })
                 : s('EXCLUSIVE', { name: nameOf(first.beneficiaryId) });
-        case 'PROPORTIONAL':
-            return s('PROPORTIONAL', { list: rows.map((r) => `${nameOf(r.beneficiaryId)} ${r.sharePercent}%`).join(', ') });
-        case 'JOINT_CONSENSUS':
-            return s('JOINT_CONSENSUS', { k: first.consensusThreshold, n: rows.length, list: rows.map((r) => nameOf(r.beneficiaryId)).join(', ') });
+        case 'PROPORTIONAL': {
+            const list = rows.map((r) => `${nameOf(r.beneficiaryId)} ${r.sharePercent}%`).join(', ');
+            return first.consensusThreshold != null
+                ? s('PROPORTIONAL_CONSENSUS', { list, k: first.consensusThreshold, n: rows.length })
+                : s('PROPORTIONAL', { list });
+        }
         default:
             return '';
     }
@@ -136,6 +139,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
         mode,
         selected: mode === 'ALL' ? [] : mode === 'EXCLUSIVE' ? value.selected.slice(0, 1) : value.selected,
         contingentId: '',
+        consensus: mode === 'PROPORTIONAL' && !allowProportional,
         threshold: '',
     });
     const toggle = (id) => {
@@ -164,13 +168,12 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 </div>
             </div>
             <div role="radiogroup" aria-label={tt('title')} className="grid sm:grid-cols-2 gap-2">
-                {availableModes(allowProportional, value.mode).map((m, i, modes) => {
+                {MODES.map((m, i, modes) => {
                     const locked = freePlan && VIP_MODES.includes(m);
                     const active = value.mode === m;
                     const wide = modes.length % 2 === 1 && i === modes.length - 1;   // số ô lẻ: ô cuối chiếm cả hàng, không lệch, không xuống dòng
                     return (
                         <button key={m} type="button" role="radio" aria-checked={active}
-                                disabled={m === 'PROPORTIONAL' && !allowProportional}
                                 onClick={() => (locked ? setUpgradeOpen(true) : setMode(m))}
                                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors ${wide ? 'sm:col-span-2 ' : ''}${
                                     active ? 'border-primary bg-primary/10 text-on-surface' : 'border-outline-variant/50 text-on-surface hover:bg-surface-container'
@@ -184,7 +187,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
             </div>
             <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} message={t('vip.upgradeMessage', { ns: 'common' })} />
             <p className="text-xs text-on-surface-variant">{tt(`modeHint.${value.mode}`)}</p>
-            {!allowProportional && <p className="text-xs text-outline">{tt('proportionalUnavailable')}</p>}
+            {!allowProportional && value.mode === 'PROPORTIONAL' && <p className="text-xs text-outline">{tt('proportionalNeedsConsensus')}</p>}
 
             {value.mode === 'EXCLUSIVE' && (
                 <>
@@ -214,7 +217,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 </>
             )}
 
-            {(value.mode === 'PROPORTIONAL' || value.mode === 'JOINT_CONSENSUS') && (
+            {value.mode === 'PROPORTIONAL' && (
                 <ul className="space-y-2">
                     {beneficiaries.map((b) => {
                         const on = value.selected.includes(b.id);
@@ -250,16 +253,31 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 );
             })()}
 
-            {value.mode === 'JOINT_CONSENSUS' && (
-                <div className="flex items-center gap-2">
-                    <select value={value.threshold} onChange={(e) => set({ threshold: e.target.value })} disabled={n < 2} className={inputClass}>
-                        <option value="">{tt('thresholdPlaceholder')}</option>
-                        {Array.from({ length: Math.max(0, n - 1) }, (_, i) => i + 2).map((k) => (
-                            <option key={k} value={k}>{tt('thresholdOption', { k, n })}</option>
-                        ))}
-                    </select>
-                    <InfoTip term="kOfN" />
-                </div>
+            {/* Điều kiện mở tài sản (K-of-N): chỉ khi chia theo tỷ lệ và két có từ 2 người thụ hưởng trở lên */}
+            {value.mode === 'PROPORTIONAL' && beneficiaries.length >= 2 && (
+                <fieldset className="space-y-2 rounded-xl border border-outline-variant/40 p-3">
+                    <legend className="px-1 text-xs font-semibold flex items-center gap-1">{tt('condition.title')} <InfoTip term="kOfN" /></legend>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="radio" name="consensus" checked={!value.consensus} disabled={!allowProportional}
+                               onChange={() => set({ consensus: false, threshold: '' })} />
+                        {tt('condition.none')}
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="radio" name="consensus" checked={!!value.consensus} onChange={() => set({ consensus: true })} />
+                        {tt('condition.kOfN')}
+                    </label>
+                    {value.consensus && (
+                        <>
+                            <select value={value.threshold} onChange={(e) => set({ threshold: e.target.value })} disabled={n < 2} className={inputClass}>
+                                <option value="">{tt('thresholdPlaceholder')}</option>
+                                {Array.from({ length: Math.max(0, n - 1) }, (_, i) => i + 2).map((k) => (
+                                    <option key={k} value={k}>{tt('thresholdOption', { k, n })}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-on-surface-variant">{tt('condition.hint')}</p>
+                        </>
+                    )}
+                </fieldset>
             )}
 
             {value.mode !== 'ALL' && (

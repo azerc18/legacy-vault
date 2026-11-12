@@ -69,7 +69,7 @@ class JointConsensusServiceTest {
     private AssetAllocation row(VaultBeneficiary b, ShamirSecretSharing.Share share, byte[] key) {
         return AssetAllocation.builder()
                 .asset(asset).beneficiary(b)
-                .mode(AllocationMode.JOINT_CONSENSUS).sharePercent(new BigDecimal("100"))
+                .mode(AllocationMode.PROPORTIONAL).sharePercent(new BigDecimal("50"))
                 .consensusThreshold(2)
                 .consensusShare("ENC:" + share.encode())
                 .consensusKeyHash(JointConsensusService.hashKey(key))

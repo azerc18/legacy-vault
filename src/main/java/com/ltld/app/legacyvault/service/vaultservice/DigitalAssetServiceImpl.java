@@ -221,7 +221,8 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         if (request.getAllocation() != null) {
             applyAllocation(vault, asset, ownerId, request.getAllocation());   // đã kiểm theo loại mới
         } else if (!allowsProportional(asset) && assetAllocationRepository.findByAssetId(assetId).stream()
-                .anyMatch(al -> al.getMode() == AllocationMode.PROPORTIONAL)) {
+                // Chia tỷ lệ có K-of-N dùng được với mọi loại tài sản; chỉ chia tỷ lệ thường mới cần tài sản pháp lý
+                .anyMatch(al -> al.getMode() == AllocationMode.PROPORTIONAL && al.getConsensusThreshold() == null)) {
             // N2-owner (Sửa #1): đổi sang loại không cho chia % mà vẫn giữ phân bổ % cũ
             throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
                     "This asset type no longer allows PROPORTIONAL. Send a new allocation in the same request.");
@@ -293,25 +294,15 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
         switch (req.getMode()) {
             case JOINT_CONSENSUS -> {
-                // X1: đồng thuận K-of-N, là tính năng của gói nâng cao
-                entitlementService.assertCanUseAdvancedAllocation(ownerId);
-                if (recipients.size() < 2) {
-                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
-                            "JOINT_CONSENSUS needs at least 2 recipients");
-                }
-                Integer threshold = req.getThreshold();
-                if (threshold == null || threshold < 2 || threshold > recipients.size()) {
-                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
-                            "threshold must be between 2 and the number of recipients");
-                }
-                for (DigitalAssetRequest.Recipient r : recipients) {
-                    if (r.getContingentBeneficiaryId() != null) {
-                        throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                                "Contingent beneficiary is only for EXCLUSIVE");
-                    }
-                }
+                // K-of-N giờ là điều kiện của "Chia theo tỷ lệ" (mode PROPORTIONAL + threshold), không còn là kiểu riêng
+                throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
+                        "JOINT_CONSENSUS is no longer a mode; use PROPORTIONAL with a consensus threshold");
             }
             case EXCLUSIVE -> {
+                if (req.getThreshold() != null) {
+                    throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
+                            "K-of-N consensus is only available with PROPORTIONAL");
+                }
                 if (recipients.size() != 1) {
                     throw new VaultException(ErrorCode.ASSET_FIELD_INVALID, "EXCLUSIVE needs exactly one recipient");
                 }
@@ -321,9 +312,11 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
             }
             case PROPORTIONAL -> {
                 entitlementService.assertCanUseAdvancedAllocation(ownerId);
-                if (!allowsProportional(asset)) {
+                // Chia tỷ lệ thường chỉ cho tài sản pháp lý. Có điều kiện K-of-N thì dùng được với mọi loại tài sản
+                // (ví crypto, ví điện tử...): tỷ lệ khi đó chỉ để ghi nhận, việc mở tài sản do K-of-N quyết định.
+                if (!allowsProportional(asset) && req.getThreshold() == null) {
                     throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                            "PROPORTIONAL is only allowed for legal-claim assets");
+                            "PROPORTIONAL is only allowed for legal-claim assets unless a K-of-N threshold is set");
                 }
                 BigDecimal total = BigDecimal.ZERO;
                 for (DigitalAssetRequest.Recipient r : recipients) {
@@ -345,13 +338,19 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                     throw new VaultException(ErrorCode.ALLOCATION_PERCENT_INVALID,
                             "PROPORTIONAL needs at least 2 recipients and shares must total 100%");
                 }
+                // Điều kiện K-of-N (tuỳ chọn): tài sản chỉ mở khi đủ K trong N người nhận đồng ý
+                Integer threshold = req.getThreshold();
+                if (threshold != null && (threshold < 2 || threshold > recipients.size())) {
+                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                            "threshold must be between 2 and the number of recipients");
+                }
             }
         }
 
         // X1: sinh khóa gốc ngẫu nhiên, chia thành N phần Shamir (mỗi người nhận 1 phần), chỉ lưu hash của khóa gốc
         List<ShamirSecretSharing.Share> shares = null;
         String keyHash = null;
-        if (req.getMode() == AllocationMode.JOINT_CONSENSUS) {
+        if (req.getMode() == AllocationMode.PROPORTIONAL && req.getThreshold() != null) {
             byte[] key = new byte[32];
             CONSENSUS_RANDOM.nextBytes(key);
             keyHash = JointConsensusService.hashKey(key);
