@@ -221,8 +221,8 @@ class DmsConfirmerServiceImplTest {
     // ---------- respondByToken ----------
 
     @Test
-    @DisplayName("X2 Nhánh 1 + m2/m3: ALIVE -> hoãn 7 ngày, ACTIVE, đếm ALIVE = 1, dời cycle_started_at, giữ lastCheckinAt thật")
-    void respondByToken_alive_postpones_countsDeferral_keepsRealLastCheckin() {
+    @DisplayName("ALIVE = check-in thay Owner: chu kỳ mới đầy đủ từ lúc trả lời, ghi người xác nhận, giữ lastCheckinAt thật")
+    void respondByToken_alive_startsFullCycle_recordsVouch_keepsRealLastCheckin() {
         LocalDateTime deadline = enterPending();
         String token = confirmerService.generateConfirmationToken(confirmer.getId(), deadline);
 
@@ -230,15 +230,20 @@ class DmsConfirmerServiceImplTest {
 
         assertEquals(DmsStatus.ACTIVE, res.getDmsStatus());
         assertEquals(DmsConfirmerDecision.ALIVE, res.getDecision());
-        assertEquals(now.plusDays(7), config.getNextCheckinDueAt());
-        assertEquals(1, config.getConfirmationDeferrals());
-        assertEquals(lastCheckin, config.getLastCheckinAt());                  // m3: không giả lần check-in
-        assertEquals(now.plusDays(7).minusDays(37), config.getCycleStartedAt());   // mốc lịch nhắc mới
+        assertEquals(now, config.getCycleStartedAt());                          // chu kỳ mới bắt đầu lúc trả lời
+        assertEquals(now.plusDays(37), config.getNextCheckinDueAt());           // 30 ngày + 7 ngày ân hạn, như Owner check-in
+        assertEquals(now.plusDays(37), res.getPostponedUntil());
+        assertEquals(now, config.getVouchedAt());
+        assertEquals(confirmer.getName(), config.getVouchedByName());
+        assertEquals(1, config.getConfirmationDeferrals());                     // m2: lần quá hạn kế tiếp kích hoạt luôn
+        assertEquals(lastCheckin, config.getLastCheckinAt());                   // m3: không giả lần check-in của Owner
         assertEquals(0, config.getRemindersSent());
         assertNotNull(config.getNextReminderAt());
         assertEquals(DmsConfirmerStatus.CONFIRMED_ALIVE, confirmer.getStatus());
         assertEquals(ExecutorStatus.INACTIVE, primary.getStatus());
-        verify(emailSender).sendOwnerConfirmedSafeNotice("owner@example.com", "Trần Thị B", now.plusDays(7));
+        // Mail báo hạn check-in (30 ngày), trang DMS cũng đếm tới mốc này
+        verify(emailSender).sendOwnerConfirmedSafeNotice("owner@example.com", confirmer.getName(), now.plusDays(30));
+        assertEquals(now.plusDays(30), DmsConfigServiceImpl.checkinDueAt(config));   // không phải lần check-in cũ của Owner
     }
 
     @Test

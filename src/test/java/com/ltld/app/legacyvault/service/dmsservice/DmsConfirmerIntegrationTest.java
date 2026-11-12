@@ -123,7 +123,8 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
 
         dmsConfirmerService.respondByToken(token, DmsConfirmerDecision.ALIVE, t0);
 
-        LocalDateTime deadline = t0.plusDays(DmsConfirmerServiceImpl.POSTPONE_SAFE_DAYS);
+        // Người xác nhận check-in thay Owner: chu kỳ mới đầy đủ bắt đầu từ t0
+        LocalDateTime deadline = t0.plusDays(INTERVAL_DAYS + GRACE_DAYS);
         DmsConfig afterAlive = config(ownerId);
         assertThat(afterAlive.getStatus()).isEqualTo(DmsStatus.ACTIVE);
         assertThat(afterAlive.getNextCheckinDueAt()).isEqualTo(deadline);
@@ -131,7 +132,12 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
         assertThat(afterAlive.getNextReminderAt()).isNotNull().isBefore(deadline);
         assertThat(afterAlive.getConfirmationDeferrals()).isEqualTo(1);
         assertThat(afterAlive.getLastCheckinAt()).isEqualTo(realLastCheckin);   // m3: không giả lần check-in
-        assertThat(afterAlive.getCycleStartedAt()).isEqualTo(deadline.minusDays(INTERVAL_DAYS + GRACE_DAYS));
+        assertThat(afterAlive.getCycleStartedAt()).isEqualTo(t0);
+        assertThat(afterAlive.getVouchedAt()).isEqualTo(t0);
+        assertThat(afterAlive.getVouchedByName()).isNotBlank();
+        // Trang DMS: hạn check-in tính từ lúc được check-in hộ, không phải lần check-in cũ (đã quá hạn) của Owner
+        assertThat(dmsConfigService.getConfig(ownerId).getCheckinDueAt()).isEqualTo(t0.plusDays(INTERVAL_DAYS));
+        assertThat(dmsConfigService.getConfig(ownerId).getVouchedAt()).isEqualTo(t0);
 
         // Quét nhắc đúng các mốc nextReminderAt: mỗi mốc gửi 1 mail, tất cả trước hạn; sau lần cuối thì hết mốc.
         List<LocalDateTime> scans = new ArrayList<>();
@@ -171,6 +177,8 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
 
         DmsConfig afterCheckIn = config(ownerId);
         assertThat(afterCheckIn.getConfirmationDeferrals()).isZero();
+        assertThat(afterCheckIn.getVouchedAt()).isNull();          // chu kỳ do chính Owner bắt đầu
+        assertThat(afterCheckIn.getVouchedByName()).isNull();
         assertThat(afterCheckIn.getCycleStartedAt()).isEqualTo(afterCheckIn.getLastCheckinAt());
 
         // Đợt mới quá hạn -> lại hỏi người xác nhận

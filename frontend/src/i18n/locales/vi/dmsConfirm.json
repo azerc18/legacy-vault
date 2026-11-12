@@ -1,7 +1,7 @@
 {
   "done": {
     "aliveTitle": "Cảm ơn bạn — đã xác nhận chủ két vẫn an toàn",
-    "aliveBody": "Chúng tôi đã hoãn việc kích hoạt Dead Man's Switch của chủ két thêm 7 ngày và nhắc họ check-in.",
+    "aliveBody": "Lần xác nhận này được tính như một lần check-in thay chủ két: chu kỳ check-in mới đã bắt đầu và chủ két đã được báo.",
     "unreachableTitle": "Cảm ơn bạn — đã thông báo cho người thi hành",
     "unreachableBody": "Chúng tôi đã ghi nhận xác nhận của bạn và thông báo cho người thi hành mà chủ két chỉ định để bắt đầu quy trình xác minh pháp lý.",
     "errorTitle": "Không thể xác minh liên kết xác nhận",
@@ -12,7 +12,7 @@
   "confirm": {
     "title": "Chủ két có an toàn không?",
     "intro": "Chủ két chưa check-in và đã hết thời gian ân hạn. Họ đã chọn bạn làm người xác nhận chéo. Hãy cho chúng tôi biết bạn có liên lạc được với họ không. Hiện chưa có gì thay đổi; câu trả lời chỉ được ghi nhận khi bạn bấm nút.",
-    "aliveButton": "Chủ két vẫn an toàn (hoãn 7 ngày)",
+    "aliveButton": "Chủ két vẫn an toàn (check-in thay)",
     "unreachableButton": "Tôi không liên lạc được với chủ két",
     "unreachableConfirmTitle": "Thông báo cho người thi hành ngay?",
     "unreachableConfirmBody": "Việc này sẽ thông báo ngay cho người thi hành của chủ két để bắt đầu bàn giao và không thể hoàn tác.",

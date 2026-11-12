@@ -488,6 +488,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
         config.setConfirmationDeferrals(0);     // X2 (m2): Owner tự check-in / lưu cấu hình thì đếm ALIVE lại từ 0
+        config.setVouchedAt(null);              // chu kỳ mới do chính Owner bắt đầu, không còn là chu kỳ người xác nhận check-in hộ
+        config.setVouchedByName(null);
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }
@@ -541,6 +543,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
                 .triggeredAt(config.getTriggeredAt())
+                .vouchedAt(config.getVouchedAt())
+                .vouchedBy(config.getVouchedByName())
                 .hasUsableExecutor(config.getStatus() == DmsStatus.TRIGGERED
                         ? null
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())
@@ -555,10 +559,16 @@ public class DmsConfigServiceImpl implements DmsConfigService {
      * "Hạn check-in" ở tương lai trong khi "Bắt đầu bàn giao" đã qua. lastCheckinAt giữ nguyên là lần check-in thật.
      */
     static LocalDateTime checkinDueAt(DmsConfig config) {
-        if (config.getLastCheckinAt() == null || config.getCheckinIntervalDays() == null) {
+        // Chu kỳ hiện tại do người xác nhận chéo check-in hộ: tính từ lúc đó. lastCheckinAt vẫn là lần check-in thật
+        // của Owner (cũ hơn), dùng nó sẽ ra hạn đã qua.
+        LocalDateTime cycleStart = config.getLastCheckinAt();
+        if (config.getVouchedAt() != null && (cycleStart == null || config.getVouchedAt().isAfter(cycleStart))) {
+            cycleStart = config.getVouchedAt();
+        }
+        if (cycleStart == null || config.getCheckinIntervalDays() == null) {
             return null;
         }
-        LocalDateTime byLastCheckin = config.getLastCheckinAt().plusDays(config.getCheckinIntervalDays());
+        LocalDateTime byLastCheckin = cycleStart.plusDays(config.getCheckinIntervalDays());
         if (config.getNextCheckinDueAt() == null || config.getGracePeriodDays() == null) {
             return byLastCheckin;
         }

@@ -19,6 +19,11 @@
     "notSetUp": "Not set up yet",
     "notSetUpHint": "Choose your schedule on the right and save to turn it on.",
     "checkIn": "I'm okay — check in",
+    "vouch": {
+      "body": "{{name}} (trusted confirmer) confirmed you are safe at {{date}}, which counts as a check-in. A new check-in cycle has started.",
+      "countdown": "Next check-in due in {{days}} d {{hours}} h {{minutes}} min.",
+      "someone": "A trusted confirmer"
+    },
     "checkedInShort": "Checked in",
     "checkingIn": "Checking in...",
     "triggeredNote": "The hand-over was triggered on {{date}}. Settings can no longer be changed.",
@@ -69,7 +74,7 @@
     "confirmers": {
       "title": "Trusted Social Confirmers (Anti-False-Trigger)",
       "subtitle": "Up to 2 trusted relatives/friends who will receive an emergency confirmation email (72h window) before your Executor is activated.",
-      "empty": "No trusted confirmers configured yet. Add up to 2 contacts below so accidental missed check-ins (e.g., travel or hospital stay) can be postponed by 7 days.",
+      "empty": "No trusted confirmers configured yet. Add up to 2 contacts below so accidental missed check-ins (e.g., travel or hospital stay) can be checked in for you by a confirmer.",
       "remove": "Remove",
       "namePlaceholder": "Full name",
       "emailPlaceholder": "Email address",

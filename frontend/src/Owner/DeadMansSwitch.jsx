@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import InfoTip from '../Common/InfoTip.jsx';
 import { useToast } from '../Common/Toast.jsx';
@@ -46,6 +46,32 @@ const STATUS = {
     NO_VAULT: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
+// Đếm ngược tới hạn check-in khi chu kỳ do người xác nhận chéo check-in hộ. Tách riêng để chỉ khối này
+// render lại mỗi 30 giây; hết hạn thì báo trang cha (onExpire) để mở lại nút check-in.
+function VouchCountdown({ dueAtMs, onExpire }) {
+    const { t } = useTranslation('dms');
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => {
+            const current = Date.now();
+            setNow(current);
+            if (current >= dueAtMs) onExpire();
+        }, 30_000);
+        return () => clearInterval(id);
+    }, [dueAtMs, onExpire]);
+    return <p className="mt-1 font-semibold">{t('dms.vouch.countdown', remainingParts(dueAtMs - now))}</p>;
+}
+
+// Thời gian còn lại -> { days, hours, minutes } cho câu đếm ngược
+function remainingParts(msLeft) {
+    const totalMinutes = Math.max(0, Math.floor(msLeft / 60000));
+    return {
+        days: Math.floor(totalMinutes / 1440),
+        hours: Math.floor((totalMinutes % 1440) / 60),
+        minutes: totalMinutes % 60,
+    };
+}
+
 export default function DeadMansSwitch() {
     const { t } = useTranslation(['dms', 'identity']);
     const vip = useVipStatus();   // false = gói FREE: form thêm Trusted Social Confirmer hiện mờ + khoá
@@ -59,6 +85,9 @@ export default function DeadMansSwitch() {
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
     const [justCheckedIn, setJustCheckedIn] = useState(false);
+    // Mốc "bây giờ" của trang; VouchCountdown cập nhật lại khi tới hạn
+    const [now, setNow] = useState(() => Date.now());
+    const refreshNow = useCallback(() => setNow(Date.now()), []);
     const [confirmerForm, setConfirmerForm] = useState({ name: '', email: '', relationship: '' });
     const [addingConfirmer, setAddingConfirmer] = useState(false);
     const [removingId, setRemovingId] = useState('');
@@ -100,6 +129,11 @@ export default function DeadMansSwitch() {
     // Owner đã xoá hết két: BE tạm dừng DMS (không nhắc, không bàn giao); nút check-in vẫn hiện nhưng BE trả DMS_NO_VAULT.
     // Giữ lần check-in cuối, các mốc của chu kỳ không còn chạy nên hiện "—". Tạo két mới thì BE bắt đầu chu kỳ mới.
     const pausedNoVault = canCheckIn && config.hasVault === false;
+    // Người xác nhận chéo đã check-in thay Owner: chu kỳ này coi như đã check-in, hiện ghi chú + đếm ngược.
+    // Nút check-in KHÔNG khoá: Owner vẫn tự check-in được (BE bắt đầu chu kỳ mới từ lúc đó và xoá dấu check-in hộ)
+    const dueAtMs = configured && config.checkinDueAt ? new Date(config.checkinDueAt).getTime() : null;
+    const vouchActive = canCheckIn && config.status === 'ACTIVE' && !!config.vouchedAt
+        && dueAtMs !== null && now < dueAtMs;
     // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
     const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
@@ -235,11 +269,19 @@ export default function DeadMansSwitch() {
                                     </span>
                                     {canCheckIn && (
                                         <button onClick={checkIn} disabled={checking || justCheckedIn} className={btnPrimary}>
-                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
+                                            <Icon name="how_to_reg" className="text-[18px]" />
+                                            {checking ? t('dms.checkingIn')
+                                                : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
                                         </button>
                                     )}
                                 </div>
 
+                                {vouchActive && !pausedNoVault && (
+                                    <div role="status" className="mt-4 p-3 rounded-xl bg-success-container/60 text-on-success-container text-sm">
+                                        <p>{t('dms.vouch.body', { name: config.vouchedBy || t('dms.vouch.someone'), date: formatDate(config.vouchedAt, true) })}</p>
+                                        <VouchCountdown dueAtMs={dueAtMs} onExpire={refreshNow} />
+                                    </div>
+                                )}
                                 {pausedNoVault && (
                                     <p className="mt-4 text-sm text-on-surface-variant">
                                         {t('dms.noVaultNote')}{' '}
