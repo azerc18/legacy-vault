@@ -102,6 +102,11 @@ public class DmsConfig {
     @Column(name = "triggered_at")
     private LocalDateTime triggeredAt;
 
+    // Admin bấm "Nhắc check-in" lần gần nhất: chặn bấm liên tục (app.dms.admin-reminder-cooldown-minutes).
+    // Không đụng tới lịch nhắc tự động (remindersSent / nextReminderAt).
+    @Column(name = "last_admin_reminder_at")
+    private LocalDateTime lastAdminReminderAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

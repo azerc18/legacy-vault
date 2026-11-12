@@ -45,6 +45,7 @@
       "EXECUTOR_REVOKED_TIMEOUT": "Bạn không xác nhận đúng hạn nên vai trò người thi hành cho {{owner}} đã chuyển sang người dự phòng.",
       "EXECUTOR_REVOKED_ADMIN": "Quản trị viên đã chỉ định người thi hành khác cho {{owner}}. Bạn không còn là {{role}} của họ.",
       "DMS_CHECKIN_REMINDER": "Nhắc check-in lần {{number}}/{{count}}: vui lòng check-in trước {{triggerAt}} để xác nhận bạn vẫn ổn.",
+      "DMS_CHECKIN_REMINDER_admin": "Quản trị viên nhắc bạn check-in: vui lòng check-in trước {{triggerAt}} để xác nhận bạn vẫn ổn.",
       "DMS_CONFIRMATION_PENDING": "Bạn đã lỡ hạn check-in. Hệ thống đang hỏi những người xác nhận tin cậy xem bạn có ổn không (đến {{deadlineAt}}). Hãy check-in ngay để dừng việc bàn giao.",
       "DMS_CONFIRMATION_REQUESTED": "{{owner}} đã lỡ hạn check-in. Vui lòng mở email hệ thống đã gửi và xác nhận họ có ổn không trước {{deadlineAt}}.",
       "DMS_OWNER_CONFIRMED_SAFE": "{{confirmer}} đã xác nhận bạn vẫn ổn. Hạn check-in tiếp theo được lùi đến {{untilAt}}.",

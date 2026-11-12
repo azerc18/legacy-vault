@@ -3,9 +3,11 @@ package com.ltld.app.legacyvault.service.dmsservice;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsCheckinResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
+import com.ltld.app.legacyvault.enums.DmsStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public interface DmsConfigService {
@@ -79,6 +81,22 @@ public interface DmsConfigService {
      * còn Executor nhận được bàn giao -> 409.
      */
     DmsConfigResponse simulateOverdueByAdmin(UUID ownerId, UUID adminId);
+
+    /**
+     * Admin chủ động nhắc Owner check-in. Nơi gọi PHẢI kiểm quyền ADMIN. Khóa DmsConfig như suspendByAdmin, kiểm:
+     * DMS đang ACTIVE hoặc PENDING_CONFIRMATION (Owner còn check-in được), Owner còn két, chưa nhắc trong
+     * cooldownMinutes gần đây (DMS_ADMIN_REMINDER_TOO_SOON, 429). Ghi lastAdminReminderAt = now và trả về thông tin
+     * để gửi mail SAU commit. Không đổi lịch nhắc tự động. Chưa có DmsConfig -> 404; trạng thái khác -> 409.
+     */
+    AdminReminderTarget markAdminReminder(UUID ownerId, LocalDateTime now, long cooldownMinutes);
+
+    /** Gửi mail lỗi: trả lại lượt nhắc (chỉ khi lastAdminReminderAt vẫn là sentAt) để Admin bấm lại được ngay. */
+    void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt);
+
+    /** Thông tin một lượt Admin nhắc check-in; checkinDueAt / triggerAt như trang DMS của Owner. */
+    record AdminReminderTarget(UUID configId, String ownerEmail, DmsStatus status,
+                               LocalDateTime checkinDueAt, LocalDateTime triggerAt) {
+    }
 
     /** Kết quả upsert; created = true khi vừa tạo cấu hình lần đầu (controller trả 201). */
     record UpsertResult(DmsConfigResponse config, boolean created) {

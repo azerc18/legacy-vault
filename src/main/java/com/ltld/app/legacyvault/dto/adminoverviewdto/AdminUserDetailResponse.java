@@ -28,6 +28,9 @@ public class AdminUserDetailResponse {
 
     private String dmsStatus;
     private LocalDateTime dmsNextCheckinDueAt;
+    // Admin nhắc check-in: lần gần nhất và lần sớm nhất được nhắc lại (null = được nhắc ngay)
+    private LocalDateTime dmsLastAdminReminderAt;
+    private LocalDateTime dmsAdminReminderAvailableAt;
 
     // Gói hiện tại (FREE nếu không có gói trả phí còn hạn)
     private String planCode;

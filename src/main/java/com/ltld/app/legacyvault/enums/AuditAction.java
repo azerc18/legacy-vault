@@ -58,6 +58,8 @@ public enum AuditAction {
     DMS_SUSPENDED, DMS_RESUMED,
     // Demo: Admin giả Owner quá hạn check-in (chỉ khi app.demo.tools-enabled=true)
     DMS_DEMO_OVERDUE_SIMULATED,
+    // Admin chủ động nhắc Owner check-in (chuông + email có link một chạm)
+    DMS_ADMIN_CHECKIN_REMINDER,
     // Q27 (B3): FR-07 hoãn kích hoạt vì Owner chưa nhận được lần nhắc nào
     DMS_TRIGGER_DEFERRED,
     // V4: Owner thêm / sửa / xóa tài sản số

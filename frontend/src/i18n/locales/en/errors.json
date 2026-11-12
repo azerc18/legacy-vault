@@ -33,6 +33,7 @@
   "CHECKIN_TOKEN_INVALID": "This check-in link is invalid or has expired.",
   "CONFIRMER_TOKEN_INVALID": "This confirmation link is invalid or has expired.",
   "DMS_CHECKIN_TOO_SOON": "You just checked in. Please try again in a few minutes.",
+  "DMS_ADMIN_REMINDER_TOO_SOON": "This owner was reminded recently. Each owner can be reminded once an hour.",
   "REMINDER_TOO_SOON": "You can send only one reminder every 24 hours.",
   "EMERGENCY_REQUEST_EXISTS": "An emergency access request is already pending.",
   "INVALID_SIGN_CODE": "The signing code is incorrect.",

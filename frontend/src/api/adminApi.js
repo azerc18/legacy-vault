@@ -70,6 +70,9 @@ export const adminApi = {
     // 409 nếu DMS đã TRIGGERED / đã SUSPENDED; 404 nếu Owner chưa cấu hình DMS
     suspendDms: (ownerId, reason) => http.put(`/admin/dms/${ownerId}/suspend`, { reason: reason || null }).then(unwrap),
     resumeDms: (ownerId) => http.put(`/admin/dms/${ownerId}/resume`).then(unwrap),
+    // Admin chủ động nhắc Owner check-in (chuông + email). 429 DMS_ADMIN_REMINDER_TOO_SOON nếu vừa nhắc.
+    // -> { sentAt, emailSent, nextAllowedAt, checkinDueAt, triggerAt }
+    remindCheckin: (ownerId) => http.post(`/admin/dms/${ownerId}/remind-checkin`).then(unwrap),
     // B-01b: chỉ dùng khi user.executorRescueNeeded = true. 409 nếu Owner vẫn còn Executor dùng được.
     rescueExecutor: (ownerId, email) => http.post(`/admin/dms/${ownerId}/executor`, { email }).then(unwrap),
     // Demo: chỉ có khi server bật APP_DEMO_TOOLS_ENABLED. demoTools -> { dmsSimulateOverdue: boolean }
