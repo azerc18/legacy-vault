@@ -129,7 +129,8 @@ export default function DeadMansSwitch() {
     // Owner đã xoá hết két: BE tạm dừng DMS (không nhắc, không bàn giao); nút check-in vẫn hiện nhưng BE trả DMS_NO_VAULT.
     // Giữ lần check-in cuối, các mốc của chu kỳ không còn chạy nên hiện "—". Tạo két mới thì BE bắt đầu chu kỳ mới.
     const pausedNoVault = canCheckIn && config.hasVault === false;
-    // Người xác nhận chéo đã check-in thay Owner: chu kỳ này coi như đã check-in, khoá nút tới hạn tiếp theo
+    // Người xác nhận chéo đã check-in thay Owner: chu kỳ này coi như đã check-in, hiện ghi chú + đếm ngược.
+    // Nút check-in KHÔNG khoá: Owner vẫn tự check-in được (BE bắt đầu chu kỳ mới từ lúc đó và xoá dấu check-in hộ)
     const dueAtMs = configured && config.checkinDueAt ? new Date(config.checkinDueAt).getTime() : null;
     const vouchActive = canCheckIn && config.status === 'ACTIVE' && !!config.vouchedAt
         && dueAtMs !== null && now < dueAtMs;
@@ -267,11 +268,10 @@ export default function DeadMansSwitch() {
                                         <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
                                     </span>
                                     {canCheckIn && (
-                                        <button onClick={checkIn} disabled={checking || justCheckedIn || vouchActive} className={btnPrimary}>
-                                            <Icon name={vouchActive ? 'verified_user' : 'how_to_reg'} className="text-[18px]" />
+                                        <button onClick={checkIn} disabled={checking || justCheckedIn} className={btnPrimary}>
+                                            <Icon name="how_to_reg" className="text-[18px]" />
                                             {checking ? t('dms.checkingIn')
-                                                : vouchActive ? t('dms.vouch.button')
-                                                    : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
+                                                : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
                                         </button>
                                     )}
                                 </div>

@@ -21,7 +21,6 @@
     "checkIn": "Tôi vẫn ổn — check-in",
     "checkingIn": "Đang check-in...",
     "vouch": {
-      "button": "Đã được check-in thay",
       "body": "{{name}} (người xác nhận chéo) đã xác nhận bạn an toàn lúc {{date}}, được tính như một lần check-in. Chu kỳ check-in mới đã bắt đầu.",
       "countdown": "Hạn check-in tiếp theo còn {{days}} ngày {{hours}} giờ {{minutes}} phút.",
       "someone": "Người xác nhận chéo"

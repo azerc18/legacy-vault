@@ -20,7 +20,6 @@
     "notSetUpHint": "Choose your schedule on the right and save to turn it on.",
     "checkIn": "I'm okay — check in",
     "vouch": {
-      "button": "Checked in for you",
       "body": "{{name}} (trusted confirmer) confirmed you are safe at {{date}}, which counts as a check-in. A new check-in cycle has started.",
       "countdown": "Next check-in due in {{days}} d {{hours}} h {{minutes}} min.",
       "someone": "A trusted confirmer"
