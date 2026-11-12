@@ -46,6 +46,7 @@
     }
   },
   "list": {
+    "vaultMaxReached": "Đã đạt tối đa {{max}} két của gói hiện tại.",
     "title": "Két sắt của tôi",
     "subtitle": "Lưu trữ tài sản số và tài liệu pháp lý cho những người bạn tin tưởng.",
     "newVault": "Tạo két mới",
@@ -72,6 +73,8 @@
     "emailPlaceholder": "Email *",
     "fullNamePlaceholder": "Họ và tên (không bắt buộc)",
     "relationshipPlaceholder": "Mối quan hệ (VD: Vợ/Chồng, Con)",
+    "limitTextMax": "Gói của bạn cho phép tối đa {{max}} két và bạn đã có {{used}} két. Hãy xoá két không dùng nếu muốn tạo két mới.",
+    "limitBack": "Về danh sách két",
     "limitTitle": "Bạn đã dùng hết số két của gói hiện tại",
     "limitText": "Gói của bạn cho phép {{max}} két và bạn đã có {{used}} két. Nâng cấp VIP để tạo thêm két mới.",
     "limitAction": "Xem gói VIP",
@@ -191,6 +194,8 @@
       }
     },
     "beneficiaries": {
+      "limitLocked": "Đã đủ {{max}} người thụ hưởng của gói",
+      "limitMax": "Đã đủ tối đa {{max}} người thụ hưởng cho mỗi két.",
       "title": "Người thụ hưởng ({{count}})",
       "empty": "Chưa có người thụ hưởng nào.",
       "status": {

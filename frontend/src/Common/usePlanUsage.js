@@ -39,6 +39,9 @@ export const atVaultLimit = (usage) =>
 export const atBeneficiaryLimit = (usage, count) =>
     !!usage && usage.maxBeneficiariesPerVault > 0 && count >= usage.maxBeneficiariesPerVault;
 
+/** Còn gói cao hơn để nâng không (đang FREE, kể cả VIP đã hết hạn). VIP chạm giới hạn thì không mời nâng cấp. */
+export const canUpgrade = (usage) => !!usage && !usage.vip;
+
 /** Mở hộp nâng cấp dùng chung (PlanLimitUpgradeDialog) với câu riêng cho tính năng. */
 export const openPlanLimit = (feature) =>
     window.dispatchEvent(new CustomEvent(PLAN_LIMIT_EVENT, { detail: { data: { feature } } }));

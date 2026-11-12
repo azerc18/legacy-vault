@@ -108,7 +108,8 @@ export const ownerApi = {
         form.append('type', type);
         form.append('file', file);
         if (documentGroupId) form.append('documentGroupId', documentGroupId);
-        return http.post('/documents/upload', form).then(unwrap);
+        // Báo các khối dùng mức dung lượng (usePlanUsage) / điểm sẵn sàng tải lại
+        return http.post('/documents/upload', form).then(unwrap).then(changed);
     },
     // -> [{ id, vaultId, documentGroupId, documentType, fileName, uploadedAt, version, isCurrent, totalVersions, archived }]
     listDocuments: (vaultId) => http.get(`/documents/vault/${vaultId}`).then((r) => unwrap(r) ?? []),
@@ -125,7 +126,7 @@ export const ownerApi = {
     downloadLegacyMessageAttachment: (vaultId, messageId, fileName) =>
         saveBlob(`/vaults/${vaultId}/messages/${messageId}/attachment`, fileName || 'attachment'),
     // 409 nếu tài liệu đang nằm trong hồ sơ xác minh
-    deleteDocument: (docId) => http.delete(`/documents/${docId}`),
+    deleteDocument: (docId) => http.delete(`/documents/${docId}`).then(changed),
 
     // Nhật ký hoạt động: trả Page { content[], totalPages, totalElements, number, size }
     // startDate/endDate: ISO date-time (vd 2026-10-01T00:00:00Z); không gửi startDate thì xem toàn bộ lịch sử

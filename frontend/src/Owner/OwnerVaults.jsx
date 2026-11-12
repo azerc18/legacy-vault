@@ -8,11 +8,15 @@ import { OwnerLayout, Icon, Alert, formatDate, btnPrimary, LoadingSkeleton } fro
 import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
 import { startSpotlightTour } from '../Common/SpotlightTour.jsx';
-import { atVaultLimit, openPlanLimit, usePlanUsage } from '../Common/usePlanUsage.js';
+import { atVaultLimit, canUpgrade, openPlanLimit, usePlanUsage } from '../Common/usePlanUsage.js';
 import { VipChip } from '../Common/VipLock.jsx';
 
 export default function OwnerVaults() {
-    const vaultLimitReached = atVaultLimit(usePlanUsage());
+    const usage = usePlanUsage();
+    const vaultLimitReached = atVaultLimit(usage);
+    const upgradable = canUpgrade(usage);
+    // Hết lượt tạo két thì tour tạo két không chạy được (trang tạo két là màn "hết lượt"): FREE mời nâng cấp, VIP thì khoá nút
+    const startGuide = () => (vaultLimitReached ? openPlanLimit('MULTIPLE_VAULTS') : startSpotlightTour());
     const { t } = useTranslation('vault');
     const { t: tOnboarding } = useTranslation('onboarding');
     const user = getUser();
@@ -37,7 +41,8 @@ export default function OwnerVaults() {
                 <div className="flex items-center gap-2.5">
                     <button
                         type="button"
-                        onClick={startSpotlightTour}
+                        onClick={startGuide}
+                        disabled={vaultLimitReached && !upgradable}
                         className="h-10 px-3.5 rounded-full border border-outline-variant/40 hover:border-primary text-xs font-bold inline-flex items-center gap-1.5 bg-surface-container-lowest text-on-surface hover:text-primary transition-colors shadow-sm"
                         title={tOnboarding('startInteractiveTour', 'Bắt đầu hướng dẫn từng bước (Interactive Tour)')}
                     >
@@ -45,9 +50,14 @@ export default function OwnerVaults() {
                         <span>{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
                     </button>
                     {/* Hết lượt tạo két của gói: mở hộp nâng cấp ngay, không vào form tạo két */}
-                    {vaultLimitReached ? (
-                        <button type="button" data-tour="new-vault-btn" onClick={() => openPlanLimit('MULTIPLE_VAULTS')} className={btnPrimary}>
+                    {/* Nút đã khoá không mang data-tour để tour tạo két không bám vào */}
+                    {vaultLimitReached && upgradable ? (
+                        <button type="button" onClick={() => openPlanLimit('MULTIPLE_VAULTS')} className={btnPrimary}>
                             <Icon name="lock" className="text-[18px]" /> {t('list.newVault')} <VipChip />
+                        </button>
+                    ) : vaultLimitReached ? (
+                        <button type="button" disabled title={t('list.vaultMaxReached', { max: usage.maxVaults })} className={btnPrimary}>
+                            <Icon name="lock" className="text-[18px]" /> {t('list.newVault')}
                         </button>
                     ) : (
                         <Link to="/owner/vaults/new" data-tour="new-vault-btn" className={btnPrimary}>

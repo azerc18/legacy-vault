@@ -8,7 +8,7 @@ import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btn
 import {AssetTypeIcon} from './assetArt.jsx';
 import {AssetFieldsForm, cleanFields, deriveAssetName, fieldProblems, focusFirstInvalid, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
 import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
-import {atBeneficiaryLimit, atVaultLimit, openPlanLimit, usePlanUsage} from '../Common/usePlanUsage.js';
+import {atBeneficiaryLimit, atVaultLimit, canUpgrade, openPlanLimit, usePlanUsage} from '../Common/usePlanUsage.js';
 import EmptyState from '../Common/EmptyState.jsx';
 
 const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation()});
@@ -41,10 +41,11 @@ export default function CreateVault() {
     const [loading, setLoading] = useState(false);
     // Két đã tạo nhưng một số tài sản theo schema lưu lỗi: không cho gửi lại (tránh tạo trùng két)
     const [partial, setPartial] = useState(null);
-    const schemas = useAssetSchemas();
+    const schemas = useAssetSchemas();   // null = đang tải, [] = lỗi -> dùng form cũ (1 ô bí mật)
     const usage = usePlanUsage();
+    const upgradable = canUpgrade(usage);
     // Đã tạo xong két ở lần bấm này: không chuyển sang màn "hết lượt" dù số két vừa chạm giới hạn
-    const [createdVaultId, setCreatedVaultId] = useState(null);   // null = đang tải, [] = lỗi -> dùng form cũ (1 ô bí mật)
+    const [createdVaultId, setCreatedVaultId] = useState(null);
 
     // Có lỗi mới thì cuộn tới đúng chỗ lỗi để người dùng thấy ngay
     useEffect(() => {
@@ -218,9 +219,12 @@ export default function CreateVault() {
     if (atVaultLimit(usage) && !createdVaultId && !loading && !partial) {
         return (
             <OwnerLayout title={t('create.title')} subtitle={t('create.subtitle')}>
+                {/* VIP chạm giới hạn: không có gói cao hơn nên không mời nâng cấp */}
                 <EmptyState bordered icon="workspace_premium" title={t('create.limitTitle')}
-                            text={t('create.limitText', {used: usage.vaultsUsed, max: usage.maxVaults})}
-                            action={{to: '/pricing', label: t('create.limitAction'), icon: 'workspace_premium'}}/>
+                            text={t(upgradable ? 'create.limitText' : 'create.limitTextMax', {used: usage.vaultsUsed, max: usage.maxVaults})}
+                            action={upgradable
+                                ? {to: '/pricing', label: t('create.limitAction'), icon: 'workspace_premium'}
+                                : {to: '/owner/vaults', label: t('create.limitBack'), icon: 'arrow_back'}}/>
             </OwnerLayout>
         );
     }
@@ -272,7 +276,7 @@ export default function CreateVault() {
                         ))}
                         {errorBox('beneficiaries')}
                         {/* Đủ số người của gói: bấm Thêm mở hộp nâng cấp, không thêm dòng trống cho nhập */}
-                        <button type="button" disabled={beneficiaries.length >= 10}
+                        <button type="button" disabled={beneficiaries.length >= 10 || (!upgradable && atBeneficiaryLimit(usage, beneficiaries.length))}
                                 onClick={() => (atBeneficiaryLimit(usage, beneficiaries.length)
                                     ? openPlanLimit('BENEFICIARY_LIMIT')
                                     : setBeneficiaries((l) => [...l, emptyBeneficiary()]))}
