@@ -176,10 +176,11 @@
     "you": "you",
     "joined": "Joined {{date}}",
     "status": { "ACTIVE": "Active", "LOCKED": "Locked", "PENDING": "Pending", "DELETED": "Deleted" },
+    "tempLocked": "Temporarily locked until {{time}} (too many wrong passwords or codes)",
     "dms": { "ACTIVE": "DMS active", "PENDING_CONFIRMATION": "DMS awaiting confirmation", "SUSPENDED": "DMS suspended", "TRIGGERED": "DMS triggered" },
     "actions": {
       "grant": "Make {{role}}", "revoke": "Remove {{role}}",
-      "lock": "Lock account", "unlock": "Unlock account",
+      "lock": "Lock account", "unlock": "Unlock account", "clearTempLock": "Clear temporary lock",
       "suspend": "Suspend DMS", "resume": "Resume DMS", "rescue": "Assign executor",
       "rolesMenu": "Roles…", "grantVip": "Grant VIP",
       "remindCheckin": "Remind to check in",

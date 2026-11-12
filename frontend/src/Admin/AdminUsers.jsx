@@ -4,7 +4,7 @@ import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
-import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
+import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf, isTemporarilyLocked } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 import UserDrawer from './UserDrawer.jsx';
 
@@ -135,6 +135,7 @@ export default function AdminUsers() {
 }
 
 function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
+    const tempLocked = isTemporarilyLocked(u);
     const { t } = useTranslation('admin');
     const allRoles = u.roles || [];
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
@@ -162,6 +163,9 @@ function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
             </td>
             <td data-label={t('users.cols.status')}>
                 <Stamp tone={toneOf(u.status)}>{t(`users.status.${u.status}`, { defaultValue: u.status })}</Stamp>
+                {tempLocked && (
+                    <p className="mt-1 text-xs text-error">{t('users.tempLocked', { time: formatDate(u.lockedUntil, true) })}</p>
+                )}
             </td>
             <td data-label={t('users.cols.roles')}>
                 <div className="flex flex-wrap gap-1">
@@ -196,8 +200,8 @@ function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
                     {!isMe && u.status === 'ACTIVE' && (
                         <button onClick={() => onAction({ kind: 'lock', user: u })} className={`${link} text-error`}>{t('users.actions.lock')}</button>
                     )}
-                    {!isMe && u.status === 'LOCKED' && (
-                        <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>{t('users.actions.unlock')}</button>
+                    {!isMe && (u.status === 'LOCKED' || tempLocked) && (
+                        <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>{t(u.status === 'LOCKED' ? 'users.actions.unlock' : 'users.actions.clearTempLock')}</button>
                     )}
                     {/* DMS của Owner: hiện đúng nút theo trạng thái */}
                     {isOwner && u.dmsStatus && (

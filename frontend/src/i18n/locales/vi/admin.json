@@ -169,10 +169,11 @@
     "you": "bạn",
     "joined": "Tham gia {{date}}",
     "status": { "ACTIVE": "Hoạt động", "LOCKED": "Đã khoá", "PENDING": "Chờ xác minh", "DELETED": "Đã xoá" },
+    "tempLocked": "Khoá tạm đến {{time}} (nhập sai mật khẩu hoặc mã nhiều lần)",
     "dms": { "ACTIVE": "DMS đang chạy", "PENDING_CONFIRMATION": "DMS chờ xác nhận", "SUSPENDED": "DMS tạm dừng", "TRIGGERED": "DMS đã kích hoạt" },
     "actions": {
       "grant": "Cấp {{role}}", "revoke": "Gỡ {{role}}",
-      "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản",
+      "lock": "Khoá tài khoản", "unlock": "Mở khoá tài khoản", "clearTempLock": "Gỡ khoá tạm",
       "suspend": "Tạm dừng DMS", "resume": "Tiếp tục DMS", "rescue": "Chỉ định người thi hành",
       "rolesMenu": "Vai trò…", "grantVip": "Tặng VIP",
       "remindCheckin": "Nhắc check-in",

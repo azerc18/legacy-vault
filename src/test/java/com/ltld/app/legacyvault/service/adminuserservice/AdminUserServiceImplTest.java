@@ -281,6 +281,21 @@ class AdminUserServiceImplTest {
             assertThat(r.getRoles()).containsExactly("LEGAL_VERIFIER", "OWNER");
             assertThat(r.getCreatedAt()).isEqualTo(created);
             assertThat(r.getLastLoginAt()).isEqualTo(lastLogin);
+            assertThat(r.getLockedUntil()).isNull();
+        }
+
+        @Test
+        @DisplayName("user đang bị khoá tạm -> trả lockedUntil; khoá tạm đã hết hạn -> null")
+        void mapsTemporaryLock() {
+            Instant until = Instant.now().plusSeconds(600);
+            user.setLockedUntil(until);
+            when(userRepository.searchForAdmin(any(), any(), any(), any()))
+                    .thenReturn(new PageImpl<>(List.of(user)));
+
+            assertThat(service.listUsers(null, null, null, 0, 20).getContent().get(0).getLockedUntil()).isEqualTo(until);
+
+            user.setLockedUntil(Instant.now().minusSeconds(60));
+            assertThat(service.listUsers(null, null, null, 0, 20).getContent().get(0).getLockedUntil()).isNull();
         }
     }
 
@@ -382,6 +397,49 @@ class AdminUserServiceImplTest {
             assertAdminError(() -> service.updateStatus(adminId, userId, req("DELETED", null)),
                     HttpStatus.BAD_REQUEST);
             verifyNoInteractions(userRepository);
+        }
+
+        @Test
+        @DisplayName("mở khoá user ACTIVE đang bị khoá tạm (sai mật khẩu 5 lần) -> xoá khoá tạm, audit")
+        void unlockTemporarilyLockedActiveUser_clearsLock() {
+            user.setFailedLoginAttempts(5);
+            user.setLockedUntil(Instant.now().plusSeconds(600));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            AdminUserResponse res = service.updateStatus(adminId, userId, req("ACTIVE", null));
+
+            assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+            assertThat(user.getFailedLoginAttempts()).isZero();
+            assertThat(user.getLockedUntil()).isNull();
+            assertThat(res.getLockedUntil()).isNull();
+            verify(tokenService, never()).revokeAllUserTokens(any(), any());
+            verify(auditLogService).log(eq(AuditAction.RBAC_CHANGE), eq(AuditResult.SUCCESS), eq(adminId),
+                    isNull(), eq("User"), eq(userId.toString()), eq("TEMPORARY LOCK CLEARED"));
+        }
+
+        @Test
+        @DisplayName("gỡ khoá tạm có lý do -> audit kèm reason")
+        void unlockTemporarilyLocked_withReason_auditsReason() {
+            user.setFailedLoginAttempts(5);
+            user.setLockedUntil(Instant.now().plusSeconds(600));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            service.updateStatus(adminId, userId, req("ACTIVE", "  user gọi hotline  "));
+
+            assertThat(user.getLockedUntil()).isNull();
+            verify(auditLogService).log(eq(AuditAction.RBAC_CHANGE), eq(AuditResult.SUCCESS), eq(adminId),
+                    isNull(), eq("User"), eq(userId.toString()), eq("TEMPORARY LOCK CLEARED reason=user gọi hotline"));
+        }
+
+        @Test
+        @DisplayName("khoá tạm đã hết hạn -> không coi là đang khoá, vẫn no-op")
+        void expiredTemporaryLock_isNoop() {
+            user.setLockedUntil(Instant.now().minusSeconds(60));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            service.updateStatus(adminId, userId, req("ACTIVE", null));
+
+            verifyNoRbacSideEffects();
         }
 
         @Test

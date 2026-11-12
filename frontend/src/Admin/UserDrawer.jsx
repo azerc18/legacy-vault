@@ -9,7 +9,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
-import { ReasonDialog, Stamp, toneOf } from './adminUi.jsx';
+import { ReasonDialog, Stamp, toneOf, isTemporarilyLocked } from './adminUi.jsx';
 import { GrantVipDialog } from './BillingDialogs.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
 import { tEnum } from '../i18n/format.js';
@@ -150,7 +150,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
     const accountActions = u && (
         <>
             {!isMe && u.status === 'ACTIVE' && <button className={`${btn} text-error`} onClick={() => setDialog('lock')}><Icon name="lock" className="text-[16px]" />{t('users.actions.lock')}</button>}
-            {!isMe && u.status === 'LOCKED' && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
+            {!isMe && (u.status === 'LOCKED' || isTemporarilyLocked(u)) && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t(u.status === 'LOCKED' ? 'users.actions.unlock' : 'users.actions.clearTempLock')}</button>}
             {isOwner && <button className={btn} onClick={() => setGranting(true)}><Icon name="workspace_premium" className="text-[16px]" />{t('users.actions.grantVip')}</button>}
             <Link to={`/admin/audit-logs?actorEmail=${encodeURIComponent(u.email)}`} className={btn}><Icon name="history" className="text-[16px]" />{t('drawer.allLogs')}</Link>
             <Link to={`/admin/payments?email=${encodeURIComponent(u.email)}`} className={btn}><Icon name="receipt_long" className="text-[16px]" />{t('drawer.payments')}</Link>
@@ -205,7 +205,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                         <Field label={t('drawer.fields.joined')}>{formatDate(u.createdAt)}</Field>
                                         <Field label={t('drawer.fields.lastLogin')}>{formatDate(u.lastLoginAt, true)}</Field>
                                         <Field label={t('drawer.fields.mfa')}>{u.mfaEnabled ? t('drawer.on') : t('drawer.off')}</Field>
-                                        <Field label={t('drawer.fields.failedLogins')}>{u.failedLoginAttempts}</Field>
+                                        <Field label={t('drawer.fields.failedLogins')}>{u.failedLoginAttempts}{isTemporarilyLocked(u) && <span className="block text-xs font-normal text-error">{t('users.tempLocked', { time: formatDate(u.lockedUntil, true) })}</span>}</Field>
                                     </dl>
                                 </Section>
 
