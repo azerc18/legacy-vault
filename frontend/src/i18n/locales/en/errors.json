@@ -23,6 +23,7 @@
   "CAPTCHA_INVALID": "The security check failed or expired. Please complete it again.",
   "CAPTCHA_UNAVAILABLE": "The security check is temporarily unavailable. Please try again in a few minutes.",
   "TOO_MANY_OTP_REQUESTS": "Too many code requests. Please wait {{retryAfterSeconds}} seconds.",
+  "IP_RATE_LIMITED": "Too many attempts from your network. Please try again in {{retryAfterSeconds}} seconds.",
   "MFA_REQUIRED": "Enter your two-factor authentication code.",
   "MFA_INVALID_CODE": "The two-factor code is incorrect.",
   "DMS_NOT_TRIGGERED": "The Dead Man's Switch has not been triggered yet.",

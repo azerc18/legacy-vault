@@ -115,7 +115,10 @@ public enum ErrorCode {
     IDENTITY_NAME_MISMATCH(HttpStatus.CONFLICT),
     IDENTITY_UNDERAGE(HttpStatus.BAD_REQUEST),
     IDENTITY_LOCKED(HttpStatus.CONFLICT),
-    IDENTITY_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
+    IDENTITY_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
+
+    // Giới hạn số request theo IP ở các API công khai /api/auth/* (data: retryAfterSeconds)
+    IP_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS);
 
     private final HttpStatus status;
 

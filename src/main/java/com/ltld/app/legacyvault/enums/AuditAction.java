@@ -96,5 +96,7 @@ public enum AuditAction {
     // Trang Hồ sơ: người dùng tự đăng xuất một / mọi thiết bị khác
     SESSION_REVOKED,
     // Trang Hồ sơ: người dùng tự xoá tài khoản (thành công / bị chặn / sai xác nhận)
-    ACCOUNT_DELETED, ACCOUNT_DELETE_FAILED
+    ACCOUNT_DELETED, ACCOUNT_DELETE_FAILED,
+    // Một IP gọi API công khai /api/auth/* vượt giới hạn (ghi 1 lần mỗi khi bắt đầu bị chặn, không ghi mỗi request)
+    IP_RATE_LIMITED
 }
