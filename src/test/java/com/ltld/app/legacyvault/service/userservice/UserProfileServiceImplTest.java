@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.userservice;
 
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.dto.userdto.SetPasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.ChangePasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.UpdateProfileRequest;
 import com.ltld.app.legacyvault.dto.userdto.UserProfileResponse;
@@ -34,6 +36,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -344,6 +349,70 @@ class UserProfileServiceImplTest {
         verify(userRepository, never()).save(any());
         verify(tokenService, never()).revokeAllUserTokens(any(), any());
         verify(auditLogService, never()).success(any(), any(), any());
+    }
+
+    @Test
+    void changePassword_googleAccount_marksPasswordSet() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(passwordEncoder.matches("old-pass", OLD_HASH)).thenReturn(true);
+        when(passwordEncoder.encode("new-pass")).thenReturn("$2a$new-hash");
+
+        service.changePassword(userId, changeRequest("old-pass", "new-pass"));
+
+        assertTrue(u.isPasswordSet());
+    }
+
+    // ---------- Cài đặt mật khẩu cho tài khoản Google ----------
+
+    private static SetPasswordRequest setRequest(String pw) {
+        SetPasswordRequest r = new SetPasswordRequest();
+        r.setNewPassword(pw);
+        r.setPasswordConfirm(pw);
+        return r;
+    }
+
+    @Test
+    void setPassword_googleAccount_setsHashWithoutCurrentPassword_keepsSessions() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(passwordEncoder.encode("new-pass")).thenReturn("$2a$new-hash");
+
+        UserProfileResponse res = service.setPassword(userId, setRequest("new-pass"));
+
+        assertEquals("$2a$new-hash", u.getPasswordHash());
+        assertTrue(u.isPasswordSet());
+        assertTrue(res.isPasswordSet());
+        verify(userRepository).save(u);
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(tokenService, never()).revokeAllUserTokens(any(), any());
+        verify(auditLogService).log(eq(AuditAction.PASSWORD_CHANGED), eq(AuditResult.SUCCESS), eq(userId),
+                eq("owner@example.com"), isNull(), isNull(), isNull(), anyString());
+    }
+
+    @Test
+    void setPassword_passwordAlreadySet_throws409AndChangesNothing() {
+        User u = user();   // passwordSet mặc định true
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+
+        UserProfileException ex = assertThrows(UserProfileException.class,
+                () -> service.setPassword(userId, setRequest("new-pass")));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals(OLD_HASH, u.getPasswordHash());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getMe_mapsPasswordSet() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        assertFalse(service.getMe(userId).isPasswordSet());
     }
 
     @Test

@@ -51,6 +51,10 @@
     "confirm": "Xác nhận mật khẩu mới",
     "submit": "Cập nhật mật khẩu",
     "submitting": "Đang cập nhật...",
+    "setTitle": "Cài đặt mật khẩu",
+    "setNotice": "Bạn đăng nhập bằng Google nên tài khoản chưa có mật khẩu. Cài đặt mật khẩu để có thể đăng nhập bằng email và mật khẩu, và để xác nhận các thao tác quan trọng như xoá tài khoản.",
+    "setSubmit": "Cài đặt mật khẩu",
+    "setDone": "Đã cài đặt mật khẩu. Từ giờ bạn có thể đăng nhập bằng email và mật khẩu này, hoặc tiếp tục dùng Google.",
     "show": "Hiện mật khẩu",
     "hide": "Ẩn mật khẩu",
     "changed": "Đã đổi mật khẩu. Vui lòng đăng nhập bằng mật khẩu mới.",
@@ -59,7 +63,8 @@
       "weak": "Mật khẩu mới chưa đạt yêu cầu.",
       "mismatch": "Mật khẩu xác nhận không khớp.",
       "same": "Mật khẩu mới phải khác mật khẩu hiện tại.",
-      "failed": "Không đổi được mật khẩu."
+      "failed": "Không đổi được mật khẩu.",
+      "setFailed": "Không cài đặt được mật khẩu."
     }
   },
   "mfa": {
@@ -258,7 +263,8 @@
     },
     "exportFirst": "Mẹo: tải \"Dữ liệu của tôi\" ở trên trước khi xoá nếu bạn muốn giữ một bản sao.",
     "password": "Mật khẩu hiện tại",
-    "passwordHint": "Đăng ký bằng Google và chưa có mật khẩu? Dùng \"Quên mật khẩu\" ở trang đăng nhập để đặt mật khẩu trước.",
+    "setPasswordFirst": "Tài khoản đăng nhập bằng Google chưa có mật khẩu. Hãy cài đặt mật khẩu ở mục \"Cài đặt mật khẩu\" phía trên trước khi xoá tài khoản.",
+    "passwordHint": "Đăng ký bằng Google và chưa có mật khẩu? Cài đặt mật khẩu ở mục \"Cài đặt mật khẩu\" phía trên trước.",
     "code": "Mã xác thực 2 lớp hoặc mã dự phòng",
     "typeEmail": "Gõ lại email để xác nhận:",
     "confirm": "Xoá vĩnh viễn tài khoản",

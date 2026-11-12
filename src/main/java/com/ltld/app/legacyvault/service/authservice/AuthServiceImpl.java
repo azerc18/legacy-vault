@@ -239,6 +239,7 @@ public class AuthServiceImpl implements AuthService{
                 .email(google.email())
                 .fullName(displayName(google))
                 .passwordHash(passwordEncoder.encode(randomSecret()))
+                .passwordSet(false)
                 .status(UserStatus.ACTIVE)
                 .preferredLanguage(AppLanguage.fromTag(language))
                 .roles(new HashSet<>(Set.of(defaultRole, beneficiaryRole)))
@@ -255,6 +256,7 @@ public class AuthServiceImpl implements AuthService{
     // nên thay mật khẩu cũ bằng chuỗi ngẫu nhiên để họ không đăng nhập được bằng mật khẩu đã đặt.
     private void activateFromGoogle(User user) {
         user.setPasswordHash(passwordEncoder.encode(randomSecret()));
+        user.setPasswordSet(false);
         user.setStatus(UserStatus.ACTIVE);
         userRepository.save(user);
         auditLogService.log(AuditAction.EMAIL_VERIFIED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
@@ -310,6 +312,7 @@ public class AuthServiceImpl implements AuthService{
                 request.getOtp(), AuditAction.PASSWORD_RESET_FAILED);
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordSet(true);
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
         userRepository.save(user);

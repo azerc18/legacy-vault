@@ -24,6 +24,8 @@ public class UserProfileResponse {
     // Thời điểm đổi ảnh gần nhất, FE dùng làm "version" để biết khi nào cần tải lại ảnh
     private Instant avatarUpdatedAt;
     private boolean mfaEnabled;
+    // false = tài khoản Google chưa cài đặt mật khẩu (hồ sơ hiện "Cài đặt mật khẩu" thay cho "Đổi mật khẩu")
+    private boolean passwordSet;
     // Ngôn ngữ nhận email và nội dung hệ thống gửi: "vi" hoặc "en"
     private String preferredLanguage;
     // Mức xác minh danh tính: NONE / BASIC / VERIFIED

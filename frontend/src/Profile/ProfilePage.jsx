@@ -269,8 +269,57 @@ function ProfileForm({ profile, onSaved }) {
     );
 }
 
+// ---------- Form cài đặt mật khẩu (tài khoản tạo bằng Google, chưa có mật khẩu) ----------
+function SetPasswordForm({ onDone }) {
+    const { t } = useTranslation('profile');
+    const [next, setNext] = useState('');
+    const [confirm, setConfirm] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+
+    const submit = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (!next || !confirm) return setError(t('password.errors.required'));
+        if (!isPasswordValid(next)) return setError(t('password.errors.weak'));
+        if (next !== confirm) return setError(t('password.errors.mismatch'));
+
+        setBusy(true);
+        try {
+            // Không đăng xuất: trước đó không có mật khẩu nào. Hồ sơ mới (passwordSet = true) đổi form về "Đổi mật khẩu"
+            onDone(await userApi.setPassword(next, confirm));
+        } catch (err) {
+            setError(getErrorMessage(err, t('password.errors.setFailed')));
+            setBusy(false);
+        }
+    };
+
+    return (
+        <Card title={t('password.setTitle')} icon="password">
+            <Alert>{error}</Alert>
+            <Alert type="info">{t('password.setNotice')}</Alert>
+            <form onSubmit={submit} className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                    <Field label={t('password.new')} hint={t('password.newHint')}>
+                        <PasswordInput value={next} onChange={setNext} autoComplete="new-password" />
+                        <PasswordStrengthMeter password={next} />
+                    </Field>
+                    <Field label={t('password.confirm')}>
+                        <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
+                    </Field>
+                </div>
+                <div className="flex justify-end pt-2">
+                    <button type="submit" disabled={busy} className={btnPrimary}>
+                        {busy ? t('password.submitting') : t('password.setSubmit')}
+                    </button>
+                </div>
+            </form>
+        </Card>
+    );
+}
+
 // ---------- Form đổi mật khẩu ----------
-function ChangePasswordForm() {
+function ChangePasswordForm({ justSet }) {
     const { t } = useTranslation('profile');
     const navigate = useNavigate();
     const [current, setCurrent] = useState('');
@@ -302,6 +351,7 @@ function ChangePasswordForm() {
     return (
         <Card title={t('password.title')} icon="lock_reset">
             <Alert>{error}</Alert>
+            <Alert type="success">{justSet ? t('password.setDone') : ''}</Alert>
             <Alert type="info">{t('password.notice')}</Alert>
             <form onSubmit={submit} className="space-y-4">
                 <Field label={t('password.current')}>
@@ -330,6 +380,8 @@ function ChangePasswordForm() {
 export default function ProfilePage() {
     const { t } = useTranslation('profile');
     const [profile, setProfile] = useState(null);
+    // Vừa cài đặt mật khẩu (tài khoản Google): báo thành công trên form đổi mật khẩu thay thế
+    const [passwordJustSet, setPasswordJustSet] = useState(false);
     const [error, setError] = useState('');
     // Lần đăng nhập đầu (Login.jsx): chào và mời hoàn thiện hồ sơ, nút Tiếp tục về trang định tới
     const [searchParams] = useSearchParams();
@@ -389,7 +441,10 @@ export default function ProfilePage() {
                                     <ProfileForm profile={profile} onSaved={handleSaved} />
                                 </div>
                                 <PreferencesCard />
-                                <ChangePasswordForm />
+                                {/* Tài khoản Google chưa có mật khẩu: cài đặt (không hỏi mật khẩu hiện tại) thay cho đổi mật khẩu */}
+                                {profile.passwordSet === false
+                                    ? <SetPasswordForm onDone={(p) => { setProfile(p); setPasswordJustSet(true); }} />
+                                    : <ChangePasswordForm justSet={passwordJustSet} />}
                                 <div id="profile-2fa" className="scroll-mt-6">
                                     <TwoFactorCard profile={profile} onChanged={setProfile} />
                                 </div>

@@ -51,6 +51,10 @@
     "confirm": "Confirm new password",
     "submit": "Update password",
     "submitting": "Updating...",
+    "setTitle": "Set a password",
+    "setNotice": "You signed in with Google, so your account has no password yet. Set one to sign in with your email and password, and to confirm important actions such as deleting your account.",
+    "setSubmit": "Set password",
+    "setDone": "Your password is set. You can now sign in with your email and this password, or keep using Google.",
     "show": "Show password",
     "hide": "Hide password",
     "changed": "Password changed. Please sign in with your new password.",
@@ -59,7 +63,8 @@
       "weak": "New password does not meet the requirements.",
       "mismatch": "Password confirmation does not match.",
       "same": "New password must be different from the current one.",
-      "failed": "Could not change password."
+      "failed": "Could not change password.",
+      "setFailed": "Could not set your password."
     }
   },
   "mfa": {
@@ -258,7 +263,8 @@
     },
     "exportFirst": "Tip: download \"My data\" above first if you want to keep a copy.",
     "password": "Current password",
-    "passwordHint": "Signed up with Google and have no password? Use \"Forgot password\" on the sign-in page to set one first.",
+    "setPasswordFirst": "This Google account has no password yet. Set one in \"Set a password\" above before deleting your account.",
+    "passwordHint": "Signed up with Google and have no password? Set one in \"Set a password\" above first.",
     "code": "Two-step verification code or backup code",
     "typeEmail": "Type your email to confirm:",
     "confirm": "Delete account permanently",

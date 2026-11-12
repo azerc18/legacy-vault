@@ -2,12 +2,14 @@ package com.ltld.app.legacyvault.service.userservice;
 
 import com.ltld.app.legacyvault.dto.userdto.AvatarFile;
 import com.ltld.app.legacyvault.dto.userdto.ChangePasswordRequest;
+import com.ltld.app.legacyvault.dto.userdto.SetPasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.UpdateProfileRequest;
 import com.ltld.app.legacyvault.dto.userdto.UserProfileResponse;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
+import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.KycLevel;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.enums.RevokedReason;
@@ -98,11 +100,32 @@ public class UserProfileServiceImpl implements UserProfileService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordSet(true);
         userRepository.save(user);
 
         // Đăng xuất mọi thiết bị khác, giống luồng reset-password
         tokenService.revokeAllUserTokens(user.getId(), RevokedReason.PASSWORD_CHANGED);
         auditLogService.success(AuditAction.PASSWORD_CHANGED, user.getId(), user.getEmail());
+    }
+
+    // Tài khoản tạo bằng Google chưa có mật khẩu (chuỗi ngẫu nhiên): cài đặt mật khẩu, không hỏi mật khẩu hiện tại.
+    // Không thu hồi phiên: trước đó không có mật khẩu nào để bị lộ, người dùng vẫn ở lại trang hồ sơ.
+    @Override
+    @Transactional
+    public UserProfileResponse setPassword(UUID userId, SetPasswordRequest request) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
+        if (user.isPasswordSet()) {
+            // Đã có mật khẩu thì phải đổi mật khẩu (có kiểm tra mật khẩu hiện tại)
+            throw new UserProfileException("A password is already set; use change password instead", HttpStatus.CONFLICT);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordSet(true);
+        userRepository.save(user);
+        auditLogService.log(AuditAction.PASSWORD_CHANGED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
+                null, null, null, "password set (google account)");
+        return toResponse(user);
     }
 
     // ---------------- Avatar ----------------
@@ -255,6 +278,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .hasAvatar(u.getAvatarPath() != null)
                 .avatarUpdatedAt(u.getAvatarUpdatedAt())
                 .mfaEnabled(u.isMfaEnabled())
+                .passwordSet(u.isPasswordSet())
                 .kycLevel((u.getKycLevel() != null ? u.getKycLevel() : KycLevel.NONE).name())
                 .phoneVerified(u.getPhoneVerifiedAt() != null)
                 .preferredLanguage((u.getPreferredLanguage() != null ? u.getPreferredLanguage() : AppLanguage.DEFAULT).tag())

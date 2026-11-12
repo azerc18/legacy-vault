@@ -459,6 +459,7 @@ public class AuthServiceImplTest {
 
     @Test
     void resetPassword_success_updatesPassword_unlocks_andRevokesTokens() {
+        user.setPasswordSet(false);   // tài khoản Google dùng "Quên mật khẩu" cũng tính là đã đặt mật khẩu
         user.setFailedLoginAttempts(3);
         user.setLockedUntil(Instant.now().plusSeconds(600));
         when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
@@ -475,6 +476,7 @@ public class AuthServiceImplTest {
         assertThat(saved.getPasswordHash()).isEqualTo("new-hash");
         assertThat(saved.getFailedLoginAttempts()).isZero();
         assertThat(saved.getLockedUntil()).isNull();
+        assertThat(saved.isPasswordSet()).isTrue();
 
         verify(tokenService).revokeAllUserTokens(user.getId(), RevokedReason.PASSWORD_CHANGED);
         verify(auditLogService).success(AuditAction.PASSWORD_RESET_SUCCESS, user.getId(), "test@example.com");
@@ -653,6 +655,7 @@ public class AuthServiceImplTest {
         assertThat(created.getEmail()).isEqualTo("test@example.com");
         assertThat(created.getFullName()).isEqualTo("Nguyen Van A");
         assertThat(created.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(created.isPasswordSet()).isFalse();   // mật khẩu ngẫu nhiên: hồ sơ cho cài đặt mật khẩu
         assertThat(created.getRoles()).containsExactlyInAnyOrder(ownerRole, beneficiaryRole);
         verify(verificationTokenService).linkPendingBeneficiaryVaults(created);
         verify(verificationTokenService, never()).issueOtp(any(), any());
@@ -703,6 +706,7 @@ public class AuthServiceImplTest {
         // Người tạo tài khoản PENDING có thể không phải chủ email -> mật khẩu họ đặt không còn dùng được
         assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
         assertThat(user.getPasswordHash()).isEqualTo("random-hash");
+        assertThat(user.isPasswordSet()).isFalse();
         verify(verificationTokenService).linkPendingBeneficiaryVaults(user);
         verify(auditLogService).log(AuditAction.EMAIL_VERIFIED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
                 null, null, null, "google");
@@ -717,6 +721,7 @@ public class AuthServiceImplTest {
         LoginResult result = authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
 
         assertThat(user.getPasswordHash()).isEqualTo("hashed-password");
+        assertThat(user.isPasswordSet()).isTrue();
         assertThat(user.getLastLoginAt()).isNotNull();
         assertThat(result.refreshToken()).isEqualTo("refresh-token");
         verify(verificationTokenService, never()).linkPendingBeneficiaryVaults(any());
