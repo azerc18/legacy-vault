@@ -88,6 +88,7 @@
     "view": "View",
     "download": "Download",
     "secret": "Secret",
+    "noSecret": "This asset has no secret information.",
     "notes": "Notes",
     "reveal": "Show secret",
     "hide": "Hide secret",

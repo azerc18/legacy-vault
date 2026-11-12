@@ -430,17 +430,32 @@ function AssetList({ vaultId, assets, onError, onAccessed = () => {}, readOnly =
     );
 }
 
-function AssetDetailModal({ detail, onClose }) {
-    const { t } = useTranslation('beneficiary');
-    const label = useEnumLabels();
-    const [reveal, setReveal] = useState(false);
-    const [copied, setCopied] = useState(false);
+// Bí mật của tài sản có schema được lưu chung thành JSON phẳng ({"pinOrPasswordNote":"..."}).
+// Tách thành từng trường để hiện nhãn dễ đọc.
+// null = không phải JSON (bí mật chữ thường của tài sản cũ, giữ là một trường);
+// [] = JSON nhưng không có trường nào ({} của DOCUMENT, hoặc Owner bỏ trống mọi trường bí mật).
+// Nhãn dự phòng khi chưa có bản dịch cho key: "legacyPin" -> "Legacy pin"
+const labelFromKey = (key) => {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+};
 
-    const copy = async () => {
-        await navigator.clipboard.writeText(detail.secret || '');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
+function parseSecretFields(secret) {
+    if (typeof secret !== 'string' || !secret.trim().startsWith('{')) return null;
+    try {
+        const obj = JSON.parse(secret);
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+        return Object.entries(obj).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
+    } catch {
+        return null;
+    }
+}
+
+function AssetDetailModal({ detail, onClose }) {
+    const { t } = useTranslation(['beneficiary', 'vault']);
+    const label = useEnumLabels();
+    const fields = parseSecretFields(detail.secret);
+    const publicFields = Object.entries(detail.fields || {}).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
 
     return createPortal(
         <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4" onClick={onClose}>
@@ -453,12 +468,31 @@ function AssetDetailModal({ detail, onClose }) {
                     <button onClick={onClose} aria-label={t('assets.close')}><Icon name="close" className="text-outline" /></button>
                 </div>
 
-                <p className="mt-5 font-label-sm text-on-surface-variant">{t('assets.secret')}</p>
-                <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                    <span className="flex-1">{reveal ? detail.secret : '••••••••••••'}</span>
-                    <button onClick={() => setReveal(!reveal)} aria-label={reveal ? t('assets.hide') : t('assets.reveal')}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
-                    <button onClick={copy} aria-label={t('assets.copy')}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
-                </div>
+                {/* Trường công khai (tên ngân hàng, số tài khoản, nơi giữ bản gốc...): hiện thẳng, không che */}
+                {publicFields.length > 0 && (
+                    <dl className="mt-5 space-y-2">
+                        {publicFields.map(([key, value]) => (
+                            <div key={key}>
+                                <dt className="font-label-sm text-on-surface-variant">{t(`vault:assetFields.labels.${key}`, { defaultValue: labelFromKey(key) })}</dt>
+                                <dd className="mt-0.5 text-sm whitespace-pre-wrap break-words">{value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                )}
+
+                {fields ? (
+                    fields.length ? fields.map(([key, value]) => (
+                        <SecretField
+                            key={key}
+                            label={t(`vault:assetFields.labels.${key}`, { defaultValue: labelFromKey(key) })}
+                            value={value}
+                        />
+                    )) : (
+                        <p className="mt-5 text-sm text-on-surface-variant">{t('assets.noSecret')}</p>
+                    )
+                ) : (
+                    <SecretField label={t('assets.secret')} value={detail.secret || ''} />
+                )}
 
                 {detail.notes && (
                     <>
@@ -470,6 +504,34 @@ function AssetDetailModal({ detail, onClose }) {
             </div>
         </div>,
         document.body
+    );
+}
+
+// Một trường bí mật: mặc định che, có nút hiện/ẩn và sao chép riêng
+function SecretField({ label, value }) {
+    const { t } = useTranslation('beneficiary');
+    const [reveal, setReveal] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // Trình duyệt chặn clipboard (không HTTPS / bị từ chối quyền): bỏ qua, vẫn bấm hiện để chép tay được
+        }
+    };
+
+    return (
+        <>
+            <p className="mt-5 font-label-sm text-on-surface-variant">{label}</p>
+            <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
+                <span className="flex-1 whitespace-pre-wrap">{reveal ? value : '••••••••••••'}</span>
+                <button onClick={() => setReveal(!reveal)} aria-label={reveal ? t('assets.hide') : t('assets.reveal')}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+                <button onClick={copy} aria-label={t('assets.copy')}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
+            </div>
+        </>
     );
 }
 
