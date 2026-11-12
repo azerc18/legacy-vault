@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import InfoTip from '../Common/InfoTip.jsx';
 import { useToast } from '../Common/Toast.jsx';
@@ -46,14 +46,20 @@ const STATUS = {
     NO_VAULT: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
-// Đồng hồ cho phần đếm ngược; cập nhật mỗi `ms` mili-giây
-function useNow(ms) {
-    const [value, setValue] = useState(() => Date.now());
+// Đếm ngược tới hạn check-in khi chu kỳ do người xác nhận chéo check-in hộ. Tách riêng để chỉ khối này
+// render lại mỗi 30 giây; hết hạn thì báo trang cha (onExpire) để mở lại nút check-in.
+function VouchCountdown({ dueAtMs, onExpire }) {
+    const { t } = useTranslation('dms');
+    const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
-        const id = setInterval(() => setValue(Date.now()), ms);
+        const id = setInterval(() => {
+            const current = Date.now();
+            setNow(current);
+            if (current >= dueAtMs) onExpire();
+        }, 30_000);
         return () => clearInterval(id);
-    }, [ms]);
-    return value;
+    }, [dueAtMs, onExpire]);
+    return <p className="mt-1 font-semibold">{t('dms.vouch.countdown', remainingParts(dueAtMs - now))}</p>;
 }
 
 // Thời gian còn lại -> { days, hours, minutes } cho câu đếm ngược
@@ -79,7 +85,9 @@ export default function DeadMansSwitch() {
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
     const [justCheckedIn, setJustCheckedIn] = useState(false);
-    const now = useNow(30_000);
+    // Mốc "bây giờ" của trang; VouchCountdown cập nhật lại khi tới hạn
+    const [now, setNow] = useState(() => Date.now());
+    const refreshNow = useCallback(() => setNow(Date.now()), []);
     const [confirmerForm, setConfirmerForm] = useState({ name: '', email: '', relationship: '' });
     const [addingConfirmer, setAddingConfirmer] = useState(false);
     const [removingId, setRemovingId] = useState('');
@@ -271,7 +279,7 @@ export default function DeadMansSwitch() {
                                 {vouchActive && !pausedNoVault && (
                                     <div role="status" className="mt-4 p-3 rounded-xl bg-success-container/60 text-on-success-container text-sm">
                                         <p>{t('dms.vouch.body', { name: config.vouchedBy || t('dms.vouch.someone'), date: formatDate(config.vouchedAt, true) })}</p>
-                                        <p className="mt-1 font-semibold">{t('dms.vouch.countdown', remainingParts(dueAtMs - now))}</p>
+                                        <VouchCountdown dueAtMs={dueAtMs} onExpire={refreshNow} />
                                     </div>
                                 )}
                                 {pausedNoVault && (

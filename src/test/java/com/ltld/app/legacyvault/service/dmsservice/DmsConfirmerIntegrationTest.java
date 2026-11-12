@@ -135,6 +135,9 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
         assertThat(afterAlive.getCycleStartedAt()).isEqualTo(t0);
         assertThat(afterAlive.getVouchedAt()).isEqualTo(t0);
         assertThat(afterAlive.getVouchedByName()).isNotBlank();
+        // Trang DMS: hạn check-in tính từ lúc được check-in hộ, không phải lần check-in cũ (đã quá hạn) của Owner
+        assertThat(dmsConfigService.getConfig(ownerId).getCheckinDueAt()).isEqualTo(t0.plusDays(INTERVAL_DAYS));
+        assertThat(dmsConfigService.getConfig(ownerId).getVouchedAt()).isEqualTo(t0);
 
         // Quét nhắc đúng các mốc nextReminderAt: mỗi mốc gửi 1 mail, tất cả trước hạn; sau lần cuối thì hết mốc.
         List<LocalDateTime> scans = new ArrayList<>();

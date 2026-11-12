@@ -388,7 +388,10 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             startVouchedCycle(config, effectiveNow);
             config.setVouchedAt(effectiveNow);
             config.setVouchedByName(confirmer.getName());
-            LocalDateTime postponedUntil = config.getNextCheckinDueAt();
+            LocalDateTime postponedUntil = config.getNextCheckinDueAt();   // hạn kích hoạt mới
+            // Mail báo hạn CHECK-IN (cùng mốc trang DMS đếm ngược), không phải hạn kích hoạt (thêm thời gian ân hạn)
+            LocalDateTime nextCheckinDue = config.getCheckinIntervalDays() == null
+                    ? postponedUntil : effectiveNow.plusDays(config.getCheckinIntervalDays());
 
             try {
                 dmsConfirmerRepository.saveAndFlush(confirmer);
@@ -414,7 +417,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             UUID configId = config.getId();
             runAfterCommit(() -> {
                 try {
-                    emailSender.sendOwnerConfirmedSafeNotice(ownerEmail, confirmerName, postponedUntil);
+                    emailSender.sendOwnerConfirmedSafeNotice(ownerEmail, confirmerName, nextCheckinDue);
                 } catch (RuntimeException ex) {
                     log.warn("X2: could not send owner safe notice for dmsConfig {}: {}", configId, ex.getMessage());
                 }

@@ -241,7 +241,9 @@ class DmsConfirmerServiceImplTest {
         assertNotNull(config.getNextReminderAt());
         assertEquals(DmsConfirmerStatus.CONFIRMED_ALIVE, confirmer.getStatus());
         assertEquals(ExecutorStatus.INACTIVE, primary.getStatus());
-        verify(emailSender).sendOwnerConfirmedSafeNotice("owner@example.com", confirmer.getName(), now.plusDays(37));
+        // Mail báo hạn check-in (30 ngày), trang DMS cũng đếm tới mốc này
+        verify(emailSender).sendOwnerConfirmedSafeNotice("owner@example.com", confirmer.getName(), now.plusDays(30));
+        assertEquals(now.plusDays(30), DmsConfigServiceImpl.checkinDueAt(config));   // không phải lần check-in cũ của Owner
     }
 
     @Test

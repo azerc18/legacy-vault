@@ -124,6 +124,7 @@ public class DmsConfig {
     @Column(name = "vouched_at")
     private LocalDateTime vouchedAt;
 
+    // Lưu tên tại thời điểm xác nhận (snapshot): người xác nhận bị xoá sau đó thì trang DMS vẫn hiện đúng ai đã xác nhận
     @Column(name = "vouched_by_name")
     private String vouchedByName;
 }
