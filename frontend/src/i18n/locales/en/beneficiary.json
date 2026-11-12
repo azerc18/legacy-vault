@@ -157,8 +157,7 @@
     "viewedOf": "Viewed <b>{{viewed}}</b> of <b>{{total}}</b> of your assets.",
     "mode": {
       "EXCLUSIVE": "Yours alone",
-      "PROPORTIONAL": "Shared",
-      "JOINT_CONSENSUS": "Joint approval"
+      "PROPORTIONAL": "Shared"
     },
     "reassigned": "Reassigned to you",
     "viewed": "Viewed",

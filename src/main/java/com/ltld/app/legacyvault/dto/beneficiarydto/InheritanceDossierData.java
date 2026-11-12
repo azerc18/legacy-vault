@@ -52,13 +52,14 @@ public record InheritanceDossierData(
                             AllocationMode mode, BigDecimal sharePercent, String note,
                             boolean viaFallback,
                             Map<String, String> publicFields,   // key -> value, đúng thứ tự schema, đã che số TK
-                            Verification verification) {        // null = không có thông tin xác thực
+                            Verification verification,          // null = không có thông tin xác thực
+                            String consensusCondition) {        // null = không có điều kiện K-of-N
 
         // Giữ chữ ký 8 tham số cũ
         public AssetLine(String assetName, AssetType type, TransferMechanism mechanism,
                          AllocationMode mode, BigDecimal sharePercent, String note,
                          boolean viaFallback, Map<String, String> publicFields) {
-            this(assetName, type, mechanism, mode, sharePercent, note, viaFallback, publicFields, null);
+            this(assetName, type, mechanism, mode, sharePercent, note, viaFallback, publicFields, null, null);
         }
     }
 

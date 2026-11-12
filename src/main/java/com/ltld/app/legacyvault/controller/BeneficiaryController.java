@@ -117,7 +117,7 @@ public class BeneficiaryController {
                 .body(ApiResponse.success(detail));
     }
 
-    // X1: tiến độ đồng thuận K-of-N của tài sản JOINT_CONSENSUS
+    // X1: tiến độ đồng thuận K-of-N của tài sản có điều kiện K-of-N
     @PreAuthorize("hasRole('BENEFICIARY')")
     @GetMapping("/vaults/{vaultId}/assets/{assetId}/consensus")
     public ResponseEntity<ApiResponse<ConsensusStatusResponse>> getConsensusStatus(
@@ -129,7 +129,7 @@ public class BeneficiaryController {
                 beneficiaryService.getConsensusStatus(vaultId, assetId, currentUserId(principal))));
     }
 
-    // X1: đồng ý mở tài sản JOINT_CONSENSUS (đủ K người đồng ý thì tất cả người nhận xem được)
+    // X1: đồng ý mở tài sản có điều kiện K-of-N (đủ K người đồng ý thì tất cả người nhận xem được)
     @PreAuthorize("hasRole('BENEFICIARY')")
     @PostMapping("/vaults/{vaultId}/assets/{assetId}/consensus/approve")
     public ResponseEntity<ApiResponse<ConsensusStatusResponse>> approveConsensus(

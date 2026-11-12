@@ -12,11 +12,6 @@ export const MODES = ['ALL', 'EXCLUSIVE', 'PROPORTIONAL'];
 // Chế độ thuộc gói VIP (PlanFeature.ADVANCED_ALLOCATION ở BE), cùng với người dự phòng của EXCLUSIVE
 const VIP_MODES = ['PROPORTIONAL'];
 
-// Chế độ hợp lệ cho loại tài sản đang chọn. BE chỉ cho chia % (PROPORTIONAL) với tài sản cần hồ sơ pháp lý
-// (transfer mechanism LEGAL_CLAIM_DOSSIER); các chế độ còn lại dùng được cho mọi loại. Loại không hợp lệ thì ẩn
-// hẳn khỏi danh sách; chỉ giữ lại khi chính nó đang được chọn (để select không trống, nút lưu sẽ báo lỗi).
-// "Chia theo tỷ lệ" giờ có ở mọi loại tài sản: tài sản không pháp lý thì BẮT BUỘC kèm K-of-N (tỷ lệ chỉ để ghi nhận).
-export const availableModes = () => MODES;
 
 const textareaCls = 'w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 const SHARE_RE = /^\d{1,3}(\.\d{1,2})?$/;                    // tối đa 2 chữ số thập phân (cột decimal(5,2))
@@ -119,8 +114,7 @@ export function allocationSummary(asset, beneficiaries, t) {
             return first.contingentBeneficiaryId
                 ? s('EXCLUSIVE_BACKUP', { name: nameOf(first.beneficiaryId), backup: nameOf(first.contingentBeneficiaryId) })
                 : s('EXCLUSIVE', { name: nameOf(first.beneficiaryId) });
-        case 'PROPORTIONAL':
-        case 'JOINT_CONSENSUS': {
+        case 'PROPORTIONAL': {
             const list = rows.map((r) => `${nameOf(r.beneficiaryId)} ${r.sharePercent}%`).join(', ');
             return first.consensusThreshold != null
                 ? s('PROPORTIONAL_CONSENSUS', { list, k: first.consensusThreshold, n: rows.length })
@@ -174,7 +168,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 </div>
             </div>
             <div role="radiogroup" aria-label={tt('title')} className="grid sm:grid-cols-2 gap-2">
-                {availableModes(allowProportional, value.mode).map((m, i, modes) => {
+                {MODES.map((m, i, modes) => {
                     const locked = freePlan && VIP_MODES.includes(m);
                     const active = value.mode === m;
                     const wide = modes.length % 2 === 1 && i === modes.length - 1;   // số ô lẻ: ô cuối chiếm cả hàng, không lệch, không xuống dòng

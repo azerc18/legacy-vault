@@ -157,8 +157,7 @@
     "viewedOf": "Đã xem <b>{{viewed}}</b>/<b>{{total}}</b> tài sản của bạn.",
     "mode": {
       "EXCLUSIVE": "Chỉ mình bạn",
-      "PROPORTIONAL": "Chia sẻ",
-      "JOINT_CONSENSUS": "Đồng thuận chung"
+      "PROPORTIONAL": "Chia sẻ"
     },
     "reassigned": "Được chuyển cho bạn",
     "viewed": "Đã xem",

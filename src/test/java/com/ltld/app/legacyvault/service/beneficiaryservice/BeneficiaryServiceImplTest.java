@@ -2739,4 +2739,48 @@ public class BeneficiaryServiceImplTest {
         assertThat(second.mode()).isEqualTo(AllocationMode.PROPORTIONAL);
         assertThat(second.sharePercent()).isEqualByComparingTo("60.00");
     }
+
+    // ===================== K-of-N trên tài sản không pháp lý: % chỉ để ghi nhận =====================
+
+    @Test
+    void getClaimProgress_cryptoWithConsensus_hidesSharePercent() {
+        BeneficiaryClaim claim = stubClaimForClose();
+        stubViewSession(true);
+        DigitalAsset crypto = asset(UUID.randomUUID(), "Ví Ledger", AssetType.CRYPTO_WALLET);
+        AssetAllocation al = AssetAllocation.builder().id(UUID.randomUUID()).asset(crypto)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("33.33")).consensusThreshold(2).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(crypto));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(vaultBeneficiaryRepository.findByVaultIdOrderByCreatedAtAsc(vaultId)).thenReturn(List.of(beneficiaryRow));
+
+        ClaimProgressResponse response = beneficiaryService.getClaimProgress(vaultId, currentUserId);
+
+        ClaimProgressResponse.AssetProgress only = response.getAssets().get(0);
+        assertThat(only.getAllocationMode()).isEqualTo(AllocationMode.PROPORTIONAL);
+        assertThat(only.getSharePercent()).isNull();
+    }
+
+    @Test
+    void getDossierData_cryptoWithConsensus_hidesShare_andDescribesCondition() {
+        User owner = new User();
+        owner.setId(UUID.randomUUID());
+        unlockedVault.setOwner(owner);
+        stubAccessibleVault();
+        stubViewSession(true);
+        DigitalAsset crypto = asset(UUID.randomUUID(), "Ví Ledger", AssetType.CRYPTO_WALLET);
+        AssetAllocation al = AssetAllocation.builder().id(UUID.randomUUID()).asset(crypto)
+                .beneficiary(beneficiaryRow).mode(AllocationMode.PROPORTIONAL)
+                .sharePercent(new BigDecimal("33.33")).consensusThreshold(2).build();
+        when(digitalAssetRepository.findByVaultIdAndStatus(vaultId, AssetStatus.ACTIVE)).thenReturn(List.of(crypto));
+        when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
+        when(assetAllocationRepository.findByAssetId(crypto.getId()))
+                .thenReturn(List.of(al, AssetAllocation.builder().build(), AssetAllocation.builder().build()));
+
+        InheritanceDossierData data = beneficiaryService.getDossierData(vaultId, currentUserId);
+
+        InheritanceDossierData.AssetLine line = data.assets().get(0);
+        assertThat(line.sharePercent()).isNull();
+        assertThat(line.consensusCondition()).isEqualTo("Cần 2/3 người thụ hưởng cùng đồng ý mới mở được tài sản");
+    }
 }

@@ -62,13 +62,13 @@ public interface BeneficiaryService {
     AssetDownloadResponse downloadInheritedAsset(UUID vaultId, UUID assetId, UUID currentUserId);
 
     /**
-     * X1: xem tiến độ đồng thuận K-of-N của một tài sản JOINT_CONSENSUS.
+     * X1: xem tiến độ đồng thuận K-of-N của một tài sản có điều kiện K-of-N.
      * Lỗi: 400 CONSENSUS_NOT_APPLICABLE (tài sản thường), 403 (chưa xác thực / không được phân bổ).
      */
     ConsensusStatusResponse getConsensusStatus(UUID vaultId, UUID assetId, UUID currentUserId);
 
     /**
-     * X1: người nhận đồng ý mở tài sản JOINT_CONSENSUS. Đủ K người đồng ý thì tất cả N người nhận xem/tải được.
+     * X1: người nhận đồng ý mở tài sản có điều kiện K-of-N. Đủ K người đồng ý thì tất cả N người nhận xem/tải được.
      * Gọi lặp lại là vô hại. Ghi audit ASSET_CONSENSUS_APPROVED ở lần đồng ý đầu tiên.
      */
     ConsensusStatusResponse approveConsensus(UUID vaultId, UUID assetId, UUID currentUserId);

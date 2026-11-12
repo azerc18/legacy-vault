@@ -5,7 +5,7 @@ import lombok.Data;
 
 import java.util.UUID;
 
-// X1: trạng thái đồng thuận K-of-N của một tài sản JOINT_CONSENSUS
+// X1: trạng thái đồng thuận K-of-N của một tài sản có điều kiện K-of-N
 @Data
 @Builder
 public class ConsensusStatusResponse {

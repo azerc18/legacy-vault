@@ -412,7 +412,6 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const changeType = (e) => setF((x) => {
         const type = e.target.value;
         const keepProportional = schemaOf(schemas, type)?.mechanism === 'LEGAL_CLAIM_DOSSIER';
-        // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh option bị disable mà vẫn đang chọn
         // Loại không phải tài sản pháp lý: chia tỷ lệ phải kèm K-of-N, nên bật sẵn điều kiện thay vì xoá phân bổ
         const allocation = x.allocation.mode === 'PROPORTIONAL' && !keepProportional ? { ...x.allocation, consensus: true } : x.allocation;
         return { ...x, assetType: type, fields: {}, allocation };
