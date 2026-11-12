@@ -17,6 +17,7 @@ import { displayVnPhone, formatPhoneInput, parseVnPhone, samePhone } from '../Co
 import useNamedBeneficiary from '../Common/useNamedBeneficiary.js';
 import AppHeader, { PAGE_WIDTH, PageTitle } from '../Common/AppHeader.jsx';
 import TwoFactorCard from './TwoFactorCard.jsx';
+import TwoFactorCodeInput from '../Common/TwoFactorCodeInput.jsx';
 import CompletenessCard from './CompletenessCard.jsx';
 import LegacyOverviewCard from './LegacyOverviewCard.jsx';
 import SessionsCard from './SessionsCard.jsx';
@@ -270,12 +271,29 @@ function ProfileForm({ profile, onSaved }) {
 }
 
 // ---------- Form cài đặt mật khẩu (tài khoản tạo bằng Google, chưa có mật khẩu) ----------
-function SetPasswordForm({ onDone }) {
+// Chỉ có phiên đăng nhập là chưa đủ (máy dùng chung, token lộ): phải nhập mã gửi tới email, và mã 2FA nếu đã bật
+function SetPasswordForm({ profile, onDone }) {
     const { t } = useTranslation('profile');
     const [next, setNext] = useState('');
     const [confirm, setConfirm] = useState('');
+    const [otp, setOtp] = useState('');
+    const [code, setCode] = useState('');
+    const [otpSent, setOtpSent] = useState(false);
+    const [sending, setSending] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+
+    const sendOtp = async () => {
+        setError(''); setSending(true);
+        try {
+            await userApi.sendSetPasswordOtp();
+            setOtpSent(true);
+        } catch (err) {
+            setError(getErrorMessage(err, t('password.errors.otpFailed')));
+        } finally {
+            setSending(false);
+        }
+    };
 
     const submit = async (e) => {
         e.preventDefault();
@@ -283,11 +301,13 @@ function SetPasswordForm({ onDone }) {
         if (!next || !confirm) return setError(t('password.errors.required'));
         if (!isPasswordValid(next)) return setError(t('password.errors.weak'));
         if (next !== confirm) return setError(t('password.errors.mismatch'));
+        if (!otp.trim()) return setError(t('password.errors.otpRequired'));
+        if (profile.mfaEnabled && !code.trim()) return setError(t('password.errors.codeRequired'));
 
         setBusy(true);
         try {
             // Không đăng xuất: trước đó không có mật khẩu nào. Hồ sơ mới (passwordSet = true) đổi form về "Đổi mật khẩu"
-            onDone(await userApi.setPassword(next, confirm));
+            onDone(await userApi.setPassword({ newPassword: next, passwordConfirm: confirm, otp: otp.trim(), code: code.trim() }));
         } catch (err) {
             setError(getErrorMessage(err, t('password.errors.setFailed')));
             setBusy(false);
@@ -308,6 +328,20 @@ function SetPasswordForm({ onDone }) {
                         <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
                     </Field>
                 </div>
+                <Field label={t('password.otp')} hint={otpSent ? t('password.otpSent', { email: profile.email }) : t('password.otpHint')}>
+                    <div className="flex gap-2">
+                        <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                               inputMode="numeric" autoComplete="one-time-code" className={inputClass} aria-label={t('password.otp')} />
+                        <button type="button" onClick={sendOtp} disabled={sending} className={`${btnOutline} shrink-0`}>
+                            {sending ? t('password.otpSending') : otpSent ? t('password.otpResend') : t('password.otpSend')}
+                        </button>
+                    </div>
+                </Field>
+                {profile.mfaEnabled && (
+                    <Field label={t('password.code')}>
+                        <TwoFactorCodeInput label={t('password.code')} value={code} onChange={setCode} inputClass={inputClass} />
+                    </Field>
+                )}
                 <div className="flex justify-end pt-2">
                     <button type="submit" disabled={busy} className={btnPrimary}>
                         {busy ? t('password.submitting') : t('password.setSubmit')}
@@ -351,7 +385,7 @@ function ChangePasswordForm({ justSet }) {
     return (
         <Card title={t('password.title')} icon="lock_reset">
             <Alert>{error}</Alert>
-            <Alert type="success">{justSet ? t('password.setDone') : ''}</Alert>
+            {justSet && <Alert type="success">{t('password.setDone')}</Alert>}
             <Alert type="info">{t('password.notice')}</Alert>
             <form onSubmit={submit} className="space-y-4">
                 <Field label={t('password.current')}>
@@ -443,7 +477,7 @@ export default function ProfilePage() {
                                 <PreferencesCard />
                                 {/* Tài khoản Google chưa có mật khẩu: cài đặt (không hỏi mật khẩu hiện tại) thay cho đổi mật khẩu */}
                                 {profile.passwordSet === false
-                                    ? <SetPasswordForm onDone={(p) => { setProfile(p); setPasswordJustSet(true); }} />
+                                    ? <SetPasswordForm profile={profile} onDone={(p) => { setProfile(p); setPasswordJustSet(true); }} />
                                     : <ChangePasswordForm justSet={passwordJustSet} />}
                                 <div id="profile-2fa" className="scroll-mt-6">
                                     <TwoFactorCard profile={profile} onChanged={setProfile} />

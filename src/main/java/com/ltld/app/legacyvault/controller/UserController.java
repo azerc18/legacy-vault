@@ -46,6 +46,12 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully. Please sign in again."));
     }
 
+    @PostMapping("/set-password/otp")
+    public ResponseEntity<ApiResponse<Void>> sendSetPasswordOtp(Principal principal) {
+        userProfileService.sendSetPasswordOtp(currentUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("A code has been sent to your email"));
+    }
+
     @PostMapping("/set-password")
     public ResponseEntity<ApiResponse<UserProfileResponse>> setPassword(
             Principal principal, @Valid @RequestBody SetPasswordRequest request) {

@@ -9,10 +9,13 @@ export const userApi = {
         http.put('/users/me', { fullName, phoneNumber, preferredLanguage }).then((r) => r.data.data),
     changePassword: (currentPassword, newPassword, passwordConfirm) =>
         http.post('/users/me/change-password', { currentPassword, newPassword, passwordConfirm }),
-    // Tài khoản tạo bằng Google chưa có mật khẩu (profile.passwordSet = false): cài đặt, không hỏi mật khẩu hiện tại.
+    // Tài khoản tạo bằng Google chưa có mật khẩu (profile.passwordSet = false): cài đặt, không hỏi mật khẩu hiện tại
+    // nhưng phải có OTP gửi tới email (sendSetPasswordOtp), và mã 2FA nếu đã bật.
     // Trả lại hồ sơ đã cập nhật (passwordSet = true); không đăng xuất.
-    setPassword: (newPassword, passwordConfirm) =>
-        http.post('/users/me/set-password', { newPassword, passwordConfirm }).then((r) => r.data.data),
+    sendSetPasswordOtp: () => http.post('/users/me/set-password/otp'),
+    setPassword: ({ newPassword, passwordConfirm, otp, code }) =>
+        http.post('/users/me/set-password', { newPassword, passwordConfirm, otp, code: code || undefined })
+            .then((r) => r.data.data),
 
     // ---- Avatar ----
     // Ảnh cần Bearer token nên không dùng <img src="/api/..."> trực tiếp được -> tải blob rồi tạo object URL

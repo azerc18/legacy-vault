@@ -52,7 +52,14 @@
     "submit": "Update password",
     "submitting": "Updating...",
     "setTitle": "Set a password",
-    "setNotice": "You signed in with Google, so your account has no password yet. Set one to sign in with your email and password, and to confirm important actions such as deleting your account.",
+    "setNotice": "You signed in with Google, so your account has no password yet. Set one to sign in with your email and password, and to confirm important actions such as deleting your account. To protect your account, you need to enter a code sent to your email.",
+    "otp": "Code sent to your email",
+    "otpHint": "Click \"Send code\" to get a 6-digit code by email.",
+    "otpSent": "A code was sent to {{email}}. It is valid for a few minutes.",
+    "otpSend": "Send code",
+    "otpResend": "Resend code",
+    "otpSending": "Sending...",
+    "code": "Two-step verification code or backup code",
     "setSubmit": "Set password",
     "setDone": "Your password is set. You can now sign in with your email and this password, or keep using Google.",
     "show": "Show password",
@@ -64,7 +71,10 @@
       "mismatch": "Password confirmation does not match.",
       "same": "New password must be different from the current one.",
       "failed": "Could not change password.",
-      "setFailed": "Could not set your password."
+      "setFailed": "Could not set your password.",
+      "otpFailed": "Could not send the verification code.",
+      "otpRequired": "Please enter the code sent to your email.",
+      "codeRequired": "Please enter your two-step verification code."
     }
   },
   "mfa": {

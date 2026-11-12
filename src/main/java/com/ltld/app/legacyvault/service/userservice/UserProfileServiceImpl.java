@@ -11,9 +11,14 @@ import com.ltld.app.legacyvault.enums.AppLanguage;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
 import com.ltld.app.legacyvault.enums.KycLevel;
+import com.ltld.app.legacyvault.enums.TokenType;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.enums.RevokedReason;
 import com.ltld.app.legacyvault.exception.UserProfileException;
+import com.ltld.app.legacyvault.exception.ExpiredOtpException;
+import com.ltld.app.legacyvault.exception.InvalidOtpException;
+import com.ltld.app.legacyvault.exception.OtpNotFoundException;
+import com.ltld.app.legacyvault.exception.TooManyAttemptsException;
 import com.ltld.app.legacyvault.exception.StorageUnavailableException;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
@@ -21,6 +26,8 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
+import com.ltld.app.legacyvault.service.mfaservice.MfaService;
+import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import com.ltld.app.legacyvault.utility.VnPhoneNumber;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -51,6 +58,8 @@ public class UserProfileServiceImpl implements UserProfileService {
     private final AuditLogService auditLogService;
     private final FileStorageService fileStorageService;
     private final CryptoService cryptoService;
+    private final VerificationTokenService verificationTokenService;
+    private final MfaService mfaService;
 
     @Override
     @Transactional(readOnly = true)
@@ -108,16 +117,33 @@ public class UserProfileServiceImpl implements UserProfileService {
         auditLogService.success(AuditAction.PASSWORD_CHANGED, user.getId(), user.getEmail());
     }
 
-    // Tài khoản tạo bằng Google chưa có mật khẩu (chuỗi ngẫu nhiên): cài đặt mật khẩu, không hỏi mật khẩu hiện tại.
-    // Không thu hồi phiên: trước đó không có mật khẩu nào để bị lộ, người dùng vẫn ở lại trang hồ sơ.
+    // Bước 1 của cài đặt mật khẩu: gửi OTP tới email (cùng mã, hạn, giới hạn gửi như "Quên mật khẩu").
     @Override
     @Transactional
+    public void sendSetPasswordOtp(UUID userId) {
+        User user = load(userId);
+        requireNoPassword(user);
+        verificationTokenService.issueOtp(user, TokenType.PASSWORD_RESET);
+    }
+
+    // Bước 2: tài khoản tạo bằng Google chưa có mật khẩu (chuỗi ngẫu nhiên) -> cài đặt mật khẩu, không hỏi mật khẩu hiện tại.
+    // Chỉ có phiên đăng nhập là chưa đủ (máy dùng chung, token lộ): phải có OTP email, và mã 2FA nếu đã bật.
+    // Không thu hồi phiên: trước đó không có mật khẩu nào để bị lộ, người dùng vẫn ở lại trang hồ sơ.
+    // noRollbackFor: lần nhập OTP / 2FA sai vẫn được đếm và ghi audit
+    @Override
+    @Transactional(noRollbackFor = {UserProfileException.class, InvalidOtpException.class,
+            TooManyAttemptsException.class, ExpiredOtpException.class, OtpNotFoundException.class})
     public UserProfileResponse setPassword(UUID userId, SetPasswordRequest request) {
         User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserProfileException("Account not found", HttpStatus.NOT_FOUND));
-        if (user.isPasswordSet()) {
-            // Đã có mật khẩu thì phải đổi mật khẩu (có kiểm tra mật khẩu hiện tại)
-            throw new UserProfileException("A password is already set; use change password instead", HttpStatus.CONFLICT);
+        requireNoPassword(user);
+
+        verificationTokenService.consumeOtp(user, TokenType.PASSWORD_RESET, request.getOtp(),
+                AuditAction.PASSWORD_CHANGE_FAILED);
+        if (user.isMfaEnabled() && !mfaService.verifyCode(user, request.getCode())) {
+            auditLogService.failure(AuditAction.PASSWORD_CHANGE_FAILED, user.getId(), user.getEmail(),
+                    "set password: invalid 2fa code");
+            throw new UserProfileException("The two-step verification code is incorrect", HttpStatus.BAD_REQUEST);
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -126,6 +152,13 @@ public class UserProfileServiceImpl implements UserProfileService {
         auditLogService.log(AuditAction.PASSWORD_CHANGED, AuditResult.SUCCESS, user.getId(), user.getEmail(),
                 null, null, null, "password set (google account)");
         return toResponse(user);
+    }
+
+    private static void requireNoPassword(User user) {
+        if (user.isPasswordSet()) {
+            // Đã có mật khẩu thì phải đổi mật khẩu (có kiểm tra mật khẩu hiện tại)
+            throw new UserProfileException("A password is already set; use change password instead", HttpStatus.CONFLICT);
+        }
     }
 
     // ---------------- Avatar ----------------

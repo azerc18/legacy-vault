@@ -13,6 +13,7 @@ public interface UserProfileService {
     UserProfileResponse getMe(UUID userId);
     UserProfileResponse updateMe(UUID userId, UpdateProfileRequest request);
     void changePassword(UUID userId, ChangePasswordRequest request);
+    void sendSetPasswordOtp(UUID userId);
     UserProfileResponse setPassword(UUID userId, SetPasswordRequest request);
     UserProfileResponse updateAvatar(UUID userId, MultipartFile file);
     AvatarFile getAvatar(UUID userId);

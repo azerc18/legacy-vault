@@ -148,6 +148,65 @@ class UserControllerTest {
         verify(userProfileService, never()).updateMe(any(), any());
     }
 
+    // ---------- POST /api/users/me/set-password (tài khoản Google) ----------
+
+    private static final String SET_PW = BASE + "/set-password";
+
+    @Test
+    void sendSetPasswordOtp_returns200() throws Exception {
+        mockMvc.perform(post(SET_PW + "/otp").principal(principal))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(userProfileService).sendSetPasswordOtp(userId);
+    }
+
+    @Test
+    void setPassword_valid_returns200WithProfile() throws Exception {
+        when(userProfileService.setPassword(eq(userId), any())).thenReturn(sample("An", null));
+
+        mockMvc.perform(post(SET_PW).principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\",\"otp\":\"123456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email").value("owner@example.com"));
+
+        verify(userProfileService).setPassword(eq(userId), argThat(r ->
+                "New-Pass1".equals(r.getNewPassword()) && "123456".equals(r.getOtp())));
+    }
+
+    @Test
+    void setPassword_weakPassword_returns400AndSkipsService() throws Exception {
+        mockMvc.perform(post(SET_PW).principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"short\",\"passwordConfirm\":\"short\",\"otp\":\"123456\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(userProfileService, never()).setPassword(any(), any());
+    }
+
+    @Test
+    void setPassword_confirmMismatch_returns400AndSkipsService() throws Exception {
+        mockMvc.perform(post(SET_PW).principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"Other-Pass1\",\"otp\":\"123456\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.passwordMatching").value("Password confirmation does not match"));
+
+        verify(userProfileService, never()).setPassword(any(), any());
+    }
+
+    @Test
+    void setPassword_missingOtp_returns400AndSkipsService() throws Exception {
+        mockMvc.perform(post(SET_PW).principal(principal)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"New-Pass1\",\"passwordConfirm\":\"New-Pass1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.otp").value("Please enter the code sent to your email"));
+
+        verify(userProfileService, never()).setPassword(any(), any());
+    }
+
     // ---------- POST /api/users/me/change-password ----------
 
     @Test

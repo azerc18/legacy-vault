@@ -52,7 +52,14 @@
     "submit": "Cập nhật mật khẩu",
     "submitting": "Đang cập nhật...",
     "setTitle": "Cài đặt mật khẩu",
-    "setNotice": "Bạn đăng nhập bằng Google nên tài khoản chưa có mật khẩu. Cài đặt mật khẩu để có thể đăng nhập bằng email và mật khẩu, và để xác nhận các thao tác quan trọng như xoá tài khoản.",
+    "setNotice": "Bạn đăng nhập bằng Google nên tài khoản chưa có mật khẩu. Cài đặt mật khẩu để có thể đăng nhập bằng email và mật khẩu, và để xác nhận các thao tác quan trọng như xoá tài khoản. Để bảo vệ tài khoản, bạn cần nhập mã gửi tới email.",
+    "otp": "Mã xác nhận gửi tới email",
+    "otpHint": "Bấm \"Gửi mã\" để nhận mã 6 số qua email.",
+    "otpSent": "Đã gửi mã tới {{email}}. Mã có hiệu lực trong vài phút.",
+    "otpSend": "Gửi mã",
+    "otpResend": "Gửi lại mã",
+    "otpSending": "Đang gửi...",
+    "code": "Mã xác thực 2 lớp hoặc mã dự phòng",
     "setSubmit": "Cài đặt mật khẩu",
     "setDone": "Đã cài đặt mật khẩu. Từ giờ bạn có thể đăng nhập bằng email và mật khẩu này, hoặc tiếp tục dùng Google.",
     "show": "Hiện mật khẩu",
@@ -64,7 +71,10 @@
       "mismatch": "Mật khẩu xác nhận không khớp.",
       "same": "Mật khẩu mới phải khác mật khẩu hiện tại.",
       "failed": "Không đổi được mật khẩu.",
-      "setFailed": "Không cài đặt được mật khẩu."
+      "setFailed": "Không cài đặt được mật khẩu.",
+      "otpFailed": "Không gửi được mã xác nhận.",
+      "otpRequired": "Vui lòng nhập mã xác nhận gửi tới email.",
+      "codeRequired": "Vui lòng nhập mã xác thực 2 lớp."
     }
   },
   "mfa": {
