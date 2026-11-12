@@ -455,6 +455,7 @@ function AssetDetailModal({ detail, onClose }) {
     const { t } = useTranslation(['beneficiary', 'vault']);
     const label = useEnumLabels();
     const fields = parseSecretFields(detail.secret);
+    const publicFields = Object.entries(detail.fields || {}).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
 
     return createPortal(
         <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4" onClick={onClose}>
@@ -466,6 +467,18 @@ function AssetDetailModal({ detail, onClose }) {
                     </div>
                     <button onClick={onClose} aria-label={t('assets.close')}><Icon name="close" className="text-outline" /></button>
                 </div>
+
+                {/* Trường công khai (tên ngân hàng, số tài khoản, nơi giữ bản gốc...): hiện thẳng, không che */}
+                {publicFields.length > 0 && (
+                    <dl className="mt-5 space-y-2">
+                        {publicFields.map(([key, value]) => (
+                            <div key={key}>
+                                <dt className="font-label-sm text-on-surface-variant">{t(`vault:assetFields.labels.${key}`, { defaultValue: labelFromKey(key) })}</dt>
+                                <dd className="mt-0.5 text-sm whitespace-pre-wrap break-words">{value}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                )}
 
                 {fields ? (
                     fields.length ? fields.map(([key, value]) => (

@@ -25,6 +25,7 @@ import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotService;
 import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotView;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldSpec;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldType;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
@@ -484,6 +485,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .assetName(asset.getAssetName())
                 .secret(decrypted.secret())
                 .notes(decrypted.notes())
+                .fields(publicFieldsOf(asset))
                 .build();
 
         // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
@@ -879,6 +881,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 + "========================================\n"
                 + "Asset name: " + asset.getAssetName() + "\n"
                 + "Asset type: " + asset.getAssetType() + "\n"
+                + "Details:" + formatPublicFieldsForDownload(asset) + "\n"
                 + "Access information:" + formatSecretForDownload(asset, decrypted.secret()) + "\n"
                 + "Note: " + notes + "\n"
                 + "Exported at: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
@@ -1356,6 +1359,51 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpCode(null);
         verification.setOtpSentAt(null);
         verification.setOtpExpiresAt(null);
+    }
+
+    /**
+     * Trường công khai (không phải SECRET) của tài sản cho người thụ hưởng, theo thứ tự schema, bỏ ô trống.
+     * Không che (khác PDF hồ sơ): người nhận đã xác minh danh tính và cần số đầy đủ để làm thủ tục.
+     * Key không có trong schema (dữ liệu cũ) đặt cuối.
+     */
+    static Map<String, String> publicFieldsOf(DigitalAsset asset) {
+        if (asset.getPublicFieldsJson() == null || asset.getPublicFieldsJson().isBlank()) return Map.of();
+        Map<String, String> raw;
+        try {
+            raw = FlatJson.decode(asset.getPublicFieldsJson());
+        } catch (RuntimeException e) {
+            return Map.of();
+        }
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        Map<String, String> out = new LinkedHashMap<>();
+        if (schema != null) {
+            for (AssetFieldSpec f : schema.fields()) {
+                String v = raw.get(f.key());
+                if (f.type() == AssetFieldType.SECRET || v == null || v.isBlank()) continue;
+                out.put(f.key(), v);
+            }
+        }
+        raw.forEach((k, v) -> {
+            if (!out.containsKey(k) && v != null && !v.isBlank()
+                    && (schema == null || schema.fields().stream().noneMatch(f -> f.key().equals(k) && f.type() == AssetFieldType.SECRET))) {
+                out.put(k, v);
+            }
+        });
+        return out;
+    }
+
+    /** Khối "Details:" trong file tải về: từng dòng "Nhãn: giá trị" theo schema; không có thì (none). */
+    static String formatPublicFieldsForDownload(DigitalAsset asset) {
+        Map<String, String> fields = publicFieldsOf(asset);
+        if (fields.isEmpty()) return " (none)";
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        StringBuilder sb = new StringBuilder();
+        fields.forEach((k, v) -> {
+            String label = schema == null ? k : schema.fields().stream()
+                    .filter(f -> f.key().equals(k)).map(AssetFieldSpec::label).findFirst().orElse(k);
+            sb.append("\n  ").append(label).append(": ").append(v);
+        });
+        return sb.toString();
     }
 
     private static Map<String, String> dossierFields(DigitalAsset asset) {

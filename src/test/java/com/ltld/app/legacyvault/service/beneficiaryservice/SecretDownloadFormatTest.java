@@ -49,4 +49,32 @@ class SecretDownloadFormatTest {
         assertThat(BeneficiaryServiceImpl.formatSecretForDownload(asset(AssetType.BANK_ACCOUNT), "{\"legacyPin\":\"1\"}"))
                 .isEqualTo("\n  legacyPin: 1");
     }
+
+    // ---------- Trường công khai (S1 #280) ----------
+
+    private static DigitalAsset bankWithFields(String json) {
+        DigitalAsset a = asset(AssetType.BANK_ACCOUNT);
+        a.setPublicFieldsJson(json);
+        return a;
+    }
+
+    @Test
+    void publicFields_followSchemaOrder_skipBlank_andAreNotMasked() {
+        DigitalAsset a = bankWithFields("{\"accountNumber\":\"0071000123456\",\"institutionName\":\"Vietcombank\",\"branchName\":\"\"}");
+
+        assertThat(BeneficiaryServiceImpl.publicFieldsOf(a))
+                .containsExactly(java.util.Map.entry("institutionName", "Vietcombank"),
+                        java.util.Map.entry("accountNumber", "0071000123456"));   // đủ số, không che
+        assertThat(BeneficiaryServiceImpl.formatPublicFieldsForDownload(a))
+                .isEqualTo("\n  Bank name: Vietcombank\n  Account number: 0071000123456");
+    }
+
+    @Test
+    void publicFields_unknownKeysLast_andMissingOrBrokenJsonIsNone() {
+        DigitalAsset a = bankWithFields("{\"legacyNote\":\"x\",\"institutionName\":\"ACB\"}");
+        assertThat(BeneficiaryServiceImpl.publicFieldsOf(a).keySet()).containsExactly("institutionName", "legacyNote");
+
+        assertThat(BeneficiaryServiceImpl.formatPublicFieldsForDownload(bankWithFields(null))).isEqualTo(" (none)");
+        assertThat(BeneficiaryServiceImpl.publicFieldsOf(bankWithFields("{broken"))).isEmpty();
+    }
 }
