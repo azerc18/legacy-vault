@@ -98,6 +98,9 @@ export default function BeneficiaryVaultDetail() {
 
     if (!user) return <Navigate to="/login" replace />;
 
+    // Két có tài sản đặt điều kiện K-of-N (assets[].consensus khác null)
+    const hasConsensus = assets.some((a) => a.consensus);
+
     return (
         <BeneficiaryLayout
             back="/beneficiary"
@@ -148,6 +151,8 @@ export default function BeneficiaryVaultDetail() {
                         <Alert type="info">{t('detail.verified', { date: formatDate(sessionExpiresAt, true) })}</Alert>
                     )}
                     {message && <Alert>{message}</Alert>}
+                    {/* Khối chấp nhận / từ chối và tiến độ chỉ hiện khi Owner đặt điều kiện K-of-N cho tài sản trong két */}
+                    {hasConsensus && (<>
                     <RespondClaim
                         vaultId={vaultId}
                         myStatus={progress?.myStatus ?? vault?.myStatus}
@@ -156,6 +161,7 @@ export default function BeneficiaryVaultDetail() {
                         onError={(e) => handleAccessError(e)}
                     />
                     <ProgressPanel progress={progress} />
+                    </>)}
                     <AssetList
                         vaultId={vaultId}
                         assets={assets}
@@ -167,7 +173,7 @@ export default function BeneficiaryVaultDetail() {
                     <CloseVault
                         vaultId={vaultId}
                         accessVersion={accessVersion}
-                        hasJoint={assets.some((a) => a.consensus)}
+                        hasJoint={hasConsensus}
                         onClosed={(res) => {
                             setVault((v) => ({ ...v, vaultStatus: res.vaultStatus, claimStatus: res.claimStatus, claimedAt: res.claimedAt }));
                             setStage('claimed');

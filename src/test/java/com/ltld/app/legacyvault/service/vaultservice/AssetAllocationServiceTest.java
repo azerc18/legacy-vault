@@ -338,20 +338,20 @@ class AssetAllocationServiceTest {
         assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ASSET_FIELD_INVALID);
     }
 
-    // ===== JOINT_CONSENSUS, mode thiếu =====
+    // ===== K-of-N: điều kiện của PROPORTIONAL =====
 
-    private static DigitalAssetRequest.AllocationRequest joint(Integer threshold,
-                                                               DigitalAssetRequest.Recipient... recipients) {
-        var a = alloc(AllocationMode.JOINT_CONSENSUS, recipients);
+    private static DigitalAssetRequest.AllocationRequest proportionalConsensus(Integer threshold,
+                                                                               DigitalAssetRequest.Recipient... recipients) {
+        var a = alloc(AllocationMode.PROPORTIONAL, recipients);
         a.setThreshold(threshold);
         return a;
     }
 
     @Test
-    @DisplayName("X1 JOINT_CONSENSUS 2/3: lưu 3 dòng, mỗi dòng 1 phần khóa, 2 phần ghép ra đúng khóa gốc")
-    void jointConsensus_ok_storesShares() throws Exception {
+    @DisplayName("K-of-N 2/3 trên chia tỷ lệ: lưu 3 dòng PROPORTIONAL giữ tỷ lệ, mỗi dòng 1 phần khoá, 2 phần ghép ra khoá gốc")
+    void proportionalConsensus_ok_storesSharesAndPercents() throws Exception {
         when(cryptoService.encrypt(any())).thenAnswer(inv -> "ENC:" + inv.getArgument(0));
-        var a = joint(2, recipient(bA, null, null), recipient(bB, null, null), recipient(bC, null, null));
+        var a = proportionalConsensus(2, recipient(bA, "50", null), recipient(bB, "30", null), recipient(bC, "20", null));
 
         update(AssetType.BANK_ACCOUNT, a);
 
@@ -360,12 +360,14 @@ class AssetAllocationServiceTest {
         verify(assetAllocationRepository, times(3)).save(captor.capture());
         List<AssetAllocation> rows = captor.getAllValues();
         assertThat(rows).allSatisfy(r -> {
-            assertThat(r.getMode()).isEqualTo(AllocationMode.JOINT_CONSENSUS);
+            assertThat(r.getMode()).isEqualTo(AllocationMode.PROPORTIONAL);
             assertThat(r.getConsensusThreshold()).isEqualTo(2);
             assertThat(r.getConsensusShare()).startsWith("ENC:");
             assertThat(r.getConsensusApprovedAt()).isNull();
-            assertThat(r.getSharePercent()).isEqualByComparingTo("100");
         });
+        assertThat(rows).extracting(AssetAllocation::getSharePercent)
+                .usingElementComparator(java.math.BigDecimal::compareTo)
+                .containsExactly(new java.math.BigDecimal("50"), new java.math.BigDecimal("30"), new java.math.BigDecimal("20"));
         // Hai phần bất kỳ ghép lại phải ra khóa gốc có hash trùng với hash đã lưu
         var shares = rows.stream()
                 .map(r -> com.ltld.app.legacyvault.utility.ShamirSecretSharing.Share
@@ -377,30 +379,48 @@ class AssetAllocationServiceTest {
     }
 
     @Test
-    @DisplayName("X1 JOINT_CONSENSUS: thiếu threshold / threshold < 2 / threshold > số người → ASSET_FIELD_INVALID")
-    void jointConsensus_badThreshold_throws() {
-        var noThreshold = joint(null, recipient(bA, null, null), recipient(bB, null, null));
-        var tooLow = joint(1, recipient(bA, null, null), recipient(bB, null, null));
-        var tooHigh = joint(3, recipient(bA, null, null), recipient(bB, null, null));
+    @DisplayName("Chia tỷ lệ không chọn K-of-N: không có phần khoá")
+    void proportional_withoutThreshold_hasNoConsensus() throws Exception {
+        var a = proportionalConsensus(null, recipient(bA, "50", null), recipient(bB, "50", null));
 
-        assertCode(() -> update(AssetType.BANK_ACCOUNT, noThreshold), ErrorCode.ASSET_FIELD_INVALID);
+        update(AssetType.BANK_ACCOUNT, a);
+
+        ArgumentCaptor<AssetAllocation> captor = ArgumentCaptor.forClass(AssetAllocation.class);
+        verify(assetAllocationRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(r -> {
+            assertThat(r.getConsensusThreshold()).isNull();
+            assertThat(r.getConsensusShare()).isNull();
+        });
+    }
+
+    @Test
+    @DisplayName("K-of-N: threshold < 2 / threshold > số người → ASSET_FIELD_INVALID")
+    void proportionalConsensus_badThreshold_throws() {
+        var tooLow = proportionalConsensus(1, recipient(bA, "50", null), recipient(bB, "50", null));
+        var tooHigh = proportionalConsensus(3, recipient(bA, "50", null), recipient(bB, "50", null));
+
         assertCode(() -> update(AssetType.BANK_ACCOUNT, tooLow), ErrorCode.ASSET_FIELD_INVALID);
         assertCode(() -> update(AssetType.BANK_ACCOUNT, tooHigh), ErrorCode.ASSET_FIELD_INVALID);
         verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
     }
 
     @Test
-    @DisplayName("X1 JOINT_CONSENSUS: chỉ 1 người nhận → ASSET_FIELD_INVALID")
-    void jointConsensus_singleRecipient_throws() {
-        var a = joint(2, recipient(bA, null, null));
+    @DisplayName("JOINT_CONSENSUS không còn là kiểu phân chia; K-of-N kèm EXCLUSIVE bị từ chối")
+    void jointConsensusMode_andThresholdWithExclusive_areRejected() {
+        var joint = alloc(AllocationMode.JOINT_CONSENSUS, recipient(bA, null, null), recipient(bB, null, null));
+        joint.setThreshold(2);
+        var exclusive = alloc(AllocationMode.EXCLUSIVE, recipient(bA, null, null));
+        exclusive.setThreshold(2);
 
-        assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ASSET_FIELD_INVALID);
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, joint), ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
+        assertCode(() -> update(AssetType.BANK_ACCOUNT, exclusive), ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
+        verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));
     }
 
     @Test
-    @DisplayName("X1 JOINT_CONSENSUS: có người dự phòng → ALLOCATION_MODE_NOT_ALLOWED")
-    void jointConsensus_withContingent_throws() {
-        var a = joint(2, recipient(bA, null, bC), recipient(bB, null, null));
+    @DisplayName("Chia tỷ lệ (kể cả có K-of-N): có người dự phòng → ALLOCATION_MODE_NOT_ALLOWED")
+    void proportionalConsensus_withContingent_throws() {
+        var a = proportionalConsensus(2, recipient(bA, "50", bC), recipient(bB, "50", null));
 
         assertCode(() -> update(AssetType.BANK_ACCOUNT, a), ErrorCode.ALLOCATION_MODE_NOT_ALLOWED);
         verify(assetAllocationRepository, never()).save(any(AssetAllocation.class));

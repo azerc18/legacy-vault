@@ -1005,8 +1005,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Map<UUID, Integer> reassignedCounts = new LinkedHashMap<>();
         List<AssetAllocation> held = assetAllocationRepository.findHeldBy(vaultId, me.getId());
         for (AssetAllocation allocation : held) {
-            if (allocation.getMode() == AllocationMode.JOINT_CONSENSUS) {
-                continue; // joint không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
+            if (JointConsensusService.isConsensusRow(allocation)) {
+                continue; // K-of-N không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
             }
             VaultBeneficiary next = allocation.getContingentBeneficiary();
             if (next != null && !next.getId().equals(me.getId()) && canReceive(vaultId, next)) {
@@ -1027,7 +1027,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
         stalled += (int) held.stream()
-                .filter(a -> a.getMode() == AllocationMode.JOINT_CONSENSUS)
+                .filter(JointConsensusService::isConsensusRow)
                 .map(a -> a.getAsset().getId())
                 .distinct()
                 .filter(id -> jointConsensusService.isStalled(assetAllocationRepository.findByAssetId(id)))

@@ -2348,7 +2348,9 @@ public class BeneficiaryServiceImplTest {
     void declineClaim_jointAsset_enoughLeft_notStalled() {
         stubDeclinable();
         AssetAllocation al = allocation(beneficiaryRow, null);
-        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        // K-of-N: chia tỷ lệ có ngưỡng đồng thuận
+        al.setMode(AllocationMode.PROPORTIONAL);
+        al.setConsensusThreshold(2);
         VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
         when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
         when(jointConsensusService.isStalled(any())).thenReturn(false);
@@ -2366,7 +2368,9 @@ public class BeneficiaryServiceImplTest {
     void declineClaim_jointAsset_tooFewLeft_isStalledAndAudited() {
         stubDeclinable();
         AssetAllocation al = allocation(beneficiaryRow, null);
-        al.setMode(AllocationMode.JOINT_CONSENSUS);
+        // K-of-N: chia tỷ lệ có ngưỡng đồng thuận
+        al.setMode(AllocationMode.PROPORTIONAL);
+        al.setConsensusThreshold(2);
         VaultBeneficiary other = otherRow(BeneficiaryInviteStatus.INVITED);
         when(assetAllocationRepository.findHeldBy(vaultId, beneficiaryRow.getId())).thenReturn(List.of(al));
         when(jointConsensusService.isStalled(any())).thenReturn(true);

@@ -51,9 +51,14 @@ public class JointConsensusService {
         }
     }
 
-    /** Tài sản có phải JOINT_CONSENSUS không (mọi dòng phân bổ cùng một mode). */
+    /** Tài sản có điều kiện K-of-N không: các dòng phân bổ mang ngưỡng đồng thuận (PROPORTIONAL + threshold). */
     public boolean isJoint(List<AssetAllocation> rows) {
-        return !rows.isEmpty() && rows.get(0).getMode() == AllocationMode.JOINT_CONSENSUS;
+        return !rows.isEmpty() && isConsensusRow(rows.get(0));
+    }
+
+    /** Dòng phân bổ thuộc tài sản có điều kiện K-of-N. */
+    public static boolean isConsensusRow(AssetAllocation row) {
+        return row.getConsensusThreshold() != null;
     }
 
     // Người nhận còn hiệu lực: chưa từ chối / từ bỏ. Phần đồng ý của người đã từ chối không được đếm.
@@ -90,7 +95,7 @@ public class JointConsensusService {
     public int approveAllHeldBy(UUID vaultId, VaultBeneficiary me) {
         int count = 0;
         for (AssetAllocation r : assetAllocationRepository.findHeldBy(vaultId, me.getId())) {
-            if (r.getMode() == AllocationMode.JOINT_CONSENSUS && r.getConsensusApprovedAt() == null) {
+            if (isConsensusRow(r) && r.getConsensusApprovedAt() == null) {
                 r.setConsensusApprovedAt(LocalDateTime.now());
                 assetAllocationRepository.save(r);
                 count++;

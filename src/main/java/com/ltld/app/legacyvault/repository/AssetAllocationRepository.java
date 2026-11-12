@@ -63,14 +63,14 @@ public interface AssetAllocationRepository extends JpaRepository<AssetAllocation
     // N2b (Q49): số phân bổ mà người đang giữ đã từ chối / từ bỏ, tức không còn ai nhận (stalled)
     // LEFT JOIN tường minh: nếu dùng al.effectiveBeneficiary.status thì Hibernate tạo INNER JOIN và làm mất
     // các dòng chưa fallback (effectiveBeneficiary IS NULL).
-    // X1: tài sản JOINT_CONSENSUS không tính ở đây (không có người dự phòng); kẹt hay không tính theo K,
+    // Tài sản có điều kiện K-of-N (consensusThreshold khác null) không tính ở đây (không có người dự phòng); kẹt hay không tính theo K,
     // xem JointConsensusService.countStalledAssets.
     @Query("""
             SELECT COUNT(al) FROM AssetAllocation al
             JOIN al.beneficiary b
             LEFT JOIN al.effectiveBeneficiary e
             WHERE al.asset.vault.id = :vaultId
-              AND al.mode <> com.ltld.app.legacyvault.enums.AllocationMode.JOINT_CONSENSUS
+              AND al.consensusThreshold IS NULL
               AND ((e IS NULL AND b.status IN :deadStatuses) OR e.status IN :deadStatuses)
             """)
     long countStalledInVault(@Param("vaultId") UUID vaultId,

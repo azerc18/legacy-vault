@@ -154,6 +154,12 @@
         "totalOk": "Đủ 100%",
         "totalOver": "Tổng đang là {{total}}%, dư {{diff}}%. Cần đúng 100%.",
         "totalUnder": "Tổng đang là {{total}}%, còn thiếu {{diff}}%. Cần đúng 100%.",
+        "condition": {
+          "title": "Điều kiện mở tài sản",
+          "none": "Không: mỗi người nhận phần của mình ngay khi két mở",
+          "kOfN": "Cần đủ K trong N người nhận cùng đồng ý",
+          "hint": "Tài sản chỉ mở khi đủ số người đã chọn cùng đồng ý. Sửa phân bổ (kể cả ghi chú) sẽ chia lại khoá và xoá các lượt đồng ý trước đó."
+        },
         "thresholdPlaceholder": "Số người cần đồng ý",
         "thresholdOption": "{{k}} trên {{n}} người",
         "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
@@ -165,6 +171,7 @@
           "EXCLUSIVE": "Chỉ {{name}}",
           "EXCLUSIVE_BACKUP": "Chỉ {{name}} (dự phòng: {{backup}})",
           "PROPORTIONAL": "Chia tỷ lệ: {{list}}",
+          "PROPORTIONAL_CONSENSUS": "Chia tỷ lệ: {{list}} · cần {{k}}/{{n}} người đồng ý",
           "JOINT_CONSENSUS": "Đồng thuận {{k}}/{{n}}: {{list}}"
         },
         "errors": {

@@ -293,25 +293,15 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
 
         switch (req.getMode()) {
             case JOINT_CONSENSUS -> {
-                // X1: đồng thuận K-of-N, là tính năng của gói nâng cao
-                entitlementService.assertCanUseAdvancedAllocation(ownerId);
-                if (recipients.size() < 2) {
-                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
-                            "JOINT_CONSENSUS needs at least 2 recipients");
-                }
-                Integer threshold = req.getThreshold();
-                if (threshold == null || threshold < 2 || threshold > recipients.size()) {
-                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
-                            "threshold must be between 2 and the number of recipients");
-                }
-                for (DigitalAssetRequest.Recipient r : recipients) {
-                    if (r.getContingentBeneficiaryId() != null) {
-                        throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                                "Contingent beneficiary is only for EXCLUSIVE");
-                    }
-                }
+                // K-of-N giờ là điều kiện của "Chia theo tỷ lệ" (mode PROPORTIONAL + threshold), không còn là kiểu riêng
+                throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
+                        "JOINT_CONSENSUS is no longer a mode; use PROPORTIONAL with a consensus threshold");
             }
             case EXCLUSIVE -> {
+                if (req.getThreshold() != null) {
+                    throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
+                            "K-of-N consensus is only available with PROPORTIONAL");
+                }
                 if (recipients.size() != 1) {
                     throw new VaultException(ErrorCode.ASSET_FIELD_INVALID, "EXCLUSIVE needs exactly one recipient");
                 }
@@ -345,13 +335,19 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
                     throw new VaultException(ErrorCode.ALLOCATION_PERCENT_INVALID,
                             "PROPORTIONAL needs at least 2 recipients and shares must total 100%");
                 }
+                // Điều kiện K-of-N (tuỳ chọn): tài sản chỉ mở khi đủ K trong N người nhận đồng ý
+                Integer threshold = req.getThreshold();
+                if (threshold != null && (threshold < 2 || threshold > recipients.size())) {
+                    throw new VaultException(ErrorCode.ASSET_FIELD_INVALID,
+                            "threshold must be between 2 and the number of recipients");
+                }
             }
         }
 
         // X1: sinh khóa gốc ngẫu nhiên, chia thành N phần Shamir (mỗi người nhận 1 phần), chỉ lưu hash của khóa gốc
         List<ShamirSecretSharing.Share> shares = null;
         String keyHash = null;
-        if (req.getMode() == AllocationMode.JOINT_CONSENSUS) {
+        if (req.getMode() == AllocationMode.PROPORTIONAL && req.getThreshold() != null) {
             byte[] key = new byte[32];
             CONSENSUS_RANDOM.nextBytes(key);
             keyHash = JointConsensusService.hashKey(key);

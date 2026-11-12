@@ -154,6 +154,12 @@
         "totalOk": "Adds up to 100%",
         "totalOver": "Total is {{total}}%, {{diff}}% too much. It must be exactly 100%.",
         "totalUnder": "Total is {{total}}%, {{diff}}% short. It must be exactly 100%.",
+        "condition": {
+          "title": "Unlock condition",
+          "none": "None: each recipient gets their share as soon as the vault opens",
+          "kOfN": "Require K of the N recipients to agree",
+          "hint": "The asset opens only when the chosen number of recipients agree. Editing the allocation (even the note) re-splits the key and clears earlier approvals."
+        },
         "thresholdPlaceholder": "Approvals needed",
         "thresholdOption": "{{k}} of {{n}} people",
         "notePlaceholder": "Note about this allocation (optional)",
@@ -165,6 +171,7 @@
           "EXCLUSIVE": "Only {{name}}",
           "EXCLUSIVE_BACKUP": "Only {{name}} (backup: {{backup}})",
           "PROPORTIONAL": "Split: {{list}}",
+          "PROPORTIONAL_CONSENSUS": "Shares: {{list}} · needs {{k}}/{{n}} to agree",
           "JOINT_CONSENSUS": "Joint approval {{k}}/{{n}}: {{list}}"
         },
         "errors": {
