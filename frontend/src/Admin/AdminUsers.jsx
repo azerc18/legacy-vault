@@ -135,6 +135,8 @@ export default function AdminUsers() {
 }
 
 function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
+    // Khoá tạm do sai mật khẩu / mã nhiều lần: trạng thái vẫn ACTIVE nhưng không đăng nhập được tới lockedUntil
+    const tempLocked = !!u.lockedUntil && new Date(u.lockedUntil) > new Date();
     const { t } = useTranslation('admin');
     const allRoles = u.roles || [];
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
@@ -162,6 +164,9 @@ function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
             </td>
             <td data-label={t('users.cols.status')}>
                 <Stamp tone={toneOf(u.status)}>{t(`users.status.${u.status}`, { defaultValue: u.status })}</Stamp>
+                {tempLocked && (
+                    <p className="mt-1 text-xs text-error">{t('users.tempLocked', { time: formatDate(u.lockedUntil, true) })}</p>
+                )}
             </td>
             <td data-label={t('users.cols.roles')}>
                 <div className="flex flex-wrap gap-1">
@@ -196,7 +201,7 @@ function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
                     {!isMe && u.status === 'ACTIVE' && (
                         <button onClick={() => onAction({ kind: 'lock', user: u })} className={`${link} text-error`}>{t('users.actions.lock')}</button>
                     )}
-                    {!isMe && u.status === 'LOCKED' && (
+                    {!isMe && (u.status === 'LOCKED' || tempLocked) && (
                         <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>{t('users.actions.unlock')}</button>
                     )}
                     {/* DMS của Owner: hiện đúng nút theo trạng thái */}

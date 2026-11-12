@@ -385,6 +385,35 @@ class AdminUserServiceImplTest {
         }
 
         @Test
+        @DisplayName("mở khoá user ACTIVE đang bị khoá tạm (sai mật khẩu 5 lần) -> xoá khoá tạm, audit")
+        void unlockTemporarilyLockedActiveUser_clearsLock() {
+            user.setFailedLoginAttempts(5);
+            user.setLockedUntil(Instant.now().plusSeconds(600));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            AdminUserResponse res = service.updateStatus(adminId, userId, req("ACTIVE", null));
+
+            assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+            assertThat(user.getFailedLoginAttempts()).isZero();
+            assertThat(user.getLockedUntil()).isNull();
+            assertThat(res.getLockedUntil()).isNull();
+            verify(tokenService, never()).revokeAllUserTokens(any(), any());
+            verify(auditLogService).log(eq(AuditAction.RBAC_CHANGE), eq(AuditResult.SUCCESS), eq(adminId),
+                    isNull(), eq("User"), eq(userId.toString()), eq("TEMPORARY LOCK CLEARED"));
+        }
+
+        @Test
+        @DisplayName("khoá tạm đã hết hạn -> không coi là đang khoá, vẫn no-op")
+        void expiredTemporaryLock_isNoop() {
+            user.setLockedUntil(Instant.now().minusSeconds(60));
+            when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+
+            service.updateStatus(adminId, userId, req("ACTIVE", null));
+
+            verifyNoRbacSideEffects();
+        }
+
+        @Test
         @DisplayName("trạng thái không đổi -> idempotent, không thu hồi token, không audit")
         void sameStatus_noop() {
             when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));

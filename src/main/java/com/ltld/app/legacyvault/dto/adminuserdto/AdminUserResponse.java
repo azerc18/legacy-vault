@@ -21,4 +21,6 @@ public class AdminUserResponse {
     private Instant lastLoginAt;
     private DmsStatus dmsStatus;
     private boolean executorRescueNeeded;
+    // Khoá tạm do sai mật khẩu / mã 2FA (trạng thái vẫn ACTIVE): còn hiệu lực tới lúc này; null = không bị khoá tạm
+    private Instant lockedUntil;
 }

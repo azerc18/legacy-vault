@@ -25,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -128,6 +129,15 @@ public class AdminUserServiceImpl implements AdminUserService{
             throw new AdminException("Account was deleted by its owner", HttpStatus.CONFLICT);
         }
         if (user.getStatus() == target) {
+            // Khoá tạm do sai mật khẩu / mã 2FA nhiều lần: trạng thái vẫn ACTIVE, chỉ có lockedUntil.
+            // Admin bấm "Mở khoá" thì phải gỡ khoá tạm này, nếu không user vẫn bị báo khoá tới hết 15 phút.
+            if (target == UserStatus.ACTIVE && isTemporarilyLocked(user)) {
+                user.setFailedLoginAttempts(0);
+                user.setLockedUntil(null);
+                String reason = req.getReason() == null || req.getReason().isBlank() ? "" : " reason=" + req.getReason().trim();
+                auditLogService.log(AuditAction.RBAC_CHANGE, AuditResult.SUCCESS, adminId, null,
+                        "User", userId.toString(), "TEMPORARY LOCK CLEARED" + reason);
+            }
             return toResponse(user);              // idempotent
         }
 
@@ -144,6 +154,10 @@ public class AdminUserServiceImpl implements AdminUserService{
         auditLogService.log(AuditAction.RBAC_CHANGE, AuditResult.SUCCESS, adminId, null,
                 "User", userId.toString(), "STATUS " + old + "->" + target + reason);
         return toResponse(user);
+    }
+
+    private static boolean isTemporarilyLocked(User u) {
+        return u.getLockedUntil() != null && u.getLockedUntil().isAfter(Instant.now());
     }
 
     private static UserStatus parseStatus(String s) {
@@ -179,6 +193,7 @@ public class AdminUserServiceImpl implements AdminUserService{
     private static AdminUserResponse build(User u, DmsConfig config, boolean rescueNeeded) {
         return AdminUserResponse.builder()
                 .id(u.getId()).email(u.getEmail()).fullName(u.getFullName()).status(u.getStatus())
+                .lockedUntil(isTemporarilyLocked(u) ? u.getLockedUntil() : null)
                 .roles(u.getRoles().stream().map(Role::getCode).sorted().toList())
                 .createdAt(u.getCreatedAt()).lastLoginAt(u.getLastLoginAt())
                 .dmsStatus(config == null ? null : config.getStatus())

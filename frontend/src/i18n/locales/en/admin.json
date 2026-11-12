@@ -68,6 +68,7 @@
     "currentPlan": "Current plan: {{plan}}",
     "receipt": "Receipt",
     "refund": {"action": "Refund", "title": "Refund payment", "message": "Refund {{amount}} to {{email}} ({{plan}}). Only the unused part of the period this payment bought is removed from the current expiry (an old, fully used payment removes nothing); if no time is left the account goes back to Free right away.", "viaGateway": "Refund through {{provider}}", "viaGatewayHint": "Calls the gateway refund API. If the gateway refuses, nothing changes.", "manualHint": "Only records that you refunded by hand outside the system. The gateway is not called.", "reasonPlaceholder": "Reason for the refund (required, max 255 characters)", "confirm": "Refund", "success": "Refunded the payment of {{email}}.", "error": "Could not refund.", "on": "Refunded {{date}}"},
+    "tempLocked": "Temporarily locked until {{time}} (too many wrong passwords or codes)",
     "status": { "SUCCESS": "Successful", "PENDING": "Pending", "FAILED": "Failed", "EXPIRED": "Expired", "REFUNDED": "Refunded" },
     "coupon": "Code {{code}} -{{discount}}",
     "couponReused": "Code paid more than once",

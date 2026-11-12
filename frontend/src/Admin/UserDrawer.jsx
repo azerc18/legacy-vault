@@ -40,6 +40,9 @@ function Section({ title, count, children }) {
  * @param onClose  đóng ngăn kéo
  * @param onChanged(user) gọi sau khi khoá/mở khoá/DMS để trang cha cập nhật dòng tương ứng (tuỳ chọn)
  */
+// Khoá tạm do sai mật khẩu / mã nhiều lần: trạng thái vẫn ACTIVE nhưng không đăng nhập được tới lockedUntil
+const isTemporarilyLocked = (u) => !!u?.lockedUntil && new Date(u.lockedUntil) > new Date();
+
 export default function UserDrawer({ userId, onClose, onChanged }) {
     const { t } = useTranslation('admin');
     const me = getUser();
@@ -159,7 +162,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                             {/* Thao tác nhanh */}
                             <div className="mt-4 flex flex-wrap gap-2">
                                 {!isMe && u.status === 'ACTIVE' && <button className={`${btn} text-error`} onClick={() => setDialog('lock')}><Icon name="lock" className="text-[16px]" />{t('users.actions.lock')}</button>}
-                                {!isMe && u.status === 'LOCKED' && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
+                                {!isMe && (u.status === 'LOCKED' || isTemporarilyLocked(u)) && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
                                 {isOwner && u.dmsStatus === 'ACTIVE' && <button className={btn} onClick={() => setDialog('suspend')}><Icon name="pause_circle" className="text-[16px]" />{t('users.actions.suspend')}</button>}
                                 {isOwner && u.dmsStatus === 'SUSPENDED' && <button className={btn} onClick={() => setDialog('resume')}><Icon name="play_circle" className="text-[16px]" />{t('users.actions.resume')}</button>}
                                 {demoTools && isOwner && u.dmsStatus === 'ACTIVE' && u.vaults?.length > 0 && (
@@ -180,7 +183,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
                                     <Field label={t('drawer.fields.joined')}>{formatDate(u.createdAt)}</Field>
                                     <Field label={t('drawer.fields.lastLogin')}>{formatDate(u.lastLoginAt, true)}</Field>
                                     <Field label={t('drawer.fields.mfa')}>{u.mfaEnabled ? t('drawer.on') : t('drawer.off')}</Field>
-                                    <Field label={t('drawer.fields.failedLogins')}>{u.failedLoginAttempts}</Field>
+                                    <Field label={t('drawer.fields.failedLogins')}>{u.failedLoginAttempts}{isTemporarilyLocked(u) && <span className="block text-xs font-normal text-error">{t('users.tempLocked', { time: formatDate(u.lockedUntil, true) })}</span>}</Field>
                                     <Field label={t('drawer.fields.plan')}>{u.planName || u.planCode}{u.planExpiresAt && <span className="block text-xs font-normal text-outline">{t('drawer.until', { date: formatDate(u.planExpiresAt) })}</span>}</Field>
                                     {u.dmsNextCheckinDueAt && <Field label={t('drawer.fields.nextCheckin')}>{formatDate(u.dmsNextCheckinDueAt, true)}</Field>}
                                 </dl>
