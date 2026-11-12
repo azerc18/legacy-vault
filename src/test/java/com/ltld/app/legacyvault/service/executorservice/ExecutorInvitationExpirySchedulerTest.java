@@ -25,6 +25,7 @@ import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
@@ -226,6 +227,19 @@ class ExecutorInvitationExpirySchedulerTest {
         assertThat(assignment.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
         assertThat(assignment.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
         verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("Mỗi dòng chạy REQUIRES_NEW + READ_COMMITTED: revokeIfUnused phải thấy assignment Owner khác vừa commit")
+    void transactions_useRequiresNewAndReadCommitted() {
+        expiredIds(assignment.getId());
+
+        scheduler.expireOverdue(now);
+
+        ArgumentCaptor<TransactionDefinition> def = ArgumentCaptor.forClass(TransactionDefinition.class);
+        verify(transactionManager).getTransaction(def.capture());
+        assertThat(def.getValue().getPropagationBehavior()).isEqualTo(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        assertThat(def.getValue().getIsolationLevel()).isEqualTo(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
     @Test

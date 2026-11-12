@@ -69,6 +69,10 @@ public class ExecutorInvitationExpiryScheduler {
         this.eventPublisher = eventPublisher;
         this.requiresNewTx = new TransactionTemplate(transactionManager);
         this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // READ_COMMITTED như FR-06 và luồng trả lời lời mời: MySQL mặc định REPEATABLE READ chốt snapshot ở câu đọc
+        // đầu tiên (findExecutorUserIdById, trước khi khóa User). Khi đó revokeIfUnused không thấy assignment mà Owner
+        // khác vừa commit cho đúng người này và gỡ nhầm role EXECUTOR.
+        this.requiresNewTx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
     // Chạy mỗi giờ; trễ 10 phút lần đầu để không chạy ngay lúc khởi động
