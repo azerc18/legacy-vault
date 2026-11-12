@@ -4,7 +4,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth, afterLoginPath } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
@@ -68,9 +68,7 @@ export default function Login() {
             updateStoredUser(toStoredUser(await userApi.getMe()));
         } catch { /* header vẫn hiển thị được tên mặc định */ }
         const target = from || homeFor(user);
-        setRedirectTo(firstLogin
-            ? `/me?${new URLSearchParams({ welcome: '1', next: target }).toString()}`
-            : target);
+        setRedirectTo(afterLoginPath(firstLogin, target));
     };
 
     const backToPassword = () => {

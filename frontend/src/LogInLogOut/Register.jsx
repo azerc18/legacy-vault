@@ -1,7 +1,7 @@
 import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { getUser, homeFor, saveSession, updateStoredUser, emailFromCredential, clearAuth } from '../auth/auth.js';
+import { getUser, homeFor, saveSession, updateStoredUser, emailFromCredential, clearAuth, afterLoginPath } from '../auth/auth.js';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
@@ -32,6 +32,9 @@ export default function Register() {
     const [captchaReset, setCaptchaReset] = useState(0);
     const captcha = useCaptchaConfig();
     const navigate = useNavigate();
+    // Đích sau khi đăng ký bằng Google (lần đầu -> trang hồ sơ). Dùng chung <Navigate> bên dưới như Login.jsx:
+    // route đích tải lazy nên navigate() trong hàm async bị <Navigate> mặc định ghi đè.
+    const [redirectTo, setRedirectTo] = useState(null);
 
     useEffect(() => {
         if (localStorage.getItem('lv_demo_mode') === 'true') {
@@ -45,7 +48,7 @@ export default function Register() {
     // Bỏ qua phiên đăng nhập demo để người dùng có thể tạo tài khoản thật
     const isDemo = typeof window !== 'undefined' && localStorage.getItem('lv_demo_mode') === 'true';
     const current = isDemo ? null : getUser();
-    if (current) return <Navigate to={homeFor(current)} replace />;
+    if (current) return <Navigate to={redirectTo || homeFor(current)} replace />;
 
 
     const handleChange = (e) => {
@@ -70,7 +73,7 @@ export default function Register() {
             }
             const user = saveSession(res.accessToken, googleEmail);
             try { updateStoredUser(toStoredUser(await userApi.getMe())); } catch { /* giữ tên mặc định */ }
-            navigate(homeFor(user), { replace: true });
+            setRedirectTo(afterLoginPath(res.firstLogin, homeFor(user)));
         } catch (err) {
             setError(getErrorMessage(err, t('google.failed')));
         } finally {

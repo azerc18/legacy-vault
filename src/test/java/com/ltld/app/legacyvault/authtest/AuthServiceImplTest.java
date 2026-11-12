@@ -264,6 +264,23 @@ public class AuthServiceImplTest {
     }
 
     @Test
+    void login_wrongPasswordThenCorrect_correctOneIsStillFirstLogin() {
+        user.setLastLoginAt(null);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed-password")).thenReturn(false);
+        when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
+        when(tokenService.generateAccessToken(user)).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
+        when(tokenService.getAccessTokenExpiry()).thenReturn(EXPIRES_AT);
+
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "wrong"), IP, USER_AGENT));
+        assertThat(user.getLastLoginAt()).isNull();   // lần sai không được ghi là đã đăng nhập
+
+        assertThat(authService.login(loginRequest("test@example.com", "Password123"), IP, USER_AGENT)
+                .response().isFirstLogin()).isTrue();
+    }
+
+    @Test
     void login_emailWithSpacesAndUpperCase_isNormalizedBeforeLookup() {
         LoginRequest request = loginRequest("  Test@Example.COM ", "Password123");
 
@@ -539,8 +556,10 @@ public class AuthServiceImplTest {
         when(mfaService.verifyCode(user, "123456")).thenReturn(true);
         stubTokens();
 
+        user.setLastLoginAt(null);   // chưa từng đăng nhập thành công: bước 1 (mfaRequired) không ghi lastLoginAt
         LoginResult result = authService.loginWithMfa(new MfaLoginRequest("raw-token", "123456"), IP, USER_AGENT);
 
+        assertThat(result.response().isFirstLogin()).isTrue();
         assertThat(result.refreshToken()).isEqualTo("refresh-token");
         assertThat(result.response().getAccessToken()).isEqualTo("access-token");
         assertThat(user.getMfaChallengeHash()).isNull();          // dùng 1 lần
@@ -626,6 +645,7 @@ public class AuthServiceImplTest {
         stubGoogleTokens();
 
         LoginResult result = authService.loginWithGoogle(GOOGLE_REQUEST, IP, USER_AGENT);
+        assertThat(result.response().isFirstLogin()).isTrue();   // tài khoản Google mới: lần đăng nhập đầu
 
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository, atLeastOnce()).save(saved.capture());

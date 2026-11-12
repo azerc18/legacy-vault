@@ -355,7 +355,7 @@ export default function ProfilePage() {
             <AppHeader />
 
             <main className={`${PAGE_WIDTH} py-10`}>
-                <PageTitle back={{ to: '/home', label: t('back') }} title={t('title')} />
+                <PageTitle back={{ to: welcome ? next : '/home', label: t('back') }} title={t('title')} />
 
                 {welcome && (
                     <div role="status" className="mb-6 p-4 rounded-2xl border border-primary/30 bg-primary/5 flex flex-wrap items-center gap-4">
@@ -364,7 +364,7 @@ export default function ProfilePage() {
                             <p className="font-bold">{t('welcome.title')}</p>
                             <p className="text-sm text-on-surface-variant">{t('welcome.text')}</p>
                         </div>
-                        <Link to={next} className={btnOutline}>
+                        <Link to={next} replace className={btnOutline}>
                             {t('welcome.continue')} <Icon name="arrow_forward" className="text-[18px]" />
                         </Link>
                     </div>
