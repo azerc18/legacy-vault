@@ -10,6 +10,8 @@ import java.util.regex.Pattern;
  * Khi {@code trustForwardedFor} bật: lấy giá trị CUỐI của X-Forwarded-For, là giá trị proxy tin cậy tự thêm vào.
  * Không lấy giá trị đầu, vì giá trị đầu do trình duyệt gửi lên và ai cũng tự đặt được.
  * Azure ghi kèm cổng ("1.2.3.4:51234"), nên bỏ phần cổng, nếu không mỗi kết nối sẽ thành một "IP" khác.
+ * Nếu sau này đặt Cloudflare proxy trước Azure (domain bật đám mây cam), giá trị cuối sẽ là IP của Cloudflare
+ * và mọi người chung một xô: khi đó phải đọc CF-Connecting-IP (chỉ tin khi request đến từ dải IP của Cloudflare).
  */
 public class ClientIpResolver {
 

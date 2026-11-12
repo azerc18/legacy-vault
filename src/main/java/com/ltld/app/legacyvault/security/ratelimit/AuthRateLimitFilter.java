@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.util.UrlPathHelper;
 
 import java.io.IOException;
 
@@ -59,10 +60,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         writeTooManyRequests(response, decision.retryAfterSeconds());
     }
 
+    /**
+     * Đường dẫn ĐÃ giải mã, bỏ context path và phần ";..." (như Spring dùng để tìm controller).
+     * Không dùng getRequestURI() thô: /api/auth/%72egister không khớp quy tắc nào nhưng Spring vẫn đưa vào /register.
+     */
     private static String path(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-        String context = request.getContextPath();
-        return context != null && !context.isEmpty() && uri.startsWith(context) ? uri.substring(context.length()) : uri;
+        return UrlPathHelper.defaultInstance.getPathWithinApplication(request);
     }
 
     private static void writeTooManyRequests(HttpServletResponse response, long retryAfterSeconds) throws IOException {

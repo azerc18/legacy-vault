@@ -10,5 +10,6 @@ security:
 
 app:
   rate-limit:
-    # Azure App Service đứng trước app và tự thêm IP người dùng vào cuối X-Forwarded-For
+    # Azure App Service đứng trước app và tự thêm IP người dùng vào cuối X-Forwarded-For.
+    # Nếu đặt Cloudflare proxy trước Azure thì giá trị cuối là IP Cloudflare: cần đọc CF-Connecting-IP (xem ClientIpResolver).
     trust-forwarded-for: ${APP_RATE_LIMIT_TRUST_FORWARDED_FOR:true}

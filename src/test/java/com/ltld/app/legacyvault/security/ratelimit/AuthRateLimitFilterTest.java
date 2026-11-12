@@ -20,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.net.URI;
 import java.time.Clock;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -109,5 +110,16 @@ class AuthRateLimitFilterTest {
                     .andExpect(status().isOk());
         }
         verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    void encodedPath_cannotBypassLimit() throws Exception {
+        // %72 = "r": Spring giải mã rồi vẫn đưa vào /register, nên filter cũng phải so trên đường dẫn đã giải mã
+        String ip = "203.0.113.6";
+        for (int i = 0; i < 2; i++) postFrom(ip, "/api/auth/register", REGISTER_BODY);
+        mockMvc.perform(post(URI.create("/api/auth/%72egister")).header("X-Forwarded-For", ip)
+                        .contentType(MediaType.APPLICATION_JSON).content(REGISTER_BODY))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.errorCode").value("IP_RATE_LIMITED"));
     }
 }

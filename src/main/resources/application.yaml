@@ -81,13 +81,14 @@ app:
     # Chỉ bật sau proxy tin cậy (Azure, xem application-prod.yaml). Không có proxy mà bật thì ai cũng tự đặt header để đổi IP.
     trust-forwarded-for: ${APP_RATE_LIMIT_TRUST_FORWARDED_FOR:false}
     rules:
+      # Mức tính cho CẢ một IP: cả lớp dùng chung wifi / NAT nhà mạng là chung một xô, nên để rộng tay.
       register:
         paths: [/api/auth/register]
-        limit: 10
+        limit: 30
         period: PT1H
       forgot:
         paths: [/api/auth/forgot-password]
-        limit: 5
+        limit: 10
         period: PT1H
       otp:
         paths: [/api/auth/send-otp]

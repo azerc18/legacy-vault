@@ -112,4 +112,29 @@ class AuthRateLimiterTest {
                 "b", rule(1, Duration.ofMinutes(1), "/api/auth/login")));
         assertThatThrownBy(() -> new AuthRateLimiter(properties, clock)).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void overCap_withBucketsStillInUse_evictsDownBelowCap() {
+        // Nhiều IP cùng đang dùng dở lượt: quét xô đầy không bỏ được gì, vẫn phải giữ map dưới trần
+        AuthRateLimiter limiter = limiter(10);
+        for (int i = 0; i < 25; i++) {
+            limiter.check("register", "10.0.0." + i);
+            clock.advance(Duration.ofMillis(600));   // xô register 1 giờ chưa kịp hồi đầy
+        }
+        assertThat(limiter.trackedKeys()).isLessThan(20);
+    }
+
+    @Test
+    void sweep_isThrottled_toOncePerSecond() {
+        AuthRateLimiter limiter = limiter(10);
+        for (int i = 0; i < 10; i++) limiter.check("register", "10.0.0." + i);
+        limiter.check("register", "10.0.1.1");   // vượt trần -> quét, bỏ bớt
+        int afterFirstSweep = limiter.trackedKeys();
+        // Cùng một mili giây: không quét lại dù vẫn chạm trần, map chỉ tạm lớn thêm
+        for (int i = 0; i < 5; i++) limiter.check("register", "10.0.2." + i);
+        assertThat(limiter.trackedKeys()).isEqualTo(afterFirstSweep + 5);
+        clock.advance(Duration.ofSeconds(1));
+        limiter.check("register", "10.0.3.1");
+        assertThat(limiter.trackedKeys()).isLessThanOrEqualTo(10);
+    }
 }
