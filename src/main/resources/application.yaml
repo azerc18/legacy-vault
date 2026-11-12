@@ -73,6 +73,34 @@ app:
         mb: [9, 10, 11, 12, 13]
         # CHƯA xác nhận được từ nguồn chính thức nên CHƯA điền (xem PR): Vietcombank, VietinBank (trang số đẹp chỉ nêu 4-12 ký tự),
         # Agribank, ACB, Sacombank, VPBank, TPBank, HDBank, VIB, MSB, SeABank, SHB, OCB, LPBank, Eximbank.
+  # Giới hạn số request theo IP cho API công khai /api/auth/* (chỉ POST). Vượt -> 429 IP_RATE_LIMITED + Retry-After.
+  # Lượt hồi dần đều trong chu kỳ. Đổi một mức qua biến môi trường, ví dụ APP_RATE_LIMIT_RULES_REGISTER_LIMIT=20.
+  # Không đưa link check-in DMS / xác nhận chéo vào đây: chặn nhầm ở đó có thể dẫn tới bàn giao khi Owner còn sống.
+  rate-limit:
+    enabled: ${APP_RATE_LIMIT_ENABLED:true}
+    # Chỉ bật sau proxy tin cậy (Azure, xem application-prod.yaml). Không có proxy mà bật thì ai cũng tự đặt header để đổi IP.
+    trust-forwarded-for: ${APP_RATE_LIMIT_TRUST_FORWARDED_FOR:false}
+    rules:
+      register:
+        paths: [/api/auth/register]
+        limit: 10
+        period: PT1H
+      forgot:
+        paths: [/api/auth/forgot-password]
+        limit: 5
+        period: PT1H
+      otp:
+        paths: [/api/auth/send-otp]
+        limit: 10
+        period: PT1H
+      login:
+        paths: [/api/auth/login, /api/auth/login/2fa, /api/auth/google]
+        limit: 20
+        period: PT1M
+      other:
+        paths: [/api/auth/verify-email, /api/auth/reset-password]
+        limit: 30
+        period: PT1M
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
   # Địa chỉ frontend (Vite, cổng 5173), dùng để tạo link trong email. BẮT BUỘC đặt FRONTEND_BASE_URL=https://... khi deploy, nếu không mail sẽ chứa link localhost.

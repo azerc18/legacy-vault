@@ -7,3 +7,8 @@ spring:
 security:
   jwt:
     cookie-secure: true
+
+app:
+  rate-limit:
+    # Azure App Service đứng trước app và tự thêm IP người dùng vào cuối X-Forwarded-For
+    trust-forwarded-for: ${APP_RATE_LIMIT_TRUST_FORWARDED_FOR:true}
