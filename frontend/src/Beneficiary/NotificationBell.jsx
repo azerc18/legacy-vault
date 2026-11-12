@@ -30,6 +30,7 @@ const TYPE_META = {
     EXECUTOR_ASSIGNED: ['assignment_ind', 'success'],
     EXECUTOR_INVITATION_ACCEPTED: ['task_alt', 'success'],
     EXECUTOR_INVITATION_DECLINED: ['person_off', 'warning'],
+    EXECUTOR_INVITATION_EXPIRED: ['timer_off', 'warning'],
     EXECUTOR_REVOKED: ['person_off', 'warning'],
     DMS_CHECKIN_REMINDER: ['alarm', 'warning'],
     DMS_CONFIRMATION_PENDING: ['crisis_alert', 'danger'],
@@ -107,6 +108,7 @@ async function targetOf(n) {
             return ifRole('EXECUTOR', '/executor/home');
         case 'EXECUTOR_INVITATION_ACCEPTED':
         case 'EXECUTOR_INVITATION_DECLINED':
+        case 'EXECUTOR_INVITATION_EXPIRED':
             return ifRole('OWNER', '/owner/executors');
         // Owner
         case 'DMS_CHECKIN_REMINDER':

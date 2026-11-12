@@ -40,6 +40,7 @@
       "EXECUTOR_INVITATION_ACCEPTED": "{{executor}} đã đồng ý làm {{role}} của bạn.",
       "EXECUTOR_INVITATION_DECLINED_reason": "{{executor}} đã từ chối làm {{role}} của bạn. Lý do: {{reason}}. Hãy chỉ định người khác.",
       "EXECUTOR_INVITATION_DECLINED": "{{executor}} đã từ chối làm {{role}} của bạn. Hãy chỉ định người khác.",
+      "EXECUTOR_INVITATION_EXPIRED": "{{executor}} không trả lời lời mời làm {{role}} trong {{days}} ngày nên lời mời đã hết hạn. Hãy chỉ định người khác.",
       "EXECUTOR_REVOKED_OWNER": "{{owner}} đã thu hồi vai trò {{role}} của bạn.",
       "EXECUTOR_REVOKED_TIMEOUT": "Bạn không xác nhận đúng hạn nên vai trò người thi hành cho {{owner}} đã chuyển sang người dự phòng.",
       "EXECUTOR_REVOKED_ADMIN": "Quản trị viên đã chỉ định người thi hành khác cho {{owner}}. Bạn không còn là {{role}} của họ.",

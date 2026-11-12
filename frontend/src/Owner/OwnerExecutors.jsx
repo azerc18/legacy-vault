@@ -118,7 +118,9 @@ function ExecutorCard({ position, assignment, onChanged }) {
                         <p className="text-sm text-on-surface-variant truncate">{assignment.email}</p>
                         <p className="text-xs text-outline">
                             {t('executors.since', { date: formatDate(assignment.assignedAt) })}
-                            {invitationPending && ` · ${t('executors.awaitingResponse')}`}
+                            {invitationPending && ` · ${assignment.invitationExpiresAt
+                                ? t('executors.awaitingResponseUntil', { date: formatDate(assignment.invitationExpiresAt) })
+                                : t('executors.awaitingResponse')}`}
                             {assignment.activatedAt && ` · ${t('executors.activated', { date: formatDate(assignment.activatedAt, true) })}`}
                             {assignment.status === 'ACTIVE' && (assignment.acknowledgedAt
                                 ? ` · ${t('executors.acknowledged', { date: formatDate(assignment.acknowledgedAt, true) })}`

@@ -106,6 +106,7 @@
     "acknowledged": "acknowledged {{date}}",
     "awaitingAck": "awaiting acknowledgement",
     "awaitingResponse": "waiting for them to accept the invitation",
+      "awaitingResponseUntil": "waiting for them to accept, expires {{date}}",
     "noneAssigned": "No one assigned.",
     "saving": "Saving...",
     "assign": "Assign",

@@ -40,6 +40,7 @@
       "EXECUTOR_INVITATION_ACCEPTED": "{{executor}} accepted to be your {{role}}.",
       "EXECUTOR_INVITATION_DECLINED_reason": "{{executor}} declined to be your {{role}}. Reason: {{reason}}. Please assign someone else.",
       "EXECUTOR_INVITATION_DECLINED": "{{executor}} declined to be your {{role}}. Please appoint someone else.",
+      "EXECUTOR_INVITATION_EXPIRED": "{{executor}} did not answer the invitation to be your {{role}} within {{days}} days, so it expired. Please assign someone else.",
       "EXECUTOR_REVOKED_OWNER": "{{owner}} removed you as their {{role}}.",
       "EXECUTOR_REVOKED_TIMEOUT": "You did not acknowledge in time, so your executor role for {{owner}} was passed to the backup executor.",
       "EXECUTOR_REVOKED_ADMIN": "An administrator assigned another executor for {{owner}}. You are no longer their {{role}}.",

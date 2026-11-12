@@ -46,6 +46,9 @@
     "from": "Invited by",
     "role": "Role",
     "invitedAt": "Invited on",
+            "expiresAtLabel": "Reply by",
+            "expiredTitle": "This invitation has expired",
+            "expiredText": "{{name}}'s executor invitation expired before it was answered. If you still want the role, ask them to send a new invitation.",
     "dutiesTitle": "If you accept, you take on",
     "duties": {
       "notified": "Being notified when their Dead Man's Switch is triggered.",

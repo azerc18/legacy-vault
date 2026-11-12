@@ -85,7 +85,14 @@ export default function ExecutorInvitation() {
     // Đã trả lời trước đó (mở lại link) hoặc vừa trả lời xong.
     // Chỉ nhận đúng hai giá trị của BE: dữ liệu lạ thì coi như chưa trả lời, không hiện nhầm "Bạn đã từ chối".
     const accepted = invitation?.responseStatus === 'ACCEPTED';
-    const answered = accepted || invitation?.responseStatus === 'DECLINED';
+    const expired = invitation?.responseStatus === 'EXPIRED';
+    const answered = accepted || expired || invitation?.responseStatus === 'DECLINED';
+    // Icon + câu chữ của thẻ kết quả: đồng ý / hết hạn / từ chối
+    const doneIcon = accepted ? 'task_alt' : expired ? 'timer_off' : 'person_off';
+    const doneTitle = accepted ? 'invitation.acceptedTitle'
+        : expired ? 'invitation.expiredTitle' : 'invitation.declinedTitle';
+    const doneText = accepted ? 'invitation.acceptedText'
+        : expired ? 'invitation.expiredText' : 'invitation.declinedText';
 
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
@@ -98,7 +105,7 @@ export default function ExecutorInvitation() {
                     {loading && <LoadingSkeleton label={t('loading')} />}
 
                     {!loading && !invitation && !error && (
-                        <GlassSurface material="thick" className="rounded-2xl p-8 text-center">
+                        <GlassSurface material="regular" className="rounded-2xl p-8 text-center">
                             <Icon name="link_off" className="text-[40px] text-outline" />
                             <h1 className="mt-3 font-title-lg text-title-lg">{t('invitation.notFoundTitle')}</h1>
                             <p className="mt-2 text-sm text-on-surface-variant">{t('invitation.notFoundText')}</p>
@@ -110,7 +117,7 @@ export default function ExecutorInvitation() {
                     )}
 
                     {!loading && invitation && (
-                        <GlassSurface material="thick" className="rounded-2xl p-7 sm:p-8">
+                        <GlassSurface material="regular" className="rounded-2xl p-7 sm:p-8">
                             {/* Kết quả vừa phản hồi, hoặc trạng thái khi mở lại link đã xử lý */}
                             {result || answered ? (
                                 <div className="text-center">
@@ -118,17 +125,13 @@ export default function ExecutorInvitation() {
                                         accepted
                                             ? 'bg-success-container text-on-success-container'
                                             : 'bg-surface-container-high text-on-surface-variant'}`}>
-                                        <Icon name={accepted ? 'task_alt' : 'person_off'} className="text-[28px]" />
+                                        <Icon name={doneIcon} className="text-[28px]" />
                                     </span>
-                                    <h1 className="mt-4 font-headline-sm text-headline-sm">
-                                        {accepted ? t('invitation.acceptedTitle') : t('invitation.declinedTitle')}
-                                    </h1>
+                                    <h1 className="mt-4 font-headline-sm text-headline-sm">{t(doneTitle)}</h1>
                                     <p className="mt-2 text-sm text-on-surface-variant">
-                                        {accepted
-                                            ? t('invitation.acceptedText', { name: ownerName(invitation) })
-                                            : t('invitation.declinedText', { name: ownerName(invitation) })}
+                                        {t(doneText, { name: ownerName(invitation) })}
                                     </p>
-                                    {invitation.respondedAt && (
+                                    {!expired && invitation.respondedAt && (
                                         <p className="mt-1 text-xs text-outline">
                                             {t('invitation.respondedAt', { date: formatDate(invitation.respondedAt, true) })}
                                         </p>
@@ -173,6 +176,14 @@ export default function ExecutorInvitation() {
                                             <div>
                                                 <p className="text-xs text-outline">{t('invitation.invitedAt')}</p>
                                                 <p className="text-sm font-semibold">{formatDate(invitation.assignedAt)}</p>
+                                            </div>
+                                        )}
+                                        {invitation.invitationExpiresAt && (
+                                            <div>
+                                                <p className="text-xs text-outline">{t('invitation.expiresAtLabel')}</p>
+                                                <p className="text-sm font-semibold text-warning">
+                                                    {formatDate(invitation.invitationExpiresAt)}
+                                                </p>
                                             </div>
                                         )}
                                     </GlassSurface>
