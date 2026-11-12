@@ -1,11 +1,13 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.adminuserdto.*;
+import com.ltld.app.legacyvault.dto.dmsdto.AdminDmsReminderResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignmentResponse;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminClaimService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
+import com.ltld.app.legacyvault.service.dmsservice.AdminDmsReminderService;
 import com.ltld.app.legacyvault.service.dmsservice.AdminExecutorRescueService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
@@ -31,6 +33,7 @@ public class AdminController {
     private final AdminRoleService adminRoleService;
     private final AdminExecutorRescueService adminExecutorRescueService;
     private final AdminClaimService adminClaimService;
+    private final AdminDmsReminderService adminDmsReminderService;
 
     @PostMapping("/users/{userId}/roles/{roleCode}")
     public ResponseEntity<ApiResponse<AdminUserResponse>> grantRole(
@@ -84,6 +87,15 @@ public class AdminController {
         UUID adminId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("DMS resumed successfully",
                 dmsConfigService.resumeByAdmin(ownerId, adminId)));
+    }
+
+    // Admin chủ động nhắc Owner check-in (chuông + email có link một chạm). 429 nếu vừa nhắc trong thời gian chờ.
+    @PostMapping("/dms/{ownerId}/remind-checkin")
+    public ResponseEntity<ApiResponse<AdminDmsReminderResponse>> remindCheckin(
+            Principal principal, @PathVariable UUID ownerId) {
+        UUID adminId = UUID.fromString(principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Check-in reminder sent",
+                adminDmsReminderService.remind(ownerId, adminId)));
     }
 
     @GetMapping("/authorities")

@@ -50,6 +50,8 @@ public enum ErrorCode {
     // Executor / DMS / Vault
     DMS_NOT_TRIGGERED(HttpStatus.CONFLICT),
     DMS_CHECKIN_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
+    // Admin vừa nhắc Owner này check-in (app.dms.admin-reminder-cooldown-minutes)
+    DMS_ADMIN_REMINDER_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS),
     EXECUTOR_NOT_ACTIVE(HttpStatus.FORBIDDEN),
     VAULT_STATE_CONFLICT(HttpStatus.CONFLICT),
     CHECKIN_TOKEN_INVALID(HttpStatus.BAD_REQUEST),

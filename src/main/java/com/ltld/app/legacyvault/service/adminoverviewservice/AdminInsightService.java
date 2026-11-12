@@ -67,6 +67,7 @@ public class AdminInsightService {
     static final int MAX_ASSET_VERIFICATIONS = 100;
 
     private final com.ltld.app.legacyvault.service.assetverificationservice.AssetVerificationService assetVerificationService;
+    private final com.ltld.app.legacyvault.service.dmsservice.AdminDmsReminderService adminDmsReminderService;
 
     @PersistenceContext
     private EntityManager em;
@@ -117,6 +118,9 @@ public class AdminInsightService {
                 .roles(u.getRoles().stream().map(Role::getCode).sorted().toList())
                 .dmsStatus(dms == null || dms.getStatus() == null ? null : dms.getStatus().name())
                 .dmsNextCheckinDueAt(dms == null ? null : dms.getNextCheckinDueAt())
+                .dmsLastAdminReminderAt(dms == null ? null : dms.getLastAdminReminderAt())
+                .dmsAdminReminderAvailableAt(dms == null ? null : adminDmsReminderService.nextAllowedAt(dms.getLastAdminReminderAt()))
+                .dmsAdminReminderAvailableInSeconds(dms == null ? null : adminDmsReminderService.secondsUntilAllowed(dms.getLastAdminReminderAt()))
                 .planCode(sub == null ? "FREE" : sub.getPlan().getCode())
                 .planName(sub == null ? null : sub.getPlan().getName())
                 .planExpiresAt(sub == null ? null : sub.getExpiresAt())

@@ -11,6 +11,9 @@ import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminClaimService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminRoleService;
 import com.ltld.app.legacyvault.service.adminuserservice.AdminUserService;
+import com.ltld.app.legacyvault.dto.dmsdto.AdminDmsReminderResponse;
+import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.service.dmsservice.AdminDmsReminderService;
 import com.ltld.app.legacyvault.service.dmsservice.AdminExecutorRescueService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
 import org.junit.jupiter.api.Test;
@@ -51,6 +54,7 @@ class AdminControllerSecurityTest {
     @MockitoBean private AdminExecutorRescueService adminExecutorRescueService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
     @MockitoBean private AdminClaimService adminClaimService;
+    @MockitoBean private AdminDmsReminderService adminDmsReminderService;
 
     private static RequestPostProcessor token(UUID subject, String... authorities) {
         SimpleGrantedAuthority[] granted = Arrays.stream(authorities)
@@ -278,5 +282,32 @@ class AdminControllerSecurityTest {
 
         mockMvc.perform(put("/api/admin/dms/{ownerId}/resume", USER_ID).with(admin()))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void remindCheckin_ownerWithoutAdminManage_returns403() throws Exception {
+        mockMvc.perform(post("/api/admin/dms/{ownerId}/remind-checkin", USER_ID).with(owner()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(adminDmsReminderService);
+    }
+
+    @Test
+    void remindCheckin_admin_passesOwnerAndAdmin() throws Exception {
+        when(adminDmsReminderService.remind(any(), any()))
+                .thenReturn(AdminDmsReminderResponse.builder().emailSent(true).build());
+
+        mockMvc.perform(post("/api/admin/dms/{ownerId}/remind-checkin", USER_ID).with(admin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.emailSent").value(true));
+        verify(adminDmsReminderService).remind(USER_ID, ADMIN_ID);
+    }
+
+    @Test
+    void remindCheckin_tooSoon_returns429WithCode() throws Exception {
+        when(adminDmsReminderService.remind(any(), any()))
+                .thenThrow(new DmsException(ErrorCode.DMS_ADMIN_REMINDER_TOO_SOON, "too soon"));
+
+        mockMvc.perform(post("/api/admin/dms/{ownerId}/remind-checkin", USER_ID).with(admin()))
+                .andExpect(status().isTooManyRequests());
     }
 }
