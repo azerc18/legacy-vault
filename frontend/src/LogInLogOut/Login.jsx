@@ -9,6 +9,7 @@ import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
+import TurnstileWidget from '../Common/TurnstileWidget.jsx';
 import BrandMark from '../Common/BrandMark.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
 
@@ -29,6 +30,10 @@ export default function Login() {
     const [mfaToken, setMfaToken] = useState(location.state?.mfaToken || null);   // != null -> đang ở bước 2
     const [code, setCode] = useState('');
     const [useBackup, setUseBackup] = useState(false);
+    // BE trả captchaRequired khi tài khoản đã sai mật khẩu nhiều lần -> hiện Turnstile cho các lần thử sau
+    const [captchaRequired, setCaptchaRequired] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState(null);
+    const [captchaReset, setCaptchaReset] = useState(0);
 
     // Trang cần đăng nhập mà người dùng đang mở dở (RequireRole truyền sang)
     const from = safeRedirect(location.state?.from);
@@ -71,9 +76,13 @@ export default function Login() {
             setError(t('login.errors.required'));
             return;
         }
+        if (captchaRequired && !captchaToken) {
+            setError(t('captcha.required'));
+            return;
+        }
         setError(''); setNeedVerify(false); setLoading(true);
         try {
-            const res = await authApi.login(email.trim(), password);
+            const res = await authApi.login(email.trim(), password, captchaRequired ? captchaToken : null);
             if (res.mfaRequired) {          // H4: chuyển sang bước nhập mã
                 setMfaToken(res.mfaToken);
                 setCode(''); setUseBackup(false);
@@ -84,6 +93,8 @@ export default function Login() {
             setError(getErrorMessage(err, t('login.errors.failed')));
             // Chỉ tài khoản chưa xác minh email mới cần link xác minh (bị khoá cũng là 403 nhưng khác mã)
             setNeedVerify(getErrorCode(err) === 'ACCOUNT_NOT_ACTIVE');
+            if (err?.response?.data?.data?.captchaRequired) setCaptchaRequired(true);
+            if (captchaRequired) setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         } finally {
             setLoading(false);
         }
@@ -200,6 +211,13 @@ export default function Login() {
                                 className={inputCls}
                             />
                         </div>
+
+                        {captchaRequired && (
+                            <div className="flex flex-col gap-2">
+                                <p className="text-xs text-on-surface-variant">{t('captcha.loginHint')}</p>
+                                <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
+                            </div>
+                        )}
 
                         <button
                             type="submit"

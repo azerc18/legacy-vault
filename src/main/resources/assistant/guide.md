@@ -39,6 +39,8 @@ One account can have several roles. If you were just given a new role, sign out 
 4. A 6-digit code is emailed to you. Continue with "Verify email".
 5. The language you are using (EN / VI) is saved as your email language. You can change it later in "My profile".
 6. If someone already named you as a beneficiary, register with that same email. Their vault will appear under "Inherited vaults", even if it was unlocked before you signed up.
+7. A "Security check" box (Cloudflare Turnstile) may appear above "Sign up". Most people only wait a second; sometimes you tick a box. If it does not load, check your connection or turn off ad blockers for this site and reload. The check sends your IP address and browser information to Cloudflare to block bots.
+8. Too many sign-ups, sign-ins or code requests from the same network in a short time are paused for a while ("Too many attempts from your network"). Wait the number of seconds shown, then try again.
 
 ### Verify email (OTP)
 1. On "Verify your email", enter your email and the 6-digit code, then click "Verify".
@@ -49,10 +51,11 @@ One account can have several roles. If you were just given a new role, sign out 
 1. Enter email and password, then click "Sign in". Or use the Google button.
 2. If two-factor authentication is on, enter the 6-digit code from your authenticator app, then "Verify". Lost your phone? Click "Use a backup code".
 3. Too many wrong passwords lock the account for a while. Contact an administrator if it stays locked.
+4. After 3 wrong passwords in a row, a "Security check" box appears. Complete it before trying again. This stops bots from locking your account on purpose.
 
 ### Forgot password
 1. On the sign-in page click "Forgot password?".
-2. Enter your email and click "Send reset code". A 6-digit code is emailed if the email is registered.
+2. Enter your email, complete the "Security check" box if it is shown, and click "Send reset code". A 6-digit code is emailed if the email is registered.
 3. On "Reset your password", enter email, the code, the new password and the confirmation, then click "Reset password".
 4. Click "Go to sign in". Accounts created with Google can use this to set a password.
 

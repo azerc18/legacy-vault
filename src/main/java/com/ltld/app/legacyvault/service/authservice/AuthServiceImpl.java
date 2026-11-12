@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.captchaservice.CaptchaService;
 import com.ltld.app.legacyvault.service.mfaservice.MfaService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
@@ -51,6 +52,7 @@ public class AuthServiceImpl implements AuthService{
     private final AuditLogService auditLogService;
     private final MfaService mfaService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final CaptchaService captchaService;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
@@ -90,7 +92,8 @@ public class AuthServiceImpl implements AuthService{
     @Override
     @Transactional(noRollbackFor = {
             InvalidCredentialException.class,
-            LockedAccountException.class
+            LockedAccountException.class,
+            CaptchaChallengeException.class
     })
     public LoginResult login(LoginRequest request, String ipAddress, String userAgent) {
         String email = request.getEmail().trim().toLowerCase();
@@ -119,6 +122,8 @@ public class AuthServiceImpl implements AuthService{
             userRepository.save(user);
         }
 
+        requireLoginCaptchaIfNeeded(user, request.getCaptchaToken());
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             int attempts = user.getFailedLoginAttempts() + 1;
             user.setFailedLoginAttempts(attempts);
@@ -134,6 +139,10 @@ public class AuthServiceImpl implements AuthService{
             userRepository.save(user);
             auditLogService.failure(AuditAction.LOGIN_FAILED, user.getId(), email,
                     "wrong password, attempt " + attempts);
+            if (captchaService.isEnabled() && attempts >= captchaService.loginAfterFailures()) {
+                // Cùng mã và câu với sai mật khẩu thường, chỉ thêm cờ để FE hiện CAPTCHA cho lần sau
+                throw new CaptchaChallengeException(ErrorCode.INVALID_CREDENTIALS, "Invalid email or password");
+            }
             throw new InvalidCredentialException();
         }
 
@@ -150,6 +159,28 @@ public class AuthServiceImpl implements AuthService{
         }
 
         return completeLogin(user, ipAddress, userAgent);
+    }
+
+    /**
+     * Tài khoản đã sai mật khẩu {@code loginAfterFailures} lần liên tiếp: lần thử tiếp phải qua CAPTCHA.
+     * Thiếu / sai token -> CAPTCHA_REQUIRED và KHÔNG tính là một lần sai, nên bot không có CAPTCHA không thể
+     * đẩy tài khoản tới mức khoá 15 phút (chặn kiểu tấn công cố tình khoá tài khoản Owner).
+     * Không gọi được Cloudflare -> cho qua (fail-open) và ghi audit; vẫn còn khoá 15 phút và giới hạn theo IP.
+     */
+    private void requireLoginCaptchaIfNeeded(User user, String captchaToken) {
+        if (!captchaService.isEnabled() || user.getFailedLoginAttempts() < captchaService.loginAfterFailures()) {
+            return;
+        }
+        switch (captchaService.verify(captchaToken)) {
+            case PASSED -> { }
+            case FAILED -> {
+                auditLogService.failure(AuditAction.CAPTCHA_FAILED, user.getId(), user.getEmail(), "step=login");
+                throw new CaptchaChallengeException(ErrorCode.CAPTCHA_REQUIRED,
+                        "Please complete the security check to continue.");
+            }
+            case UNAVAILABLE -> auditLogService.failure(AuditAction.CAPTCHA_UNAVAILABLE, user.getId(), user.getEmail(),
+                    "step=login (allowed, fail-open)");
+        }
     }
 
     @Override

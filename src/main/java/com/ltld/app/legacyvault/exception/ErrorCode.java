@@ -36,6 +36,10 @@ public enum ErrorCode {
     OTP_NOT_FOUND(HttpStatus.BAD_REQUEST),
     TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS),
     TOO_MANY_OTP_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
+    // CAPTCHA (Cloudflare Turnstile) ở Đăng ký, Quên mật khẩu, Đăng nhập sau nhiều lần sai
+    CAPTCHA_REQUIRED(HttpStatus.BAD_REQUEST),
+    CAPTCHA_INVALID(HttpStatus.BAD_REQUEST),
+    CAPTCHA_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
     MFA_REQUIRED(HttpStatus.UNAUTHORIZED),
     MFA_INVALID_CODE(HttpStatus.BAD_REQUEST),
     MFA_CHALLENGE_EXPIRED(HttpStatus.UNAUTHORIZED),

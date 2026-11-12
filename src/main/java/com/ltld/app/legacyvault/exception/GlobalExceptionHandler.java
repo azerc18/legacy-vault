@@ -54,6 +54,14 @@ public class GlobalExceptionHandler {
                         Map.of("feature", e.getFeature().name())));
     }
 
+    // CAPTCHA ở Đăng nhập: FE thấy captchaRequired thì hiện widget Turnstile rồi cho thử lại
+    @ExceptionHandler(CaptchaChallengeException.class)
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> handleCaptchaChallenge(CaptchaChallengeException e) {
+        return ResponseEntity.status(e.getStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(e.getErrorCode(), e.getMessage(), Map.of("captchaRequired", true)));
+    }
+
     @ExceptionHandler(TooManyOtpRequestsException.class)
     public ResponseEntity<ApiResponse<Map<String, Long>>> handleTooManyOtpRequest(TooManyOtpRequestsException e) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

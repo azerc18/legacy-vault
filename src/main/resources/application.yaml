@@ -135,6 +135,14 @@ app:
   google:
     # OAuth Client ID (Google Cloud Console > Credentials > Web application). Để trống = ẩn nút Google.
     client-id: ${GOOGLE_CLIENT_ID:}
+  # CAPTCHA Cloudflare Turnstile ở Đăng ký, Quên mật khẩu (luôn đòi) và Đăng nhập (sau login-after-failures lần sai).
+  # Mặc định TẮT (local, CI, E2E). Production đặt APP_CAPTCHA_SITE_KEY, APP_CAPTCHA_SECRET_KEY rồi APP_CAPTCHA_ENABLED=true.
+  # Secret key chỉ đặt qua biến môi trường, KHÔNG commit. Không áp cho link check-in DMS / xác nhận chéo.
+  captcha:
+    enabled: ${APP_CAPTCHA_ENABLED:false}
+    site-key: ${APP_CAPTCHA_SITE_KEY:}
+    secret-key: ${APP_CAPTCHA_SECRET_KEY:}
+    login-after-failures: 3
   ai:
     provider: ${AI_PROVIDER:mock}
     gemini:

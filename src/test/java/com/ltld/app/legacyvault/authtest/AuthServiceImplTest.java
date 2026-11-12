@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.captchaservice.CaptchaService;
 import com.ltld.app.legacyvault.service.authservice.AuthServiceImpl;
 import com.ltld.app.legacyvault.service.mfaservice.MfaService;
 import com.ltld.app.legacyvault.service.tokenservice.TokenService;
@@ -79,6 +80,10 @@ public class AuthServiceImplTest {
 
     @Mock
     GoogleTokenVerifier googleTokenVerifier;
+
+    // Mặc định mock trả isEnabled() = false: các test cũ chạy như khi chưa bật CAPTCHA
+    @Mock
+    CaptchaService captchaService;
 
 
     private Role ownerRole;
@@ -733,5 +738,102 @@ public class AuthServiceImplTest {
     void googleConfig_hidesClientId_whenDisabled() {
         when(googleTokenVerifier.isEnabled()).thenReturn(false);
         assertThat(authService.googleConfig()).isEqualTo(new GoogleConfigResponse(false, null));
+    }
+
+    // ---------- CAPTCHA ở Đăng nhập (sau 3 lần sai) ----------
+
+    private void captchaOn() {
+        when(captchaService.isEnabled()).thenReturn(true);
+        when(captchaService.loginAfterFailures()).thenReturn(3);
+    }
+
+    @Test
+    void login_belowThreshold_doesNotAskCloudflare() {
+        captchaOn();
+        user.setFailedLoginAttempts(1);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "WrongPassword"), IP, USER_AGENT))
+                .isInstanceOf(InvalidCredentialException.class);
+        verify(captchaService, never()).verify(any());
+    }
+
+    @Test
+    void login_thirdWrongPassword_flagsCaptchaForNextAttempt() {
+        captchaOn();
+        user.setFailedLoginAttempts(2);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "WrongPassword"), IP, USER_AGENT))
+                .isInstanceOf(CaptchaChallengeException.class)
+                .extracting(e -> ((CaptchaChallengeException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(3);
+    }
+
+    @Test
+    void login_atThreshold_withoutCaptcha_isRejected_andNotCountedTowardsLock() {
+        captchaOn();
+        user.setFailedLoginAttempts(3);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(captchaService.verify(null)).thenReturn(CaptchaService.Result.FAILED);
+
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "WrongPassword"), IP, USER_AGENT))
+                .isInstanceOf(CaptchaChallengeException.class)
+                .extracting(e -> ((CaptchaChallengeException) e).getErrorCode())
+                .isEqualTo(ErrorCode.CAPTCHA_REQUIRED);
+
+        // Bot không có CAPTCHA không đẩy được tài khoản tới mức khoá
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(3);
+        assertThat(user.getLockedUntil()).isNull();
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(auditLogService).failure(AuditAction.CAPTCHA_FAILED, user.getId(), "test@example.com", "step=login");
+    }
+
+    @Test
+    void login_atThreshold_withValidCaptcha_andCorrectPassword_logsIn() {
+        captchaOn();
+        user.setFailedLoginAttempts(3);
+        LoginRequest request = loginRequest("test@example.com", "Password123");
+        request.setCaptchaToken("turnstile-token");
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(captchaService.verify("turnstile-token")).thenReturn(CaptchaService.Result.PASSED);
+        when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
+        when(tokenService.generateAccessToken(user)).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
+        when(tokenService.getAccessTokenExpiry()).thenReturn(EXPIRES_AT);
+
+        assertThat(authService.login(request, IP, USER_AGENT).refreshToken()).isEqualTo("refresh-token");
+
+        assertThat(user.getFailedLoginAttempts()).isZero();
+    }
+
+    @Test
+    void login_atThreshold_cloudflareDown_failsOpen_andAudits() {
+        captchaOn();
+        user.setFailedLoginAttempts(3);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(captchaService.verify(null)).thenReturn(CaptchaService.Result.UNAVAILABLE);
+        when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
+
+        // Vẫn kiểm mật khẩu và vẫn đếm lần sai: khoá 15 phút còn nguyên tác dụng
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "WrongPassword"), IP, USER_AGENT))
+                .isInstanceOf(CaptchaChallengeException.class);
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(4);
+        verify(auditLogService).failure(AuditAction.CAPTCHA_UNAVAILABLE, user.getId(), "test@example.com",
+                "step=login (allowed, fail-open)");
+    }
+
+    @Test
+    void login_captchaDisabled_neverAsksCloudflare_evenAfterManyFailures() {
+        user.setFailedLoginAttempts(4);
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongPassword", "hashed-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginRequest("test@example.com", "WrongPassword"), IP, USER_AGENT))
+                .isInstanceOf(LockedAccountException.class);
+        verify(captchaService, never()).verify(any());
     }
 }

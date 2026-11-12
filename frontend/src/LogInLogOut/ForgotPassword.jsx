@@ -5,12 +5,16 @@ import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
+import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
 
 export default function ForgotPassword() {
     const { t } = useTranslation('auth');
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState(null);
+    const [captchaReset, setCaptchaReset] = useState(0);
+    const captcha = useCaptchaConfig();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -19,14 +23,19 @@ export default function ForgotPassword() {
             setError(t('forgot.errors.emailRequired'));
             return;
         }
+        if (captcha?.enabled && !captchaToken) {
+            setError(t('captcha.required'));
+            return;
+        }
         setError('');
         setLoading(true);
         try {
-            await authApi.forgotPassword(email.trim());
+            await authApi.forgotPassword(email.trim(), captchaToken);
             // BE luôn trả thành công (không lộ email có tồn tại hay không) -> sang bước nhập mã
             navigate('/reset-password', { state: { email: email.trim() } });
         } catch (err) {
             setError(getErrorMessage(err, t('forgot.errors.failed')));
+            setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         } finally {
             setLoading(false);
         }
@@ -67,6 +76,8 @@ export default function ForgotPassword() {
                             className="w-full h-12 px-4 rounded-xl border border-outline-variant bg-background text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                         />
                     </div>
+
+                    <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
 
                     <button
                         type="submit"
