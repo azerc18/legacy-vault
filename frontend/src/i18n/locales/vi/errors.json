@@ -20,6 +20,7 @@
   "OTP_NOT_FOUND": "Không tìm thấy mã xác minh. Vui lòng yêu cầu mã mới.",
   "TOO_MANY_ATTEMPTS": "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.",
   "TOO_MANY_OTP_REQUESTS": "Bạn yêu cầu mã quá nhiều lần. Vui lòng đợi {{retryAfterSeconds}} giây.",
+  "IP_RATE_LIMITED": "Mạng của bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau {{retryAfterSeconds}} giây.",
   "MFA_REQUIRED": "Vui lòng nhập mã xác thực 2 lớp.",
   "MFA_INVALID_CODE": "Mã xác thực 2 lớp không đúng.",
   "DMS_NOT_TRIGGERED": "Dead Man's Switch chưa được kích hoạt.",
