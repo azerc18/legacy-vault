@@ -63,6 +63,16 @@ public class ExecutorAssignmentMailListener {
             log.warn("Executor invitation: sending {} mail for assignment {} failed: {}",
                     event.kind(), event.assignmentId(), e.getMessage());
         }
+        // Hết hạn: báo cả người được mời. Gửi riêng để lỗi mail của Owner không chặn mail này (và ngược lại).
+        if (event.kind() == ExecutorInvitationTimeoutEvent.Kind.EXPIRED) {
+            try {
+                emailSender.sendExecutorInvitationExpiredToInvitee(event.executorEmail(), event.ownerName(),
+                        event.ownerEmail(), event.executorType(), event.days());
+            } catch (RuntimeException e) {
+                log.warn("Executor invitation: telling invitee about expired assignment {} failed: {}",
+                        event.assignmentId(), e.getMessage());
+            }
+        }
     }
 
     // Lời mời làm Executor: báo Owner người được mời đã đồng ý / từ chối. Lỗi gửi chỉ log, không retry.

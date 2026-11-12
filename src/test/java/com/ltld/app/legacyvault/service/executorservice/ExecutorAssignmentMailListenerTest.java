@@ -62,6 +62,34 @@ class ExecutorAssignmentMailListenerTest {
                 "exec@example.test", "Exec B", ExecutorType.BACKUP, 7));
         verify(emailSender).sendExecutorInvitationExpiredNotice("owner@example.test",
                 "Exec B (exec@example.test)", ExecutorType.BACKUP, 7);
+        // Hết hạn thì người được mời cũng được báo
+        verify(emailSender).sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A",
+                "owner@example.test", ExecutorType.BACKUP, 7);
+    }
+
+    @Test
+    @DisplayName("Hạn lời mời: mail cho Owner lỗi vẫn gửi mail cho người được mời")
+    void invitationExpired_ownerMailFailure_stillTellsInvitee() {
+        doThrow(new MailSendException("SMTP down")).when(emailSender)
+                .sendExecutorInvitationExpiredNotice(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+
+        assertThatCode(() -> listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.EXPIRED,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 7))).doesNotThrowAnyException();
+
+        verify(emailSender).sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A",
+                "owner@example.test", ExecutorType.PRIMARY, 7);
+    }
+
+    @Test
+    @DisplayName("Hạn lời mời: lượt nhắc không gửi mail hết hạn cho người được mời")
+    void invitationReminder_doesNotSendExpiredMail() {
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.REMINDER,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 3));
+
+        verify(emailSender, org.mockito.Mockito.never()).sendExecutorInvitationExpiredToInvitee(
+                any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
     }
 
     @Test

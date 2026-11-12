@@ -121,6 +121,17 @@ class EmailSenderExecutorNoticeTest {
                 .contains("Exec B (exec@example.test)", "7 day(s)", "https://app.example.test/owner/executors");
     }
 
+    // Hạn lời mời: báo người được mời rằng lời mời đã hết hiệu lực
+    @Test
+    void invitationExpired_tellsInvitee() {
+        emailSender.sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, 7);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("exec@example.test");
+        assertThat(message.getText()).contains("Owner A", "7 day(s)", "has expired", "ask");
+    }
+
     @Test
     void assignedNotice_mentionsOwnerAndRole_withoutOtpFooter() {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",

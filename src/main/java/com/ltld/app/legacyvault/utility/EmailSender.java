@@ -571,6 +571,14 @@ public class EmailSender {
         sendKeyed(ownerEmail, lang, Style.NOTICE, "mail.execExpired", paras);
     }
 
+    /** Báo người được mời: lời mời đã hết hạn, không còn trả lời được. */
+    public void sendExecutorInvitationExpiredToInvitee(String to, String ownerName, String ownerEmail,
+                                                       ExecutorType type, int expiryDays) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        sendKeyed(to, lang, Style.NOTICE, "mail.execExpiredInvitee", List.of(MailMessages.get(lang,
+                "mail.execExpiredInvitee.body", ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), expiryDays)));
+    }
+
     public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
         AppLanguage lang = languageResolver.forEmail(to);
         sendKeyed(to, lang, Style.NOTICE, "mail.execRevoked", List.of(MailMessages.get(lang, "mail.execRevoked.body",

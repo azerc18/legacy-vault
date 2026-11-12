@@ -46,9 +46,9 @@
     "from": "Người mời",
     "role": "Vai trò",
     "invitedAt": "Mời ngày",
-            "expiresAtLabel": "Hết hạn trả lời",
-            "expiredTitle": "Lời mời đã hết hạn",
-            "expiredText": "Lời mời làm người thi hành của {{name}} đã quá hạn trả lời nên không còn hiệu lực. Nếu vẫn muốn nhận, hãy nhờ họ gửi lại lời mời.",
+    "expiresAtLabel": "Hết hạn trả lời",
+    "expiredTitle": "Lời mời đã hết hạn",
+    "expiredText": "Lời mời làm người thi hành của {{name}} đã quá hạn trả lời nên không còn hiệu lực. Nếu vẫn muốn nhận, hãy nhờ họ gửi lại lời mời.",
     "dutiesTitle": "Khi đồng ý, bạn nhận các việc sau",
     "duties": {
       "notified": "Được báo khi Công tắc người chết của họ kích hoạt.",
