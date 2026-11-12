@@ -62,6 +62,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
     public static final int MAX_CONFIRMERS = 2;
     public static final int CONFIRMATION_TIMEOUT_HOURS = 72;
+    // Chỉ dùng khi cấu hình thiếu lịch (không xảy ra với cấu hình đã lưu): lùi hạn tối thiểu
     public static final int POSTPONE_SAFE_DAYS = 7;
 
     public static final String PURPOSE_CLAIM = "purpose";
@@ -380,11 +381,14 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
         if (decision == DmsConfirmerDecision.ALIVE) {
             confirmer.setStatus(DmsConfirmerStatus.CONFIRMED_ALIVE);
-            LocalDateTime postponedUntil = effectiveNow.plusDays(POSTPONE_SAFE_DAYS);
             config.setStatus(DmsStatus.ACTIVE);
             // m2: ALIVE chỉ 1 lần/đợt; đợt quá hạn kế tiếp mà Owner chưa check-in thì kích hoạt luôn.
             config.setConfirmationDeferrals(config.getConfirmationDeferrals() + 1);
-            startPostponedCycle(config, postponedUntil);
+            // Người xác nhận báo an toàn = check-in thay Owner: bắt đầu chu kỳ check-in mới đầy đủ từ lúc trả lời.
+            startVouchedCycle(config, effectiveNow);
+            config.setVouchedAt(effectiveNow);
+            config.setVouchedByName(confirmer.getName());
+            LocalDateTime postponedUntil = config.getNextCheckinDueAt();
 
             try {
                 dmsConfirmerRepository.saveAndFlush(confirmer);
@@ -421,7 +425,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                     .decision(DmsConfirmerDecision.ALIVE)
                     .ownerName(ownerName)
                     .postponedUntil(postponedUntil)
-                    .message("Confirmed owner is safe. Dead Man's Switch postponed by 7 days.")
+                    .message("Confirmed owner is safe. A new check-in cycle has started.")
                     .build();
         }
 
@@ -456,21 +460,20 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     }
 
     /**
-     * ALIVE: hạn mới là postponedUntil và Owner phải được nhắc lại theo đúng lịch nhắc như sau check-in.
-     * m3: chỉ dời cycle_started_at (mốc lịch nhắc), KHÔNG đụng lastCheckinAt: lastCheckinAt luôn là lần check-in thật
-     * (trang DMS / Admin / F1 hiển thị và dùng nó). Mốc chu kỳ đặt để triggerAt rơi đúng postponedUntil, nên các lần
-     * nhắc chia đều thời gian chờ ngay trước hạn. remindersSent về 0: nhắc lần lượt rồi dừng.
+     * ALIVE: người xác nhận check-in thay Owner, chu kỳ mới bắt đầu từ lúc trả lời (như Owner tự check-in).
+     * m3: KHÔNG đụng lastCheckinAt: lastCheckinAt luôn là lần check-in thật của Owner (trang DMS / Admin / F1 dùng nó);
+     * ai bắt đầu chu kỳ thì xem vouchedAt / vouchedByName. remindersSent về 0: nhắc lần lượt rồi dừng.
      */
-    private void startPostponedCycle(DmsConfig config, LocalDateTime postponedUntil) {
+    private void startVouchedCycle(DmsConfig config, LocalDateTime now) {
         Integer interval = config.getCheckinIntervalDays();
         Integer grace = config.getGracePeriodDays();
         Integer reminders = config.getReminderCount();
         if (interval == null || grace == null || reminders == null) {
-            // Lịch chưa đủ (không xảy ra với cấu hình đã lưu qua upsertConfig): chỉ lùi hạn như trước.
-            config.setNextCheckinDueAt(postponedUntil);
+            // Lịch chưa đủ (không xảy ra với cấu hình đã lưu qua upsertConfig): lùi hạn tối thiểu như trước.
+            config.setNextCheckinDueAt(now.plusDays(POSTPONE_SAFE_DAYS));
             return;
         }
-        LocalDateTime cycleStart = postponedUntil.minusDays((long) interval + grace);
+        LocalDateTime cycleStart = now;
         DmsSchedule schedule = scheduleCalculator.calculate(cycleStart, interval, grace, reminders);
         config.setCycleStartedAt(cycleStart);
         config.setRemindersSent(0);

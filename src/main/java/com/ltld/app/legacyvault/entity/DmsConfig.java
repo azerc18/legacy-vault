@@ -119,4 +119,11 @@ public class DmsConfig {
     @Version
     @Column(name = "version", nullable = false)
     private Long version;
+
+    // Lần gần nhất người xác nhận chéo báo "Owner vẫn an toàn" (tính như một lần check-in). Owner tự check-in thì xoá.
+    @Column(name = "vouched_at")
+    private LocalDateTime vouchedAt;
+
+    @Column(name = "vouched_by_name")
+    private String vouchedByName;
 }

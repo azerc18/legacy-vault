@@ -39,4 +39,7 @@ public class DmsConfigResponse {
     private Boolean hasVault;
     // Chưa cấu hình: Owner đã xác minh danh tính (KYC) chưa, cũng là điều kiện bật DMS lần đầu. Đã cấu hình: null.
     private Boolean identityVerified;
+    // Chu kỳ hiện tại do người xác nhận chéo bắt đầu (báo "Owner vẫn an toàn"): thời điểm và tên người đó. null = không.
+    private LocalDateTime vouchedAt;
+    private String vouchedBy;
 }

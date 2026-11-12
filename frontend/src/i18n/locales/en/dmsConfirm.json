@@ -1,7 +1,7 @@
 {
   "done": {
     "aliveTitle": "Thank You — Owner Marked as Safe",
-    "aliveBody": "We have postponed the owner's Dead Man's Switch activation by 7 days and sent them a reminder to check in.",
+    "aliveBody": "This counts as a check-in on the owner's behalf: a new check-in cycle has started and the owner has been notified.",
     "unreachableTitle": "Thank You — Digital Executor Has Been Notified",
     "unreachableBody": "We have recorded your confirmation and notified the owner's designated Digital Executor to begin the legal verification process.",
     "errorTitle": "Confirmation Link Could Not Be Verified",
@@ -12,7 +12,7 @@
   "confirm": {
     "title": "Is the owner safe?",
     "intro": "The owner of these vaults has not checked in, and their grace period has ended. They named you as a trusted confirmer. Please tell us whether you can reach them. Nothing has changed yet; your answer is only recorded when you press a button.",
-    "aliveButton": "The owner is safe (postpone 7 days)",
+    "aliveButton": "The owner is safe (check in for them)",
     "unreachableButton": "I cannot reach the owner",
     "unreachableConfirmTitle": "Notify the executor now?",
     "unreachableConfirmBody": "This immediately notifies the owner's executor to begin the handover and cannot be undone.",

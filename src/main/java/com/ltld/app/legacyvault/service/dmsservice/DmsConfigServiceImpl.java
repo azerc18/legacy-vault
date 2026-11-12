@@ -488,6 +488,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         config.setRemindersSent(0);
         config.setTriggerDeferrals(0);
         config.setConfirmationDeferrals(0);     // X2 (m2): Owner tự check-in / lưu cấu hình thì đếm ALIVE lại từ 0
+        config.setVouchedAt(null);              // chu kỳ mới do chính Owner bắt đầu, không còn là chu kỳ người xác nhận check-in hộ
+        config.setVouchedByName(null);
         config.setNextCheckinDueAt(schedule.triggerAt());
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }
@@ -541,6 +543,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
                 .nextReminderAt(config.getNextReminderAt())
                 .remindersSent(config.getRemindersSent())
                 .triggeredAt(config.getTriggeredAt())
+                .vouchedAt(config.getVouchedAt())
+                .vouchedBy(config.getVouchedByName())
                 .hasUsableExecutor(config.getStatus() == DmsStatus.TRIGGERED
                         ? null
                         : ExecutorActivationRule.pickActivationTarget(executors).isPresent())

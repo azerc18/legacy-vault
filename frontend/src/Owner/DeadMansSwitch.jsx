@@ -46,6 +46,26 @@ const STATUS = {
     NO_VAULT: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
 };
 
+// Đồng hồ cho phần đếm ngược; cập nhật mỗi `ms` mili-giây
+function useNow(ms) {
+    const [value, setValue] = useState(() => Date.now());
+    useEffect(() => {
+        const id = setInterval(() => setValue(Date.now()), ms);
+        return () => clearInterval(id);
+    }, [ms]);
+    return value;
+}
+
+// Thời gian còn lại -> { days, hours, minutes } cho câu đếm ngược
+function remainingParts(msLeft) {
+    const totalMinutes = Math.max(0, Math.floor(msLeft / 60000));
+    return {
+        days: Math.floor(totalMinutes / 1440),
+        hours: Math.floor((totalMinutes % 1440) / 60),
+        minutes: totalMinutes % 60,
+    };
+}
+
 export default function DeadMansSwitch() {
     const { t } = useTranslation(['dms', 'identity']);
     const vip = useVipStatus();   // false = gói FREE: form thêm Trusted Social Confirmer hiện mờ + khoá
@@ -59,6 +79,7 @@ export default function DeadMansSwitch() {
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
     const [justCheckedIn, setJustCheckedIn] = useState(false);
+    const now = useNow(30_000);
     const [confirmerForm, setConfirmerForm] = useState({ name: '', email: '', relationship: '' });
     const [addingConfirmer, setAddingConfirmer] = useState(false);
     const [removingId, setRemovingId] = useState('');
@@ -100,6 +121,10 @@ export default function DeadMansSwitch() {
     // Owner đã xoá hết két: BE tạm dừng DMS (không nhắc, không bàn giao); nút check-in vẫn hiện nhưng BE trả DMS_NO_VAULT.
     // Giữ lần check-in cuối, các mốc của chu kỳ không còn chạy nên hiện "—". Tạo két mới thì BE bắt đầu chu kỳ mới.
     const pausedNoVault = canCheckIn && config.hasVault === false;
+    // Người xác nhận chéo đã check-in thay Owner: chu kỳ này coi như đã check-in, khoá nút tới hạn tiếp theo
+    const dueAtMs = configured && config.checkinDueAt ? new Date(config.checkinDueAt).getTime() : null;
+    const vouchActive = canCheckIn && config.status === 'ACTIVE' && !!config.vouchedAt
+        && dueAtMs !== null && now < dueAtMs;
     // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai
     const noExecutor = config?.hasUsableExecutor === false && config.status !== 'TRIGGERED';
 
@@ -234,12 +259,21 @@ export default function DeadMansSwitch() {
                                         <Icon name={s.icon} className="text-[18px]" /> {t(`dms.status.${statusKey}`)}
                                     </span>
                                     {canCheckIn && (
-                                        <button onClick={checkIn} disabled={checking || justCheckedIn} className={btnPrimary}>
-                                            <Icon name="how_to_reg" className="text-[18px]" /> {checking ? t('dms.checkingIn') : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
+                                        <button onClick={checkIn} disabled={checking || justCheckedIn || vouchActive} className={btnPrimary}>
+                                            <Icon name={vouchActive ? 'verified_user' : 'how_to_reg'} className="text-[18px]" />
+                                            {checking ? t('dms.checkingIn')
+                                                : vouchActive ? t('dms.vouch.button')
+                                                    : justCheckedIn ? t('dms.checkedInShort') : t('dms.checkIn')}
                                         </button>
                                     )}
                                 </div>
 
+                                {vouchActive && !pausedNoVault && (
+                                    <div role="status" className="mt-4 p-3 rounded-xl bg-success-container/60 text-on-success-container text-sm">
+                                        <p>{t('dms.vouch.body', { name: config.vouchedBy || t('dms.vouch.someone'), date: formatDate(config.vouchedAt, true) })}</p>
+                                        <p className="mt-1 font-semibold">{t('dms.vouch.countdown', remainingParts(dueAtMs - now))}</p>
+                                    </div>
+                                )}
                                 {pausedNoVault && (
                                     <p className="mt-4 text-sm text-on-surface-variant">
                                         {t('dms.noVaultNote')}{' '}
