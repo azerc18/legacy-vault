@@ -25,6 +25,17 @@ public class ExecutorInvitationPolicy {
 
     public ExecutorInvitationPolicy(@Value("${app.executor.invitation-expiry-days:7}") int expiryDays,
                                     @Value("${app.executor.invitation-reminder-days:3}") int reminderDays) {
+        // Cấu hình sai thì hỏng âm thầm: reminderDays >= expiryDays sẽ nhắc ngay lúc vừa mời.
+        // Báo luôn lúc khởi động thay vì để chạy sai trên môi trường thật.
+        if (expiryDays < 1) {
+            throw new IllegalArgumentException(
+                    "app.executor.invitation-expiry-days must be at least 1 day, got " + expiryDays);
+        }
+        if (reminderDays < 1 || reminderDays >= expiryDays) {
+            throw new IllegalArgumentException("app.executor.invitation-reminder-days must be between 1 and "
+                    + (expiryDays - 1) + " (less than app.executor.invitation-expiry-days = " + expiryDays
+                    + "), got " + reminderDays);
+        }
         this.expiryDays = expiryDays;
         this.reminderDays = reminderDays;
     }

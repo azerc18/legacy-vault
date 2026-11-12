@@ -27,12 +27,22 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
     @Query("select a from ExecutorAssignment a where a.owner.id = :ownerId")
     List<ExecutorAssignment> findAllByOwnerIdForUpdate(@Param("ownerId") UUID ownerId);
 
+    // Khóa FOR UPDATE một dòng theo id; job quét hạn lời mời dùng để đọc lại trạng thái mới nhất trước khi đổi.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from ExecutorAssignment a where a.id = :id")
+    Optional<ExecutorAssignment> findByIdForUpdate(@Param("id") UUID id);
+
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorType(UUID ownerId, ExecutorType executorType);
 
     // Lời mời làm Executor: lấy Owner của assignment mà KHÔNG nạp entity, để khóa DmsConfig -> User -> assignment
     // đúng thứ tự FR-06 rồi mới đọc assignment (bản đã nạp trước khi khóa sẽ không được làm mới).
     @Query("select a.owner.id from ExecutorAssignment a where a.id = :id")
     Optional<UUID> findOwnerIdById(@Param("id") UUID id);
+
+    // Chỉ lấy id người được mời: job quét cần biết khóa User nào TRƯỚC khi nạp assignment,
+    // vì findByIdForUpdate không làm mới entity đã nằm sẵn trong persistence context.
+    @Query("select a.executorUser.id from ExecutorAssignment a where a.id = :id")
+    Optional<UUID> findExecutorUserIdById(@Param("id") UUID id);
 
     Optional<ExecutorAssignment> findByOwnerIdAndExecutorTypeAndStatus(
             UUID ownerId, ExecutorType executorType, ExecutorStatus status);

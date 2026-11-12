@@ -33,8 +33,10 @@ import java.util.UUID;
  *       không còn làm Executor cho Owner nào — rồi báo Owner qua mail và chuông để chỉ định người khác.</li>
  * </ul>
  *
- * <p>Mỗi dòng xử lý trong transaction REQUIRES_NEW riêng và khóa lại trước khi kiểm tra điều kiện, vì người
- * được mời có thể vừa trả lời hoặc Owner vừa thu hồi. Một dòng lỗi không chặn các dòng còn lại.
+ * <p>Mỗi dòng xử lý trong transaction REQUIRES_NEW riêng, khóa FOR UPDATE rồi mới kiểm tra điều kiện trên dữ
+ * liệu mới nhất, vì người được mời có thể vừa trả lời hoặc Owner vừa thu hồi / thay người. Thứ tự khóa giống
+ * FR-06 (User -> ExecutorAssignment) nên không deadlock với luồng trả lời lời mời. Một dòng lỗi không chặn các
+ * dòng còn lại.
  * Mặc định BẬT; tắt bằng app.executor.invitation-expiry.enabled=false.
  */
 @Slf4j
@@ -104,7 +106,8 @@ public class ExecutorInvitationExpiryScheduler {
     }
 
     private boolean remind(UUID id, LocalDateTime now, TransactionStatus status) {
-        ExecutorAssignment a = executorAssignmentRepository.findById(id).orElse(null);
+        // Khóa dòng rồi mới xét; chỉ đụng assignment, không đổi role nên không cần khóa User
+        ExecutorAssignment a = executorAssignmentRepository.findByIdForUpdate(id).orElse(null);
         // Vừa trả lời / vừa bị thu hồi / vừa được nhắc ở lần quét trước: bỏ qua
         if (a == null || !policy.isOpen(a, now) || a.getInvitationReminderSentAt() != null) {
             status.setRollbackOnly();
@@ -118,8 +121,15 @@ public class ExecutorInvitationExpiryScheduler {
     }
 
     private boolean expire(UUID id, LocalDateTime now, TransactionStatus status) {
-        ExecutorAssignment a = executorAssignmentRepository.findById(id).orElse(null);
-        if (a == null || !policy.isExpired(a, now)) {
+        // Thứ tự khóa như FR-06: User -> ExecutorAssignment. Lấy id người được mời bằng truy vấn vô hướng
+        // (không nạp entity) để khóa User trước, rồi mới nạp assignment kèm khóa và xét trên dữ liệu mới nhất.
+        UUID executorUserId = executorAssignmentRepository.findExecutorUserIdById(id).orElse(null);
+        User executor = executorUserId == null ? null : userRepository.findByIdForUpdate(executorUserId).orElse(null);
+        ExecutorAssignment a = executor == null ? null
+                : executorAssignmentRepository.findByIdForUpdate(id).orElse(null);
+        // Vừa trả lời, Owner vừa thu hồi, hoặc Owner vừa thay người khác vào vị trí này: bỏ qua
+        if (a == null || !policy.isExpired(a, now)
+                || !a.getExecutorUser().getId().equals(executor.getId())) {
             status.setRollbackOnly();
             return false;
         }
@@ -128,9 +138,6 @@ public class ExecutorInvitationExpiryScheduler {
         a.setRevokedAt(now);
         a.setResponseStatus(ExecutorResponseStatus.EXPIRED);
         a.setRespondedAt(now);
-        // Khóa User trước khi đụng roles (cùng thứ tự với FR-06: User -> ExecutorAssignment)
-        User executor = userRepository.findByIdForUpdate(a.getExecutorUser().getId())
-                .orElse(a.getExecutorUser());
         executorRoleManager.revokeIfUnused(executor, a.getId());
         executorAssignmentRepository.saveAndFlush(a);
 

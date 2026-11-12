@@ -80,7 +80,9 @@ class ExecutorInvitationExpirySchedulerTest {
                 .build();
 
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        when(executorAssignmentRepository.findById(assignment.getId())).thenReturn(Optional.of(assignment));
+        when(executorAssignmentRepository.findByIdForUpdate(assignment.getId())).thenReturn(Optional.of(assignment));
+        when(executorAssignmentRepository.findExecutorUserIdById(assignment.getId()))
+                .thenReturn(Optional.of(executorUser.getId()));
         when(executorAssignmentRepository.saveAndFlush(any(ExecutorAssignment.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findByIdForUpdate(executorUser.getId())).thenReturn(Optional.of(executorUser));
@@ -202,12 +204,28 @@ class ExecutorInvitationExpirySchedulerTest {
     @DisplayName("Một dòng lỗi không chặn dòng còn lại")
     void expireOverdue_oneFailure_continues() {
         UUID broken = UUID.randomUUID();
-        when(executorAssignmentRepository.findById(broken)).thenThrow(new IllegalStateException("db down"));
+        when(executorAssignmentRepository.findExecutorUserIdById(broken)).thenThrow(new IllegalStateException("db down"));
         expiredIds(broken, assignment.getId());
 
         scheduler.expireOverdue(now);
 
         assertThat(assignment.getResponseStatus()).isEqualTo(ExecutorResponseStatus.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("Owner vừa thay người khác vào vị trí trước khi job khóa được dòng: bỏ qua")
+    void expireOverdue_someoneElseTookTheSeat_skips() {
+        expiredIds(assignment.getId());
+        User other = User.builder().id(UUID.randomUUID()).email("other@example.test").fullName("Other")
+                .status(UserStatus.ACTIVE).roles(new HashSet<>()).build();
+        // Khóa theo người cũ, nhưng dòng đọc lại (đã khóa) đang mang người mới
+        assignment.setExecutorUser(other);
+
+        scheduler.expireOverdue(now);
+
+        assertThat(assignment.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        assertThat(assignment.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
+        verifyNoInteractions(auditLogService, eventPublisher);
     }
 
     @Test
