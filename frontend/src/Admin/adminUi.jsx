@@ -140,6 +140,9 @@ export const STATUS_TONE = {
 };
 export const toneOf = (status) => STATUS_TONE[status] || 'muted';
 
+// Khoá tạm do sai mật khẩu / mã nhiều lần: trạng thái vẫn ACTIVE nhưng không đăng nhập được tới lockedUntil
+export const isTemporarilyLocked = (u) => !!u?.lockedUntil && new Date(u.lockedUntil) > new Date();
+
 // Tờ hồ sơ: khung giấy có tiêu đề + mã hồ sơ (tab) + nút bên phải
 export function Dossier({title, tab, right, className = '', bodyClass = 'p-5', children}) {
     return (

@@ -4,7 +4,7 @@ import { getUser } from '../auth/auth.js';
 import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
-import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf } from './adminUi.jsx';
+import { AdminLayout, ReasonDialog, Pager, Stamp, isAdmin, toneOf, isTemporarilyLocked } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
 import UserDrawer from './UserDrawer.jsx';
 
@@ -135,8 +135,7 @@ export default function AdminUsers() {
 }
 
 function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
-    // Khoá tạm do sai mật khẩu / mã nhiều lần: trạng thái vẫn ACTIVE nhưng không đăng nhập được tới lockedUntil
-    const tempLocked = !!u.lockedUntil && new Date(u.lockedUntil) > new Date();
+    const tempLocked = isTemporarilyLocked(u);
     const { t } = useTranslation('admin');
     const allRoles = u.roles || [];
     const roles = allRoles.filter((r) => !HIDDEN_ROLES.includes(r));
@@ -202,7 +201,7 @@ function UserRow({ u, isMe, manageable, labelOf, onAction, onOpen }) {
                         <button onClick={() => onAction({ kind: 'lock', user: u })} className={`${link} text-error`}>{t('users.actions.lock')}</button>
                     )}
                     {!isMe && (u.status === 'LOCKED' || tempLocked) && (
-                        <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>{t('users.actions.unlock')}</button>
+                        <button onClick={() => onAction({ kind: 'unlock', user: u })} className={link}>{t(u.status === 'LOCKED' ? 'users.actions.unlock' : 'users.actions.clearTempLock')}</button>
                     )}
                     {/* DMS của Owner: hiện đúng nút theo trạng thái */}
                     {isOwner && u.dmsStatus && (

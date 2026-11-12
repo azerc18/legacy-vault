@@ -134,9 +134,8 @@ public class AdminUserServiceImpl implements AdminUserService{
             if (target == UserStatus.ACTIVE && isTemporarilyLocked(user)) {
                 user.setFailedLoginAttempts(0);
                 user.setLockedUntil(null);
-                String reason = req.getReason() == null || req.getReason().isBlank() ? "" : " reason=" + req.getReason().trim();
                 auditLogService.log(AuditAction.RBAC_CHANGE, AuditResult.SUCCESS, adminId, null,
-                        "User", userId.toString(), "TEMPORARY LOCK CLEARED" + reason);
+                        "User", userId.toString(), "TEMPORARY LOCK CLEARED" + reasonSuffix(req));
             }
             return toResponse(user);              // idempotent
         }
@@ -150,10 +149,14 @@ public class AdminUserServiceImpl implements AdminUserService{
             user.setLockedUntil(null);
         }
 
-        String reason = req.getReason() == null || req.getReason().isBlank() ? "" : " reason=" + req.getReason().trim();
         auditLogService.log(AuditAction.RBAC_CHANGE, AuditResult.SUCCESS, adminId, null,
-                "User", userId.toString(), "STATUS " + old + "->" + target + reason);
+                "User", userId.toString(), "STATUS " + old + "->" + target + reasonSuffix(req));
         return toResponse(user);
+    }
+
+    /** " reason=..." cho audit; rỗng nếu Admin không nhập lý do. */
+    private static String reasonSuffix(UpdateUserStatusRequest req) {
+        return req.getReason() == null || req.getReason().isBlank() ? "" : " reason=" + req.getReason().trim();
     }
 
     private static boolean isTemporarilyLocked(User u) {

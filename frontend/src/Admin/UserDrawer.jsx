@@ -9,7 +9,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { getUser } from '../auth/auth.js';
 import { Icon, Alert, formatDate } from '../Owner/ownerUi.jsx';
-import { ReasonDialog, Stamp, toneOf } from './adminUi.jsx';
+import { ReasonDialog, Stamp, toneOf, isTemporarilyLocked } from './adminUi.jsx';
 import { GrantVipDialog } from './BillingDialogs.jsx';
 import VerificationBadge from '../Common/VerificationBadge.jsx';
 import { tEnum } from '../i18n/format.js';
@@ -41,9 +41,6 @@ function Section({ title, count, children }) {
  * @param onClose  đóng ngăn kéo
  * @param onChanged(user) gọi sau khi khoá/mở khoá/DMS để trang cha cập nhật dòng tương ứng (tuỳ chọn)
  */
-// Khoá tạm do sai mật khẩu / mã nhiều lần: trạng thái vẫn ACTIVE nhưng không đăng nhập được tới lockedUntil
-const isTemporarilyLocked = (u) => !!u?.lockedUntil && new Date(u.lockedUntil) > new Date();
-
 export default function UserDrawer({ userId, onClose, onChanged }) {
     const { t } = useTranslation('admin');
     const me = getUser();
@@ -153,7 +150,7 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
     const accountActions = u && (
         <>
             {!isMe && u.status === 'ACTIVE' && <button className={`${btn} text-error`} onClick={() => setDialog('lock')}><Icon name="lock" className="text-[16px]" />{t('users.actions.lock')}</button>}
-            {!isMe && (u.status === 'LOCKED' || isTemporarilyLocked(u)) && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t('users.actions.unlock')}</button>}
+            {!isMe && (u.status === 'LOCKED' || isTemporarilyLocked(u)) && <button className={btn} onClick={() => setDialog('unlock')}><Icon name="lock_open" className="text-[16px]" />{t(u.status === 'LOCKED' ? 'users.actions.unlock' : 'users.actions.clearTempLock')}</button>}
             {isOwner && <button className={btn} onClick={() => setGranting(true)}><Icon name="workspace_premium" className="text-[16px]" />{t('users.actions.grantVip')}</button>}
             <Link to={`/admin/audit-logs?actorEmail=${encodeURIComponent(u.email)}`} className={btn}><Icon name="history" className="text-[16px]" />{t('drawer.allLogs')}</Link>
             <Link to={`/admin/payments?email=${encodeURIComponent(u.email)}`} className={btn}><Icon name="receipt_long" className="text-[16px]" />{t('drawer.payments')}</Link>
