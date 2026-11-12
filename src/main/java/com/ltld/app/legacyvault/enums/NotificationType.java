@@ -35,5 +35,9 @@ public enum NotificationType {
     VERIFICATION_REOPENED,
     // Việc 3: admin tặng VIP / hoàn tiền
     SUBSCRIPTION_GRANTED,
-    PAYMENT_REFUNDED
+    PAYMENT_REFUNDED,
+    // Lời mời làm Executor: báo Owner khi người được mời đồng ý / từ chối
+    EXECUTOR_INVITATION_ACCEPTED,
+    EXECUTOR_INVITATION_DECLINED,
+    EXECUTOR_INVITATION_EXPIRED
 }

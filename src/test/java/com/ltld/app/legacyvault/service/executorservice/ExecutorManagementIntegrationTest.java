@@ -101,6 +101,7 @@ class ExecutorManagementIntegrationTest {
     private AuditLogService auditLogService;
 
     @Autowired private ExecutorManagementService executorManagementService;
+    @Autowired private ExecutorInvitationService executorInvitationService;
     @Autowired private DmsConfigService dmsConfigService;
     @Autowired private VaultRepository vaultRepository;
     @Autowired private DmsAutomationService dmsAutomationService;
@@ -195,13 +196,49 @@ class ExecutorManagementIntegrationTest {
                 .containsExactly(p.getAssignmentId(), bk.getAssignmentId());
 
         verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                a.getEmail(), o.fullName, o.email, ExecutorType.PRIMARY);
+                eq(a.getEmail()), eq(o.fullName), eq(o.email), eq(ExecutorType.PRIMARY), any());
         verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                b.getEmail(), o.fullName, o.email, ExecutorType.BACKUP);
+                eq(b.getEmail()), eq(o.fullName), eq(o.email), eq(ExecutorType.BACKUP), any());
         assertThat(auditCount(o, AuditAction.EXECUTOR_ASSIGNED)).isEqualTo(2);
     }
 
     // ---------- 2. FR-06 -> FR-07 ----------
+
+    @Test
+    void pendingInvitation_isNotAUsableExecutor_untilAccepted() {
+        Owner o = owner(T0.plusDays(5));
+        User a = user("a");
+        ExecutorAssignmentResponse assigned = assignPending(o, ExecutorType.PRIMARY, a);
+
+        assertThat(assigned.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
+        // Còn chờ phản hồi: DMS chưa có ai để kích hoạt khi bàn giao bắt đầu
+        assertThat(dmsConfigService.getConfig(o.id).getHasUsableExecutor()).isFalse();
+
+        executorInvitationService.accept(assigned.getAssignmentId(), a.getId().toString());
+
+        assertThat(executorAssignmentRepository.findById(assigned.getAssignmentId()).orElseThrow()
+                .getResponseStatus()).isEqualTo(ExecutorResponseStatus.ACCEPTED);
+        assertThat(dmsConfigService.getConfig(o.id).getHasUsableExecutor()).isTrue();
+    }
+
+    @Test
+    void declinedInvitation_freesThePositionAndRemovesTheRole() {
+        Owner o = owner(T0.plusDays(5));
+        User a = user("a");
+        ExecutorAssignmentResponse assigned = assignPending(o, ExecutorType.PRIMARY, a);
+
+        executorInvitationService.decline(assigned.getAssignmentId(), a.getId().toString(), "Bận quá");
+
+        ExecutorAssignment row = executorAssignmentRepository.findById(assigned.getAssignmentId()).orElseThrow();
+        assertThat(row.getResponseStatus()).isEqualTo(ExecutorResponseStatus.DECLINED);
+        assertThat(row.getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        assertThat(row.getDeclineReason()).isEqualTo("Bận quá");
+        assertThat(hasExecutorRole(a.getId())).isFalse();
+
+        // Vị trí trống: Owner chỉ định người khác không cần confirmReplace
+        User b = user("b");
+        assertThat(assign(o, ExecutorType.PRIMARY, b, false).getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+    }
 
     @Test
     void assignedExecutors_areUsedByDmsTriggerAndBr03Escalation() {
@@ -271,8 +308,11 @@ class ExecutorManagementIntegrationTest {
         List<String> actions = jdbcTemplate.queryForList(
                 "SELECT action FROM audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?"
                         + " ORDER BY created_at", String.class, "%ownerId=" + o.id + "%");
-        assertThat(actions).containsExactly(AuditAction.EXECUTOR_ASSIGNED.name(),
-                AuditAction.EXECUTOR_REVOKE.name(), AuditAction.EXECUTOR_ASSIGNED.name());
+        // assign() = Owner chỉ định rồi người đó đồng ý lời mời, nên mỗi lần chỉ định có thêm EXECUTOR_ACCEPTED.
+        assertThat(actions).containsExactly(
+                AuditAction.EXECUTOR_ASSIGNED.name(), AuditAction.EXECUTOR_ACCEPTED.name(),
+                AuditAction.EXECUTOR_REVOKE.name(),
+                AuditAction.EXECUTOR_ASSIGNED.name(), AuditAction.EXECUTOR_ACCEPTED.name());
         String revokeDetail = jdbcTemplate.queryForObject(
                 "SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) FROM audit_logs WHERE action = ?"
                         + " AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
@@ -282,7 +322,7 @@ class ExecutorManagementIntegrationTest {
         verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorRevokedNotice(
                 c.getEmail(), o.fullName, o.email, ExecutorType.PRIMARY);
         verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                d.getEmail(), o.fullName, o.email, ExecutorType.PRIMARY);
+                eq(d.getEmail()), eq(o.fullName), eq(o.email), eq(ExecutorType.PRIMARY), any());
     }
 
     // ---------- 4. Role qua nhiều Owner ----------
@@ -370,7 +410,7 @@ class ExecutorManagementIntegrationTest {
                 assign(o, ExecutorType.BACKUP, b, false);
                 // Chờ mail của bước chuẩn bị gửi xong rồi mới xóa lượt gọi, để không lẫn vào kiểm tra của vòng.
                 verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                        eq(b.getEmail()), anyString(), anyString(), any());
+                        eq(b.getEmail()), anyString(), anyString(), any(), any());
                 clearInvocations(emailSender);
                 dmsLog.list.clear();
 
@@ -382,7 +422,7 @@ class ExecutorManagementIntegrationTest {
                 List<Throwable> results = runConcurrently(pool, List.of(
                         () -> {
                             if (delayPut) spin(headStartNanos);
-                            return assign(o, ExecutorType.PRIMARY, c, true);
+                            return assignPending(o, ExecutorType.PRIMARY, c, true);
                         },
                         () -> {
                             if (!delayPut) spin(headStartNanos);
@@ -436,24 +476,27 @@ class ExecutorManagementIntegrationTest {
                 assertThat(auditCount(o, AuditAction.EXECUTOR_ASSIGNED)).as("round %d ASSIGNED", round)
                         .isEqualTo(2);
 
-                // DMS đã TRIGGERED -> đúng một Executor ACTIVE, và là Primary hiện hành.
+                // DMS đã TRIGGERED -> đúng một Executor ACTIVE.
+                // PUT thành công: Primary mới (c) còn đang chờ trả lời lời mời nên trigger bỏ qua,
+                // kích hoạt Backup (b) đã đồng ý. PUT thất bại: Primary vẫn là a đã đồng ý.
                 List<ExecutorAssignment> rows = executorAssignmentRepository.findAllByOwnerId(o.id);
                 assertThat(rows).filteredOn(r -> r.getStatus() == ExecutorStatus.ACTIVE)
                         .as("round %d ACTIVE executors", round)
                         .singleElement()
                         .satisfies(r -> {
-                            assertThat(r.getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
-                            assertThat(r.getExecutorUser().getId()).isEqualTo(putOk ? c.getId() : a.getId());
+                            assertThat(r.getExecutorType())
+                                    .isEqualTo(putOk ? ExecutorType.BACKUP : ExecutorType.PRIMARY);
+                            assertThat(r.getExecutorUser().getId()).isEqualTo(putOk ? b.getId() : a.getId());
                         });
 
                 if (putOk) {
                     verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                            c.getEmail(), o.fullName, o.email, ExecutorType.PRIMARY);
+                            eq(c.getEmail()), eq(o.fullName), eq(o.email), eq(ExecutorType.PRIMARY), any());
                     verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorRevokedNotice(
                             a.getEmail(), o.fullName, o.email, ExecutorType.PRIMARY);
                 } else {
                     verify(emailSender, after(NO_MAIL_WAIT_MS).never()).sendExecutorAssignedNotice(
-                            any(), any(), any(), any());
+                            any(), any(), any(), any(), any());
                     verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
                 }
 
@@ -505,9 +548,9 @@ class ExecutorManagementIntegrationTest {
                 assertThat(hasExecutorRole(winner.getId())).isTrue();
                 assertThat(hasExecutorRole(loser.getId())).as("role của bên thua đã rollback").isFalse();
                 verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                        eq(winner.getEmail()), anyString(), anyString(), any());
+                        eq(winner.getEmail()), anyString(), anyString(), any(), any());
                 verify(emailSender, after(NO_MAIL_WAIT_MS).never()).sendExecutorAssignedNotice(
-                        eq(loser.getEmail()), anyString(), anyString(), any());
+                        eq(loser.getEmail()), anyString(), anyString(), any(), any());
 
                 clearInvocations(emailSender);
                 deleteSeededData();
@@ -532,7 +575,7 @@ class ExecutorManagementIntegrationTest {
         dmsAutomationService.processOverdueDms(T0);
         assertThat(dmsConfigRepository.findById(o.configId).orElseThrow().getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         verify(emailSender, timeout(MAIL_WAIT_MS)).sendExecutorAssignedNotice(
-                eq(b.getEmail()), anyString(), anyString(), any());
+                eq(b.getEmail()), anyString(), anyString(), any(), any());
         clearInvocations(emailSender);
         int auditsBefore = totalAuditCount(o);
 
@@ -547,7 +590,7 @@ class ExecutorManagementIntegrationTest {
         assertThat(executorAssignmentRepository.findById(backupId).orElseThrow().getStatus())
                 .isEqualTo(ExecutorStatus.INACTIVE);
         assertThat(hasExecutorRole(c.getId())).isFalse();
-        verify(emailSender, after(NO_MAIL_WAIT_MS).never()).sendExecutorAssignedNotice(any(), any(), any(), any());
+        verify(emailSender, after(NO_MAIL_WAIT_MS).never()).sendExecutorAssignedNotice(any(), any(), any(), any(), any());
         verify(emailSender, never()).sendExecutorRevokedNotice(any(), any(), any(), any());
     }
 
@@ -672,7 +715,23 @@ class ExecutorManagementIntegrationTest {
         return u;
     }
 
+    /**
+     * Owner chỉ định VÀ người được chỉ định đồng ý lời mời — trạng thái mà các test dưới đây coi là
+     * "đã có Executor dùng được". Chỉ định suông (còn chờ phản hồi) dùng {@link #assignPending}.
+     */
     private ExecutorAssignmentResponse assign(Owner o, ExecutorType type, User executor, boolean confirmReplace) {
+        ExecutorAssignmentResponse assigned = assignPending(o, type, executor, confirmReplace);
+        executorInvitationService.accept(assigned.getAssignmentId(), executor.getId().toString());
+        return assigned;
+    }
+
+    /** Chỉ định nhưng chưa trả lời lời mời (responseStatus = PENDING). */
+    private ExecutorAssignmentResponse assignPending(Owner o, ExecutorType type, User executor) {
+        return assignPending(o, type, executor, false);
+    }
+
+    private ExecutorAssignmentResponse assignPending(Owner o, ExecutorType type, User executor,
+                                                     boolean confirmReplace) {
         AssignExecutorRequest request = new AssignExecutorRequest();
         request.setEmail(executor.getEmail());
         request.setConfirmReplace(confirmReplace);

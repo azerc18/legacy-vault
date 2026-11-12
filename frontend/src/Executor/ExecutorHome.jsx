@@ -140,8 +140,11 @@ export default function ExecutorHome() {
     if (!isExecutor) return <Navigate to="/home" replace/>;
 
     const all = cases ?? [];
-    const active = all.filter((c) => c.status === 'ACTIVE');
-    const standby = all.filter((c) => c.status === 'INACTIVE');
+    // Lời mời chưa trả lời: chưa được tính là hồ sơ, hiện riêng ở đầu trang
+    const invitations = all.filter((c) => c.responseStatus === 'PENDING');
+    const answered = all.filter((c) => c.responseStatus !== 'PENDING');
+    const active = answered.filter((c) => c.status === 'ACTIVE');
+    const standby = answered.filter((c) => c.status === 'INACTIVE');
     const needAction = active.filter((c) => caseStep(c, c.progress) <= 1).length;
     const waiting = active.filter((c) => caseStep(c, c.progress) === 2).length;
     const unlocked = active.flatMap((c) => c.progress).filter((p) => ['UNLOCKED', 'CLAIMED'].includes(p.handoverStatus)).length;
@@ -176,6 +179,28 @@ export default function ExecutorHome() {
 
                 {error && <div
                     className="mb-6 p-4 rounded-xl bg-error-container text-on-error-container text-sm">{error}</div>}
+
+                {invitations.length > 0 && (
+                    <section className="mb-10">
+                        <h2 className="font-label-lg text-label-lg text-on-surface-variant mb-4">{t('home.invitationsTitle')}</h2>
+                        <div className="flex flex-col gap-4">
+                            {invitations.map((c) => (
+                                <div key={c.assignmentId}
+                                     className="bg-surface-container-lowest rounded-2xl border border-outline-variant/30 p-5 flex flex-wrap items-center justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-secondary uppercase tracking-wide">{t(`type.${c.executorType}`, c.executorType)}</p>
+                                        <p className="font-semibold mt-1 truncate">{t('home.invitationFrom', {name: ownerName(c)})}</p>
+                                        <p className="text-sm text-on-surface-variant">{t('home.invitationHint')}</p>
+                                    </div>
+                                    <Link to={`/executor/invitations/${c.assignmentId}`}
+                                          className="h-10 px-4 rounded-xl text-sm font-semibold inline-flex items-center gap-2 lv-btn-primary bg-primary text-on-primary hover:bg-primary-container">
+                                        <Icon name="mark_email_unread" className="text-[18px]"/> {t('home.invitationOpen')}
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
 
                 <section data-tour="executor-stats" className="lv-feature-grid mb-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatCard icon="assignment_late" label={t('home.stats.needAction')} value={cases && needAction}/>

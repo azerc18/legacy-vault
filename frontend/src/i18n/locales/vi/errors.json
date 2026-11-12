@@ -1,4 +1,5 @@
 {
+  "EXECUTOR_INVITATION_CLOSED": "Lời mời này không còn trả lời được. Có thể bạn đã trả lời, chủ di sản đã thu hồi, lời mời đã hết hạn, hoặc quy trình bàn giao đã bắt đầu.",
   "UNKNOWN": "Đã có lỗi xảy ra.",
   "NETWORK_ERROR": "Không kết nối được máy chủ. Vui lòng kiểm tra mạng.",
   "INTERNAL_ERROR": "Hệ thống gặp lỗi. Vui lòng thử lại sau.",

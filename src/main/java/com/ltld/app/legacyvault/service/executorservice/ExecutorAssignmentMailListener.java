@@ -10,7 +10,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * FR-06 bước 5: gửi thông báo thay đổi quyền cho Executor, CHỈ sau khi transaction đã commit.
+ * FR-06 bước 5: gửi thông báo thay đổi quyền cho Executor (và kết quả lời mời cho Owner), CHỈ sau khi transaction đã commit.
  *
  * <p>Chạy @Async trên executor mặc định của Spring (@EnableAsync ở LegacyVaultApplication), nên request của
  * Owner không phải chờ SMTP. AFTER_COMMIT quyết định CÓ gửi hay không (rollback thì không gửi), @Async chỉ đưa
@@ -31,7 +31,8 @@ public class ExecutorAssignmentMailListener {
             try {
                 switch (mail.type()) {
                     case ASSIGNED -> emailSender.sendExecutorAssignedNotice(
-                            mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.executorType());
+                            mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.executorType(),
+                            mail.assignmentId());
                     case REVOKED -> emailSender.sendExecutorRevokedNotice(
                             mail.recipientEmail(), mail.ownerName(), mail.ownerEmail(), mail.executorType());
                     case REVOKED_TIMEOUT -> emailSender.sendExecutorTimeoutRevokedNotice(
@@ -43,6 +44,47 @@ public class ExecutorAssignmentMailListener {
                 log.warn("FR-06: sending {} notice for executor position {} failed: {}",
                         mail.type(), mail.executorType(), e.getMessage());
             }
+        }
+    }
+
+    // Hạn lời mời: nhắc người được mời khi sắp hết hạn, báo Owner khi đã hết hạn. Lỗi gửi chỉ log.
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void on(ExecutorInvitationTimeoutEvent event) {
+        try {
+            switch (event.kind()) {
+                case REMINDER -> emailSender.sendExecutorInvitationReminder(event.executorEmail(),
+                        event.ownerName(), event.ownerEmail(), event.executorType(),
+                        event.assignmentId(), event.days());
+                case EXPIRED -> emailSender.sendExecutorInvitationExpiredNotice(event.ownerEmail(),
+                        event.executorLabel(), event.executorType(), event.days());
+            }
+        } catch (RuntimeException e) {
+            log.warn("Executor invitation: sending {} mail for assignment {} failed: {}",
+                    event.kind(), event.assignmentId(), e.getMessage());
+        }
+        // Hết hạn: báo cả người được mời. Gửi riêng để lỗi mail của Owner không chặn mail này (và ngược lại).
+        if (event.kind() == ExecutorInvitationTimeoutEvent.Kind.EXPIRED) {
+            try {
+                emailSender.sendExecutorInvitationExpiredToInvitee(event.executorEmail(), event.ownerName(),
+                        event.ownerEmail(), event.executorType(), event.days());
+            } catch (RuntimeException e) {
+                log.warn("Executor invitation: telling invitee about expired assignment {} failed: {}",
+                        event.assignmentId(), e.getMessage());
+            }
+        }
+    }
+
+    // Lời mời làm Executor: báo Owner người được mời đã đồng ý / từ chối. Lỗi gửi chỉ log, không retry.
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void on(ExecutorInvitationRespondedEvent event) {
+        try {
+            emailSender.sendExecutorInvitationResponseNotice(event.ownerEmail(), event.executorLabel(),
+                    event.executorType(), event.accepted(), event.declineReason());
+        } catch (RuntimeException e) {
+            log.warn("Executor invitation: notifying owner about assignment {} failed: {}",
+                    event.assignmentId(), e.getMessage());
         }
     }
 }

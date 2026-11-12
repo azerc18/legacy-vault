@@ -24,6 +24,8 @@ import com.ltld.app.legacyvault.service.auditservice.AuditEvent;
 import com.ltld.app.legacyvault.service.auditservice.MailDataReader;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationRespondedEvent;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationTimeoutEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -242,18 +244,91 @@ class InAppNotificationEventListenerTest {
         User executor = user("exec@example.com", "Exec");
         when(userRepository.findByEmail("exec@example.com")).thenReturn(Optional.of(executor));
 
+        UUID assignmentId = UUID.randomUUID();
         listener.onExecutorAssignmentChanged(new ExecutorAssignmentChangedEvent(List.of(
-                ExecutorMail.assigned("exec@example.com", "Nguyen Van An", "owner@example.com", ExecutorType.PRIMARY),
+                ExecutorMail.assigned("exec@example.com", "Nguyen Van An", "owner@example.com", ExecutorType.PRIMARY,
+                        assignmentId),
                 ExecutorMail.revokedByTimeout("exec@example.com", "Nguyen Van An", "owner@example.com", 14),
-                ExecutorMail.assigned("nobody@example.com", "Nguyen Van An", "owner@example.com", ExecutorType.BACKUP))));
+                ExecutorMail.assigned("nobody@example.com", "Nguyen Van An", "owner@example.com", ExecutorType.BACKUP,
+                        UUID.randomUUID()))));
 
         List<Notification> all = saved(2);   // nobody@example.com chưa có tài khoản: chỉ nhận email
         assertThat(all.get(0).getType()).isEqualTo(NotificationType.EXECUTOR_ASSIGNED);
         assertThat(NotificationParams.parse(all.get(0).getParams())).containsEntry("role", "PRIMARY");
+        // Lời mời: chuông mở trang đồng ý / từ chối của đúng assignment
+        assertThat(all.get(0).getReferenceType()).isEqualTo(InAppNotifier.REF_EXECUTOR_ASSIGNMENT);
+        assertThat(all.get(0).getReferenceId()).isEqualTo(assignmentId);
         assertThat(all.get(1).getType()).isEqualTo(NotificationType.EXECUTOR_REVOKED);
         // FE chọn câu theo variant (notifications.types.EXECUTOR_REVOKED_TIMEOUT)
         assertThat(NotificationParams.parse(all.get(1).getParams()))
                 .containsEntry("variant", "TIMEOUT").containsEntry("owner", "Nguyen Van An").doesNotContainKey("reason");
+    }
+
+    @Test
+    void executorInvitationAccepted_notifiesOwner() {
+        UUID assignmentId = UUID.randomUUID();
+
+        listener.onExecutorInvitationResponded(new ExecutorInvitationRespondedEvent(assignmentId, owner.getId(),
+                owner.getEmail(), owner.getFullName(), "Exec", "exec@example.com", ExecutorType.PRIMARY, true, null));
+
+        Notification n = saved(1).get(0);
+        assertThat(n.getRecipient()).isSameAs(owner);
+        assertThat(n.getType()).isEqualTo(NotificationType.EXECUTOR_INVITATION_ACCEPTED);
+        assertThat(n.getReferenceType()).isEqualTo(InAppNotifier.REF_EXECUTOR_ASSIGNMENT);
+        assertThat(n.getReferenceId()).isEqualTo(assignmentId);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .containsEntry("executor", "Exec (exec@example.com)").containsEntry("role", "PRIMARY")
+                .doesNotContainKey("reason");
+    }
+
+    @Test
+    void executorInvitationDeclined_notifiesOwnerWithReason() {
+        listener.onExecutorInvitationResponded(new ExecutorInvitationRespondedEvent(UUID.randomUUID(), owner.getId(),
+                owner.getEmail(), owner.getFullName(), null, "exec@example.com", ExecutorType.BACKUP, false, "Busy"));
+
+        Notification n = saved(1).get(0);
+        assertThat(n.getType()).isEqualTo(NotificationType.EXECUTOR_INVITATION_DECLINED);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .containsEntry("executor", "exec@example.com").containsEntry("role", "BACKUP")
+                .containsEntry("reason", "Busy")
+                // variant -> câu dịch EXECUTOR_INVITATION_DECLINED_reason có {{reason}}
+                .containsEntry("variant", "reason");
+        assertThat(n.getContent()).contains("Reason: Busy");
+    }
+
+    @Test
+    void executorInvitationDeclinedWithoutReason_usesPlainVariant() {
+        listener.onExecutorInvitationResponded(new ExecutorInvitationRespondedEvent(UUID.randomUUID(), owner.getId(),
+                owner.getEmail(), owner.getFullName(), null, "exec@example.com", ExecutorType.BACKUP, false, "  "));
+
+        Notification n = saved(1).get(0);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .doesNotContainKey("reason").doesNotContainKey("variant");
+        assertThat(n.getContent()).doesNotContain("Reason:");
+    }
+
+    @Test
+    void executorInvitationExpired_notifiesOwner() {
+        UUID assignmentId = UUID.randomUUID();
+        listener.onExecutorInvitationExpired(new ExecutorInvitationTimeoutEvent(
+                ExecutorInvitationTimeoutEvent.Kind.EXPIRED, assignmentId, owner.getId(), owner.getEmail(),
+                owner.getFullName(), "exec@example.com", "Exec", ExecutorType.PRIMARY, 7));
+
+        Notification n = saved(1).get(0);
+        assertThat(n.getType()).isEqualTo(NotificationType.EXECUTOR_INVITATION_EXPIRED);
+        assertThat(n.getReferenceId()).isEqualTo(assignmentId);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .containsEntry("executor", "Exec (exec@example.com)")
+                .containsEntry("role", "PRIMARY").containsEntry("days", "7");
+    }
+
+    @Test
+    void executorInvitationReminder_doesNotNotifyOwner() {
+        listener.onExecutorInvitationExpired(new ExecutorInvitationTimeoutEvent(
+                ExecutorInvitationTimeoutEvent.Kind.REMINDER, UUID.randomUUID(), owner.getId(), owner.getEmail(),
+                owner.getFullName(), "exec@example.com", "Exec", ExecutorType.PRIMARY, 3));
+
+        saved(0);
     }
 
     @Test

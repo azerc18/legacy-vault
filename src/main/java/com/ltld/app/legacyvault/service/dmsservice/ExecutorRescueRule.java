@@ -32,8 +32,7 @@ public final class ExecutorRescueRule {
 
     // FR-07: còn Backup chờ (INACTIVE, user ACTIVE) thì chưa cần Admin cứu, BR-03 / Owner đã có người dự phòng
     public static boolean hasStandbyBackup(Collection<ExecutorAssignment> all) {
-        return all.stream().anyMatch(a -> a.getExecutorType() == ExecutorType.BACKUP
-                && a.getStatus() == ExecutorStatus.INACTIVE
+        return all.stream().anyMatch(a -> ExecutorActivationRule.isUsableBackup(a)
                 && a.getExecutorUser() != null
                 && a.getExecutorUser().getStatus() == UserStatus.ACTIVE);
     }

@@ -39,6 +39,9 @@
     "EXECUTOR_ASSIGNED": "Chỉ định người thi hành",
     "EXECUTOR_REPLACED": "Thay người thi hành",
     "EXECUTOR_REVOKE": "Thu hồi người thi hành",
+    "EXECUTOR_ACCEPTED": "Người thi hành đồng ý lời mời",
+    "EXECUTOR_DECLINED": "Người thi hành từ chối lời mời",
+    "EXECUTOR_INVITATION_EXPIRED": "Lời mời làm người thi hành đã hết hạn",
     "EXECUTOR_ACTIVATED": "Kích hoạt người thi hành",
     "EXECUTOR_ACKNOWLEDGED": "Người thi hành đã xác nhận",
     "VAULT_DELETED": "Xoá két"

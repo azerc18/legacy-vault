@@ -122,6 +122,7 @@ public class ExecutorSelfServiceImpl implements ExecutorSelfService {
                 .ownerEmail(a.getOwner().getEmail())
                 .executorType(a.getExecutorType())
                 .status(a.getStatus())
+                .responseStatus(a.getResponseStatus())
                 .assignedAt(a.getAssignedAt())
                 .activatedAt(a.getActivatedAt())
                 .acknowledgedAt(a.getAcknowledgedAt())

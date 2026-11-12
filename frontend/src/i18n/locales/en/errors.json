@@ -1,4 +1,5 @@
 {
+  "EXECUTOR_INVITATION_CLOSED": "This invitation can no longer be answered. You may have already answered it, the owner withdrew it, it expired, or the handover has started.",
   "UNKNOWN": "Something went wrong.",
   "NETWORK_ERROR": "Cannot reach the server. Check your connection.",
   "INTERNAL_ERROR": "Something went wrong on our side. Please try again later.",

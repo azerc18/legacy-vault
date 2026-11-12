@@ -58,6 +58,8 @@ public enum ErrorCode {
     EMERGENCY_REQUEST_EXISTS(HttpStatus.CONFLICT),
     // Owner đã xoá hết vault: DMS tạm dừng, check-in không thành công
     DMS_NO_VAULT(HttpStatus.CONFLICT),
+    // Lời mời làm Executor đã được trả lời, đã bị Owner thu hồi / thay người, hoặc DMS đã bắt đầu bàn giao
+    EXECUTOR_INVITATION_CLOSED(HttpStatus.CONFLICT),
 
     // Verifier
     INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),

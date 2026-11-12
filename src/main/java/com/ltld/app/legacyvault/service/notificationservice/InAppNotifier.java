@@ -34,6 +34,8 @@ public class InAppNotifier {
     public static final String REF_VAULT = "Vault";
     public static final String REF_REQUEST = "LegalVerificationRequest";
     public static final String REF_DMS_CONFIG = "DmsConfig";
+    // Lời mời làm Executor (id = ExecutorAssignment.id)
+    public static final String REF_EXECUTOR_ASSIGNMENT = "ExecutorAssignment";
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;

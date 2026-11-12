@@ -30,10 +30,112 @@ class EmailSenderExecutorNoticeTest {
     @InjectMocks
     private EmailSender emailSender;
 
+    private static final java.util.UUID ASSIGNMENT_ID =
+            java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
+
+    // Lời mời: có app.frontend.base-url thì có nút dẫn tới trang đồng ý / từ chối của đúng assignment
+    @Test
+    void assignedNotice_withFrontendUrl_linksToInvitationPage() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test/");
+
+        emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID);
+
+        assertThat(sentMessage().getText())
+                .contains("View and respond to the invitation: https://app.example.test/executor/invitations/" + ASSIGNMENT_ID)
+                .contains("only become the executor after you accept");
+    }
+
+    // Chưa cấu hình frontend: không có link, hướng dẫn đăng nhập thay thế
+    @Test
+    void assignedNotice_withoutFrontendUrl_explainsHowToRespond() {
+        emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID);
+
+        assertThat(sentMessage().getText())
+                .contains("Sign in to LegacyVault and open the Executor page")
+                .doesNotContain("/executor/invitations/");
+    }
+
+    @Test
+    void invitationAccepted_tellsOwner() {
+        emailSender.sendExecutorInvitationResponseNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.PRIMARY, true, null);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("owner@example.test");
+        assertThat(message.getText()).contains("Exec B (exec@example.test) has accepted to be your Primary executor")
+                .doesNotContain("Reason:");
+    }
+
+    @Test
+    void invitationDeclined_tellsOwnerWithReason_andLinksToExecutorsPage() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test");
+
+        emailSender.sendExecutorInvitationResponseNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.BACKUP, false, "  Too busy  ");
+
+        assertThat(sentMessage().getText())
+                .contains("Exec B (exec@example.test) has declined to be your Backup executor",
+                        "Reason: Too busy", "https://app.example.test/owner/executors");
+    }
+
+    // Lý do từ chối do người dùng gõ: không được biến thành nút bấm trong mail của Owner
+    // (đoạn riêng dạng "Nhãn: https://..." sẽ bị MailHtml dựng thành nút).
+    @Test
+    void invitationDeclined_reasonWithUrl_isNotRenderedAsButton() {
+        emailSender.sendExecutorInvitationResponseNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.PRIMARY, false, "https://phishing.example.test");
+
+        SentMail message = sentMessage();
+        assertThat(message.getText()).contains("Reason: https://phishing.example.test");
+        // Nút dùng display:inline-block + padding:13px 44px; link thường trong đoạn thì không.
+        assertThat(message.getHtml()).doesNotContain("display:inline-block;background:");
+    }
+
+    // Hạn lời mời: nhắc người được mời, có link tới đúng lời mời
+    @Test
+    void invitationReminder_tellsDaysLeftAndLinksToInvitation() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test");
+
+        emailSender.sendExecutorInvitationReminder("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID, 3);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("exec@example.test");
+        assertThat(message.getText())
+                .contains("3 day(s) left", "Owner A", "https://app.example.test/executor/invitations/" + ASSIGNMENT_ID);
+    }
+
+    // Hạn lời mời: báo Owner khi đã hết hạn, dẫn về trang Người thực thi
+    @Test
+    void invitationExpired_tellsOwnerPositionIsEmpty() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test");
+
+        emailSender.sendExecutorInvitationExpiredNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.BACKUP, 7);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("owner@example.test");
+        assertThat(message.getText())
+                .contains("Exec B (exec@example.test)", "7 day(s)", "https://app.example.test/owner/executors");
+    }
+
+    // Hạn lời mời: báo người được mời rằng lời mời đã hết hiệu lực
+    @Test
+    void invitationExpired_tellsInvitee() {
+        emailSender.sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, 7);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("exec@example.test");
+        assertThat(message.getText()).contains("Owner A", "7 day(s)", "has expired", "ask");
+    }
+
     @Test
     void assignedNotice_mentionsOwnerAndRole_withoutOtpFooter() {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",
-                ExecutorType.BACKUP);
+                ExecutorType.BACKUP, ASSIGNMENT_ID);
 
         SentMail message = sentMessage();
         assertThat(message.getTo()).containsExactly("exec@example.test");
@@ -83,10 +185,11 @@ class EmailSenderExecutorNoticeTest {
     // T5: Owner không có fullName -> dùng email làm tên hiển thị, không in chữ "null".
     @Test
     void assignedNotice_ownerWithoutName_usesEmailAndNeverPrintsNull() {
-        emailSender.sendExecutorAssignedNotice("exec@example.test", null, "owner@example.test", ExecutorType.PRIMARY);
+        emailSender.sendExecutorAssignedNotice("exec@example.test", null, "owner@example.test", ExecutorType.PRIMARY,
+                ASSIGNMENT_ID);
 
         assertThat(sentMessage().getText())
-                .contains("owner@example.test has assigned you", "Dead Man's Switch of owner@example.test")
+                .contains("owner@example.test would like to appoint you", "Dead Man's Switch of owner@example.test")
                 .doesNotContain("null");
     }
 
@@ -101,10 +204,11 @@ class EmailSenderExecutorNoticeTest {
 
     @Test
     void assignedNotice_ownerWithName_showsNameAndEmail() {
-        emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
+        emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY,
+                ASSIGNMENT_ID);
 
         assertThat(sentMessage().getText())
-                .contains("Owner A (owner@example.test) has assigned you", "Dead Man's Switch of Owner A ")
+                .contains("Owner A (owner@example.test) would like to appoint you", "Dead Man's Switch of Owner A ")
                 .doesNotContain("null");
     }
 

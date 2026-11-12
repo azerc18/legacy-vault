@@ -3,6 +3,8 @@ package com.ltld.app.legacyvault.controller;
 import com.ltld.app.legacyvault.dto.executordto.BeneficiaryClaimProgressResponse;
 import com.ltld.app.legacyvault.dto.executordto.CreateDeathVerificationRequest;
 import com.ltld.app.legacyvault.dto.executordto.DeathVerificationResponse;
+import com.ltld.app.legacyvault.dto.executordto.DeclineExecutorInvitationRequest;
+import com.ltld.app.legacyvault.dto.executordto.ExecutorInvitationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorActivationResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorVerificationRequestResponse;
 import com.ltld.app.legacyvault.dto.executordto.ExecutorAssignedVaultsResponse;
@@ -15,6 +17,7 @@ import com.ltld.app.legacyvault.service.dmsservice.DmsAutomationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssetService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorClaimTrackingService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorHandoverService;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorSelfService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorVerificationService;
 import com.ltld.app.legacyvault.service.executorservice.VerificationExchangeService;
@@ -32,6 +35,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -55,6 +59,33 @@ public class ExecutorController {
     private final VerificationExchangeService verificationExchangeService;
     private final ExecutorSelfService executorSelfService;
     private final ExecutorClaimTrackingService executorClaimTrackingService;
+    private final ExecutorInvitationService executorInvitationService;
+
+    // Lời mời làm Executor: trang đồng ý / từ chối (link trong mail và chuông). Không cần role EXECUTOR trong JWT:
+    // phiên đăng nhập cũ có thể chưa mang role vừa cấp; service tự kiểm lời mời có thuộc người gọi không (404 nếu không).
+    @GetMapping("/{assignmentId}/invitation")
+    public ResponseEntity<ApiResponse<ExecutorInvitationResponse>> getInvitation(
+            @PathVariable UUID assignmentId, Principal principal) {
+        ExecutorInvitationResponse response = executorInvitationService.getInvitation(assignmentId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Executor invitation retrieved", response));
+    }
+
+    @PostMapping("/{assignmentId}/invitation/accept")
+    public ResponseEntity<ApiResponse<ExecutorInvitationResponse>> acceptInvitation(
+            @PathVariable UUID assignmentId, Principal principal) {
+        ExecutorInvitationResponse response = executorInvitationService.accept(assignmentId, principal.getName());
+        return ResponseEntity.ok(ApiResponse.success("Executor invitation accepted", response));
+    }
+
+    @PostMapping("/{assignmentId}/invitation/decline")
+    public ResponseEntity<ApiResponse<ExecutorInvitationResponse>> declineInvitation(
+            @PathVariable UUID assignmentId,
+            @Valid @RequestBody(required = false) DeclineExecutorInvitationRequest request,
+            Principal principal) {
+        ExecutorInvitationResponse response = executorInvitationService.decline(assignmentId, principal.getName(),
+                request == null ? null : request.getReason());
+        return ResponseEntity.ok(ApiResponse.success("Executor invitation declined", response));
+    }
 
     // N2-exec: tiến độ nhận tài sản của từng người thụ hưởng trong một Vault đã bàn giao
     @GetMapping("/{assignmentId}/vaults/{vaultId}/beneficiaries")

@@ -36,15 +36,83 @@ class ExecutorAssignmentMailListenerTest {
     @InjectMocks
     private ExecutorAssignmentMailListener listener;
 
+    private static final java.util.UUID ASSIGNMENT_ID = java.util.UUID.randomUUID();
+
+    @Test
+    @DisplayName("Lời mời: báo Owner kết quả đồng ý / từ chối kèm lý do")
+    void invitationResponded_notifiesOwner() {
+        listener.on(new ExecutorInvitationRespondedEvent(ASSIGNMENT_ID, java.util.UUID.randomUUID(),
+                "owner@example.test", "Owner A", "Exec B", "exec@example.test", ExecutorType.BACKUP, false, "Busy"));
+
+        verify(emailSender).sendExecutorInvitationResponseNotice(
+                "owner@example.test", "Exec B (exec@example.test)", ExecutorType.BACKUP, false, "Busy");
+    }
+
+    @Test
+    @DisplayName("Hạn lời mời: REMINDER gửi cho người được mời, EXPIRED gửi cho Owner")
+    void invitationTimeout_sendsRightMailToRightPerson() {
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.REMINDER,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 3));
+        verify(emailSender).sendExecutorInvitationReminder("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID, 3);
+
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.EXPIRED,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.BACKUP, 7));
+        verify(emailSender).sendExecutorInvitationExpiredNotice("owner@example.test",
+                "Exec B (exec@example.test)", ExecutorType.BACKUP, 7);
+        // Hết hạn thì người được mời cũng được báo
+        verify(emailSender).sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A",
+                "owner@example.test", ExecutorType.BACKUP, 7);
+    }
+
+    @Test
+    @DisplayName("Hạn lời mời: mail cho Owner lỗi vẫn gửi mail cho người được mời")
+    void invitationExpired_ownerMailFailure_stillTellsInvitee() {
+        doThrow(new MailSendException("SMTP down")).when(emailSender)
+                .sendExecutorInvitationExpiredNotice(any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+
+        assertThatCode(() -> listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.EXPIRED,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 7))).doesNotThrowAnyException();
+
+        verify(emailSender).sendExecutorInvitationExpiredToInvitee("exec@example.test", "Owner A",
+                "owner@example.test", ExecutorType.PRIMARY, 7);
+    }
+
+    @Test
+    @DisplayName("Hạn lời mời: lượt nhắc không gửi mail hết hạn cho người được mời")
+    void invitationReminder_doesNotSendExpiredMail() {
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.REMINDER,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 3));
+
+        verify(emailSender, org.mockito.Mockito.never()).sendExecutorInvitationExpiredToInvitee(
+                any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt());
+    }
+
+    @Test
+    @DisplayName("Lời mời: lỗi gửi mail cho Owner bị nuốt, không ném ra")
+    void invitationResponded_sendFailureIsSwallowed() {
+        doThrow(new MailSendException("SMTP down")).when(emailSender).sendExecutorInvitationResponseNotice(
+                any(), any(), any(), eq(true), any());
+
+        assertThatCode(() -> listener.on(new ExecutorInvitationRespondedEvent(ASSIGNMENT_ID,
+                java.util.UUID.randomUUID(), "owner@example.test", null, null, "exec@example.test",
+                ExecutorType.PRIMARY, true, null))).doesNotThrowAnyException();
+    }
+
     @Test
     @DisplayName("ASSIGNED gọi sendExecutorAssignedNotice, REVOKED gọi sendExecutorRevokedNotice")
     void dispatchesEachMailToMatchingMethod() {
         listener.on(new ExecutorAssignmentChangedEvent(List.of(
-                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY),
+                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY,
+                        ASSIGNMENT_ID),
                 ExecutorMail.revoked("old@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY))));
 
         verify(emailSender).sendExecutorAssignedNotice(
-                "new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
+                "new@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY, ASSIGNMENT_ID);
         verify(emailSender).sendExecutorRevokedNotice(
                 "old@example.test", "Owner A", "owner@example.test", ExecutorType.PRIMARY);
         verify(emailSender, never()).sendExecutorRevokedNotice(
@@ -55,10 +123,11 @@ class ExecutorAssignmentMailListenerTest {
     @DisplayName("Lỗi gửi mail bị nuốt (không ném ra) và không chặn các mail còn lại")
     void sendFailure_isSwallowedAndOtherMailsStillSent() {
         doThrow(new MailSendException("SMTP down")).when(emailSender).sendExecutorAssignedNotice(
-                "new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP);
+                "new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP, ASSIGNMENT_ID);
 
         assertThatCode(() -> listener.on(new ExecutorAssignmentChangedEvent(List.of(
-                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP),
+                ExecutorMail.assigned("new@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP,
+                        ASSIGNMENT_ID),
                 ExecutorMail.revoked("old@example.test", "Owner A", "owner@example.test", ExecutorType.BACKUP)))))
                 .doesNotThrowAnyException();
 

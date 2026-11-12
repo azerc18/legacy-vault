@@ -26,6 +26,7 @@ const VerificationHistory = lazy(() => import('./LegalVerifier/VerificationHisto
 const VerifierHome = lazy(() => import('./LegalVerifier/VerifierHome.jsx'));
 const ExecutorHome = lazy(() => import('./Executor/ExecutorHome.jsx'));
 const ExecutorCase = lazy(() => import('./Executor/ExecutorCase.jsx'));
+const ExecutorInvitation = lazy(() => import('./Executor/ExecutorInvitation.jsx'));
 const BeneficiaryVaults = lazy(() => import('./Beneficiary/BeneficiaryVaults.jsx'));
 const BeneficiaryVaultDetail = lazy(() => import('./Beneficiary/BeneficiaryVaultDetail.jsx'));
 const BeneficiaryGuide = lazy(() => import('./Beneficiary/BeneficiaryGuide.jsx'));
@@ -113,6 +114,10 @@ function App() {
                 {/* Executor */}
                 <Route path="/executor/home" element={guard(EXECUTOR, <ExecutorHome />)} />
                 <Route path="/executor/cases/:assignmentId" element={guard(EXECUTOR, <ExecutorCase />)} />
+                {/* Lời mời: chỉ cần đăng nhập — JWT của phiên cũ có thể chưa mang role EXECUTOR vừa được cấp.
+                    guard(null, ...) truyền state.from nên mở link trong mail lúc chưa đăng nhập thì sau khi
+                    đăng nhập sẽ quay lại đúng lời mời. */}
+                <Route path="/executor/invitations/:assignmentId" element={guard(null, <ExecutorInvitation />)} />
 
                 {/* Legal Verifier */}
                 <Route path="/verifier/home" element={guard(VERIFIER, <VerifierHome />)} />

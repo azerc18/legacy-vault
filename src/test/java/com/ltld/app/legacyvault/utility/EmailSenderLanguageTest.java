@@ -188,10 +188,10 @@ class EmailSenderLanguageTest {
         SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
 
         emailSender.sendExecutorAssignedNotice("ex@example.com", "Owner A", "owner@example.com",
-                com.ltld.app.legacyvault.enums.ExecutorType.BACKUP);
+                com.ltld.app.legacyvault.enums.ExecutorType.BACKUP, java.util.UUID.randomUUID());
 
         assertThat(SentMail.captureOne(javaMailSender).getText())
-                .contains("Owner A (owner@example.com) đã chỉ định bạn làm Người thực thi dự phòng (BACKUP)",
+                .contains("Owner A (owner@example.com) muốn chỉ định bạn làm Người thực thi dự phòng (BACKUP)",
                         "Công tắc người chết của Owner A");
     }
 
