@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.entity.VerificationToken;
 import com.ltld.app.legacyvault.exception.*;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
+import com.ltld.app.legacyvault.service.captchaservice.CaptchaService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
@@ -76,6 +77,10 @@ public class AuthControllerTest {
 
     @MockitoBean
     private VerificationTokenService tokenService;
+
+    // Mặc định mock: requirePassed() không làm gì (như khi CAPTCHA tắt)
+    @MockitoBean
+    private CaptchaService captchaService;
 
     // ---------- helpers dùng chung ----------
 
@@ -540,6 +545,80 @@ public class AuthControllerTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.enabled").value(true))
                     .andExpect(jsonPath("$.data.clientId").value("client-123.apps.googleusercontent.com"));
+        }
+    }
+
+    @Nested
+    @DisplayName("CAPTCHA (Turnstile)")
+    class Captcha {
+
+        private Map<String, String> registerBody() {
+            return Map.of("email", EMAIL, "fullName", "Nguyen Van A", "password", "Password123!",
+                    "passwordConfirm", "Password123!", "captchaToken", "tok");
+        }
+
+        @Test
+        void config_isPublic_andReturnsSiteKey() throws Exception {
+            when(captchaService.isEnabled()).thenReturn(true);
+            when(captchaService.siteKey()).thenReturn("0x4AAA-site");
+            when(captchaService.loginAfterFailures()).thenReturn(3);
+
+            mockMvc.perform(get("/api/auth/captcha/config"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.enabled").value(true))
+                    .andExpect(jsonPath("$.data.siteKey").value("0x4AAA-site"))
+                    .andExpect(jsonPath("$.data.loginAfterFailures").value(3));
+        }
+
+        @Test
+        void register_failedCaptcha_doesNotCreateAccountOrSendMail() throws Exception {
+            doThrow(new BusinessException(ErrorCode.CAPTCHA_INVALID, "Please complete the security check"))
+                    .when(captchaService).requirePassed("tok", "register");
+
+            postJson(REGISTER_URL, registerBody())
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("CAPTCHA_INVALID"));
+            verify(authService, never()).register(any());
+        }
+
+        @Test
+        void register_passesTokenToCaptcha_thenRegisters() throws Exception {
+            postJson(REGISTER_URL, registerBody()).andExpect(status().isCreated());
+            verify(captchaService).requirePassed("tok", "register");
+            verify(authService).register(any(RegisterRequest.class));
+        }
+
+        @Test
+        void forgotPassword_cloudflareDown_isServiceUnavailable_andSendsNothing() throws Exception {
+            doThrow(new BusinessException(ErrorCode.CAPTCHA_UNAVAILABLE, "unavailable"))
+                    .when(captchaService).requirePassed("tok", "forgot-password");
+
+            postJson(FORGOT_PASSWORD_URL, Map.of("email", EMAIL, "captchaToken", "tok"))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(jsonPath("$.errorCode").value("CAPTCHA_UNAVAILABLE"));
+            verify(tokenService, never()).sendPasswordResetOtp(any());
+        }
+
+        @Test
+        void login_captchaChallenge_returnsFlagForFrontend() throws Exception {
+            when(authService.login(any(LoginRequest.class), any(), any()))
+                    .thenThrow(new CaptchaChallengeException(ErrorCode.CAPTCHA_REQUIRED, "Please complete the security check"));
+
+            postJson(LOGIN_URL, Map.of("email", EMAIL, "password", "x"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errorCode").value("CAPTCHA_REQUIRED"))
+                    .andExpect(jsonPath("$.data.captchaRequired").value(true));
+        }
+
+        @Test
+        void login_wrongPasswordAtThreshold_staysUnauthorized_withFlag() throws Exception {
+            when(authService.login(any(LoginRequest.class), any(), any()))
+                    .thenThrow(new CaptchaChallengeException(ErrorCode.INVALID_CREDENTIALS, "Invalid email or password"));
+
+            postJson(LOGIN_URL, Map.of("email", EMAIL, "password", "x"))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.errorCode").value("INVALID_CREDENTIALS"))
+                    .andExpect(jsonPath("$.data.captchaRequired").value(true));
         }
     }
 }

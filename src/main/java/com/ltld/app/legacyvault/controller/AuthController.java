@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.logindto.LoginRequest;
 import com.ltld.app.legacyvault.dto.logindto.LoginResponse;
 import com.ltld.app.legacyvault.dto.logindto.LoginResult;
 import com.ltld.app.legacyvault.dto.logindto.MfaLoginRequest;
+import com.ltld.app.legacyvault.dto.logindto.CaptchaConfigResponse;
 import com.ltld.app.legacyvault.dto.logindto.GoogleConfigResponse;
 import com.ltld.app.legacyvault.dto.logindto.GoogleLoginRequest;
 import com.ltld.app.legacyvault.dto.otpdto.SendOtpRequest;
@@ -13,6 +14,7 @@ import com.ltld.app.legacyvault.dto.otpdto.VerifyOtpRequest;
 import com.ltld.app.legacyvault.dto.registerdto.RegisterRequest;
 import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
+import com.ltld.app.legacyvault.service.captchaservice.CaptchaService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,10 +36,11 @@ public class AuthController {
     private final AuthService authService;
     private final VerificationTokenService tokenService;
     private final JwtProperties jwtProperties;
+    private final CaptchaService captchaService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
-
+        captchaService.requirePassed(request.getCaptchaToken(), "register");
         authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Register Successfully"));
@@ -86,6 +89,13 @@ public class AuthController {
             return ResponseEntity.ok(ApiResponse.success("Two-factor code required", result.response()));
         }
         return withRefreshCookie(result, "Login successfully");
+    }
+
+    // Công khai: FE hỏi có bật CAPTCHA (Turnstile) không và site key là gì
+    @GetMapping("/captcha/config")
+    public ResponseEntity<ApiResponse<CaptchaConfigResponse>> captchaConfig() {
+        return ResponseEntity.ok(ApiResponse.success(new CaptchaConfigResponse(
+                captchaService.isEnabled(), captchaService.siteKey(), captchaService.loginAfterFailures())));
     }
 
     // Công khai: FE hỏi có bật Google không và Client ID là gì
@@ -149,6 +159,7 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        captchaService.requirePassed(request.getCaptchaToken(), "forgot-password");
         tokenService.sendPasswordResetOtp(request);
         return ResponseEntity.ok(ApiResponse.success("Reset code has been sent."));
     }

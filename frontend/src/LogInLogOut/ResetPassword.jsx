@@ -9,6 +9,7 @@ import { isPasswordValid } from '../Common/passwordPolicy.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
+import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
 
 const RESEND_SECONDS = 60;
 
@@ -27,6 +28,10 @@ export default function ResetPassword() {
     const [loading, setLoading] = useState(false);
     const [done, setDone] = useState(false);
     const [cooldown, setCooldown] = useState(RESEND_SECONDS);
+    // Gửi lại mã cũng là "Quên mật khẩu" nên cũng cần Turnstile khi BE bật CAPTCHA
+    const captcha = useCaptchaConfig();
+    const [captchaToken, setCaptchaToken] = useState(null);
+    const [captchaReset, setCaptchaReset] = useState(0);
 
     // Đếm ngược cho nút "Gửi lại mã"
     useEffect(() => {
@@ -40,15 +45,20 @@ export default function ResetPassword() {
             setError(t('reset.errors.emailRequired'));
             return;
         }
+        if (captcha?.enabled && !captchaToken) {
+            setError(t('captcha.required'));
+            return;
+        }
         setError('');
         try {
-            await authApi.forgotPassword(email.trim());
+            await authApi.forgotPassword(email.trim(), captchaToken);
             setInfo(t('reset.resent'));
             setCooldown(RESEND_SECONDS);
         } catch (err) {
             const wait = err.response?.data?.data?.retryAfterSeconds;
             if (getErrorCode(err) === 'TOO_MANY_OTP_REQUESTS' && wait) setCooldown(Number(wait));
             setError(getErrorMessage(err, t('reset.errors.resendFailed')));
+            setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         }
     };
 
@@ -158,6 +168,8 @@ export default function ResetPassword() {
                                     </button>
                                 </div>
                                 <OtpInput id="reset-otp" label={t('reset.otp')} value={otp} onChange={setOtp} />
+                                {/* Chỉ hiện khi đã được bấm "Gửi lại mã" */}
+                                <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} show={cooldown <= 0} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">

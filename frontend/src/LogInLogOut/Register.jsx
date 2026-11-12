@@ -9,6 +9,7 @@ import { isPasswordValid } from '../Common/passwordPolicy.js';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
+import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import { useTranslation } from 'react-i18next';
 
@@ -27,6 +28,9 @@ export default function Register() {
     });
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState(null);
+    const [captchaReset, setCaptchaReset] = useState(0);
+    const captcha = useCaptchaConfig();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -90,6 +94,11 @@ export default function Register() {
             return;
         }
 
+        if (captcha?.enabled && !captchaToken) {
+            setError(t('captcha.required'));
+            return;
+        }
+
         setError('');
         setLoading(true);
         try {
@@ -99,11 +108,13 @@ export default function Register() {
                 password,
                 passwordConfirm,
                 language: uiLanguage,
+                captchaToken: captchaToken || undefined,
             });
             // BE đã tự gửi OTP -> sang trang xác thực
             navigate('/verify-email', { state: { email: email.trim() } });
         } catch (err) {
             setError(getErrorMessage(err, t('register.errors.failed')));
+            setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         } finally {
             setLoading(false);
         }
@@ -185,6 +196,8 @@ export default function Register() {
                             className={inputCls}
                         />
                     </div>
+
+                    <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} />
 
                     <button
                         type="submit"
