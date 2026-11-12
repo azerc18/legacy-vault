@@ -268,5 +268,10 @@
       "check": "Không kiểm tra được điều kiện xoá tài khoản.",
       "failed": "Không xoá được tài khoản."
     }
+  },
+  "welcome": {
+    "title": "Chào mừng bạn đến với LegacyVault",
+    "text": "Hãy hoàn thiện thông tin hồ sơ (họ tên, số điện thoại, ảnh đại diện, ngôn ngữ) trước khi bắt đầu.",
+    "continue": "Tiếp tục"
   }
 }
