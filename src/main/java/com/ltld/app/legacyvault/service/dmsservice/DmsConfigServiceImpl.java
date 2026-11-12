@@ -55,6 +55,10 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     static final String SUSPEND_TRIGGERED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be suspended.";
     static final String ALREADY_SUSPENDED_MESSAGE = "The Dead Man's Switch is already suspended.";
     static final String NOT_SUSPENDED_MESSAGE = "The Dead Man's Switch is not suspended.";
+    static final String ADMIN_REMIND_NOT_ACTIVE_MESSAGE =
+            "The Dead Man's Switch is not waiting for a check-in, so the owner cannot be reminded.";
+    static final String ADMIN_REMIND_TOO_SOON_MESSAGE =
+            "This owner was reminded a moment ago. Please try again later.";
     static final String KYC_REQUIRED_MESSAGE =
             "Verify your identity before enabling the Dead Man's Switch.";
     // Executor chỉ được tính khi đã đồng ý lời mời (ExecutorActivationRule)
@@ -403,6 +407,36 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         auditByAdmin(AuditAction.DMS_DEMO_OVERDUE_SIMULATED, adminId, config,
                 "previousDueAt=" + previousDueAt + ", confirmationDeferrals=" + config.getConfirmationDeferrals());
         return toResponse(config, executors);
+    }
+
+    @Override
+    @Transactional
+    public AdminReminderTarget markAdminReminder(UUID ownerId, LocalDateTime now, long cooldownMinutes) {
+        DmsConfig config = findConfigForUpdate(ownerId);
+        if (config.getStatus() != DmsStatus.ACTIVE && config.getStatus() != DmsStatus.PENDING_CONFIRMATION) {
+            throw new DmsException(ADMIN_REMIND_NOT_ACTIVE_MESSAGE, HttpStatus.CONFLICT);
+        }
+        // Không còn két thì DMS tạm dừng, Owner cũng không check-in được: nhắc chỉ gây hoang mang.
+        assertHasVault(ownerId);
+        LocalDateTime last = config.getLastAdminReminderAt();
+        if (cooldownMinutes > 0 && last != null && last.isAfter(now.minusMinutes(cooldownMinutes))) {
+            throw new DmsException(ErrorCode.DMS_ADMIN_REMINDER_TOO_SOON, ADMIN_REMIND_TOO_SOON_MESSAGE);
+        }
+        config.setLastAdminReminderAt(now);
+        config = dmsConfigRepository.saveAndFlush(config);
+        return new AdminReminderTarget(config.getId(), config.getOwner().getEmail(), config.getStatus(),
+                checkinDueAt(config), config.getNextCheckinDueAt(), last);
+    }
+
+    @Override
+    @Transactional
+    public void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt, LocalDateTime previousReminderAt) {
+        dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
+                .filter(c -> Objects.equals(c.getLastAdminReminderAt(), sentAt))
+                .ifPresent(c -> {
+                    c.setLastAdminReminderAt(previousReminderAt);
+                    dmsConfigRepository.saveAndFlush(c);
+                });
     }
 
     private DmsConfig findConfig(UUID ownerId) {

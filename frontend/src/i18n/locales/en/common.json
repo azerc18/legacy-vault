@@ -45,6 +45,7 @@
       "EXECUTOR_REVOKED_TIMEOUT": "You did not acknowledge in time, so your executor role for {{owner}} was passed to the backup executor.",
       "EXECUTOR_REVOKED_ADMIN": "An administrator assigned another executor for {{owner}}. You are no longer their {{role}}.",
       "DMS_CHECKIN_REMINDER": "Check-in reminder {{number}}/{{count}}: please check in before {{triggerAt}} to confirm you are safe.",
+      "DMS_CHECKIN_REMINDER_admin": "An administrator reminds you to check in: please check in before {{triggerAt}} to confirm you are safe.",
       "DMS_CONFIRMATION_PENDING": "You missed your check-in. We are asking your trusted confirmers whether you are safe (until {{deadlineAt}}). Check in now to stop the handover.",
       "DMS_CONFIRMATION_REQUESTED": "{{owner}} has missed their check-in. Please open the email we sent you and confirm whether they are safe before {{deadlineAt}}.",
       "DMS_OWNER_CONFIRMED_SAFE": "{{confirmer}} confirmed you are safe. Your next check-in is postponed to {{untilAt}}.",

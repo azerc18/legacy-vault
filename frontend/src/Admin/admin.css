@@ -150,6 +150,38 @@ html.dark .lv-admin { --adm-seal: 255 138 128; }
 @keyframes lv-drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .lv-drawer { animation: none; } .lv-stamp { transform: none; } }
 
+/* Hồ sơ người dùng dạng hộp thoại giữa màn hình (thay ngăn kéo bên phải). Điện thoại: phủ toàn màn hình. */
+.lv-admin.lv-drawer.lv-dossier-modal {
+  top: 50%; left: 50%; right: auto; bottom: auto;
+  width: min(1080px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  transform: translate(-50%, -50%);
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 40px 120px -40px rgb(0 0 0 / .7);
+  animation: lv-dossier-pop .22s ease-out;
+}
+.lv-dossier-modal .lv-dossier-scroll { overflow-y: auto; overscroll-behavior: contain; }
+.lv-dossier-card {
+  border: 1px solid rgb(var(--adm-rule));
+  border-radius: 18px;
+  padding: 1rem 1.125rem 1.125rem;
+  background: rgb(var(--lock-accent-rgb, 143 164 255) / .04);
+}
+.lv-dossier-card > section:first-child { margin-top: 0; }
+@keyframes lv-dossier-pop {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(.985); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+@media (max-width: 639px) {
+  .lv-admin.lv-drawer.lv-dossier-modal {
+    top: 0; left: 0; width: 100vw; max-height: 100dvh; height: 100dvh;
+    transform: none; border-radius: 0; animation: lv-drawer-in .22s ease-out;
+  }
+}
+@media (prefers-reduced-motion: reduce) { .lv-admin.lv-drawer.lv-dossier-modal { animation: none; } }
+
 /* Biểu đồ cột đơn giản (C2) */
 .lv-bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; }
 .lv-bars > div { flex: 1; min-width: 4px; background: rgb(var(--c-secondary) / .75); border-radius: 3px 3px 0 0; position: relative; }

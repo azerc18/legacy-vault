@@ -437,6 +437,39 @@ public class EmailSender {
     }
 
     /**
+     * Admin chủ động nhắc Owner check-in DMS: cùng link một chạm + QR như mail nhắc tự động (F2), nhưng nói rõ là
+     * quản trị viên nhắc và không đánh số lần nhắc. Không @Async: Admin cần biết gửi lỗi để báo lại trên màn hình.
+     * pendingConfirmation = DMS đang chờ người xác nhận chéo (triggerAt là hạn chờ 72 giờ).
+     */
+    public void sendDmsAdminCheckinReminder(String email, LocalDateTime checkinDueAt, LocalDateTime triggerAt,
+                                            boolean pendingConfirmation, String checkinToken) {
+        AppLanguage lang = languageResolver.forEmail(email);
+        String base = frontendBase();
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, pendingConfirmation ? "mail.dmsAdminReminder.p1Pending" : "mail.dmsAdminReminder.p1",
+                formatDeadline(checkinDueAt), formatDeadline(triggerAt)));
+        byte[] qrPng = null;
+        if (base != null && checkinToken != null && !checkinToken.isBlank()) {
+            String checkinUrl = base + "/dms/checkin?token=" + URLEncoder.encode(checkinToken, StandardCharsets.UTF_8);
+            paras.add(MailMessages.get(lang, "mail.dmsReminder.link"));
+            paras.add(MailMessages.get(lang, "mail.dmsReminder.button") + ": " + checkinUrl);
+            try {
+                qrPng = QrCodeImage.png(checkinUrl + "&via=qr", CHECKIN_QR_PX);
+            } catch (RuntimeException e) {
+                log.warn("DMS admin reminder QR could not be generated, sending without QR: {}", e.getMessage());
+            }
+        }
+        paras.add(MailMessages.get(lang, "mail.dmsAdminReminder.p2"));
+        deliver(email, lang, Style.URGENT,
+                MailMessages.get(lang, "mail.dmsAdminReminder.subject"),
+                MailMessages.get(lang, "mail.dmsAdminReminder.title"),
+                paras, null, null, null, null,
+                qrPng == null ? null : CHECKIN_QR_CID,
+                qrPng == null ? null : MailMessages.get(lang, "mail.dmsReminder.qr"),
+                qrPng);
+    }
+
+    /**
      * X2 (C1): gửi email khẩn cấp cho Trusted Social Confirmer khi Owner quá hạn check-in + gracePeriodDays.
      * Chỉ MỘT link tới trang FE công khai /dms/confirm?token=...; mở link không đổi gì (trình quét link của hộp thư
      * có thể tự mở). Quyết định chỉ được ghi khi người nhận bấm nút trên trang (POST /api/dms/confirm).

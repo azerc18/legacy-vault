@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage } from '../api/http.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
-import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
+import TurnstileWidget, { useCaptchaConfig, refreshCaptchaConfigOnError } from '../Common/TurnstileWidget.jsx';
 
 export default function ForgotPassword() {
     const { t } = useTranslation('auth');
@@ -35,6 +35,7 @@ export default function ForgotPassword() {
             navigate('/reset-password', { state: { email: email.trim() } });
         } catch (err) {
             setError(getErrorMessage(err, t('forgot.errors.failed')));
+            refreshCaptchaConfigOnError(err);
             setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         } finally {
             setLoading(false);
