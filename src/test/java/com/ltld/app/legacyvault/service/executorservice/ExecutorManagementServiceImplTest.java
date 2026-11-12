@@ -88,7 +88,7 @@ class ExecutorManagementServiceImplTest {
         // ExecutorRoleManager thật dựng từ các mock trên, để assertion trên roleRepository/executorAssignmentRepository giữ nguyên.
         service = new ExecutorManagementServiceImpl(executorAssignmentRepository, dmsConfigRepository, userRepository,
                 new ExecutorRoleManager(roleRepository, executorAssignmentRepository), vaultRepository,
-                auditLogService, eventPublisher, dmsConfirmerRepository);
+                auditLogService, eventPublisher, dmsConfirmerRepository, new ExecutorInvitationPolicy(7, 3));
 
         ownerId = UUID.randomUUID();
         owner = user(ownerId, OWNER_EMAIL, UserStatus.ACTIVE);

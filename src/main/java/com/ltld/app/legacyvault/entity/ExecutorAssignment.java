@@ -59,6 +59,15 @@ public class ExecutorAssignment {
     @Column(name = "decline_reason", length = 500)
     private String declineReason;
 
+    // Hạn trả lời lời mời (ExecutorInvitationPolicy, mặc định 7 ngày kể từ lúc chỉ định).
+    // null = dữ liệu cũ hoặc dòng không phải lời mời đang chờ -> không bao giờ hết hạn.
+    @Column(name = "invitation_expires_at")
+    private LocalDateTime invitationExpiresAt;
+
+    // Lúc đã gửi mail nhắc sắp hết hạn; giữ để không nhắc lại mỗi lần job quét
+    @Column(name = "invitation_reminder_sent_at")
+    private LocalDateTime invitationReminderSentAt;
+
     // FR-06: thời điểm Owner chỉ định người hiện tại (dòng có thể được dùng lại khi thay người,
     // nên createdAt không phản ánh lần chỉ định gần nhất). NULL với dữ liệu cũ trước FR-06.
     @Column(name = "assigned_at")

@@ -7,5 +7,7 @@ package com.ltld.app.legacyvault.enums;
 public enum ExecutorResponseStatus {
     PENDING,
     ACCEPTED,
-    DECLINED
+    DECLINED,
+    /** Hết hạn trả lời: hệ thống tự thu hồi, kèm ExecutorStatus.REVOKED như DECLINED. */
+    EXPIRED
 }

@@ -73,6 +73,8 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
     private final ApplicationEventPublisher eventPublisher;
     // X2 (m1): chặn chỉ định Executor trùng người xác nhận chéo của Owner
     private final DmsConfirmerRepository dmsConfirmerRepository;
+    // Hạn trả lời lời mời (mặc định 7 ngày)
+    private final ExecutorInvitationPolicy invitationPolicy;
 
     // READ_COMMITTED: MySQL chạy REPEATABLE READ nên các câu đọc thường sau khi giữ khóa User vẫn thấy snapshot
     // cũ; READ_COMMITTED để existsBy... và lần nạp roles thấy dữ liệu đã commit mới nhất.
@@ -149,7 +151,11 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
         assignment.setResponseStatus(ExecutorResponseStatus.PENDING);
         assignment.setRespondedAt(null);
         assignment.setDeclineReason(null);
-        assignment.setAssignedAt(LocalDateTime.now());
+        LocalDateTime assignedAt = LocalDateTime.now();
+        assignment.setAssignedAt(assignedAt);
+        // Hạn trả lời: quá hạn thì ExecutorInvitationExpiryScheduler tự thu hồi, vị trí không treo mãi
+        assignment.setInvitationExpiresAt(invitationPolicy.expiresAt(assignedAt));
+        assignment.setInvitationReminderSentAt(null);
         assignment.setActivatedAt(null);
         assignment.setAcknowledgedAt(null);
         assignment.setRevokedAt(null);
@@ -350,6 +356,7 @@ public class ExecutorManagementServiceImpl implements ExecutorManagementService 
                 .responseStatus(assignment.getResponseStatus())
                 .respondedAt(assignment.getRespondedAt())
                 .declineReason(assignment.getDeclineReason())
+                .invitationExpiresAt(assignment.getInvitationExpiresAt())
                 .build();
     }
 }

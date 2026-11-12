@@ -541,6 +541,36 @@ public class EmailSender {
         sendKeyed(ownerEmail, lang, accepted ? Style.CASE : Style.NOTICE, prefix, paras);
     }
 
+    /** Nhắc người được mời: lời mời sắp hết hạn, kèm link mở trang đồng ý / từ chối. */
+    public void sendExecutorInvitationReminder(String to, String ownerName, String ownerEmail, ExecutorType type,
+                                               UUID assignmentId, int daysLeft) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.execReminder.body",
+                ownerLabel(ownerName, ownerEmail), roleLabel(lang, type), daysLeft));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.execAssigned.button") + ": "
+                    + base + "/executor/invitations/" + assignmentId);
+        } else {
+            paras.add(MailMessages.get(lang, "mail.execAssigned.noLink"));
+        }
+        sendKeyed(to, lang, Style.NOTICE, "mail.execReminder", paras);
+    }
+
+    /** Báo Owner: lời mời hết hạn, hệ thống đã thu hồi, vị trí đang trống. */
+    public void sendExecutorInvitationExpiredNotice(String ownerEmail, String executorLabel, ExecutorType type,
+                                                    int expiryDays) {
+        AppLanguage lang = languageResolver.forEmail(ownerEmail);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.execExpired.body", executorLabel, roleLabel(lang, type), expiryDays));
+        String base = frontendBase();
+        if (base != null) {
+            paras.add(MailMessages.get(lang, "mail.execResponse.button") + ": " + base + "/owner/executors");
+        }
+        sendKeyed(ownerEmail, lang, Style.NOTICE, "mail.execExpired", paras);
+    }
+
     public void sendExecutorRevokedNotice(String to, String ownerName, String ownerEmail, ExecutorType type) {
         AppLanguage lang = languageResolver.forEmail(to);
         sendKeyed(to, lang, Style.NOTICE, "mail.execRevoked", List.of(MailMessages.get(lang, "mail.execRevoked.body",

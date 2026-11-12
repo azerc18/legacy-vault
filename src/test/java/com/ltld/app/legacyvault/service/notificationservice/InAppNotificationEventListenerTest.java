@@ -25,6 +25,7 @@ import com.ltld.app.legacyvault.service.auditservice.MailDataReader;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationRespondedEvent;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationTimeoutEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -304,6 +305,30 @@ class InAppNotificationEventListenerTest {
         assertThat(NotificationParams.parse(n.getParams()))
                 .doesNotContainKey("reason").doesNotContainKey("variant");
         assertThat(n.getContent()).doesNotContain("Reason:");
+    }
+
+    @Test
+    void executorInvitationExpired_notifiesOwner() {
+        UUID assignmentId = UUID.randomUUID();
+        listener.onExecutorInvitationExpired(new ExecutorInvitationTimeoutEvent(
+                ExecutorInvitationTimeoutEvent.Kind.EXPIRED, assignmentId, owner.getId(), owner.getEmail(),
+                owner.getFullName(), "exec@example.com", "Exec", ExecutorType.PRIMARY, 7));
+
+        Notification n = saved(1).get(0);
+        assertThat(n.getType()).isEqualTo(NotificationType.EXECUTOR_INVITATION_EXPIRED);
+        assertThat(n.getReferenceId()).isEqualTo(assignmentId);
+        assertThat(NotificationParams.parse(n.getParams()))
+                .containsEntry("executor", "Exec (exec@example.com)")
+                .containsEntry("role", "PRIMARY").containsEntry("days", "7");
+    }
+
+    @Test
+    void executorInvitationReminder_doesNotNotifyOwner() {
+        listener.onExecutorInvitationExpired(new ExecutorInvitationTimeoutEvent(
+                ExecutorInvitationTimeoutEvent.Kind.REMINDER, UUID.randomUUID(), owner.getId(), owner.getEmail(),
+                owner.getFullName(), "exec@example.com", "Exec", ExecutorType.PRIMARY, 3));
+
+        saved(0);
     }
 
     @Test

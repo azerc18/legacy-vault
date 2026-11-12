@@ -93,6 +93,34 @@ class EmailSenderExecutorNoticeTest {
         assertThat(message.getHtml()).doesNotContain("display:inline-block;background:");
     }
 
+    // Hạn lời mời: nhắc người được mời, có link tới đúng lời mời
+    @Test
+    void invitationReminder_tellsDaysLeftAndLinksToInvitation() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test");
+
+        emailSender.sendExecutorInvitationReminder("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID, 3);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("exec@example.test");
+        assertThat(message.getText())
+                .contains("3 day(s) left", "Owner A", "https://app.example.test/executor/invitations/" + ASSIGNMENT_ID);
+    }
+
+    // Hạn lời mời: báo Owner khi đã hết hạn, dẫn về trang Người thực thi
+    @Test
+    void invitationExpired_tellsOwnerPositionIsEmpty() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test");
+
+        emailSender.sendExecutorInvitationExpiredNotice("owner@example.test", "Exec B (exec@example.test)",
+                ExecutorType.BACKUP, 7);
+
+        SentMail message = sentMessage();
+        assertThat(message.getTo()).containsExactly("owner@example.test");
+        assertThat(message.getText())
+                .contains("Exec B (exec@example.test)", "7 day(s)", "https://app.example.test/owner/executors");
+    }
+
     @Test
     void assignedNotice_mentionsOwnerAndRole_withoutOtpFooter() {
         emailSender.sendExecutorAssignedNotice("exec@example.test", "Owner A", "owner@example.test",

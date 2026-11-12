@@ -4,12 +4,14 @@ import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.ExecutorType;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +56,23 @@ public interface ExecutorAssignmentRepository extends JpaRepository<ExecutorAssi
     List<ExecutorAssignment> findLiveByExecutorEmail(@Param("email") String email);
     // D3: Executor này còn assignment ACTIVE với Owner này không.
     boolean existsByOwnerIdAndExecutorUserIdAndStatus(UUID ownerId, UUID executorUserId, ExecutorStatus status);
+
+    // Lời mời còn chờ phản hồi đã quá hạn -> job tự thu hồi. Chỉ lấy id, mỗi dòng xử lý trong transaction riêng.
+    @Query("select a.id from ExecutorAssignment a"
+            + " where a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED"
+            + " and a.responseStatus = com.ltld.app.legacyvault.enums.ExecutorResponseStatus.PENDING"
+            + " and a.invitationExpiresAt is not null and a.invitationExpiresAt <= :now order by a.invitationExpiresAt")
+    List<UUID> findExpiredInvitationIds(@Param("now") LocalDateTime now, Pageable pageable);
+
+    // Lời mời sắp hết hạn và chưa gửi nhắc -> job gửi mail nhắc một lần
+    @Query("select a.id from ExecutorAssignment a"
+            + " where a.status <> com.ltld.app.legacyvault.enums.ExecutorStatus.REVOKED"
+            + " and a.responseStatus = com.ltld.app.legacyvault.enums.ExecutorResponseStatus.PENDING"
+            + " and a.invitationReminderSentAt is null"
+            + " and a.invitationExpiresAt is not null and a.invitationExpiresAt > :now and a.invitationExpiresAt <= :until"
+            + " order by a.invitationExpiresAt")
+    List<UUID> findInvitationIdsToRemind(@Param("now") LocalDateTime now, @Param("until") LocalDateTime until,
+                                         Pageable pageable);
 
     // Admin: assignment ACTIVE của nhiều Owner, kèm user để kiểm tra tài khoản còn ACTIVE (1 query, không N+1)
     @Query("select a from ExecutorAssignment a join fetch a.executorUser " +

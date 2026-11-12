@@ -20,6 +20,7 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.MailType;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationRespondedEvent;
+import com.ltld.app.legacyvault.service.executorservice.ExecutorInvitationTimeoutEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -244,6 +245,20 @@ public class InAppNotificationEventListener {
                                         event.executorLabel(), reason),
                         "executor", event.executorLabel(), "role", role, "reason", reason,
                         "variant", reason == null ? null : "reason"));
+    }
+
+    // Lời mời hết hạn: báo Owner để chỉ định người khác (mail do ExecutorAssignmentMailListener lo)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onExecutorInvitationExpired(ExecutorInvitationTimeoutEvent event) {
+        if (event.kind() != ExecutorInvitationTimeoutEvent.Kind.EXPIRED) {
+            return;
+        }
+        String role = event.executorType() == null ? null : event.executorType().name();
+        notifier.toUser(event.ownerId(), draft(NotificationType.EXECUTOR_INVITATION_EXPIRED,
+                REF_EXECUTOR_ASSIGNMENT, event.assignmentId(),
+                String.format("%s did not answer your executor invitation within %d days. Please assign someone else.",
+                        event.executorLabel(), event.days()),
+                "executor", event.executorLabel(), "role", role, "days", String.valueOf(event.days())));
     }
 
     // N2-exec: Executor nhắc người thụ hưởng chưa phản hồi

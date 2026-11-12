@@ -76,7 +76,8 @@ class ExecutorInvitationServiceImplTest {
     void setUp() {
         // ExecutorRoleManager thật dựng từ mock, để kiểm tra việc gỡ role EXECUTOR khi từ chối.
         service = new ExecutorInvitationServiceImpl(executorAssignmentRepository, dmsConfigRepository, userRepository,
-                new ExecutorRoleManager(roleRepository, executorAssignmentRepository), auditLogService, eventPublisher);
+                new ExecutorRoleManager(roleRepository, executorAssignmentRepository), new ExecutorInvitationPolicy(7, 3),
+                auditLogService, eventPublisher);
 
         ownerId = UUID.randomUUID();
         execId = UUID.randomUUID();
@@ -107,6 +108,60 @@ class ExecutorInvitationServiceImplTest {
         when(dmsConfigRepository.findByOwnerIdForUpdate(ownerId)).thenReturn(Optional.empty());
         when(executorAssignmentRepository.saveAndFlush(any(ExecutorAssignment.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    // ---------- Hạn trả lời lời mời ----------
+
+    @Test
+    @DisplayName("Lời mời đã quá hạn: xem thì canRespond = false (chưa cần chờ job quét)")
+    void getInvitation_expired_cannotRespond() {
+        assignment.setInvitationExpiresAt(LocalDateTime.now().minusMinutes(1));
+
+        ExecutorInvitationResponse res = service.getInvitation(assignment.getId(), execId.toString());
+
+        assertThat(res.isCanRespond()).isFalse();
+        assertThat(res.getInvitationExpiresAt()).isEqualTo(assignment.getInvitationExpiresAt());
+        // Dòng vẫn PENDING cho tới khi job thu hồi
+        assertThat(res.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("Đồng ý sau khi quá hạn: 409 EXECUTOR_INVITATION_CLOSED, không đổi gì, không mail")
+    void accept_afterExpiry_conflict() {
+        assignment.setInvitationExpiresAt(LocalDateTime.now().minusSeconds(1));
+
+        assertThatThrownBy(() -> service.accept(assignment.getId(), execId.toString()))
+                .isInstanceOf(ExecutorManagementException.class)
+                .hasMessage(ExecutorInvitationServiceImpl.EXPIRED_MESSAGE)
+                .satisfies(e -> assertThat(((ExecutorManagementException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.EXECUTOR_INVITATION_CLOSED));
+
+        assertThat(assignment.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService, eventPublisher);
+    }
+
+    @Test
+    @DisplayName("Từ chối sau khi quá hạn: 409, giữ nguyên dòng")
+    void decline_afterExpiry_conflict() {
+        assignment.setInvitationExpiresAt(LocalDateTime.now().minusSeconds(1));
+
+        assertThatThrownBy(() -> service.decline(assignment.getId(), execId.toString(), "muộn rồi"))
+                .isInstanceOf(ExecutorManagementException.class)
+                .hasMessage(ExecutorInvitationServiceImpl.EXPIRED_MESSAGE);
+
+        assertThat(assignment.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
+        verify(executorAssignmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("Còn hạn: đồng ý bình thường")
+    void accept_beforeExpiry_ok() {
+        assignment.setInvitationExpiresAt(LocalDateTime.now().plusDays(3));
+
+        ExecutorInvitationResponse res = service.accept(assignment.getId(), execId.toString());
+
+        assertThat(res.getResponseStatus()).isEqualTo(ExecutorResponseStatus.ACCEPTED);
     }
 
     // ---------- getInvitation ----------

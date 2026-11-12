@@ -44,6 +44,8 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
     static final String NOT_FOUND_MESSAGE = "Executor invitation not found.";
     static final String CLOSED_MESSAGE =
             "This invitation has already been answered or was withdrawn by the owner.";
+    static final String EXPIRED_MESSAGE =
+            "This invitation has expired. Ask the owner to send you a new one.";
     static final String HANDOVER_STARTED_MESSAGE =
             "The owner's Dead Man's Switch has started the handover process; this invitation can no longer be answered.";
 
@@ -51,6 +53,7 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
     private final DmsConfigRepository dmsConfigRepository;
     private final UserRepository userRepository;
     private final ExecutorRoleManager executorRoleManager;
+    private final ExecutorInvitationPolicy invitationPolicy;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -132,6 +135,10 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
                 || assignment.getResponseStatus() != ExecutorResponseStatus.PENDING) {
             throw new ExecutorManagementException(ErrorCode.EXECUTOR_INVITATION_CLOSED, CLOSED_MESSAGE);
         }
+        // Quá hạn nhưng job quét chưa chạy tới: chặn ngay, đừng để trả lời muộn vẫn ăn
+        if (invitationPolicy.isExpired(assignment, LocalDateTime.now())) {
+            throw new ExecutorManagementException(ErrorCode.EXECUTOR_INVITATION_CLOSED, EXPIRED_MESSAGE);
+        }
         return new Locked(me, assignment, dms);
     }
 
@@ -165,8 +172,9 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
                 assignment.getExecutorType(), accepted, reason));
     }
 
-    private static ExecutorInvitationResponse toResponse(ExecutorAssignment a, DmsConfig dms) {
+    private ExecutorInvitationResponse toResponse(ExecutorAssignment a, DmsConfig dms) {
         boolean handoverStarted = dms != null && dms.getStatus() == DmsStatus.TRIGGERED;
+        boolean expired = invitationPolicy.isExpired(a, LocalDateTime.now());
         Integer waitDays = dms == null ? null : dms.getBackupActivationWaitDays();
         return ExecutorInvitationResponse.builder()
                 .assignmentId(a.getId())
@@ -177,8 +185,9 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
                 .responseStatus(a.getResponseStatus())
                 .assignedAt(a.getAssignedAt() != null ? a.getAssignedAt() : a.getCreatedAt())
                 .respondedAt(a.getRespondedAt())
+                .invitationExpiresAt(a.getInvitationExpiresAt())
                 .backupActivationWaitDays(waitDays != null ? waitDays : DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS)
-                .canRespond(!handoverStarted && a.getStatus() != ExecutorStatus.REVOKED
+                .canRespond(!handoverStarted && !expired && a.getStatus() != ExecutorStatus.REVOKED
                         && a.getResponseStatus() == ExecutorResponseStatus.PENDING)
                 .build();
     }

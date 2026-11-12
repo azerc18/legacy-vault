@@ -22,6 +22,8 @@ public class ExecutorInvitationResponse {
     private ExecutorResponseStatus responseStatus;
     private LocalDateTime assignedAt;
     private LocalDateTime respondedAt;
+    // Hạn trả lời lời mời (null = dữ liệu cũ, không hết hạn). FE hiện "Hết hạn trả lời: ..."
+    private LocalDateTime invitationExpiresAt;
     // Số ngày Primary phải xác nhận sau khi DMS kích hoạt trước khi quyền chuyển sang Backup (BR-03), mặc định 14
     private int backupActivationWaitDays;
     // true khi còn trả lời được: đang chờ phản hồi, chưa bị thu hồi và DMS của Owner chưa bắt đầu bàn giao

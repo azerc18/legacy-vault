@@ -47,6 +47,24 @@ public class ExecutorAssignmentMailListener {
         }
     }
 
+    // Hạn lời mời: nhắc người được mời khi sắp hết hạn, báo Owner khi đã hết hạn. Lỗi gửi chỉ log.
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void on(ExecutorInvitationTimeoutEvent event) {
+        try {
+            switch (event.kind()) {
+                case REMINDER -> emailSender.sendExecutorInvitationReminder(event.executorEmail(),
+                        event.ownerName(), event.ownerEmail(), event.executorType(),
+                        event.assignmentId(), event.days());
+                case EXPIRED -> emailSender.sendExecutorInvitationExpiredNotice(event.ownerEmail(),
+                        event.executorLabel(), event.executorType(), event.days());
+            }
+        } catch (RuntimeException e) {
+            log.warn("Executor invitation: sending {} mail for assignment {} failed: {}",
+                    event.kind(), event.assignmentId(), e.getMessage());
+        }
+    }
+
     // Lời mời làm Executor: báo Owner người được mời đã đồng ý / từ chối. Lỗi gửi chỉ log, không retry.
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

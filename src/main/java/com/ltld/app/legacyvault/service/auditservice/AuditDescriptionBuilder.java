@@ -156,6 +156,7 @@ public class AuditDescriptionBuilder {
             case EXECUTOR_REPLACED -> "Changed the executor.";
             case EXECUTOR_ACCEPTED -> "The executor accepted the invitation.";
             case EXECUTOR_DECLINED -> "The executor declined the invitation.";
+            case EXECUTOR_INVITATION_EXPIRED -> "The executor invitation expired and was withdrawn automatically.";
             case EXECUTOR_ASSIGNED_BY_ADMIN -> "An administrator assigned an executor because none was available.";
             // Owner thu hồi luôn ghi actor = Owner; BR-03 (FR-07 tự thu hồi Primary) ghi actor = null
             case EXECUTOR_REVOKE -> log.getActor() == null

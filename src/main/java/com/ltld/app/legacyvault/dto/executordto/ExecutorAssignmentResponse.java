@@ -27,4 +27,6 @@ public class ExecutorAssignmentResponse {
     private ExecutorResponseStatus responseStatus;
     private LocalDateTime respondedAt;
     private String declineReason;
+    // Hạn trả lời lời mời; chỉ có nghĩa khi responseStatus = PENDING
+    private LocalDateTime invitationExpiresAt;
 }

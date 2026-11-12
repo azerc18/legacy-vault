@@ -49,6 +49,22 @@ class ExecutorAssignmentMailListenerTest {
     }
 
     @Test
+    @DisplayName("Hạn lời mời: REMINDER gửi cho người được mời, EXPIRED gửi cho Owner")
+    void invitationTimeout_sendsRightMailToRightPerson() {
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.REMINDER,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.PRIMARY, 3));
+        verify(emailSender).sendExecutorInvitationReminder("exec@example.test", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, ASSIGNMENT_ID, 3);
+
+        listener.on(new ExecutorInvitationTimeoutEvent(ExecutorInvitationTimeoutEvent.Kind.EXPIRED,
+                ASSIGNMENT_ID, java.util.UUID.randomUUID(), "owner@example.test", "Owner A",
+                "exec@example.test", "Exec B", ExecutorType.BACKUP, 7));
+        verify(emailSender).sendExecutorInvitationExpiredNotice("owner@example.test",
+                "Exec B (exec@example.test)", ExecutorType.BACKUP, 7);
+    }
+
+    @Test
     @DisplayName("Lời mời: lỗi gửi mail cho Owner bị nuốt, không ném ra")
     void invitationResponded_sendFailureIsSwallowed() {
         doThrow(new MailSendException("SMTP down")).when(emailSender).sendExecutorInvitationResponseNotice(
