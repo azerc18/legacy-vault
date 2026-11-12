@@ -7,13 +7,27 @@ import { authApi } from '../api/authApi.js';
 import { useTheme } from './theme.js';
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-let configPromise = null;   // hỏi BE 1 lần cho cả phiên
+let configPromise = null;   // hỏi BE 1 lần cho cả phiên (hỏi lại khi BE báo lỗi CAPTCHA)
 let scriptPromise = null;
+const listeners = new Set();
 
 const loadConfig = () => {
     configPromise ??= authApi.captchaConfig().catch(() => ({ enabled: false }));
     return configPromise;
 };
+
+const CAPTCHA_ERROR_CODES = new Set(['CAPTCHA_REQUIRED', 'CAPTCHA_INVALID', 'CAPTCHA_UNAVAILABLE']);
+
+/**
+ * BE vừa đòi CAPTCHA mà trang có thể đang giữ cấu hình cũ (tab mở trước khi Admin bật APP_CAPTCHA_ENABLED):
+ * hỏi lại BE và vẽ widget ngay, không bắt người dùng tải lại trang.
+ */
+export function refreshCaptchaConfigOnError(err) {
+    const body = err?.response?.data;
+    if (!CAPTCHA_ERROR_CODES.has(body?.errorCode) && !body?.data?.captchaRequired) return;
+    configPromise = null;
+    loadConfig().then((cfg) => listeners.forEach((fn) => fn(cfg)));
+}
 
 const loadScript = () => {
     if (window.turnstile) return Promise.resolve();
@@ -34,8 +48,10 @@ export function useCaptchaConfig() {
     const [config, setConfig] = useState(null);
     useEffect(() => {
         let alive = true;
-        loadConfig().then((cfg) => { if (alive) setConfig(cfg?.enabled && cfg.siteKey ? cfg : { enabled: false }); });
-        return () => { alive = false; };
+        const apply = (cfg) => { if (alive) setConfig(cfg?.enabled && cfg.siteKey ? cfg : { enabled: false }); };
+        loadConfig().then(apply);
+        listeners.add(apply);
+        return () => { alive = false; listeners.delete(apply); };
     }, []);
     return config;
 }

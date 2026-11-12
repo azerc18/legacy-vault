@@ -9,7 +9,7 @@ import { isPasswordValid } from '../Common/passwordPolicy.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
-import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
+import TurnstileWidget, { useCaptchaConfig, refreshCaptchaConfigOnError } from '../Common/TurnstileWidget.jsx';
 
 const RESEND_SECONDS = 60;
 
@@ -58,6 +58,7 @@ export default function ResetPassword() {
             const wait = err.response?.data?.data?.retryAfterSeconds;
             if (getErrorCode(err) === 'TOO_MANY_OTP_REQUESTS' && wait) setCooldown(Number(wait));
             setError(getErrorMessage(err, t('reset.errors.resendFailed')));
+            refreshCaptchaConfigOnError(err);
             setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         }
     };
