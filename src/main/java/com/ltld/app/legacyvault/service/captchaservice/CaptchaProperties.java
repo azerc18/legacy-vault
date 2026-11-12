@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,5 +20,11 @@ public class CaptchaProperties {
     private String secretKey = "";
     private String verifyUrl = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
     private int loginAfterFailures = 3;
+    /**
+     * Hostname mà Cloudflare báo token được giải trên đó phải nằm trong danh sách này
+     * (chặn token lấy từ trang khác dùng chung site key). Để trống thì bỏ qua bước này và chỉ dựa vào
+     * danh sách hostname khai trên Cloudflare dashboard.
+     */
+    private List<String> allowedHostnames = new ArrayList<>();
     private Duration timeout = Duration.ofSeconds(5);
 }

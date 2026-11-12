@@ -143,6 +143,8 @@ app:
     site-key: ${APP_CAPTCHA_SITE_KEY:}
     secret-key: ${APP_CAPTCHA_SECRET_KEY:}
     login-after-failures: 3
+    # Token phải được giải trên một trong các hostname này (Cloudflare trả về trong siteverify). Trống = không kiểm.
+    allowed-hostnames: ${APP_CAPTCHA_ALLOWED_HOSTNAMES:legacyvault.codes,www.legacyvault.codes,legacyvault-luctieulinhdong.azurewebsites.net,localhost}
   ai:
     provider: ${AI_PROVIDER:mock}
     gemini:

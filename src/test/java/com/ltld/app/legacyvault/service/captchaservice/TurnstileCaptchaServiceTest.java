@@ -31,7 +31,12 @@ class TurnstileCaptchaServiceTest {
     private MockRestServiceServer server;
 
     private TurnstileCaptchaService service(boolean enabled, String siteKey, String secret) {
+        return service(enabled, siteKey, secret, java.util.List.of());
+    }
+
+    private TurnstileCaptchaService service(boolean enabled, String siteKey, String secret, java.util.List<String> hosts) {
         CaptchaProperties p = new CaptchaProperties();
+        p.setAllowedHostnames(hosts);
         p.setEnabled(enabled);
         p.setSiteKey(siteKey);
         p.setSecretKey(secret);
@@ -117,5 +122,19 @@ class TurnstileCaptchaServiceTest {
                 .extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.CAPTCHA_UNAVAILABLE);
         verify(audit).failure(org.mockito.ArgumentMatchers.eq(AuditAction.CAPTCHA_UNAVAILABLE),
                 org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), anyString());
+    }
+
+    @Test
+    void tokenSolvedOnAnotherSite_fails_whenHostnamesConfigured() {
+        TurnstileCaptchaService s = service(true, "site-key", "secret-key", java.util.List.of("legacyvault.codes"));
+        respond("{\"success\":true,\"hostname\":\"evil.example\",\"error-codes\":[]}");
+        assertThat(s.verify("tok")).isEqualTo(CaptchaService.Result.FAILED);
+    }
+
+    @Test
+    void tokenSolvedOnOurSite_passes_caseInsensitive() {
+        TurnstileCaptchaService s = service(true, "site-key", "secret-key", java.util.List.of("legacyvault.codes"));
+        respond("{\"success\":true,\"hostname\":\"LegacyVault.codes\",\"error-codes\":[]}");
+        assertThat(s.verify("tok")).isEqualTo(CaptchaService.Result.PASSED);
     }
 }

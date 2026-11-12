@@ -27,7 +27,8 @@ import java.util.List;
 @EnableConfigurationProperties(CaptchaProperties.class)
 public class TurnstileCaptchaService implements CaptchaService {
 
-    private record SiteverifyResponse(boolean success, @JsonProperty("error-codes") List<String> errorCodes) {}
+    private record SiteverifyResponse(boolean success, String hostname,
+                                      @JsonProperty("error-codes") List<String> errorCodes) {}
 
     private final CaptchaProperties properties;
     private final AuditLogService auditLogService;
@@ -86,7 +87,13 @@ public class TurnstileCaptchaService implements CaptchaService {
                     .retrieve()
                     .body(SiteverifyResponse.class);
             if (res == null) return Result.UNAVAILABLE;
-            if (res.success()) return Result.PASSED;
+            if (res.success()) {
+                if (!hostnameAllowed(res.hostname())) {
+                    log.warn("Turnstile token solved on unexpected hostname: {}", res.hostname());
+                    return Result.FAILED;
+                }
+                return Result.PASSED;
+            }
             List<String> codes = res.errorCodes() == null ? List.of() : res.errorCodes();
             // Lỗi phía mình (secret sai / thiếu) hoặc lỗi nội bộ của Cloudflare: không phải lỗi người dùng
             if (codes.contains("invalid-input-secret") || codes.contains("missing-input-secret")
@@ -117,6 +124,12 @@ public class TurnstileCaptchaService implements CaptchaService {
                         "The security check is temporarily unavailable. Please try again in a few minutes.");
             }
         }
+    }
+
+    private boolean hostnameAllowed(String hostname) {
+        List<String> allowed = properties.getAllowedHostnames();
+        if (allowed == null || allowed.stream().allMatch(TurnstileCaptchaService::isBlank)) return true;
+        return hostname != null && allowed.stream().anyMatch(h -> h != null && h.trim().equalsIgnoreCase(hostname));
     }
 
     private static boolean isBlank(String s) {

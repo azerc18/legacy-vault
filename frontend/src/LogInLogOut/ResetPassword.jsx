@@ -31,6 +31,7 @@ export default function ResetPassword() {
     // Gửi lại mã cũng là "Quên mật khẩu" nên cũng cần Turnstile khi BE bật CAPTCHA
     const captcha = useCaptchaConfig();
     const [captchaToken, setCaptchaToken] = useState(null);
+    const [captchaReset, setCaptchaReset] = useState(0);
 
     // Đếm ngược cho nút "Gửi lại mã"
     useEffect(() => {
@@ -57,6 +58,7 @@ export default function ResetPassword() {
             const wait = err.response?.data?.data?.retryAfterSeconds;
             if (getErrorCode(err) === 'TOO_MANY_OTP_REQUESTS' && wait) setCooldown(Number(wait));
             setError(getErrorMessage(err, t('reset.errors.resendFailed')));
+            setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         }
     };
 
@@ -167,7 +169,7 @@ export default function ResetPassword() {
                                 </div>
                                 <OtpInput id="reset-otp" label={t('reset.otp')} value={otp} onChange={setOtp} />
                                 {/* Chỉ hiện khi đã được bấm "Gửi lại mã" */}
-                                <TurnstileWidget onToken={setCaptchaToken} show={cooldown <= 0} />
+                                <TurnstileWidget onToken={setCaptchaToken} resetSignal={captchaReset} show={cooldown <= 0} />
                             </div>
 
                             <div className="flex flex-col gap-1.5">
