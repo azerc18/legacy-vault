@@ -5,6 +5,8 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-route
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { atBeneficiaryLimit, openPlanLimit, usePlanUsage } from '../Common/usePlanUsage.js';
+import { VipLocked } from '../Common/VipLock.jsx';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
     ASSET_ICON, ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger, LoadingSkeleton } from './ownerUi.jsx';
@@ -552,6 +554,8 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
     const [editing, setEditing] = useState(null);     // { id, fullName, relationship } đang sửa
     const [loading, setLoading] = useState(false);
     const onlyOne = beneficiaries.length <= 1;          // BE chặn xoá người cuối cùng (LAST_BENEFICIARY)
+    // Đủ số người của gói: khoá form thêm (bấm vào mở hộp nâng cấp), không cho nhập rồi mới bị từ chối
+    const beneficiaryLimitReached = atBeneficiaryLimit(usePlanUsage(), beneficiaries.length);
 
     const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -684,6 +688,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                 </ul>
             )}
             {editable && (
+                <VipLocked locked={beneficiaryLimitReached} feature="BENEFICIARY_LIMIT">
                 <form onSubmit={handleAdd} className="space-y-3">
                     <input type="email" required value={form.email} maxLength={255} onChange={(e) => setField('email', e.target.value)}
                            placeholder={t('detail.beneficiaries.emailPlaceholder')} className={inputClass} />
@@ -697,6 +702,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                         {loading ? t('ui.saving') : t('detail.beneficiaries.addButton')}
                     </button>
                 </form>
+                </VipLocked>
             )}
             <ConfirmDialog
                 open={!!removing}
@@ -738,6 +744,19 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     }, [vaultId, t]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Báo sớm khi file làm vượt dung lượng của gói (BE vẫn kiểm cuối cùng; file mã hoá lớn hơn bản gốc một chút)
+    const usage = usePlanUsage();
+    const overStorage = (f) => !!f && !!usage && usage.maxStorageBytes > 0
+        && usage.storageUsedBytes + f.size > usage.maxStorageBytes;
+    const pickFile = (setter) => (f) => {
+        if (overStorage(f)) {
+            openPlanLimit('STORAGE');
+            return;
+        }
+        setter(f);
+        setError('');
+    };
 
     const validateFile = (f) => {
         if (!f) return t('detail.documents.errors.chooseFile');
@@ -868,7 +887,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                 </option>
                             ))}
                         </select>
-                        <FilePicker file={file} onChange={(f) => { setFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={file} onChange={pickFile(setFile)} accept={ALLOWED.join(',')} disabled={loading} />
                         <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.uploading') : t('ui.upload')}</button>
                     </form>
                 </>
@@ -893,7 +912,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         })}
                     </p>
                     <form onSubmit={uploadNewVersion} className="space-y-4">
-                        <FilePicker file={newVersionFile} onChange={(f) => { setNewVersionFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={newVersionFile} onChange={pickFile(setNewVersionFile)} accept={ALLOWED.join(',')} disabled={loading} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>{t('common:actions.cancel')}</button>
                             <button type="submit" disabled={loading || !newVersionFile} className={btnPrimary}>
