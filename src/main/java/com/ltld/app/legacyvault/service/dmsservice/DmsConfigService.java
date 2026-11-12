@@ -90,12 +90,18 @@ public interface DmsConfigService {
      */
     AdminReminderTarget markAdminReminder(UUID ownerId, LocalDateTime now, long cooldownMinutes);
 
-    /** Gửi mail lỗi: trả lại lượt nhắc (chỉ khi lastAdminReminderAt vẫn là sentAt) để Admin bấm lại được ngay. */
-    void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt);
+    /**
+     * Gửi mail lỗi: trả lại lượt nhắc để Admin bấm lại được ngay. Chỉ khi lastAdminReminderAt vẫn là sentAt;
+     * khôi phục về previousReminderAt (lần nhắc thành công trước đó, có thể null).
+     */
+    void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt, LocalDateTime previousReminderAt);
 
-    /** Thông tin một lượt Admin nhắc check-in; checkinDueAt / triggerAt như trang DMS của Owner. */
+    /**
+     * Thông tin một lượt Admin nhắc check-in; checkinDueAt / triggerAt như trang DMS của Owner.
+     * previousReminderAt: lần Admin nhắc thành công trước lượt này (null nếu chưa có).
+     */
     record AdminReminderTarget(UUID configId, String ownerEmail, DmsStatus status,
-                               LocalDateTime checkinDueAt, LocalDateTime triggerAt) {
+                               LocalDateTime checkinDueAt, LocalDateTime triggerAt, LocalDateTime previousReminderAt) {
     }
 
     /** Kết quả upsert; created = true khi vừa tạo cấu hình lần đầu (controller trả 201). */

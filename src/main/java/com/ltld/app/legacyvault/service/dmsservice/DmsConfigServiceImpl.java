@@ -425,16 +425,16 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         config.setLastAdminReminderAt(now);
         config = dmsConfigRepository.saveAndFlush(config);
         return new AdminReminderTarget(config.getId(), config.getOwner().getEmail(), config.getStatus(),
-                checkinDueAt(config), config.getNextCheckinDueAt());
+                checkinDueAt(config), config.getNextCheckinDueAt(), last);
     }
 
     @Override
     @Transactional
-    public void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt) {
+    public void releaseAdminReminder(UUID ownerId, LocalDateTime sentAt, LocalDateTime previousReminderAt) {
         dmsConfigRepository.findByOwnerIdForUpdate(ownerId)
                 .filter(c -> Objects.equals(c.getLastAdminReminderAt(), sentAt))
                 .ifPresent(c -> {
-                    c.setLastAdminReminderAt(null);
+                    c.setLastAdminReminderAt(previousReminderAt);
                     dmsConfigRepository.saveAndFlush(c);
                 });
     }

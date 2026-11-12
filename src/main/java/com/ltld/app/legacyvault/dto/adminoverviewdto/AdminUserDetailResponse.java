@@ -31,6 +31,7 @@ public class AdminUserDetailResponse {
     // Admin nhắc check-in: lần gần nhất và lần sớm nhất được nhắc lại (null = được nhắc ngay)
     private LocalDateTime dmsLastAdminReminderAt;
     private LocalDateTime dmsAdminReminderAvailableAt;
+    private Long dmsAdminReminderAvailableInSeconds;
 
     // Gói hiện tại (FREE nếu không có gói trả phí còn hạn)
     private String planCode;

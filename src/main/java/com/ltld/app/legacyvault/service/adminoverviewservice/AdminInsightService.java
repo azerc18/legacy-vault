@@ -120,6 +120,7 @@ public class AdminInsightService {
                 .dmsNextCheckinDueAt(dms == null ? null : dms.getNextCheckinDueAt())
                 .dmsLastAdminReminderAt(dms == null ? null : dms.getLastAdminReminderAt())
                 .dmsAdminReminderAvailableAt(dms == null ? null : adminDmsReminderService.nextAllowedAt(dms.getLastAdminReminderAt()))
+                .dmsAdminReminderAvailableInSeconds(dms == null ? null : adminDmsReminderService.secondsUntilAllowed(dms.getLastAdminReminderAt()))
                 .planCode(sub == null ? "FREE" : sub.getPlan().getCode())
                 .planName(sub == null ? null : sub.getPlan().getName())
                 .planExpiresAt(sub == null ? null : sub.getExpiresAt())

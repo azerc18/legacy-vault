@@ -82,6 +82,14 @@ export default function UserDrawer({ userId, onClose, onChanged }) {
         return () => window.removeEventListener('keydown', onKey);
     }, [userId, dialog, onClose]);
 
+    // Hết thời gian chờ nhắc check-in thì tải lại hồ sơ để mở lại nút (server trả số giây còn lại, không lệ thuộc múi giờ)
+    const waitSeconds = u?.dmsAdminReminderAvailableInSeconds;
+    useEffect(() => {
+        if (!waitSeconds || waitSeconds <= 0) return undefined;
+        const timer = setTimeout(load, Math.min(waitSeconds * 1000 + 1000, 2 ** 31 - 1));
+        return () => clearTimeout(timer);
+    }, [waitSeconds, load]);
+
     if (!userId) return null;
 
     const isMe = u && u.id === me?.id;

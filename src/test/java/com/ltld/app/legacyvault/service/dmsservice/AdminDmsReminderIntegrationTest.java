@@ -26,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -169,6 +170,49 @@ class AdminDmsReminderIntegrationTest {
 
         doNothing().when(emailSender).sendDmsAdminCheckinReminder(any(), any(), any(), anyBoolean(), any());
         assertThat(adminDmsReminderService.remind(ownerId, adminId).isEmailSent()).isTrue();
+        // Bấm lại sau khi mail lỗi không ghi thêm chuông giống hệt
+        assertThat(adminBells(ownerId)).hasSize(1);
+        // Audit: lần lỗi là FAILURE, lần gửi được là SUCCESS
+        assertThat(auditLogRepository.findByActor_IdOrderByCreatedAtDesc(adminId, Pageable.unpaged()))
+                .extracting(AuditLog::getAction).containsOnly(AuditAction.DMS_ADMIN_CHECKIN_REMINDER).hasSize(2);
+    }
+
+    @Test
+    void mailFailsAfterEarlierSuccess_restoresPreviousReminderTime() {
+        UUID ownerId = ownerWithDms();
+        UUID adminId = admin();
+        LocalDateTime earlier = LocalDateTime.now().minusMinutes(90).truncatedTo(ChronoUnit.MICROS);
+        DmsConfig config = config(ownerId);
+        config.setLastAdminReminderAt(earlier);
+        dmsConfigRepository.saveAndFlush(config);
+        doThrow(new MailSendException("smtp down"))
+                .when(emailSender).sendDmsAdminCheckinReminder(any(), any(), any(), anyBoolean(), any());
+
+        assertThat(adminDmsReminderService.remind(ownerId, adminId).isEmailSent()).isFalse();
+
+        assertThat(config(ownerId).getLastAdminReminderAt()).isEqualTo(earlier);
+    }
+
+    @Test
+    void twoSuccessfulRemindersAfterCooldown_writeTwoBells() {
+        UUID ownerId = ownerWithDms();
+        UUID adminId = admin();
+        adminDmsReminderService.remind(ownerId, adminId);
+        DmsConfig config = config(ownerId);
+        config.setLastAdminReminderAt(LocalDateTime.now().minusMinutes(61).truncatedTo(ChronoUnit.MICROS));
+        dmsConfigRepository.saveAndFlush(config);
+
+        adminDmsReminderService.remind(ownerId, adminId);
+
+        assertThat(adminBells(ownerId)).hasSize(2);
+    }
+
+    @Test
+    void secondsUntilAllowed_countsDownFromLastReminder() {
+        assertThat(adminDmsReminderService.secondsUntilAllowed(null)).isNull();
+        assertThat(adminDmsReminderService.secondsUntilAllowed(LocalDateTime.now().minusMinutes(61))).isNull();
+        assertThat(adminDmsReminderService.secondsUntilAllowed(LocalDateTime.now().minusMinutes(50)))
+                .isBetween(590L, 600L);
     }
 
     @Test
@@ -232,6 +276,13 @@ class AdminDmsReminderIntegrationTest {
 
     private DmsConfig config(UUID ownerId) {
         return dmsConfigRepository.findByOwnerId(ownerId).orElseThrow();
+    }
+
+    private List<Notification> adminBells(UUID ownerId) {
+        return notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(ownerId).stream()
+                .filter(n -> n.getType() == NotificationType.DMS_CHECKIN_REMINDER)
+                .filter(n -> n.getParams() != null && n.getParams().contains("\"variant\":\"admin\""))
+                .toList();
     }
 
     private String email(UUID userId) {

@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -64,15 +65,25 @@ public class AdminDmsReminderService {
         return next.isAfter(LocalDateTime.now()) ? next : null;
     }
 
+    /** Số giây còn lại tới lúc được nhắc lại (để FE tự mở nút, không phụ thuộc múi giờ); null = được nhắc ngay. */
+    public Long secondsUntilAllowed(LocalDateTime lastAdminReminderAt) {
+        LocalDateTime next = nextAllowedAt(lastAdminReminderAt);
+        return next == null ? null : Math.max(1, Duration.between(LocalDateTime.now(), next).toSeconds());
+    }
+
     public AdminDmsReminderResponse remind(UUID ownerId, UUID adminId) {
         // MICROS: cột DATETIME(6); releaseAdminReminder so sánh đúng giá trị đã lưu.
         LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         DmsConfigService.AdminReminderTarget target = dmsConfigService.markAdminReminder(ownerId, now, cooldownMinutes);
 
-        inAppNotifier.toEmail(target.ownerEmail(), InAppNotifier.draft(NotificationType.DMS_CHECKIN_REMINDER,
+        // Bấm lại sau khi mail lỗi: lượt nhắc được trả về previousReminderAt nên params giống hệt lần trước,
+        // toEmailOnce bỏ qua -> Owner không nhận 2 chuông giống nhau. Lượt nhắc mới (sau một lần gửi được) có
+        // previousReminderAt khác nên vẫn ghi chuông.
+        inAppNotifier.toEmailOnce(target.ownerEmail(), InAppNotifier.draft(NotificationType.DMS_CHECKIN_REMINDER,
                 InAppNotifier.REF_DMS_CONFIG, target.configId(),
                 "An administrator reminds you to check in to confirm you are safe.",
-                "variant", "admin", "dueAt", target.checkinDueAt(), "triggerAt", target.triggerAt()));
+                "variant", "admin", "dueAt", target.checkinDueAt(), "triggerAt", target.triggerAt(),
+                "previousReminderAt", target.previousReminderAt()));
 
         boolean emailSent;
         try {
@@ -84,14 +95,16 @@ public class AdminDmsReminderService {
             log.error("Admin check-in reminder email to owner {} failed", ownerId, e);
             emailSent = false;
             try {
-                dmsConfigService.releaseAdminReminder(ownerId, now);
+                dmsConfigService.releaseAdminReminder(ownerId, now, target.previousReminderAt());
             } catch (RuntimeException ex) {
                 log.error("Could not release admin check-in reminder for owner {}", ownerId, ex);
             }
         }
 
         String adminEmail = userRepository.findById(adminId).map(User::getEmail).orElse(null);
-        auditLogService.log(AuditAction.DMS_ADMIN_CHECKIN_REMINDER, AuditResult.SUCCESS, adminId, adminEmail, null,
+        // Email lỗi -> FAILURE để lọc nhật ký theo kết quả (chuông vẫn đã ghi, detail có emailSent=false)
+        auditLogService.log(AuditAction.DMS_ADMIN_CHECKIN_REMINDER,
+                emailSent ? AuditResult.SUCCESS : AuditResult.FAILURE, adminId, adminEmail, null,
                 DmsActivationProcessor.ENTITY_DMS_CONFIG, target.configId().toString(),
                 DmsActivationProcessor.ownerDetail(ownerId) + ", emailSent=" + emailSent);
 
