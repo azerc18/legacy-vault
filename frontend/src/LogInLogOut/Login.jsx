@@ -9,7 +9,7 @@ import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
-import TurnstileWidget from '../Common/TurnstileWidget.jsx';
+import TurnstileWidget, { refreshCaptchaConfigOnError } from '../Common/TurnstileWidget.jsx';
 import BrandMark from '../Common/BrandMark.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
 
@@ -91,6 +91,7 @@ export default function Login() {
             await finishLogin(res.accessToken);
         } catch (err) {
             setError(getErrorMessage(err, t('login.errors.failed')));
+            refreshCaptchaConfigOnError(err);
             // Chỉ tài khoản chưa xác minh email mới cần link xác minh (bị khoá cũng là 403 nhưng khác mã)
             setNeedVerify(getErrorCode(err) === 'ACCOUNT_NOT_ACTIVE');
             if (err?.response?.data?.data?.captchaRequired) setCaptchaRequired(true);

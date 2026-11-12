@@ -9,7 +9,7 @@ import { isPasswordValid } from '../Common/passwordPolicy.js';
 import PasswordInput from '../Common/PasswordInput.jsx';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import GoogleSignInButton from '../Common/GoogleSignInButton.jsx';
-import TurnstileWidget, { useCaptchaConfig } from '../Common/TurnstileWidget.jsx';
+import TurnstileWidget, { useCaptchaConfig, refreshCaptchaConfigOnError } from '../Common/TurnstileWidget.jsx';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import { useTranslation } from 'react-i18next';
 
@@ -114,6 +114,7 @@ export default function Register() {
             navigate('/verify-email', { state: { email: email.trim() } });
         } catch (err) {
             setError(getErrorMessage(err, t('register.errors.failed')));
+            refreshCaptchaConfigOnError(err);
             setCaptchaReset((n) => n + 1);   // token đã dùng, lấy token mới
         } finally {
             setLoading(false);
