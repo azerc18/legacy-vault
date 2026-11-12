@@ -71,6 +71,14 @@ class AuditMailListenerTest {
         verify(emailSender).sendPasswordChangedNotice("an@example.com", "An");
     }
 
+    // Đổi mật khẩu và cài đặt mật khẩu (tài khoản Google) cũng báo qua email
+    @Test
+    void passwordChanged_sendsPasswordChangedNotice() {
+        listener.handle(event(AuditAction.PASSWORD_CHANGED, "SUCCESS", "password set (google account)"));
+
+        verify(emailSender).sendPasswordChangedNotice("an@example.com", "An");
+    }
+
     @Test
     void failedResult_sendsNothing() {
         listener.handle(event(AuditAction.PASSWORD_RESET_SUCCESS, "FAILURE", null));

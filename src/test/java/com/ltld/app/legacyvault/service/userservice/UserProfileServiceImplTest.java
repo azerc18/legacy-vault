@@ -1,8 +1,14 @@
 package com.ltld.app.legacyvault.service.userservice;
 
+import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.dto.userdto.SetPasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.ChangePasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.UpdateProfileRequest;
 import com.ltld.app.legacyvault.dto.userdto.UserProfileResponse;
+import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
+import com.ltld.app.legacyvault.service.mfaservice.MfaService;
+import com.ltld.app.legacyvault.enums.TokenType;
+import com.ltld.app.legacyvault.exception.InvalidOtpException;
 import com.ltld.app.legacyvault.entity.Role;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.AuditAction;
@@ -34,10 +40,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -56,6 +66,8 @@ class UserProfileServiceImplTest {
     @Mock private AuditLogService auditLogService;
     @Mock private FileStorageService fileStorageService;
     @Mock private CryptoService cryptoService;
+    @Mock private VerificationTokenService verificationTokenService;
+    @Mock private MfaService mfaService;
     @InjectMocks private UserProfileServiceImpl service;
 
     private final UUID userId = UUID.randomUUID();
@@ -344,6 +356,146 @@ class UserProfileServiceImplTest {
         verify(userRepository, never()).save(any());
         verify(tokenService, never()).revokeAllUserTokens(any(), any());
         verify(auditLogService, never()).success(any(), any(), any());
+    }
+
+    @Test
+    void changePassword_googleAccount_marksPasswordSet() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(passwordEncoder.matches("old-pass", OLD_HASH)).thenReturn(true);
+        when(passwordEncoder.encode("new-pass")).thenReturn("$2a$new-hash");
+
+        service.changePassword(userId, changeRequest("old-pass", "new-pass"));
+
+        assertTrue(u.isPasswordSet());
+    }
+
+    // ---------- Cài đặt mật khẩu cho tài khoản Google ----------
+
+    private static SetPasswordRequest setRequest(String pw) {
+        SetPasswordRequest r = new SetPasswordRequest();
+        r.setNewPassword(pw);
+        r.setPasswordConfirm(pw);
+        r.setOtp("123456");
+        return r;
+    }
+
+    @Test
+    void sendSetPasswordOtp_googleAccount_issuesPasswordResetOtp() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        service.sendSetPasswordOtp(userId);
+
+        verify(verificationTokenService).issueOtp(u, TokenType.PASSWORD_RESET);
+    }
+
+    @Test
+    void sendSetPasswordOtp_passwordAlreadySet_throws409AndSendsNothing() {
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user()));
+
+        UserProfileException ex = assertThrows(UserProfileException.class, () -> service.sendSetPasswordOtp(userId));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        verify(verificationTokenService, never()).issueOtp(any(), any());
+    }
+
+    @Test
+    void setPassword_wrongOtp_propagates_andChangesNothing() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        doThrow(new InvalidOtpException("Wrong OTP for user")).when(verificationTokenService)
+                .consumeOtp(u, TokenType.PASSWORD_RESET, "123456", AuditAction.PASSWORD_CHANGE_FAILED);
+
+        assertThrows(InvalidOtpException.class, () -> service.setPassword(userId, setRequest("new-pass")));
+
+        assertEquals(OLD_HASH, u.getPasswordHash());
+        assertFalse(u.isPasswordSet());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void setPassword_mfaEnabled_wrongCode_throws400AndChangesNothing() {
+        User u = user();
+        u.setPasswordSet(false);
+        u.setMfaEnabled(true);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(mfaService.verifyCode(u, "000000")).thenReturn(false);
+        SetPasswordRequest req = setRequest("new-pass");
+        req.setCode("000000");
+
+        UserProfileException ex = assertThrows(UserProfileException.class, () -> service.setPassword(userId, req));
+
+        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(OLD_HASH, u.getPasswordHash());
+        verify(userRepository, never()).save(any());
+        verify(auditLogService).failure(AuditAction.PASSWORD_CHANGE_FAILED, userId, "owner@example.com",
+                "set password: invalid 2fa code");
+    }
+
+    @Test
+    void setPassword_mfaEnabled_correctCode_setsPassword() {
+        User u = user();
+        u.setPasswordSet(false);
+        u.setMfaEnabled(true);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(mfaService.verifyCode(u, "246810")).thenReturn(true);
+        when(passwordEncoder.encode("new-pass")).thenReturn("$2a$new-hash");
+        SetPasswordRequest req = setRequest("new-pass");
+        req.setCode("246810");
+
+        service.setPassword(userId, req);
+
+        assertEquals("$2a$new-hash", u.getPasswordHash());
+        assertTrue(u.isPasswordSet());
+    }
+
+    @Test
+    void setPassword_googleAccount_setsHashWithoutCurrentPassword_keepsSessions() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+        when(passwordEncoder.encode("new-pass")).thenReturn("$2a$new-hash");
+
+        UserProfileResponse res = service.setPassword(userId, setRequest("new-pass"));
+
+        verify(verificationTokenService).consumeOtp(u, TokenType.PASSWORD_RESET, "123456", AuditAction.PASSWORD_CHANGE_FAILED);
+        verify(mfaService, never()).verifyCode(any(), any());   // chưa bật 2FA
+        assertEquals("$2a$new-hash", u.getPasswordHash());
+        assertTrue(u.isPasswordSet());
+        assertTrue(res.isPasswordSet());
+        verify(userRepository).save(u);
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+        verify(tokenService, never()).revokeAllUserTokens(any(), any());
+        verify(auditLogService).log(eq(AuditAction.PASSWORD_CHANGED), eq(AuditResult.SUCCESS), eq(userId),
+                eq("owner@example.com"), isNull(), isNull(), isNull(), anyString());
+    }
+
+    @Test
+    void setPassword_passwordAlreadySet_throws409AndChangesNothing() {
+        User u = user();   // passwordSet mặc định true
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(u));
+
+        UserProfileException ex = assertThrows(UserProfileException.class,
+                () -> service.setPassword(userId, setRequest("new-pass")));
+
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        assertEquals(OLD_HASH, u.getPasswordHash());
+        verify(verificationTokenService, never()).consumeOtp(any(), any(), any(), any());
+        verify(passwordEncoder, never()).encode(anyString());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void getMe_mapsPasswordSet() {
+        User u = user();
+        u.setPasswordSet(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(u));
+
+        assertFalse(service.getMe(userId).isPasswordSet());
     }
 
     @Test

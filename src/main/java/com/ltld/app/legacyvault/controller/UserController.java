@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.userdto.AvatarFile;
 import com.ltld.app.legacyvault.dto.userdto.ChangePasswordRequest;
+import com.ltld.app.legacyvault.dto.userdto.SetPasswordRequest;
 import com.ltld.app.legacyvault.dto.userdto.UpdateProfileRequest;
 import com.ltld.app.legacyvault.dto.userdto.UserProfileResponse;
 import com.ltld.app.legacyvault.service.userservice.UserProfileService;
@@ -43,6 +44,19 @@ public class UserController {
             Principal principal, @Valid @RequestBody ChangePasswordRequest request) {
         userProfileService.changePassword(currentUserId(principal), request);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully. Please sign in again."));
+    }
+
+    @PostMapping("/set-password/otp")
+    public ResponseEntity<ApiResponse<Void>> sendSetPasswordOtp(Principal principal) {
+        userProfileService.sendSetPasswordOtp(currentUserId(principal));
+        return ResponseEntity.ok(ApiResponse.success("A code has been sent to your email"));
+    }
+
+    @PostMapping("/set-password")
+    public ResponseEntity<ApiResponse<UserProfileResponse>> setPassword(
+            Principal principal, @Valid @RequestBody SetPasswordRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Password set successfully",
+                userProfileService.setPassword(currentUserId(principal), request)));
     }
 
     // ---------- Avatar ----------

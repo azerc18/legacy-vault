@@ -102,8 +102,8 @@ public class AuditMailListener {
                     actor(e).ifPresent(u -> emailSender.sendWelcomeEmail(u.getEmail(), u.getFullName()));
                 }
             }
-            // N2: đặt lại mật khẩu thành công
-            case PASSWORD_RESET_SUCCESS -> {
+            // N2: đặt lại / đổi / cài đặt mật khẩu thành công (báo để chủ tài khoản phát hiện nếu không phải mình làm)
+            case PASSWORD_RESET_SUCCESS, PASSWORD_CHANGED -> {
                 if (isSuccess(e)) {
                     actor(e).ifPresent(u -> emailSender.sendPasswordChangedNotice(u.getEmail(), u.getFullName()));
                 }

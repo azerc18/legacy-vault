@@ -41,6 +41,12 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    // false = tài khoản tạo bằng Google, mật khẩu là chuỗi ngẫu nhiên không ai biết: hồ sơ cho CÀI ĐẶT mật khẩu
+    // (không hỏi mật khẩu hiện tại). Đặt lại / đổi / cài đặt mật khẩu thì thành true.
+    @Column(name = "password_set", nullable = false)
+    @Builder.Default
+    private boolean passwordSet = true;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default

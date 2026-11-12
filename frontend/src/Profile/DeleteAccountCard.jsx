@@ -39,7 +39,7 @@ export default function DeleteAccountCard({ profile }) {
     };
 
     const emailOk = confirmEmail.trim().toLowerCase() === (profile.email || '').toLowerCase();
-    const ready = check?.deletable && password && emailOk && (!check.mfaRequired || code.trim());
+    const ready = check?.deletable && profile.passwordSet !== false && password && emailOk && (!check.mfaRequired || code.trim());
 
     const submit = async (e) => {
         e.preventDefault();
@@ -105,6 +105,12 @@ export default function DeleteAccountCard({ profile }) {
                                 </ul>
                                 <p className="text-xs text-on-surface-variant">{t('deleteAccount.exportFirst')}</p>
 
+                                {/* Tài khoản Google chưa có mật khẩu: phải cài đặt mật khẩu (mục phía trên) mới xác nhận xoá được */}
+                                {profile.passwordSet === false && (
+                                    <p className="p-3 rounded-xl bg-warning-container text-on-warning-container text-sm">
+                                        {t('deleteAccount.setPasswordFirst')}
+                                    </p>
+                                )}
                                 <label className="block">
                                     <span className="block text-sm font-semibold mb-1.5">{t('deleteAccount.password')}</span>
                                     <SharedPasswordInput className={inputClass} value={password} onChange={setPassword} autoComplete="current-password" />

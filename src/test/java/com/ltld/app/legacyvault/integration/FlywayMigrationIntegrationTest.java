@@ -153,4 +153,38 @@ class FlywayMigrationIntegrationTest {
             assertThat(col).contains("'" + t.name() + "'");
         }
     }
+
+    // Tài khoản Google đã có trước migration V20261112_1900: đánh dấu "chưa đặt mật khẩu", trừ khi sau đó đã đặt lại / đổi
+    @Test
+    void passwordSetBackfill_marksOnlyGoogleAccountsWithoutLaterPasswordChange() throws Exception {
+        String sql = new String(new org.springframework.core.io.ClassPathResource(
+                "db/migration/V20261112_1900__user_password_set.sql").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        String backfill = sql.substring(sql.indexOf("UPDATE `users`"));
+
+        java.util.UUID google = java.util.UUID.randomUUID();
+        java.util.UUID googleReset = java.util.UUID.randomUUID();
+        java.util.UUID normal = java.util.UUID.randomUUID();
+        for (java.util.UUID id : java.util.List.of(google, googleReset, normal)) {
+            jdbcTemplate.update("""
+                    INSERT INTO users (id, email, full_name, password_hash, status, created_at, updated_at)
+                    VALUES (UUID_TO_BIN(?), ?, 'U', 'h', 'ACTIVE', NOW(6), NOW(6))
+                    """, id.toString(), id + "@example.com");
+        }
+        String audit = """
+                INSERT INTO audit_logs (id, actor_id, action, metadata, created_at)
+                VALUES (UUID_TO_BIN(UUID()), UUID_TO_BIN(?), ?, ?, NOW(6) + INTERVAL ? SECOND)
+                """;
+        jdbcTemplate.update(audit, google.toString(), "REGISTER", "{\"detail\":\"google\"}", 0);
+        jdbcTemplate.update(audit, googleReset.toString(), "EMAIL_VERIFIED", "{\"detail\":\"google\"}", 0);
+        jdbcTemplate.update(audit, googleReset.toString(), "PASSWORD_RESET_SUCCESS", "{\"result\":\"SUCCESS\"}", 5);
+        jdbcTemplate.update(audit, normal.toString(), "REGISTER", "{\"result\":\"SUCCESS\"}", 0);
+
+        jdbcTemplate.execute(backfill);
+
+        String q = "SELECT password_set FROM users WHERE id = UUID_TO_BIN(?)";
+        assertThat(jdbcTemplate.queryForObject(q, Boolean.class, google.toString())).isFalse();
+        assertThat(jdbcTemplate.queryForObject(q, Boolean.class, googleReset.toString())).isTrue();
+        assertThat(jdbcTemplate.queryForObject(q, Boolean.class, normal.toString())).isTrue();
+    }
 }
