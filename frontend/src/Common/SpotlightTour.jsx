@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getUser } from '../auth/auth.js';
-import { FEATURE_TOURS, getFeatureTourForPath } from './featureToursConfig.js';
+import { FEATURE_TOURS, VAULT_CREATED_EVENT, getFeatureTourForPath } from './featureToursConfig.js';
 import LanguageSwitch from './LanguageSwitch.jsx';
+import { paymentApi } from '../api/paymentApi.js';
+import { atVaultLimit } from './usePlanUsage.js';
 
 export const ONBOARDING_STATUS_KEY = 'lv_onboarding_status';
 export const ONBOARDING_STEP_KEY = 'lv_tour_step';
@@ -56,6 +58,20 @@ export function resetAllTours() {
     }
 }
 
+// Hết lượt tạo két thì trang tạo két là màn "hết lượt", tour tạo két không có gì để hướng dẫn.
+// Lỗi / chưa biết thì vẫn cho chạy tour (BE vẫn chặn khi bấm Tạo).
+const vaultTourBlocked = () => paymentApi.getMyUsage().then(atVaultLimit).catch(() => false);
+
+// Đánh dấu tour tạo két đã xong để không tự bật / tự tiếp tục lại
+function markVaultTourDone() {
+    try {
+        localStorage.setItem(scoped(ONBOARDING_STATUS_KEY), 'completed');
+        localStorage.removeItem(scoped(ONBOARDING_STEP_KEY));
+    } catch {
+        // ignore
+    }
+}
+
 export default function SpotlightTour() {
     const { t } = useTranslation(['onboarding', 'common']);
     const location = useLocation();
@@ -67,6 +83,8 @@ export default function SpotlightTour() {
     const [currentStep, setCurrentStep] = useState(1);
     const [targetRect, setTargetRect] = useState(null);
     const [showCongrats, setShowCongrats] = useState(false);
+    // Muốn bắt đầu tour tạo két nhưng đã hết lượt két: báo ngắn thay vì dẫn vào màn "hết lượt"
+    const [showTourBlocked, setShowTourBlocked] = useState(false);
     const retryTimerRef = useRef(null);
     const tooltipRef = useRef(null);
 
@@ -192,8 +210,15 @@ export default function SpotlightTour() {
                 // Chỉ kích hoạt lại tour tạo két nếu đang ở đúng trang tạo két (/owner/vaults hoặc /owner/vaults/new)
                 if (location.pathname === '/owner/vaults' || location.pathname === '/owner/vaults/new') {
                     const savedStep = parseInt(localStorage.getItem(scoped(ONBOARDING_STEP_KEY)) || '1', 10);
-                    setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
-                    setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
+                    let cancelled = false;
+                    vaultTourBlocked().then((blocked) => {
+                        if (cancelled) return;
+                        // Bỏ dở tour rồi đã tạo két (hết lượt): không tiếp tục nữa, coi như xong
+                        if (blocked) { markVaultTourDone(); return; }
+                        setCurrentStep(savedStep >= 1 && savedStep <= 6 ? savedStep : 1);
+                        setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
+                    });
+                    return () => { cancelled = true; };
                 }
             }
         } catch {
@@ -229,9 +254,14 @@ export default function SpotlightTour() {
 
     // 3. Lắng nghe các sự kiện toàn cục
     useEffect(() => {
-        const handleStartVaultTour = () => {
+        const handleStartVaultTour = async () => {
             setShowPrompt(false);
             setShowCongrats(false);
+            if (await vaultTourBlocked()) {
+                markVaultTourDone();
+                setShowTourBlocked(true);
+                return;
+            }
             setCurrentStep(1);
             setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
             try {
@@ -270,6 +300,19 @@ export default function SpotlightTour() {
             window.removeEventListener(START_FEATURE_TOUR_EVENT, handleStartFeatureTour);
         };
     }, [location.pathname, navigate, vaultTourConfig]);
+
+    // Người dùng bấm "Tạo két sắt" thật và két đã tạo xong -> tour tạo két hoàn tất. Không để effect số 4 kéo ngược
+    // về form tạo két (lúc này có thể đã hết lượt két, form là màn "hết lượt")
+    useEffect(() => {
+        if (activeTour?.type !== 'vault_creation') return undefined;
+        const onCreated = () => {
+            markVaultTourDone();
+            setActiveTour(null);
+            setShowCongrats(true);
+        };
+        window.addEventListener(VAULT_CREATED_EVENT, onCreated);
+        return () => window.removeEventListener(VAULT_CREATED_EVENT, onCreated);
+    }, [activeTour]);
 
     // 4. Cuộn và canh nét phần tử khi chuyển bước
     useEffect(() => {
@@ -392,8 +435,13 @@ export default function SpotlightTour() {
     }, [activeTour, showPrompt, showCongrats]);
 
     // Xử lý lựa chọn câu hỏi lần đầu
-    const handlePromptNewbie = () => {
+    const handlePromptNewbie = async () => {
         setShowPrompt(false);
+        if (await vaultTourBlocked()) {
+            markVaultTourDone();
+            setShowTourBlocked(true);
+            return;
+        }
         setCurrentStep(1);
         setActiveTour({ type: 'vault_creation', config: vaultTourConfig });
         try {
@@ -771,6 +819,29 @@ export default function SpotlightTour() {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Hết lượt két: tour tạo két không chạy, chỉ báo ngắn (không mời nâng cấp) */}
+            {showTourBlocked && (
+                <div
+                    className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="tour-blocked-title"
+                >
+                    <div className="w-full max-w-sm bg-[#0e1629] border border-white/15 rounded-2xl shadow-2xl text-white p-6 text-center">
+                        <span className="material-symbols-outlined text-[32px] text-amber-300">info</span>
+                        <h3 id="tour-blocked-title" className="text-lg font-bold mt-2">{t('tour.blocked.title')}</h3>
+                        <p className="text-sm text-white/75 mt-2 leading-relaxed">{t('tour.blocked.text')}</p>
+                        <button
+                            type="button"
+                            onClick={() => setShowTourBlocked(false)}
+                            className="mt-5 w-full h-10 rounded-xl bg-amber-400 text-slate-950 font-bold hover:brightness-110"
+                        >
+                            {t('tour.blocked.action')}
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* 3. MODAL CHÚC MỪNG HOÀN TẤT (CHO TOUR KHỞI TẠO KÉT) */}

@@ -4,6 +4,9 @@
  * Áp dụng cho mọi vai trò (Owner, Beneficiary, Executor, Legal Verifier), ngoại trừ Admin.
  */
 
+// CreateVault phát khi tạo két xong, để tour tạo két (SpotlightTour) tự hoàn tất
+export const VAULT_CREATED_EVENT = 'lv:vault-created';
+
 export const FEATURE_TOURS = [
     // 1. Owner: Nhật ký hoạt động (/owner/activity)
     {

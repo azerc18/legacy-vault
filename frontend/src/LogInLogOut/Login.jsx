@@ -1,10 +1,10 @@
 import AuthShell from '../Common/AuthShell.jsx';
 import React, { useState, useEffect } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../api/authApi.js';
 import { getErrorMessage, getErrorCode } from '../api/http.js';
-import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth } from '../auth/auth.js';
+import { saveSession, getUser, updateStoredUser, homeFor, safeRedirect, emailFromCredential, clearAuth, afterLoginPath } from '../auth/auth.js';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import LanguageSwitch from '../Common/LanguageSwitch.jsx';
 import PasswordInput from '../Common/PasswordInput.jsx';
@@ -19,7 +19,6 @@ const inputCls =
 export default function Login() {
     const { t, i18n } = useTranslation('auth');
     const uiLanguage = (i18n.resolvedLanguage || i18n.language || 'vi').slice(0, 2) === 'en' ? 'en' : 'vi';
-    const navigate = useNavigate();
     const location = useLocation();
     // Trang Đăng ký chuyển sang khi tài khoản Google đã bật 2FA: { email, mfaToken }
     const [email, setEmail] = useState(location.state?.email || '');
@@ -37,6 +36,9 @@ export default function Login() {
 
     // Trang cần đăng nhập mà người dùng đang mở dở (RequireRole truyền sang)
     const from = safeRedirect(location.state?.from);
+    // Đích đến sau khi đăng nhập xong. Dùng chung <Navigate> bên dưới thay vì navigate() trong hàm async:
+    // route đích tải lazy nên Login còn render lại một nhịp và <Navigate> mặc định sẽ ghi đè đích (vd. /me?welcome=1).
+    const [redirectTo, setRedirectTo] = useState(null);
     // http.js chuyển về /login?expired=1 khi refresh token hết hạn
     const expired = new URLSearchParams(location.search).has('expired');
 
@@ -53,17 +55,20 @@ export default function Login() {
     const isDemo = typeof window !== 'undefined' && localStorage.getItem('lv_demo_mode') === 'true';
     const current = isDemo ? null : getUser();
     if (current) {
-        return <Navigate to={from || homeFor(current)} replace />;
+        return <Navigate to={redirectTo || from || homeFor(current)} replace />;
     }
 
     // Lưu token TRƯỚC rồi mới gọi /users/me (để request có Bearer token)
     // mail: truyền thẳng khi vừa setEmail (state chưa kịp cập nhật), vd. đăng nhập Google
-    const finishLogin = async (accessToken, mail = email) => {
+    // firstLogin (BE): lần đăng nhập thành công đầu tiên -> trang hồ sơ để hoàn thiện thông tin,
+    // giữ trang định tới (link mời, trang chủ theo vai trò) để nút "Tiếp tục" trên trang hồ sơ đưa về
+    const finishLogin = async (accessToken, mail = email, firstLogin = false) => {
         const user = saveSession(accessToken, mail.trim());
         try {
             updateStoredUser(toStoredUser(await userApi.getMe()));
         } catch { /* header vẫn hiển thị được tên mặc định */ }
-        navigate(from || homeFor(user), { replace: true });
+        const target = from || homeFor(user);
+        setRedirectTo(afterLoginPath(firstLogin, target));
     };
 
     const backToPassword = () => {
@@ -88,7 +93,7 @@ export default function Login() {
                 setCode(''); setUseBackup(false);
                 return;
             }
-            await finishLogin(res.accessToken);
+            await finishLogin(res.accessToken, email, res.firstLogin);
         } catch (err) {
             setError(getErrorMessage(err, t('login.errors.failed')));
             refreshCaptchaConfigOnError(err);
@@ -112,7 +117,7 @@ export default function Login() {
                 setCode(''); setUseBackup(false);
                 return;
             }
-            await finishLogin(res.accessToken, googleEmail);
+            await finishLogin(res.accessToken, googleEmail, res.firstLogin);
         } catch (err) {
             setError(getErrorMessage(err, t('google.failed')));
         } finally {
@@ -125,8 +130,8 @@ export default function Login() {
         if (!code.trim()) return setError(t('mfa.errors.required'));
         setError(''); setLoading(true);
         try {
-            const { accessToken } = await authApi.loginMfa(mfaToken, code.trim());
-            await finishLogin(accessToken);
+            const { accessToken, firstLogin } = await authApi.loginMfa(mfaToken, code.trim());
+            await finishLogin(accessToken, email, firstLogin);
         } catch (err) {
             const msg = getErrorMessage(err, t('mfa.errors.failed'));
             const ec = getErrorCode(err);

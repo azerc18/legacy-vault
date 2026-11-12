@@ -32,9 +32,22 @@ export const homeFor = (u) =>
         : u?.roles?.includes(ROLES.LEGAL_VERIFIER) ? '/verifier/home'
             : '/home';
 
-// Chỉ nhận đường dẫn nội bộ ("/owner/vaults/1"), chặn "//evil.com" hay "https://..." (open redirect)
-export const safeRedirect = (path) =>
-    typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path !== '/login' ? path : null;
+// Chỉ nhận đường dẫn nội bộ ("/owner/vaults/1"), chặn open redirect: "//evil.com", "https://...",
+// và "/\\evil.com" (trình duyệt đổi "\\" thành "/" nên thành "//evil.com"). Kiểm lại bằng URL: phải cùng origin.
+export const safeRedirect = (path) => {
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return null;
+    try {
+        const url = new URL(path, window.location.origin);
+        if (url.origin !== window.location.origin || url.pathname === '/login') return null;
+        return url.pathname + url.search + url.hash;
+    } catch {
+        return null;
+    }
+};
+
+// Đích sau khi đăng nhập: lần đầu (BE trả firstLogin) thì qua trang hồ sơ, nút "Tiếp tục" ở đó đưa về target
+export const afterLoginPath = (firstLogin, target) =>
+    firstLogin ? `/me?${new URLSearchParams({ welcome: '1', next: target }).toString()}` : target;
 
 // Email trong ID token của Google, chỉ để hiển thị / lưu tên mặc định (BE mới là nơi kiểm tra chữ ký)
 export function emailFromCredential(credential) {

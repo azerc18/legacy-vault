@@ -17,7 +17,8 @@ export function VipChip({ className = '' }) {
 
 // Tính năng VIP khi hiện ở tài khoản FREE: làm mờ, không thao tác được, bấm vào thì mở hộp nâng cấp.
 // locked = false (đã là VIP hoặc chưa biết gói) thì hiện nguyên như bình thường.
-export function VipLocked({ locked, children, className = '' }) {
+// feature: PlanFeature để hộp nâng cấp hiện câu riêng (vd. BENEFICIARY_LIMIT); bỏ trống thì dùng câu chung.
+export function VipLocked({ locked, children, className = '', feature, label }) {
     const { t } = useTranslation('common');
     const [open, setOpen] = useState(false);
     if (!locked) return children;
@@ -27,10 +28,10 @@ export function VipLocked({ locked, children, className = '' }) {
             <button type="button" onClick={() => setOpen(true)}
                     className="absolute inset-0 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-primary hover:bg-primary/5 transition-colors">
                 <Icon name="lock" className="text-[18px]" />
-                {t('vip.lockedLabel')}
+                {label || t('vip.lockedLabel')}
                 <VipChip />
             </button>
-            <UpgradeDialog open={open} onClose={() => setOpen(false)} message={t('vip.upgradeMessage')} />
+            <UpgradeDialog open={open} onClose={() => setOpen(false)} feature={feature} message={feature ? undefined : t('vip.upgradeMessage')} />
         </div>
     );
 }

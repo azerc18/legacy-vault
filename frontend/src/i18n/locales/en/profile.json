@@ -268,5 +268,10 @@
       "check": "Could not check whether your account can be deleted.",
       "failed": "Could not delete your account."
     }
+  },
+  "welcome": {
+    "title": "Welcome to LegacyVault",
+    "text": "Please complete your profile (name, phone number, avatar, language) before you get started.",
+    "continue": "Continue"
   }
 }

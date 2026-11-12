@@ -27,10 +27,9 @@ export default function BeneficiaryVaults() {
     if (!user) return <Navigate to="/login" replace />;
 
     return (
-        <BeneficiaryLayout title={t('list.title')} subtitle={t('list.subtitle')}>
-            <div data-tour="beneficiary-header">
-                {error && <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
-            </div>
+        <BeneficiaryLayout title={t('list.title')} subtitle={t('list.subtitle')} headerTour="beneficiary-header">
+            {/* Bước 1 hướng dẫn nhanh trỏ vào tiêu đề trang; trước đây trỏ vào khối báo lỗi (rỗng, cao 0px) */}
+            {error && <div className="mb-4 p-3 rounded-lg bg-error-container text-on-error-container text-sm">{error}</div>}
 
             {loading ? (
                 <LoadingSkeleton label={t('list.loading')}/>

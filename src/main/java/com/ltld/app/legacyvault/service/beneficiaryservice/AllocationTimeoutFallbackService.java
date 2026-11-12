@@ -38,7 +38,7 @@ import java.util.UUID;
  *   tính thành công cho vault này. Không dựa vào "có claim" vì BeneficiaryNotificationListener tạo sẵn claim
  *   PENDING cho mọi người đã có tài khoản ngay lúc mở khóa.
  * - Người nhận thay phải đã ACCEPTED, có tài khoản và claim còn PENDING (chưa đóng phần của mình).
- * - PROPORTIONAL và JOINT_CONSENSUS giữ nguyên (không có người dự phòng, Owner quyết định chia lại).
+ * - PROPORTIONAL (kể cả có điều kiện K-of-N) giữ nguyên (không có người dự phòng, Owner quyết định chia lại).
  * - Không đổi trạng thái của người quá hạn; chạy lại không chuyển lần hai vì chỉ chọn effective IS NULL.
  * Trùng khoảng 10 dòng với declineClaim (canReceive + vòng lặp chuyển); gộp lại ở PR refactor sau.
  */

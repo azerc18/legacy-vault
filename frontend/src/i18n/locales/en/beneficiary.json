@@ -88,6 +88,7 @@
     "view": "View",
     "download": "Download",
     "secret": "Secret",
+    "noSecret": "This asset has no secret information.",
     "notes": "Notes",
     "reveal": "Show secret",
     "hide": "Hide secret",
@@ -157,8 +158,7 @@
     "viewedOf": "Viewed <b>{{viewed}}</b> of <b>{{total}}</b> of your assets.",
     "mode": {
       "EXCLUSIVE": "Yours alone",
-      "PROPORTIONAL": "Shared",
-      "JOINT_CONSENSUS": "Joint approval"
+      "PROPORTIONAL": "Shared"
     },
     "reassigned": "Reassigned to you",
     "viewed": "Viewed",

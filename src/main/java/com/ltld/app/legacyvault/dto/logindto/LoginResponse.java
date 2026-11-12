@@ -19,4 +19,6 @@ public class LoginResponse {
     private Instant expiresAt;
     private boolean mfaRequired;
     private String mfaToken;
+    // true khi đây là lần đăng nhập thành công đầu tiên của tài khoản: FE đưa người dùng tới trang hồ sơ để hoàn thiện thông tin
+    private boolean firstLogin;
 }

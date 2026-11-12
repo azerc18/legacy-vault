@@ -8,8 +8,13 @@ import { OwnerLayout, Icon, Alert, formatDate, btnPrimary, LoadingSkeleton } fro
 import EmptyState from '../Common/EmptyState.jsx';
 import EstateReadinessCard from './EstateReadinessCard.jsx';
 import { startSpotlightTour } from '../Common/SpotlightTour.jsx';
+import { atVaultLimit, canUpgrade, openPlanLimit, usePlanUsage } from '../Common/usePlanUsage.js';
+import { VipChip } from '../Common/VipLock.jsx';
 
 export default function OwnerVaults() {
+    const usage = usePlanUsage();
+    const vaultLimitReached = atVaultLimit(usage);
+    const upgradable = canUpgrade(usage);
     const { t } = useTranslation('vault');
     const { t: tOnboarding } = useTranslation('onboarding');
     const user = getUser();
@@ -41,9 +46,21 @@ export default function OwnerVaults() {
                         <Icon name="rocket_launch" className="text-[18px] text-amber-500" />
                         <span>{tOnboarding('guideBtn', 'Hướng dẫn')}</span>
                     </button>
-                    <Link to="/owner/vaults/new" data-tour="new-vault-btn" className={btnPrimary}>
-                        <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
-                    </Link>
+                    {/* Hết lượt tạo két của gói: mở hộp nâng cấp ngay, không vào form tạo két */}
+                    {/* Nút đã khoá không mang data-tour để tour tạo két không bám vào */}
+                    {vaultLimitReached && upgradable ? (
+                        <button type="button" onClick={() => openPlanLimit('MULTIPLE_VAULTS')} className={btnPrimary}>
+                            <Icon name="lock" className="text-[18px]" /> {t('list.newVault')} <VipChip />
+                        </button>
+                    ) : vaultLimitReached ? (
+                        <button type="button" disabled title={t('list.vaultMaxReached', { max: usage.maxVaults })} className={btnPrimary}>
+                            <Icon name="lock" className="text-[18px]" /> {t('list.newVault')}
+                        </button>
+                    ) : (
+                        <Link to="/owner/vaults/new" data-tour="new-vault-btn" className={btnPrimary}>
+                            <Icon name="add" className="text-[18px]" /> {t('list.newVault')}
+                        </Link>
+                    )}
                 </div>
             }
         >

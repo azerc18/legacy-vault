@@ -8,6 +8,9 @@ import {OwnerLayout, Card, Icon, Alert, ASSET_TYPES, inputClass, btnPrimary, btn
 import {AssetTypeIcon} from './assetArt.jsx';
 import {AssetFieldsForm, cleanFields, deriveAssetName, fieldProblems, focusFirstInvalid, schemaOf, useAssetSchemas, validateFields} from './AssetFields.jsx';
 import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
+import {atBeneficiaryLimit, atVaultLimit, canUpgrade, openPlanLimit, usePlanUsage} from '../Common/usePlanUsage.js';
+import EmptyState from '../Common/EmptyState.jsx';
+import {VAULT_CREATED_EVENT} from '../Common/featureToursConfig.js';
 
 const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation()});
 // Khi tạo két, người thụ hưởng chưa có id: dùng uid của dòng làm khoá tạm, sau khi két có id sẽ đổi sang id thật (khớp theo email)
@@ -40,6 +43,10 @@ export default function CreateVault() {
     // Két đã tạo nhưng một số tài sản theo schema lưu lỗi: không cho gửi lại (tránh tạo trùng két)
     const [partial, setPartial] = useState(null);
     const schemas = useAssetSchemas();   // null = đang tải, [] = lỗi -> dùng form cũ (1 ô bí mật)
+    const usage = usePlanUsage();
+    const upgradable = canUpgrade(usage);
+    // Đã tạo xong két ở lần bấm này: không chuyển sang màn "hết lượt" dù số két vừa chạm giới hạn
+    const [createdVaultId, setCreatedVaultId] = useState(null);
 
     // Có lỗi mới thì cuộn tới đúng chỗ lỗi để người dùng thấy ngay
     useEffect(() => {
@@ -56,9 +63,9 @@ export default function CreateVault() {
     const changeAssetType = (i, assetType) =>
         setAssets((list) => list.map((a, idx) => {
             if (idx !== i) return a;
-            // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh tuỳ chọn bị khoá mà vẫn đang chọn
+            // Loại mới không phải tài sản pháp lý: chia tỷ lệ phải kèm K-of-N, nên bật sẵn điều kiện
             const keep = canSplitPercent(schemaOf(schemas, assetType));
-            const allocation = a.allocation.mode === 'PROPORTIONAL' && !keep ? emptyAllocation() : a.allocation;
+            const allocation = a.allocation.mode === 'PROPORTIONAL' && !keep ? {...a.allocation, consensus: true} : a.allocation;
             return {...a, assetType, fields: {}, allocation};
         }));
     const setAssetAllocation = (i, allocation) =>
@@ -152,6 +159,8 @@ export default function CreateVault() {
                     notes: a.notes.trim() || null,
                 })),
             });
+            setCreatedVaultId(vault.id);
+            window.dispatchEvent(new CustomEvent(VAULT_CREATED_EVENT));
             // API tạo két chỉ nhận secret thô, nên tài sản theo schema được thêm ngay sau khi két có id
             // Id người thụ hưởng thật chỉ có sau khi tạo két: đổi khoá email sang id để gửi phân bổ
             let idByUid = new Map();
@@ -208,6 +217,20 @@ export default function CreateVault() {
         }
     };
 
+    // Gói đã hết lượt tạo két: chặn ngay từ đầu, không để Owner nhập cả form rồi mới bị từ chối
+    if (atVaultLimit(usage) && !createdVaultId && !loading && !partial) {
+        return (
+            <OwnerLayout title={t('create.title')} subtitle={t('create.subtitle')}>
+                {/* VIP chạm giới hạn: không có gói cao hơn nên không mời nâng cấp */}
+                <EmptyState bordered icon={upgradable ? 'workspace_premium' : 'inventory_2'} title={t('create.limitTitle')}
+                            text={t(upgradable ? 'create.limitText' : 'create.limitTextMax', {used: usage.vaultsUsed, max: usage.maxVaults})}
+                            action={upgradable
+                                ? {to: '/pricing', label: t('create.limitAction'), icon: 'workspace_premium'}
+                                : {to: '/owner/vaults', label: t('create.limitBack'), icon: 'arrow_back'}}/>
+            </OwnerLayout>
+        );
+    }
+
     return (
         <OwnerLayout title={t('create.title')} subtitle={t('create.subtitle')}>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -254,8 +277,15 @@ export default function CreateVault() {
                             </div>
                         ))}
                         {errorBox('beneficiaries')}
-                        <button type="button" disabled={beneficiaries.length >= 10} onClick={() => setBeneficiaries((l) => [...l, emptyBeneficiary()])} className={btnOutline}>
-                            <Icon name="add" className="text-[18px]" /> {t('create.addBeneficiary')}
+                        {/* Đủ số người của gói: bấm Thêm mở hộp nâng cấp, không thêm dòng trống cho nhập */}
+                        <button type="button" disabled={beneficiaries.length >= 10 || (!upgradable && atBeneficiaryLimit(usage, beneficiaries.length))}
+                                title={!upgradable && atBeneficiaryLimit(usage, beneficiaries.length)
+                                    ? t('detail.beneficiaries.limitMax', {max: usage.maxBeneficiariesPerVault}) : undefined}
+                                onClick={() => (atBeneficiaryLimit(usage, beneficiaries.length)
+                                    ? openPlanLimit('BENEFICIARY_LIMIT')
+                                    : setBeneficiaries((l) => [...l, emptyBeneficiary()]))}
+                                className={btnOutline}>
+                            <Icon name={atBeneficiaryLimit(usage, beneficiaries.length) ? 'lock' : 'add'} className="text-[18px]" /> {t('create.addBeneficiary')}
                         </button>
                     </div>
                 </Card>

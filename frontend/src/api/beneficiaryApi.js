@@ -56,7 +56,7 @@ export const beneficiaryApi = {
     downloadAsset: (vaultId, assetId, name) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/download`, `${name || 'asset'}.txt`),
 
-    // X1: đồng thuận K-of-N cho tài sản JOINT_CONSENSUS
+    // X1: đồng thuận K-of-N cho tài sản có điều kiện K-of-N
     getConsensus: (vaultId, assetId) => http.get(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus`).then(unwrap),
     approveConsensus: (vaultId, assetId) => http.post(`/beneficiaries/vaults/${vaultId}/assets/${assetId}/consensus/approve`).then(unwrap),
 

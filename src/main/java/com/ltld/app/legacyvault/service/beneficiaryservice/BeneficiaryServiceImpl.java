@@ -11,6 +11,7 @@ import com.ltld.app.legacyvault.enums.BeneficiaryInviteStatus;
 import com.ltld.app.legacyvault.enums.ClaimStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
+import com.ltld.app.legacyvault.enums.TransferMechanism;
 import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.enums.VerificationStatus;
@@ -25,6 +26,7 @@ import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotService;
 import com.ltld.app.legacyvault.service.handoverservice.HandoverSnapshotView;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldSpec;
+import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetFieldType;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchema;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.AssetSchemaRegistry;
 import com.ltld.app.legacyvault.service.vaultservice.assetschema.FlatJson;
@@ -38,6 +40,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -449,7 +452,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         List<DigitalAsset> visible = digitalAssetRepository.findByVaultIdAndStatus(vault.getId(), AssetStatus.ACTIVE)
                 .stream().filter(asset -> !hidden.contains(asset.getId())).toList();
 
-        // X1: tiến độ đồng thuận của các tài sản JOINT_CONSENSUS (1 query cho cả vault)
+        // X1: tiến độ đồng thuận của các tài sản có điều kiện K-of-N (1 query cho cả vault)
         UUID myId = me.getId();
         Map<UUID, JointConsensusService.Info> consensus = jointConsensusService.infoByAsset(
                 assetAllocationRepository.findByAssetIdIn(visible.stream().map(DigitalAsset::getId).toList()), myId);
@@ -484,6 +487,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .assetName(asset.getAssetName())
                 .secret(decrypted.secret())
                 .notes(decrypted.notes())
+                .fields(publicFieldsOf(asset))
                 .build();
 
         // Chỉ ghi audit khi giải mã thành công, và không đưa dữ liệu rõ vào log
@@ -634,7 +638,6 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 .filter(a -> !hidden.contains(a.getId()))
                 .map(a -> {
                     AssetAllocation al = mine.get(a.getId());
-                    boolean proportional = al != null && al.getMode() == AllocationMode.PROPORTIONAL;
                     boolean viaFallback = al != null && al.getEffectiveBeneficiary() != null
                             && !al.getBeneficiary().getId().equals(me.getId());
                     return ClaimProgressResponse.AssetProgress.builder()
@@ -642,7 +645,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                             .assetType(a.getAssetType())
                             .assetName(a.getAssetName())
                             .allocationMode(al != null ? al.getMode() : null)
-                            .sharePercent(proportional ? al.getSharePercent() : null)
+                            .sharePercent(al != null && al.getMode() == AllocationMode.PROPORTIONAL ? meaningfulShare(al, a) : null)
                             .reassignedToMe(viaFallback)
                             .viewed(!unviewedIds.contains(a.getId()))
                             .build();
@@ -770,7 +773,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                     "This asset is not allocated to you.");
         }
 
-        // X1: tài sản JOINT_CONSENSUS chỉ mở khi đủ K người đồng ý (chặn trước khi giải mã)
+        // X1: tài sản có điều kiện K-of-N chỉ mở khi đủ K người đồng ý (chặn trước khi giải mã)
         jointConsensusService.assertReached(asset.getId());
 
         DecryptedAsset decrypted;
@@ -879,11 +882,41 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 + "========================================\n"
                 + "Asset name: " + asset.getAssetName() + "\n"
                 + "Asset type: " + asset.getAssetType() + "\n"
-                + "Access information: " + decrypted.secret() + "\n"
+                + "Details:" + formatPublicFieldsForDownload(asset) + "\n"
+                + "Access information:" + formatSecretForDownload(asset, decrypted.secret()) + "\n"
                 + "Note: " + notes + "\n"
                 + "Exported at: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
                 + "\n"
                 + "Please keep this information safe and delete the file after saving it.\n";
+    }
+
+    /**
+     * Thông tin bí mật của tài sản có schema được lưu chung thành JSON phẳng ({"pinOrPasswordNote":"..."}).
+     * Tách thành từng dòng "Nhãn: giá trị" để người nhận đọc được; bí mật dạng chữ thường (tài sản cũ) giữ nguyên.
+     */
+    static String formatSecretForDownload(DigitalAsset asset, String secret) {
+        if (secret == null || secret.isBlank()) {
+            return " (none)";
+        }
+        Map<String, String> fields;
+        try {
+            fields = secret.trim().startsWith("{") ? FlatJson.decode(secret) : null;
+        } catch (RuntimeException e) {
+            fields = null;
+        }
+        if (fields == null) {
+            return " " + secret;          // bí mật chữ thường (tài sản cũ) hoặc chuỗi không phải JSON
+        }
+        // JSON nhưng không có trường nào ({} của DOCUMENT, hoặc bỏ trống mọi trường bí mật): vòng for ra rỗng -> (none)
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            if (e.getValue() == null || e.getValue().isBlank()) continue;
+            String label = schema == null ? e.getKey() : schema.fields().stream()
+                    .filter(f -> f.key().equals(e.getKey())).map(AssetFieldSpec::label).findFirst().orElse(e.getKey());
+            sb.append("\n  ").append(label).append(": ").append(e.getValue());
+        }
+        return sb.isEmpty() ? " (none)" : sb.toString();
     }
 
     // Tên tài sản do người dùng nhập nên phải làm sạch trước khi đặt tên tệp (chống header injection, ký tự cấm)
@@ -1005,8 +1038,8 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         Map<UUID, Integer> reassignedCounts = new LinkedHashMap<>();
         List<AssetAllocation> held = assetAllocationRepository.findHeldBy(vaultId, me.getId());
         for (AssetAllocation allocation : held) {
-            if (allocation.getMode() == AllocationMode.JOINT_CONSENSUS) {
-                continue; // joint không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
+            if (JointConsensusService.isConsensusRow(allocation)) {
+                continue; // K-of-N không có người dự phòng; kẹt hay không tính theo K ngay bên dưới
             }
             VaultBeneficiary next = allocation.getContingentBeneficiary();
             if (next != null && !next.getId().equals(me.getId()) && canReceive(vaultId, next)) {
@@ -1027,7 +1060,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
         // X1: tài sản joint chỉ kẹt khi số người còn nhận được ít hơn K (me đã được đánh dấu DECLINED ở trên)
         stalled += (int) held.stream()
-                .filter(a -> a.getMode() == AllocationMode.JOINT_CONSENSUS)
+                .filter(JointConsensusService::isConsensusRow)
                 .map(a -> a.getAsset().getId())
                 .distinct()
                 .filter(id -> jointConsensusService.isStalled(assetAllocationRepository.findByAssetId(id)))
@@ -1246,12 +1279,13 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                             a.getAssetType(),
                             TransferMechanisms.resolve(a.getTransferMechanism(), a.getAssetType()),
                             al != null ? al.getMode() : null,
-                            al != null ? al.getSharePercent() : null,
+                            al != null ? meaningfulShare(al, a) : null,
                             al != null ? al.getNote() : null,
                             al != null && !al.getBeneficiary().getId().equals(me.getId()),
                             dossierFields(a),
                             vs == null ? null : new InheritanceDossierData.Verification(
-                                    vs.status(), vs.method(), vs.provider(), vs.verifiedAt()));
+                                    vs.status(), vs.method(), vs.provider(), vs.verifiedAt()),
+                            consensusCondition(al, a));
                 })
                 .toList();
         // X5: chỉ lấy các bản tài liệu hiện hành (is_current = true)
@@ -1329,6 +1363,51 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         verification.setOtpExpiresAt(null);
     }
 
+    /**
+     * Trường công khai (không phải SECRET) của tài sản cho người thụ hưởng, theo thứ tự schema, bỏ ô trống.
+     * Không che (khác PDF hồ sơ): người nhận đã xác minh danh tính và cần số đầy đủ để làm thủ tục.
+     * Key không có trong schema (dữ liệu cũ) đặt cuối.
+     */
+    static Map<String, String> publicFieldsOf(DigitalAsset asset) {
+        if (asset.getPublicFieldsJson() == null || asset.getPublicFieldsJson().isBlank()) return Map.of();
+        Map<String, String> raw;
+        try {
+            raw = FlatJson.decode(asset.getPublicFieldsJson());
+        } catch (RuntimeException e) {
+            return Map.of();
+        }
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        Map<String, String> out = new LinkedHashMap<>();
+        if (schema != null) {
+            for (AssetFieldSpec f : schema.fields()) {
+                String v = raw.get(f.key());
+                if (f.type() == AssetFieldType.SECRET || v == null || v.isBlank()) continue;
+                out.put(f.key(), v);
+            }
+        }
+        raw.forEach((k, v) -> {
+            if (!out.containsKey(k) && v != null && !v.isBlank()
+                    && (schema == null || schema.fields().stream().noneMatch(f -> f.key().equals(k) && f.type() == AssetFieldType.SECRET))) {
+                out.put(k, v);
+            }
+        });
+        return out;
+    }
+
+    /** Khối "Details:" trong file tải về: từng dòng "Nhãn: giá trị" theo schema; không có thì (none). */
+    static String formatPublicFieldsForDownload(DigitalAsset asset) {
+        Map<String, String> fields = publicFieldsOf(asset);
+        if (fields.isEmpty()) return " (none)";
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        StringBuilder sb = new StringBuilder();
+        fields.forEach((k, v) -> {
+            String label = schema == null ? k : schema.fields().stream()
+                    .filter(f -> f.key().equals(k)).map(AssetFieldSpec::label).findFirst().orElse(k);
+            sb.append("\n  ").append(label).append(": ").append(v);
+        });
+        return sb.toString();
+    }
+
     private static Map<String, String> dossierFields(DigitalAsset asset) {
         if (asset.getPublicFieldsJson() == null) return Map.of();
         Map<String, String> raw = FlatJson.decode(asset.getPublicFieldsJson());
@@ -1346,5 +1425,25 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
 
     private static String mask(String key, String v) {
         return DOSSIER_MASKED_KEYS.contains(key) && v.length() > 4 ? "****" + v.substring(v.length() - 4) : v;
+    }
+
+    /**
+     * Tỷ lệ chỉ có nghĩa với tài sản khai nhận pháp lý. Tài sản khác (ví crypto, email, MXH…) dùng chia tỷ lệ
+     * chỉ để đặt điều kiện K-of-N, % khi đó chỉ để ghi nhận nên không hiện cho người thụ hưởng / trong hồ sơ PDF.
+     */
+    private static BigDecimal meaningfulShare(AssetAllocation al, DigitalAsset asset) {
+        if (al.getMode() == AllocationMode.PROPORTIONAL
+                && TransferMechanisms.resolve(asset.getTransferMechanism(), asset.getAssetType())
+                        != TransferMechanism.LEGAL_CLAIM_DOSSIER) {
+            return null;
+        }
+        return al.getSharePercent();
+    }
+
+    /** Câu mô tả điều kiện K-of-N cho hồ sơ PDF, null nếu tài sản không có điều kiện này. */
+    private String consensusCondition(AssetAllocation al, DigitalAsset asset) {
+        if (al == null || al.getConsensusThreshold() == null) return null;
+        int total = assetAllocationRepository.findByAssetId(asset.getId()).size();
+        return "Cần " + al.getConsensusThreshold() + "/" + total + " người thụ hưởng cùng đồng ý mới mở được tài sản";
     }
 }

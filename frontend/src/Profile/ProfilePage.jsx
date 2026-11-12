@@ -1,13 +1,13 @@
 // Trang hồ sơ cá nhân (/me) — dùng chung cho mọi role
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ReducedMotionConfig } from '@animate-ui/react/utils/motion';
 import { userApi, toStoredUser } from '../api/userApi.js';
 import UserAvatar from '../Common/UserAvatar.jsx';
 import { useVipStatus } from '../Common/useVipStatus.js';
 import { getErrorMessage } from '../api/http.js';
-import { updateStoredUser, logout } from '../auth/auth.js';
+import { updateStoredUser, logout, safeRedirect } from '../auth/auth.js';
 import { useToast } from '../Common/Toast.jsx';
 import { Icon, Card, Alert, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import PasswordStrengthMeter from '../Common/PasswordStrengthMeter.jsx';
@@ -331,6 +331,10 @@ export default function ProfilePage() {
     const { t } = useTranslation('profile');
     const [profile, setProfile] = useState(null);
     const [error, setError] = useState('');
+    // Lần đăng nhập đầu (Login.jsx): chào và mời hoàn thiện hồ sơ, nút Tiếp tục về trang định tới
+    const [searchParams] = useSearchParams();
+    const welcome = searchParams.get('welcome') === '1';
+    const next = safeRedirect(searchParams.get('next')) || '/home';
 
     useEffect(() => {
         userApi.getMe()
@@ -351,7 +355,20 @@ export default function ProfilePage() {
             <AppHeader />
 
             <main className={`${PAGE_WIDTH} py-10`}>
-                <PageTitle back={{ to: '/home', label: t('back') }} title={t('title')} />
+                <PageTitle back={{ to: welcome ? next : '/home', label: t('back') }} title={t('title')} />
+
+                {welcome && (
+                    <div role="status" className="mb-6 p-4 rounded-2xl border border-primary/30 bg-primary/5 flex flex-wrap items-center gap-4">
+                        <Icon name="waving_hand" className="text-[28px] text-primary" />
+                        <div className="flex-1 min-w-[220px]">
+                            <p className="font-bold">{t('welcome.title')}</p>
+                            <p className="text-sm text-on-surface-variant">{t('welcome.text')}</p>
+                        </div>
+                        <Link to={next} replace className={btnOutline}>
+                            {t('welcome.continue')} <Icon name="arrow_forward" className="text-[18px]" />
+                        </Link>
+                    </div>
+                )}
 
                 <Alert>{error}</Alert>
                 {!profile && !error && <LoadingSkeleton label={t('loading')} />}

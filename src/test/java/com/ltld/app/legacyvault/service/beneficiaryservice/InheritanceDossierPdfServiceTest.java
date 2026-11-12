@@ -83,4 +83,18 @@ class InheritanceDossierPdfServiceTest {
 
         assertThat(text).contains("Tài khoản Gmail", "Chung cho mọi người thụ hưởng");
     }
+
+    @Test
+    void render_consensusAsset_showsKofNCondition() throws Exception {
+        var d = sample(false);
+        var crypto = new InheritanceDossierData.AssetLine("Ví Ledger", AssetType.CRYPTO_WALLET,
+                TransferMechanism.CRYPTOGRAPHIC_SPLIT_KEY, AllocationMode.PROPORTIONAL, null, null, false, Map.of(),
+                null, "Cần 2/3 người thụ hưởng cùng đồng ý mới mở được tài sản");
+        var data = new InheritanceDossierData(d.vaultId(), d.vaultName(), d.unlockedAt(), d.claimDeadlineAt(),
+                d.owner(), d.beneficiary(), d.executor(), null, List.of(crypto), List.of(), d.generatedAt());
+
+        String text = text(service.render(data)).replaceAll("\\s+", " ");
+
+        assertThat(text).contains("Theo tỷ lệ", "Cần 2/3 người thụ hưởng cùng đồng ý");
+    }
 }

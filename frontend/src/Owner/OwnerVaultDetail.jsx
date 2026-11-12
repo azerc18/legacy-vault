@@ -5,6 +5,8 @@ import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-route
 import { getUser } from '../auth/auth.js';
 import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { atBeneficiaryLimit, canUpgrade, openPlanLimit, usePlanUsage } from '../Common/usePlanUsage.js';
+import { VipLocked } from '../Common/VipLock.jsx';
 import {
     OwnerLayout, Card, Icon, Alert, ConfirmDialog, formatDate, humanize,
     ASSET_ICON, ASSET_TYPES, DOCUMENT_TYPES, inputClass, btnPrimary, btnOutline, btnDanger, LoadingSkeleton } from './ownerUi.jsx';
@@ -33,6 +35,8 @@ function groupAssetsByType(assets) {
 }
 
 export default function OwnerVaultDetail() {
+    // Gọi một lần cho cả trang rồi truyền xuống, tránh hai request /me/usage giống nhau
+    const usage = usePlanUsage();
     const { t } = useTranslation(['vault', 'enums', 'common', 'verification']);
     const { vaultId } = useParams();
     const location = useLocation();
@@ -83,9 +87,9 @@ export default function OwnerVaultDetail() {
                         <AssetSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onChanged={reload} />
                     </div>
                     <div data-tour="vault-detail-beneficiaries">
-                        <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} />
+                        <BeneficiarySection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} onSaved={reload} usage={usage} />
                     </div>
-                    <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} />
+                    <DocumentSection vaultId={vaultId} editable={editable} onChanged={reload} usage={usage} />
                     <LegacyMessageSection vaultId={vaultId} beneficiaries={vault.beneficiaries || []} editable={editable} />
                     <ActivitySection vaultId={vaultId} />
                     {editable && <DeleteSection vaultId={vaultId} />}
@@ -412,8 +416,8 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
     const changeType = (e) => setF((x) => {
         const type = e.target.value;
         const keepProportional = schemaOf(schemas, type)?.mechanism === 'LEGAL_CLAIM_DOSSIER';
-        // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh option bị disable mà vẫn đang chọn
-        const allocation = x.allocation.mode === 'PROPORTIONAL' && !keepProportional ? emptyAllocation() : x.allocation;
+        // Loại không phải tài sản pháp lý: chia tỷ lệ phải kèm K-of-N, nên bật sẵn điều kiện thay vì xoá phân bổ
+        const allocation = x.allocation.mode === 'PROPORTIONAL' && !keepProportional ? { ...x.allocation, consensus: true } : x.allocation;
         return { ...x, assetType: type, fields: {}, allocation };
     });
     const setField = (k, v) => setF((x) => ({ ...x, fields: { ...x.fields, [k]: v } }));
@@ -544,7 +548,7 @@ function AssetFormModal({ vaultId, beneficiaries, initial, schemas, onClose, onS
 /* ---------- FR-02 / N2-owner: danh sách người thụ hưởng ---------- */
 const emptyBeneficiaryForm = { email: '', fullName: '', relationship: '' };
 
-function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
+function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved, usage }) {
     const { t } = useTranslation('vault');
     const [form, setForm] = useState(emptyBeneficiaryForm);
     const [error, setError] = useState('');
@@ -552,6 +556,9 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
     const [editing, setEditing] = useState(null);     // { id, fullName, relationship } đang sửa
     const [loading, setLoading] = useState(false);
     const onlyOne = beneficiaries.length <= 1;          // BE chặn xoá người cuối cùng (LAST_BENEFICIARY)
+    // Đủ số người của gói: khoá form thêm (bấm vào mở hộp nâng cấp), không cho nhập rồi mới bị từ chối
+    const beneficiaryLimitReached = atBeneficiaryLimit(usage, beneficiaries.length);
+    const upgradable = canUpgrade(usage);
 
     const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -684,6 +691,10 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                 </ul>
             )}
             {editable && (
+                <>
+                {/* FREE: khoá form, bấm vào mời nâng cấp. VIP đủ người: không có gói cao hơn, chỉ khoá nút Thêm */}
+                <VipLocked locked={beneficiaryLimitReached && upgradable} feature="BENEFICIARY_LIMIT"
+                           label={t('detail.beneficiaries.limitLocked', { max: usage?.maxBeneficiariesPerVault })}>
                 <form onSubmit={handleAdd} className="space-y-3">
                     <input type="email" required value={form.email} maxLength={255} onChange={(e) => setField('email', e.target.value)}
                            placeholder={t('detail.beneficiaries.emailPlaceholder')} className={inputClass} />
@@ -693,10 +704,15 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
                         <input value={form.relationship} maxLength={50} onChange={(e) => setField('relationship', e.target.value)}
                                placeholder={t('detail.beneficiaries.relationshipPlaceholder')} className={inputClass} />
                     </div>
-                    <button type="submit" disabled={loading || beneficiaries.length >= 10} className={btnPrimary}>
+                    <button type="submit" disabled={loading || beneficiaries.length >= 10 || beneficiaryLimitReached} className={btnPrimary}>
                         {loading ? t('ui.saving') : t('detail.beneficiaries.addButton')}
                     </button>
                 </form>
+                </VipLocked>
+                {beneficiaryLimitReached && !upgradable && (
+                    <p className="mt-2 text-xs text-on-surface-variant">{t('detail.beneficiaries.limitMax', { max: usage.maxBeneficiariesPerVault })}</p>
+                )}
+                </>
             )}
             <ConfirmDialog
                 open={!!removing}
@@ -717,7 +733,7 @@ function BeneficiarySection({ vaultId, beneficiaries, editable, onSaved }) {
 const ALLOWED = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
 const MAX_SIZE = 10 * 1024 * 1024;
 
-function DocumentSection({ vaultId, editable, onChanged }) {
+function DocumentSection({ vaultId, editable, onChanged, usage }) {
     const { t } = useTranslation(['vault', 'enums', 'common']);
     const [docs, setDocs] = useState([]);
     const [type, setType] = useState('WILL');
@@ -738,6 +754,21 @@ function DocumentSection({ vaultId, editable, onChanged }) {
     }, [vaultId, t]);
 
     useEffect(() => { load(); }, [load]);
+
+    // Báo sớm khi file làm vượt dung lượng của gói (BE vẫn kiểm cuối cùng; file mã hoá lớn hơn bản gốc một chút)
+    const overStorage = (f) => !!f && !!usage && usage.maxStorageBytes > 0
+        && usage.storageUsedBytes + f.size > usage.maxStorageBytes;
+    const pickFile = (setter) => (f) => {
+        // Chỉ chặn khi file tự nó hợp lệ; file sai loại / quá 10MB để validateFile báo đúng lỗi lúc tải lên
+        if (f && !validateFile(f) && overStorage(f)) {
+            if (canUpgrade(usage)) { openPlanLimit('STORAGE'); return; }
+            // VIP: không có gói cao hơn, báo ngay tại form thay vì để BE trả lỗi rồi hiện hộp nâng cấp "gói Miễn phí"
+            setError(t('detail.documents.errors.storageFull'));
+            return;
+        }
+        setter(f);
+        setError('');
+    };
 
     const validateFile = (f) => {
         if (!f) return t('detail.documents.errors.chooseFile');
@@ -868,7 +899,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                                 </option>
                             ))}
                         </select>
-                        <FilePicker file={file} onChange={(f) => { setFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={file} onChange={pickFile(setFile)} accept={ALLOWED.join(',')} disabled={loading} />
                         <button type="submit" disabled={loading} className={btnPrimary}>{loading ? t('ui.uploading') : t('ui.upload')}</button>
                     </form>
                 </>
@@ -893,7 +924,7 @@ function DocumentSection({ vaultId, editable, onChanged }) {
                         })}
                     </p>
                     <form onSubmit={uploadNewVersion} className="space-y-4">
-                        <FilePicker file={newVersionFile} onChange={(f) => { setNewVersionFile(f); setError(''); }} accept={ALLOWED.join(',')} disabled={loading} />
+                        <FilePicker file={newVersionFile} onChange={pickFile(setNewVersionFile)} accept={ALLOWED.join(',')} disabled={loading} />
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => { setUpdatingDoc(null); setNewVersionFile(null); }} className={btnOutline}>{t('common:actions.cancel')}</button>
                             <button type="submit" disabled={loading || !newVersionFile} className={btnPrimary}>
