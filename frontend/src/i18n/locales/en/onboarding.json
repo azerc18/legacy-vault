@@ -77,6 +77,11 @@
         "instruction": "Review your entered details and click 'Create Vault' to securely seal your digital estate!",
         "tip": "After creation, you can configure your Dead Man's Switch (DMS) check-in intervals or invite legal executors."
       }
+    },
+    "blocked": {
+      "title": "The vault creation guide can't start",
+      "text": "You have used all the vaults in your plan, so there is no new vault to walk you through. Other pages still show their own guide the first time you open them.",
+      "action": "Got it"
     }
   },
   "featureTours": {

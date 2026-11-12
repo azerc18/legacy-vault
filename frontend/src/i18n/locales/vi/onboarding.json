@@ -77,6 +77,11 @@
         "instruction": "Kiểm tra lại toàn bộ thông tin và nhấn 'Tạo két sắt' để niêm phong an toàn khối tài sản di sản của bạn!",
         "tip": "Sau khi tạo két thành công, bạn có thể thiết lập thêm Công tắc tử thần (DMS) hoặc mời thêm Người thi hành di chúc (Executor)."
       }
+    },
+    "blocked": {
+      "title": "Hướng dẫn tạo két chưa chạy được",
+      "text": "Bạn đã dùng hết số két của gói nên không còn két mới để hướng dẫn tạo. Các trang khác vẫn có hướng dẫn riêng khi bạn mở lần đầu.",
+      "action": "Đã hiểu"
     }
   },
   "featureTours": {

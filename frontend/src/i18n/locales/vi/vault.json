@@ -243,7 +243,8 @@
         "uploadVersion": "Không thể tải lên phiên bản mới.",
         "history": "Không thể tải lịch sử phiên bản.",
         "download": "Tải xuống thất bại.",
-        "delete": "Không thể xoá tài liệu."
+        "delete": "Không thể xoá tài liệu.",
+        "storageFull": "Đã dùng hết dung lượng tối đa của gói. Xoá bớt tài liệu cũ để tải lên tài liệu mới."
       }
     },
     "messages": {

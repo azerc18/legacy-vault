@@ -15,8 +15,6 @@ export default function OwnerVaults() {
     const usage = usePlanUsage();
     const vaultLimitReached = atVaultLimit(usage);
     const upgradable = canUpgrade(usage);
-    // Hết lượt tạo két thì tour tạo két không chạy được (trang tạo két là màn "hết lượt"): FREE mời nâng cấp, VIP thì khoá nút
-    const startGuide = () => (vaultLimitReached ? openPlanLimit('MULTIPLE_VAULTS') : startSpotlightTour());
     const { t } = useTranslation('vault');
     const { t: tOnboarding } = useTranslation('onboarding');
     const user = getUser();
@@ -41,8 +39,7 @@ export default function OwnerVaults() {
                 <div className="flex items-center gap-2.5">
                     <button
                         type="button"
-                        onClick={startGuide}
-                        disabled={vaultLimitReached && !upgradable}
+                        onClick={startSpotlightTour}
                         className="h-10 px-3.5 rounded-full border border-outline-variant/40 hover:border-primary text-xs font-bold inline-flex items-center gap-1.5 bg-surface-container-lowest text-on-surface hover:text-primary transition-colors shadow-sm"
                         title={tOnboarding('startInteractiveTour', 'Bắt đầu hướng dẫn từng bước (Interactive Tour)')}
                     >

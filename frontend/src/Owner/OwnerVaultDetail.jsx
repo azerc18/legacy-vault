@@ -759,9 +759,11 @@ function DocumentSection({ vaultId, editable, onChanged, usage }) {
     const overStorage = (f) => !!f && !!usage && usage.maxStorageBytes > 0
         && usage.storageUsedBytes + f.size > usage.maxStorageBytes;
     const pickFile = (setter) => (f) => {
-        // Chỉ mời nâng cấp khi file tự nó hợp lệ; file sai loại / quá 10MB để validateFile báo đúng lỗi lúc tải lên
-        if (f && !validateFile(f) && overStorage(f) && canUpgrade(usage)) {
-            openPlanLimit('STORAGE');
+        // Chỉ chặn khi file tự nó hợp lệ; file sai loại / quá 10MB để validateFile báo đúng lỗi lúc tải lên
+        if (f && !validateFile(f) && overStorage(f)) {
+            if (canUpgrade(usage)) { openPlanLimit('STORAGE'); return; }
+            // VIP: không có gói cao hơn, báo ngay tại form thay vì để BE trả lỗi rồi hiện hộp nâng cấp "gói Miễn phí"
+            setError(t('detail.documents.errors.storageFull'));
             return;
         }
         setter(f);

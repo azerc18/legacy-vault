@@ -243,7 +243,8 @@
         "uploadVersion": "Could not upload new version.",
         "history": "Could not load version history.",
         "download": "Download failed.",
-        "delete": "Could not delete."
+        "delete": "Could not delete.",
+        "storageFull": "You have used all the storage in your plan. Delete older documents to upload new ones."
       }
     },
     "messages": {

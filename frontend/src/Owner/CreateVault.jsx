@@ -10,6 +10,7 @@ import {AssetFieldsForm, cleanFields, deriveAssetName, fieldProblems, focusFirst
 import {AllocationFields, allocationBody, emptyAllocation, validateAllocation} from './AllocationFields.jsx';
 import {atBeneficiaryLimit, atVaultLimit, canUpgrade, openPlanLimit, usePlanUsage} from '../Common/usePlanUsage.js';
 import EmptyState from '../Common/EmptyState.jsx';
+import {VAULT_CREATED_EVENT} from '../Common/featureToursConfig.js';
 
 const emptyAsset = () => ({assetType: 'BANK_ACCOUNT', assetName: '', secret: '', notes: '', fields: {}, allocation: emptyAllocation()});
 // Khi tạo két, người thụ hưởng chưa có id: dùng uid của dòng làm khoá tạm, sau khi két có id sẽ đổi sang id thật (khớp theo email)
@@ -159,6 +160,7 @@ export default function CreateVault() {
                 })),
             });
             setCreatedVaultId(vault.id);
+            window.dispatchEvent(new CustomEvent(VAULT_CREATED_EVENT));
             // API tạo két chỉ nhận secret thô, nên tài sản theo schema được thêm ngay sau khi két có id
             // Id người thụ hưởng thật chỉ có sau khi tạo két: đổi khoá email sang id để gửi phân bổ
             let idByUid = new Map();
@@ -220,7 +222,7 @@ export default function CreateVault() {
         return (
             <OwnerLayout title={t('create.title')} subtitle={t('create.subtitle')}>
                 {/* VIP chạm giới hạn: không có gói cao hơn nên không mời nâng cấp */}
-                <EmptyState bordered icon="workspace_premium" title={t('create.limitTitle')}
+                <EmptyState bordered icon={upgradable ? 'workspace_premium' : 'inventory_2'} title={t('create.limitTitle')}
                             text={t(upgradable ? 'create.limitText' : 'create.limitTextMax', {used: usage.vaultsUsed, max: usage.maxVaults})}
                             action={upgradable
                                 ? {to: '/pricing', label: t('create.limitAction'), icon: 'workspace_premium'}
@@ -277,6 +279,8 @@ export default function CreateVault() {
                         {errorBox('beneficiaries')}
                         {/* Đủ số người của gói: bấm Thêm mở hộp nâng cấp, không thêm dòng trống cho nhập */}
                         <button type="button" disabled={beneficiaries.length >= 10 || (!upgradable && atBeneficiaryLimit(usage, beneficiaries.length))}
+                                title={!upgradable && atBeneficiaryLimit(usage, beneficiaries.length)
+                                    ? t('detail.beneficiaries.limitMax', {max: usage.maxBeneficiariesPerVault}) : undefined}
                                 onClick={() => (atBeneficiaryLimit(usage, beneficiaries.length)
                                     ? openPlanLimit('BENEFICIARY_LIMIT')
                                     : setBeneficiaries((l) => [...l, emptyBeneficiary()]))}
