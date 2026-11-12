@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.authservice.AuthService;
+import com.ltld.app.legacyvault.service.captchaservice.CaptchaService;
 import com.ltld.app.legacyvault.service.verificationservice.VerificationTokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +66,7 @@ class AuthRateLimitFilterTest {
     @MockitoBean private VerificationTokenService tokenService;
     @MockitoBean private AuditLogService auditLogService;
     @MockitoBean private JwtDecoder jwtDecoder;
+    @MockitoBean private CaptchaService captchaService;   // AuthController cần (#275); mặc định không chặn gì
 
     private ResultActions postFrom(String ip, String url, String body) throws Exception {
         return mockMvc.perform(post(url).header("X-Forwarded-For", "6.6.6.6, " + ip + ":5000")
