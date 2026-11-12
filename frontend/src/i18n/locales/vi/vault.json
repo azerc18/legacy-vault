@@ -142,7 +142,7 @@
         "modeHint": {
           "ALL": "Mọi người thụ hưởng trong két sắt đều thấy tài sản này (mặc định).",
           "EXCLUSIVE": "Chỉ một người nhận tài sản này. Có thể chọn người dự phòng nhận thay nếu người đó từ chối.",
-          "PROPORTIONAL": "Chia cho nhiều người theo tỷ lệ %, tổng phải bằng 100%. Chỉ dùng cho tài sản cần hồ sơ pháp lý.",
+          "PROPORTIONAL": "Chia cho nhiều người theo tỷ lệ %, tổng phải bằng 100%. Tài sản không làm hồ sơ pháp lý (ví crypto, ví điện tử…) phải kèm điều kiện K-of-N.",
           "JOINT_CONSENSUS": "Tài sản chỉ mở khi đủ số người trong nhóm được chọn cùng đồng ý. Sửa phân bổ (kể cả ghi chú) sẽ chia lại khoá và xoá các lượt đồng ý trước đó."
         },
         "recipientPlaceholder": "Chọn người nhận",
@@ -165,7 +165,7 @@
         "notePlaceholder": "Ghi chú về cách phân bổ (không bắt buộc)",
         "vipNote": "Các lựa chọn có nhãn VIP (chia theo tỷ lệ %, đồng thuận K trên N người, người dự phòng) chỉ dùng được với gói VIP. Gói miễn phí vẫn chia cho tất cả hoặc chọn một người nhận.",
         "subtitle": "Chọn ai được nhận tài sản này và nhận theo cách nào.",
-        "proportionalUnavailable": "Chia theo tỷ lệ % chỉ dùng cho tài sản cần làm thủ tục pháp lý (tài khoản ngân hàng, tài khoản sàn, tài liệu), nên loại tài sản này không có lựa chọn đó.",
+        "proportionalNeedsConsensus": "Loại tài sản này không làm hồ sơ pháp lý nên chia theo tỷ lệ phải kèm điều kiện K-of-N; tỷ lệ chỉ để ghi nhận.",
         "summary": {
           "ALL": "Tất cả người thụ hưởng",
           "EXCLUSIVE": "Chỉ {{name}}",

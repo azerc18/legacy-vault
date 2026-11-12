@@ -221,7 +221,8 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
         if (request.getAllocation() != null) {
             applyAllocation(vault, asset, ownerId, request.getAllocation());   // đã kiểm theo loại mới
         } else if (!allowsProportional(asset) && assetAllocationRepository.findByAssetId(assetId).stream()
-                .anyMatch(al -> al.getMode() == AllocationMode.PROPORTIONAL)) {
+                // Chia tỷ lệ có K-of-N dùng được với mọi loại tài sản; chỉ chia tỷ lệ thường mới cần tài sản pháp lý
+                .anyMatch(al -> al.getMode() == AllocationMode.PROPORTIONAL && al.getConsensusThreshold() == null)) {
             // N2-owner (Sửa #1): đổi sang loại không cho chia % mà vẫn giữ phân bổ % cũ
             throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
                     "This asset type no longer allows PROPORTIONAL. Send a new allocation in the same request.");
@@ -311,9 +312,11 @@ public class DigitalAssetServiceImpl implements DigitalAssetService {
             }
             case PROPORTIONAL -> {
                 entitlementService.assertCanUseAdvancedAllocation(ownerId);
-                if (!allowsProportional(asset)) {
+                // Chia tỷ lệ thường chỉ cho tài sản pháp lý. Có điều kiện K-of-N thì dùng được với mọi loại tài sản
+                // (ví crypto, ví điện tử...): tỷ lệ khi đó chỉ để ghi nhận, việc mở tài sản do K-of-N quyết định.
+                if (!allowsProportional(asset) && req.getThreshold() == null) {
                     throw new VaultException(ErrorCode.ALLOCATION_MODE_NOT_ALLOWED,
-                            "PROPORTIONAL is only allowed for legal-claim assets");
+                            "PROPORTIONAL is only allowed for legal-claim assets unless a K-of-N threshold is set");
                 }
                 BigDecimal total = BigDecimal.ZERO;
                 for (DigitalAssetRequest.Recipient r : recipients) {

@@ -56,9 +56,9 @@ export default function CreateVault() {
     const changeAssetType = (i, assetType) =>
         setAssets((list) => list.map((a, idx) => {
             if (idx !== i) return a;
-            // Loại mới không chia % được thì bỏ PROPORTIONAL, tránh tuỳ chọn bị khoá mà vẫn đang chọn
+            // Loại mới không phải tài sản pháp lý: chia tỷ lệ phải kèm K-of-N, nên bật sẵn điều kiện
             const keep = canSplitPercent(schemaOf(schemas, assetType));
-            const allocation = a.allocation.mode === 'PROPORTIONAL' && !keep ? emptyAllocation() : a.allocation;
+            const allocation = a.allocation.mode === 'PROPORTIONAL' && !keep ? {...a.allocation, consensus: true} : a.allocation;
             return {...a, assetType, fields: {}, allocation};
         }));
     const setAssetAllocation = (i, allocation) =>

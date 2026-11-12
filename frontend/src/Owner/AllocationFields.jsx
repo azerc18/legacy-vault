@@ -15,8 +15,8 @@ const VIP_MODES = ['PROPORTIONAL'];
 // Chế độ hợp lệ cho loại tài sản đang chọn. BE chỉ cho chia % (PROPORTIONAL) với tài sản cần hồ sơ pháp lý
 // (transfer mechanism LEGAL_CLAIM_DOSSIER); các chế độ còn lại dùng được cho mọi loại. Loại không hợp lệ thì ẩn
 // hẳn khỏi danh sách; chỉ giữ lại khi chính nó đang được chọn (để select không trống, nút lưu sẽ báo lỗi).
-export const availableModes = (allowProportional, currentMode) =>
-    MODES.filter((m) => m !== 'PROPORTIONAL' || allowProportional || currentMode === 'PROPORTIONAL');
+// "Chia theo tỷ lệ" giờ có ở mọi loại tài sản: tài sản không pháp lý thì BẮT BUỘC kèm K-of-N (tỷ lệ chỉ để ghi nhận).
+export const availableModes = () => MODES;
 
 const textareaCls = 'w-full px-4 py-2 rounded-xl border border-outline-variant bg-background focus:outline-none focus:border-primary';
 const SHARE_RE = /^\d{1,3}(\.\d{1,2})?$/;                    // tối đa 2 chữ số thập phân (cột decimal(5,2))
@@ -66,7 +66,8 @@ export function validateAllocation(a, allowProportional, t) {
             if (a.contingentId && a.contingentId === a.selected[0]) return err('backupSame');
             return '';
         case 'PROPORTIONAL': {
-            if (!allowProportional) return err('proportionalNotAllowed');
+            // Tài sản không pháp lý: chỉ chia tỷ lệ khi có điều kiện K-of-N
+            if (!allowProportional && !a.consensus) return err('proportionalNotAllowed');
             if (n < 2) return err('pickTwo');
             let total = 0;
             for (const id of a.selected) {
@@ -144,7 +145,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
         mode,
         selected: mode === 'ALL' ? [] : mode === 'EXCLUSIVE' ? value.selected.slice(0, 1) : value.selected,
         contingentId: '',
-        consensus: false,
+        consensus: mode === 'PROPORTIONAL' && !allowProportional,
         threshold: '',
     });
     const toggle = (id) => {
@@ -179,7 +180,6 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                     const wide = modes.length % 2 === 1 && i === modes.length - 1;   // số ô lẻ: ô cuối chiếm cả hàng, không lệch, không xuống dòng
                     return (
                         <button key={m} type="button" role="radio" aria-checked={active}
-                                disabled={m === 'PROPORTIONAL' && !allowProportional}
                                 onClick={() => (locked ? setUpgradeOpen(true) : setMode(m))}
                                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition-colors ${wide ? 'sm:col-span-2 ' : ''}${
                                     active ? 'border-primary bg-primary/10 text-on-surface' : 'border-outline-variant/50 text-on-surface hover:bg-surface-container'
@@ -193,7 +193,7 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
             </div>
             <UpgradeDialog open={upgradeOpen} onClose={() => setUpgradeOpen(false)} message={t('vip.upgradeMessage', { ns: 'common' })} />
             <p className="text-xs text-on-surface-variant">{tt(`modeHint.${value.mode}`)}</p>
-            {!allowProportional && <p className="text-xs text-outline">{tt('proportionalUnavailable')}</p>}
+            {!allowProportional && value.mode === 'PROPORTIONAL' && <p className="text-xs text-outline">{tt('proportionalNeedsConsensus')}</p>}
 
             {value.mode === 'EXCLUSIVE' && (
                 <>
@@ -264,7 +264,8 @@ export function AllocationFields({ beneficiaries, value, onChange, allowProporti
                 <fieldset className="space-y-2 rounded-xl border border-outline-variant/40 p-3">
                     <legend className="px-1 text-xs font-semibold flex items-center gap-1">{tt('condition.title')} <InfoTip term="kOfN" /></legend>
                     <label className="flex items-center gap-2 text-sm">
-                        <input type="radio" name="consensus" checked={!value.consensus} onChange={() => set({ consensus: false, threshold: '' })} />
+                        <input type="radio" name="consensus" checked={!value.consensus} disabled={!allowProportional}
+                               onChange={() => set({ consensus: false, threshold: '' })} />
                         {tt('condition.none')}
                     </label>
                     <label className="flex items-center gap-2 text-sm">

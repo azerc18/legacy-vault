@@ -458,6 +458,29 @@ class AssetAllocationServiceTest {
     // ===== đổi assetType khi còn PROPORTIONAL =====
 
     @Test
+    @DisplayName("Chia tỷ lệ + K-of-N dùng được cho tài sản không pháp lý (ví crypto)")
+    void proportionalConsensus_cryptoWallet_allowed() throws Exception {
+        when(cryptoService.encrypt(any())).thenAnswer(inv -> "ENC:" + inv.getArgument(0));
+        var a = alloc(AllocationMode.PROPORTIONAL, recipient(bA, "50", null), recipient(bB, "50", null));
+        a.setThreshold(2);
+
+        update(AssetType.CRYPTO_WALLET, a);
+
+        verify(assetAllocationRepository, times(2)).save(any(AssetAllocation.class));
+    }
+
+    @Test
+    @DisplayName("Dữ liệu K-of-N cũ (đã migration sang PROPORTIONAL) trên ví crypto: sửa tài sản không gửi allocation vẫn được")
+    void update_cryptoWithLegacyConsensus_withoutAllocation_ok() throws Exception {
+        AssetAllocation old = AssetAllocation.builder()
+                .asset(asset).beneficiary(bA)
+                .mode(AllocationMode.PROPORTIONAL).sharePercent(new BigDecimal("50")).consensusThreshold(2).build();
+        when(assetAllocationRepository.findByAssetId(assetId)).thenReturn(List.of(old));
+
+        update(AssetType.CRYPTO_WALLET, null);
+    }
+
+    @Test
     @DisplayName("updateAsset: đổi sang CRYPTO_WALLET khi còn dòng PROPORTIONAL → ALLOCATION_MODE_NOT_ALLOWED")
     void update_typeChange_withExistingProportional_throws() {
         AssetAllocation old = AssetAllocation.builder()

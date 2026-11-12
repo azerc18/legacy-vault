@@ -151,8 +151,8 @@ export default function BeneficiaryVaultDetail() {
                         <Alert type="info">{t('detail.verified', { date: formatDate(sessionExpiresAt, true) })}</Alert>
                     )}
                     {message && <Alert>{message}</Alert>}
-                    {/* Khối chấp nhận / từ chối và tiến độ chỉ hiện khi Owner đặt điều kiện K-of-N cho tài sản trong két */}
-                    {hasConsensus && (<>
+                    {/* Nhận / Từ chối là luồng chung của mọi két (từ chối chuyển phần cho người dự phòng; người dự phòng phải
+                        "Nhận" thì mới được chuyển khi quá hạn). Phần đồng thuận K-of-N chỉ hiện ở tài sản có điều kiện đó. */}
                     <RespondClaim
                         vaultId={vaultId}
                         myStatus={progress?.myStatus ?? vault?.myStatus}
@@ -161,7 +161,6 @@ export default function BeneficiaryVaultDetail() {
                         onError={(e) => handleAccessError(e)}
                     />
                     <ProgressPanel progress={progress} />
-                    </>)}
                     <AssetList
                         vaultId={vaultId}
                         assets={assets}
