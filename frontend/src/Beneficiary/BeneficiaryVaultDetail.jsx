@@ -431,14 +431,21 @@ function AssetList({ vaultId, assets, onError, onAccessed = () => {}, readOnly =
 }
 
 // Bí mật của tài sản có schema được lưu chung thành JSON phẳng ({"pinOrPasswordNote":"..."}).
-// Tách thành từng trường để hiện nhãn dễ đọc; bí mật dạng chữ thường (tài sản cũ) giữ là một trường.
+// Tách thành từng trường để hiện nhãn dễ đọc.
+// null = không phải JSON (bí mật chữ thường của tài sản cũ, giữ là một trường);
+// [] = JSON nhưng không có trường nào ({} của DOCUMENT, hoặc Owner bỏ trống mọi trường bí mật).
+// Nhãn dự phòng khi chưa có bản dịch cho key: "legacyPin" -> "Legacy pin"
+const labelFromKey = (key) => {
+    const words = key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 function parseSecretFields(secret) {
     if (typeof secret !== 'string' || !secret.trim().startsWith('{')) return null;
     try {
         const obj = JSON.parse(secret);
         if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
-        const entries = Object.entries(obj).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
-        return entries.length ? entries : null;
+        return Object.entries(obj).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
     } catch {
         return null;
     }
@@ -461,13 +468,15 @@ function AssetDetailModal({ detail, onClose }) {
                 </div>
 
                 {fields ? (
-                    fields.map(([key, value]) => (
+                    fields.length ? fields.map(([key, value]) => (
                         <SecretField
                             key={key}
-                            label={t(`vault:assetFields.labels.${key}`, { defaultValue: key })}
+                            label={t(`vault:assetFields.labels.${key}`, { defaultValue: labelFromKey(key) })}
                             value={value}
                         />
-                    ))
+                    )) : (
+                        <p className="mt-5 text-sm text-on-surface-variant">{t('assets.noSecret')}</p>
+                    )
                 ) : (
                     <SecretField label={t('assets.secret')} value={detail.secret || ''} />
                 )}
@@ -492,9 +501,13 @@ function SecretField({ label, value }) {
     const [copied, setCopied] = useState(false);
 
     const copy = async () => {
-        await navigator.clipboard.writeText(value);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // Trình duyệt chặn clipboard (không HTTPS / bị từ chối quyền): bỏ qua, vẫn bấm hiện để chép tay được
+        }
     };
 
     return (

@@ -900,9 +900,10 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         } catch (RuntimeException e) {
             fields = null;
         }
-        if (fields == null || fields.isEmpty()) {
-            return " " + secret;
+        if (fields == null) {
+            return " " + secret;          // bí mật chữ thường (tài sản cũ) hoặc chuỗi không phải JSON
         }
+        // JSON nhưng không có trường nào ({} của DOCUMENT, hoặc bỏ trống mọi trường bí mật): vòng for ra rỗng -> (none)
         AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, String> e : fields.entrySet()) {

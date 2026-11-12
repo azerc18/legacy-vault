@@ -36,4 +36,17 @@ class SecretDownloadFormatTest {
                 .isEqualTo(" {not json");
         assertThat(BeneficiaryServiceImpl.formatSecretForDownload(asset(AssetType.OTHER), null)).isEqualTo(" (none)");
     }
+
+    @Test
+    void emptyJson_orAllBlank_isNone() {
+        assertThat(BeneficiaryServiceImpl.formatSecretForDownload(asset(AssetType.DOCUMENT), "{}")).isEqualTo(" (none)");
+        assertThat(BeneficiaryServiceImpl.formatSecretForDownload(asset(AssetType.BANK_ACCOUNT), "{\"pinOrPasswordNote\":\"\"}"))
+                .isEqualTo(" (none)");
+    }
+
+    @Test
+    void unknownKey_fallsBackToKeyAsLabel() {
+        assertThat(BeneficiaryServiceImpl.formatSecretForDownload(asset(AssetType.BANK_ACCOUNT), "{\"legacyPin\":\"1\"}"))
+                .isEqualTo("\n  legacyPin: 1");
+    }
 }
