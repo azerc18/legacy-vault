@@ -28,7 +28,10 @@ const CAPTCHA_ERROR_CODES = new Set(['CAPTCHA_REQUIRED', 'CAPTCHA_INVALID', 'CAP
 export function refreshCaptchaConfigOnError(err) {
     const body = err?.response?.data;
     if (!CAPTCHA_ERROR_CODES.has(body?.errorCode) && !body?.data?.captchaRequired) return;
-    if (currentConfig?.enabled && currentConfig.siteKey) return;   // đã có cấu hình bật: widget đang hiện, khỏi hỏi lại
+    // Chỉ đòi CAPTCHA (vd. sai mật khẩu nhiều lần) mà cấu hình đang bật: widget đã hiện, khỏi hỏi lại.
+    // CAPTCHA_INVALID / CAPTCHA_UNAVAILABLE thì vẫn hỏi lại, phòng khi Admin vừa đổi site key.
+    const onlyRequired = body?.errorCode === 'CAPTCHA_REQUIRED' || (!CAPTCHA_ERROR_CODES.has(body?.errorCode) && body?.data?.captchaRequired);
+    if (onlyRequired && currentConfig?.enabled && currentConfig.siteKey) return;
     configPromise = null;
     loadConfig().then((cfg) => listeners.forEach((fn) => fn(cfg)));
 }
