@@ -430,17 +430,24 @@ function AssetList({ vaultId, assets, onError, onAccessed = () => {}, readOnly =
     );
 }
 
-function AssetDetailModal({ detail, onClose }) {
-    const { t } = useTranslation('beneficiary');
-    const label = useEnumLabels();
-    const [reveal, setReveal] = useState(false);
-    const [copied, setCopied] = useState(false);
+// Bí mật của tài sản có schema được lưu chung thành JSON phẳng ({"pinOrPasswordNote":"..."}).
+// Tách thành từng trường để hiện nhãn dễ đọc; bí mật dạng chữ thường (tài sản cũ) giữ là một trường.
+function parseSecretFields(secret) {
+    if (typeof secret !== 'string' || !secret.trim().startsWith('{')) return null;
+    try {
+        const obj = JSON.parse(secret);
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return null;
+        const entries = Object.entries(obj).filter(([, v]) => typeof v === 'string' && v.trim() !== '');
+        return entries.length ? entries : null;
+    } catch {
+        return null;
+    }
+}
 
-    const copy = async () => {
-        await navigator.clipboard.writeText(detail.secret || '');
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-    };
+function AssetDetailModal({ detail, onClose }) {
+    const { t } = useTranslation(['beneficiary', 'vault']);
+    const label = useEnumLabels();
+    const fields = parseSecretFields(detail.secret);
 
     return createPortal(
         <div className="lv-modal-backdrop fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-md flex items-center justify-center px-4" onClick={onClose}>
@@ -453,12 +460,17 @@ function AssetDetailModal({ detail, onClose }) {
                     <button onClick={onClose} aria-label={t('assets.close')}><Icon name="close" className="text-outline" /></button>
                 </div>
 
-                <p className="mt-5 font-label-sm text-on-surface-variant">{t('assets.secret')}</p>
-                <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
-                    <span className="flex-1">{reveal ? detail.secret : '••••••••••••'}</span>
-                    <button onClick={() => setReveal(!reveal)} aria-label={reveal ? t('assets.hide') : t('assets.reveal')}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
-                    <button onClick={copy} aria-label={t('assets.copy')}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
-                </div>
+                {fields ? (
+                    fields.map(([key, value]) => (
+                        <SecretField
+                            key={key}
+                            label={t(`vault:assetFields.labels.${key}`, { defaultValue: key })}
+                            value={value}
+                        />
+                    ))
+                ) : (
+                    <SecretField label={t('assets.secret')} value={detail.secret || ''} />
+                )}
 
                 {detail.notes && (
                     <>
@@ -470,6 +482,30 @@ function AssetDetailModal({ detail, onClose }) {
             </div>
         </div>,
         document.body
+    );
+}
+
+// Một trường bí mật: mặc định che, có nút hiện/ẩn và sao chép riêng
+function SecretField({ label, value }) {
+    const { t } = useTranslation('beneficiary');
+    const [reveal, setReveal] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        await navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
+
+    return (
+        <>
+            <p className="mt-5 font-label-sm text-on-surface-variant">{label}</p>
+            <div className="mt-1 flex items-center gap-2 p-3 rounded-xl bg-surface-container-low font-mono text-sm break-all">
+                <span className="flex-1 whitespace-pre-wrap">{reveal ? value : '••••••••••••'}</span>
+                <button onClick={() => setReveal(!reveal)} aria-label={reveal ? t('assets.hide') : t('assets.reveal')}><Icon name={reveal ? 'visibility_off' : 'visibility'} className="text-[20px] text-outline" /></button>
+                <button onClick={copy} aria-label={t('assets.copy')}><Icon name={copied ? 'check' : 'content_copy'} className="text-[20px] text-outline" /></button>
+            </div>
+        </>
     );
 }
 

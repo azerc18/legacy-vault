@@ -879,11 +879,39 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
                 + "========================================\n"
                 + "Asset name: " + asset.getAssetName() + "\n"
                 + "Asset type: " + asset.getAssetType() + "\n"
-                + "Access information: " + decrypted.secret() + "\n"
+                + "Access information:" + formatSecretForDownload(asset, decrypted.secret()) + "\n"
                 + "Note: " + notes + "\n"
                 + "Exported at: " + ZonedDateTime.now(VN_ZONE).format(EXPORT_TIME_FORMAT) + "\n"
                 + "\n"
                 + "Please keep this information safe and delete the file after saving it.\n";
+    }
+
+    /**
+     * Thông tin bí mật của tài sản có schema được lưu chung thành JSON phẳng ({"pinOrPasswordNote":"..."}).
+     * Tách thành từng dòng "Nhãn: giá trị" để người nhận đọc được; bí mật dạng chữ thường (tài sản cũ) giữ nguyên.
+     */
+    static String formatSecretForDownload(DigitalAsset asset, String secret) {
+        if (secret == null || secret.isBlank()) {
+            return " (none)";
+        }
+        Map<String, String> fields;
+        try {
+            fields = secret.trim().startsWith("{") ? FlatJson.decode(secret) : null;
+        } catch (RuntimeException e) {
+            fields = null;
+        }
+        if (fields == null || fields.isEmpty()) {
+            return " " + secret;
+        }
+        AssetSchema schema = asset.getAssetType() == null ? null : AssetSchemaRegistry.schemaOf(asset.getAssetType());
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            if (e.getValue() == null || e.getValue().isBlank()) continue;
+            String label = schema == null ? e.getKey() : schema.fields().stream()
+                    .filter(f -> f.key().equals(e.getKey())).map(AssetFieldSpec::label).findFirst().orElse(e.getKey());
+            sb.append("\n  ").append(label).append(": ").append(e.getValue());
+        }
+        return sb.isEmpty() ? " (none)" : sb.toString();
     }
 
     // Tên tài sản do người dùng nhập nên phải làm sạch trước khi đặt tên tệp (chống header injection, ký tự cấm)
