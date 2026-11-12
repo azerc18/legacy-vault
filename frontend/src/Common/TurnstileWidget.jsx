@@ -11,8 +11,11 @@ let configPromise = null;   // hỏi BE 1 lần cho cả phiên (hỏi lại khi
 let scriptPromise = null;
 const listeners = new Set();
 
+let currentConfig = null;   // kết quả lần hỏi gần nhất
 const loadConfig = () => {
-    configPromise ??= authApi.captchaConfig().catch(() => ({ enabled: false }));
+    configPromise ??= authApi.captchaConfig()
+        .catch(() => ({ enabled: false }))
+        .then((cfg) => { currentConfig = cfg; return cfg; });
     return configPromise;
 };
 
@@ -25,6 +28,7 @@ const CAPTCHA_ERROR_CODES = new Set(['CAPTCHA_REQUIRED', 'CAPTCHA_INVALID', 'CAP
 export function refreshCaptchaConfigOnError(err) {
     const body = err?.response?.data;
     if (!CAPTCHA_ERROR_CODES.has(body?.errorCode) && !body?.data?.captchaRequired) return;
+    if (currentConfig?.enabled && currentConfig.siteKey) return;   // đã có cấu hình bật: widget đang hiện, khỏi hỏi lại
     configPromise = null;
     loadConfig().then((cfg) => listeners.forEach((fn) => fn(cfg)));
 }
