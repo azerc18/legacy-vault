@@ -358,6 +358,8 @@ public class AuthServiceImpl implements AuthService{
     }
 
     private LoginResult completeLogin(User user, String ipAddress, String userAgent) {
+        // Chưa từng đăng nhập thành công (mật khẩu, 2FA hay Google đều đi qua đây)
+        boolean firstLogin = user.getLastLoginAt() == null;
         user.setLastLoginAt(Instant.now());
         userRepository.save(user);
         auditLogService.success(AuditAction.LOGIN, user.getId(), user.getEmail());
@@ -368,6 +370,7 @@ public class AuthServiceImpl implements AuthService{
                 .accessToken(accessToken)
                 .tokenType("Bearer")
                 .expiresAt(tokenService.getAccessTokenExpiry())
+                .firstLogin(firstLogin)
                 .build();
         return new LoginResult(response, refreshToken);
     }

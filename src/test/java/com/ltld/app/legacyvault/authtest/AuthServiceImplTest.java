@@ -249,6 +249,21 @@ public class AuthServiceImplTest {
     }
 
     @Test
+    void login_firstTime_flagsFirstLogin_thenNotOnNextLogin() {
+        user.setLastLoginAt(null);
+        LoginRequest request = loginRequest("test@example.com", "Password123");
+        when(userRepository.findByEmailForUpdate("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("Password123", "hashed-password")).thenReturn(true);
+        when(tokenService.generateAccessToken(user)).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(user, IP, USER_AGENT)).thenReturn("refresh-token");
+        when(tokenService.getAccessTokenExpiry()).thenReturn(EXPIRES_AT);
+
+        assertThat(authService.login(request, IP, USER_AGENT).response().isFirstLogin()).isTrue();
+        // lastLoginAt đã được ghi ở lần trước
+        assertThat(authService.login(request, IP, USER_AGENT).response().isFirstLogin()).isFalse();
+    }
+
+    @Test
     void login_emailWithSpacesAndUpperCase_isNormalizedBeforeLookup() {
         LoginRequest request = loginRequest("  Test@Example.COM ", "Password123");
 
