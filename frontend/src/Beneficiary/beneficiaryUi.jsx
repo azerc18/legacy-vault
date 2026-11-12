@@ -70,12 +70,15 @@ export const btnOutline =
     'lv-btn-secondary h-11 px-5 rounded-xl border border-outline-variant text-primary font-bold flex items-center justify-center gap-2 hover:bg-surface-container-low disabled:opacity-60 disabled:cursor-not-allowed';
 
 // backLabel bỏ trống thì PageTitle tự dùng common:actions.back
-export function BeneficiaryLayout({ title, subtitle, back, backLabel, children }) {
+// headerTour: giá trị data-tour gắn vào khối tiêu đề trang, để hướng dẫn nhanh chỉ vào đúng tiêu đề
+export function BeneficiaryLayout({ title, subtitle, back, backLabel, headerTour, children }) {
     return (
         <div className="bg-background font-body-md text-on-surface antialiased min-h-screen">
             <AppHeader />
             <main className={`${PAGE_WIDTH} py-10`}>
-                <PageTitle back={{ to: back || '/home', label: backLabel }} title={title} subtitle={subtitle} />
+                <div data-tour={headerTour}>
+                    <PageTitle back={{ to: back || '/home', label: backLabel }} title={title} subtitle={subtitle} />
+                </div>
                 {children}
             </main>
         </div>
