@@ -96,9 +96,7 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
             oldId = null;   // QR một số thẻ ghi lại chính số CCCD ở trường này
         }
         VnProvince province = VnProvince.fromAddress(qr.address()).orElse(null);
-        if (province == null) {
-            warnings.add("PROVINCE_NOT_DETECTED");
-        }
+        VnProvince suggested = suggestProvince(province, qr.citizenId(), warnings);
         return IdentityExtractResponse.builder()
                 .source(KycSource.QR.name())
                 .citizenId(qr.citizenId())
@@ -107,6 +105,7 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
                 .dateOfBirth(qr.dateOfBirth())
                 .gender(qr.gender() == null ? null : qr.gender().name())
                 .residenceProvince(province == null ? null : province.name())
+                .suggestedProvince(suggested == null ? null : suggested.name())
                 .warnings(warnings)
                 .build();
     }
@@ -139,9 +138,7 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
         }
         CitizenId.Gender gender = CitizenQrParser.parseGender(x.gender());
         VnProvince province = VnProvince.fromAddress(x.placeOfResidence()).orElse(null);
-        if (province == null) {
-            warnings.add("PROVINCE_NOT_DETECTED");
-        }
+        VnProvince suggested = suggestProvince(province, digits, warnings);
         warnings.add("REVIEW_AI_RESULT");
         return IdentityExtractResponse.builder()
                 .source(KycSource.OCR.name())
@@ -150,8 +147,22 @@ public class OwnerIdentityServiceImpl implements OwnerIdentityService {
                 .dateOfBirth(dob)
                 .gender(gender == null ? null : gender.name())
                 .residenceProvince(province == null ? null : province.name())
+                .suggestedProvince(suggested == null ? null : suggested.name())
                 .warnings(warnings)
                 .build();
+    }
+
+    /**
+     * Không đọc được tỉnh từ địa chỉ: gợi ý tỉnh mới theo 3 số đầu CCCD (nơi đăng ký khai sinh) và báo
+     * PROVINCE_SUGGESTED_FROM_ID; không suy được thì báo PROVINCE_NOT_DETECTED như cũ. Đọc được địa chỉ thì không gợi ý.
+     */
+    private static VnProvince suggestProvince(VnProvince fromAddress, String citizenId, List<String> warnings) {
+        if (fromAddress != null) {
+            return null;
+        }
+        VnProvince suggested = VnProvince.fromCitizenIdPrefix(citizenId).orElse(null);
+        warnings.add(suggested != null ? "PROVINCE_SUGGESTED_FROM_ID" : "PROVINCE_NOT_DETECTED");
+        return suggested;
     }
 
     // ---------------------------------------------------------------- phone OTP

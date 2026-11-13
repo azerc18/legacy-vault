@@ -18,5 +18,8 @@ public class IdentityExtractResponse {
     private String gender;
     // Tỉnh (34 tỉnh mới) suy ra từ địa chỉ thường trú; null nếu không suy ra được
     private String residenceProvince;
+    // Chỉ có khi KHÔNG đọc được tỉnh từ địa chỉ: tỉnh mới suy từ 3 số đầu CCCD (nơi đăng ký khai sinh).
+    // FE đưa lên đầu danh sách làm gợi ý, không chọn sẵn; người dùng vẫn phải tự chọn nơi đang ở.
+    private String suggestedProvince;
     private List<String> warnings;
 }

@@ -344,7 +344,19 @@ class OwnerIdentityServiceImplTest {
         assertThat(res.getFullName()).isEqualTo("Nguyễn Văn An");
         assertThat(res.getGender()).isEqualTo("MALE");
         assertThat(res.getResidenceProvince()).isEqualTo("HO_CHI_MINH");
+        // Đọc được tỉnh từ địa chỉ thì không gợi ý theo số CCCD
+        assertThat(res.getSuggestedProvince()).isNull();
         assertThat(res.getWarnings()).isEmpty();
+    }
+
+    @Test
+    void extractFromQr_addressWithoutProvince_suggestsFromCitizenIdPrefix() {
+        IdentityExtractResponse res = service.extractFromQr(userId,
+                "079201123456|025123456|NGUYỄN VĂN AN|02052001|Nam|Số 1 Đường ABC|15072021");
+
+        assertThat(res.getResidenceProvince()).isNull();   // không chọn sẵn
+        assertThat(res.getSuggestedProvince()).isEqualTo("HO_CHI_MINH");
+        assertThat(res.getWarnings()).containsExactly("PROVINCE_SUGGESTED_FROM_ID");
     }
 
     @Test
@@ -369,7 +381,33 @@ class OwnerIdentityServiceImplTest {
         assertThat(res.getCitizenId()).isEqualTo(CCCD);
         assertThat(res.getDateOfBirth()).isEqualTo(LocalDate.of(2001, 5, 2));
         assertThat(res.getResidenceProvince()).isEqualTo("HO_CHI_MINH");
+        assertThat(res.getSuggestedProvince()).isNull();
         assertThat(res.getWarnings()).containsExactly("REVIEW_AI_RESULT");
+    }
+
+    @Test
+    void extractFromImage_addressUnreadable_suggestsFromCitizenIdPrefix() {
+        when(uploadedDocumentValidator.readAndValidate(any())).thenReturn(new byte[]{1});
+        when(ocrClient.read(any())).thenReturn(new CitizenIdOcrClient.Extracted(
+                "082 195 654 321", "TRẦN THỊ BÌNH", "10/03/1995", "Nữ", null, "CCCD"));
+
+        IdentityExtractResponse res = service.extractFromImage(userId, null, true);
+
+        assertThat(res.getResidenceProvince()).isNull();
+        assertThat(res.getSuggestedProvince()).isEqualTo("DONG_THAP");   // 082 Tiền Giang -> Đồng Tháp
+        assertThat(res.getWarnings()).containsExactly("PROVINCE_SUGGESTED_FROM_ID", "REVIEW_AI_RESULT");
+    }
+
+    @Test
+    void extractFromImage_noAddressAndNoReadableId_noSuggestion() {
+        when(uploadedDocumentValidator.readAndValidate(any())).thenReturn(new byte[]{1});
+        when(ocrClient.read(any())).thenReturn(new CitizenIdOcrClient.Extracted(
+                "0821956", "TRẦN THỊ BÌNH", "10/03/1995", "Nữ", null, "CCCD"));
+
+        IdentityExtractResponse res = service.extractFromImage(userId, null, true);
+
+        assertThat(res.getSuggestedProvince()).isNull();
+        assertThat(res.getWarnings()).containsExactly("CITIZEN_ID_UNREADABLE", "PROVINCE_NOT_DETECTED", "REVIEW_AI_RESULT");
     }
 
     // ------------------------------------------------------------ death certificate match

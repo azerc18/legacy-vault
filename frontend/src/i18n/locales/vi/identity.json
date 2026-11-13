@@ -62,6 +62,7 @@
     },
     "warnings": {
       "PROVINCE_NOT_DETECTED": "Chưa xác định được tỉnh/thành nơi ở. Hãy chọn trong danh sách.",
+      "PROVINCE_SUGGESTED_FROM_ID": "Chưa đọc được tỉnh/thành từ địa chỉ. Gợi ý theo nơi đăng ký khai sinh trên số CCCD: {{province}}. Hãy chọn đúng nơi bạn đang ở.",
       "NOT_A_CITIZEN_ID_CARD": "Ảnh có vẻ không phải mặt trước CCCD. Hãy kiểm tra lại.",
       "CITIZEN_ID_UNREADABLE": "Không đọc rõ số CCCD. Hãy nhập lại.",
       "DATE_OF_BIRTH_UNREADABLE": "Không đọc rõ ngày sinh. Hãy nhập lại."
@@ -92,7 +93,9 @@
     "province": "Tỉnh/thành nơi ở",
     "provinceHint": "Theo danh sách 34 tỉnh, thành từ 01/07/2025.",
     "phone": "Số điện thoại",
-    "choose": "— Chọn —"
+    "choose": "— Chọn —",
+    "suggested": "Gợi ý",
+    "allProvinces": "Tất cả tỉnh/thành"
   },
   "phone": {
     "title": "Xác minh số điện thoại",
