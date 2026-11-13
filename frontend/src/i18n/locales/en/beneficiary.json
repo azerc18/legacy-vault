@@ -63,7 +63,7 @@
     "otpSent": "A 6-digit code has been sent to your email. It expires in 5 minutes.",
     "otpResent": "A new code has been sent.",
     "otpPlaceholder": "6-digit code",
-    "idPlaceholder": "ID card number",
+    "idPlaceholder": "12-digit citizen ID number",
     "resend": "Resend code",
     "resendIn": "Resend code in {{seconds}}s",
     "changeMethod": "Change method",
