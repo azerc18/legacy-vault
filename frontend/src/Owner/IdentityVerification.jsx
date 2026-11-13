@@ -43,8 +43,9 @@ export default function IdentityVerification() {
     const [aiConsent, setAiConsent] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [warnings, setWarnings] = useState([]);
-    // Tỉnh gợi ý theo 3 số đầu CCCD khi không đọc được tỉnh từ địa chỉ: chỉ đưa lên đầu danh sách, không chọn sẵn
-    const [suggestedProvince, setSuggestedProvince] = useState('');
+    // Tỉnh gợi ý theo 3 số đầu CCCD khi không đọc được tỉnh từ địa chỉ: chỉ đưa lên đầu danh sách, không chọn sẵn.
+    // Giữ kèm 3 số đầu lúc nhận kết quả để bỏ gợi ý khi người dùng sửa số CCCD sang mã tỉnh khác.
+    const [suggestion, setSuggestion] = useState({ province: '', prefix: '' });
     const [reading, setReading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -92,7 +93,9 @@ export default function IdentityVerification() {
             source: data.source || 'MANUAL',
         });
         setWarnings(data.warnings || []);
-        setSuggestedProvince(data.residenceProvince ? '' : (data.suggestedProvince || ''));
+        setSuggestion(data.residenceProvince || !data.suggestedProvince
+            ? { province: '', prefix: '' }
+            : { province: data.suggestedProvince, prefix: (data.citizenId || '').replace(/\D/g, '').slice(0, 3) });
         setStep('review');
     };
 
@@ -234,6 +237,10 @@ export default function IdentityVerification() {
     };
 
     const provinceName = (code) => status?.provinces?.find((p) => p.code === code)?.name || code;
+    // Gợi ý chỉ còn đúng khi số CCCD vẫn bắt đầu bằng 3 số lúc đọc thẻ (OCR có thể đọc sai và người dùng sửa lại)
+    const suggestedProvince = suggestion.province
+        && form.citizenId.replace(/\D/g, '').startsWith(suggestion.prefix) ? suggestion.province : '';
+    const provinceOptions = (status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>);
 
     return (
         <OwnerLayout title={t('title')} subtitle={t('subtitle')} back={returnTo ? { to: returnTo } : undefined}>
@@ -335,7 +342,10 @@ export default function IdentityVerification() {
                                     <p className="text-sm text-on-surface-variant mb-4">{t(`review.hint.${form.source}`)}</p>
                                     {warnings.filter((w) => w !== 'REVIEW_AI_RESULT').map((w) => (
                                         <Alert key={w} type="warning">
-                                            {t(`review.warnings.${w}`, { province: provinceName(suggestedProvince) })}
+                                            {/* Đã sửa số CCCD sang mã tỉnh khác: gợi ý cũ không còn đúng, quay về câu "chưa xác định" */}
+                                            {w === 'PROVINCE_SUGGESTED_FROM_ID' && !suggestedProvince
+                                                ? t('review.warnings.PROVINCE_NOT_DETECTED')
+                                                : t(`review.warnings.${w}`, { province: provinceName(suggestedProvince) })}
                                         </Alert>
                                     ))}
                                     <div className="grid sm:grid-cols-2 gap-4">
@@ -368,11 +378,9 @@ export default function IdentityVerification() {
                                                         <option value={suggestedProvince}>{provinceName(suggestedProvince)}</option>
                                                     </optgroup>
                                                 )}
-                                                {suggestedProvince ? (
-                                                    <optgroup label={t('fields.allProvinces')}>
-                                                        {(status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
-                                                    </optgroup>
-                                                ) : (status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+                                                {suggestedProvince
+                                                    ? <optgroup label={t('fields.allProvinces')}>{provinceOptions}</optgroup>
+                                                    : provinceOptions}
                                             </select>
                                         </Field>
                                     </div>
