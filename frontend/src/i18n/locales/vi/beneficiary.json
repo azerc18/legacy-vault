@@ -63,7 +63,7 @@
     "otpSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
     "otpResent": "Đã gửi mã mới.",
     "otpPlaceholder": "Mã 6 chữ số",
-    "idPlaceholder": "Số căn cước / CMND",
+    "idPlaceholder": "Số CCCD 12 chữ số",
     "resend": "Gửi lại mã",
     "resendIn": "Gửi lại mã sau {{seconds}} giây",
     "changeMethod": "Đổi phương thức",
