@@ -84,6 +84,56 @@ public enum VnProvince {
         return Optional.ofNullable(best);
     }
 
+    /**
+     * 3 số đầu CCCD (nơi đăng ký khai sinh, bộ 63 mã trước sắp xếp) -> tỉnh mới. Chỉ dùng để GỢI Ý khi không đọc được
+     * tỉnh từ địa chỉ: nơi khai sinh có thể khác nơi đang ở, nên không được dùng thay cho địa chỉ.
+     */
+    private static final java.util.Map<String, VnProvince> BY_BIRTH_CODE = java.util.Map.ofEntries(
+            java.util.Map.entry("001", HA_NOI), java.util.Map.entry("002", TUYEN_QUANG),
+            java.util.Map.entry("004", CAO_BANG), java.util.Map.entry("006", THAI_NGUYEN),
+            java.util.Map.entry("008", TUYEN_QUANG), java.util.Map.entry("010", LAO_CAI),
+            java.util.Map.entry("011", DIEN_BIEN), java.util.Map.entry("012", LAI_CHAU),
+            java.util.Map.entry("014", SON_LA), java.util.Map.entry("015", LAO_CAI),
+            java.util.Map.entry("017", PHU_THO), java.util.Map.entry("019", THAI_NGUYEN),
+            java.util.Map.entry("020", LANG_SON), java.util.Map.entry("022", QUANG_NINH),
+            java.util.Map.entry("024", BAC_NINH), java.util.Map.entry("025", PHU_THO),
+            java.util.Map.entry("026", PHU_THO), java.util.Map.entry("027", BAC_NINH),
+            java.util.Map.entry("030", HAI_PHONG), java.util.Map.entry("031", HAI_PHONG),
+            java.util.Map.entry("033", HUNG_YEN), java.util.Map.entry("034", HUNG_YEN),
+            java.util.Map.entry("035", NINH_BINH), java.util.Map.entry("036", NINH_BINH),
+            java.util.Map.entry("037", NINH_BINH), java.util.Map.entry("038", THANH_HOA),
+            java.util.Map.entry("040", NGHE_AN), java.util.Map.entry("042", HA_TINH),
+            java.util.Map.entry("044", QUANG_TRI), java.util.Map.entry("045", QUANG_TRI),
+            java.util.Map.entry("046", HUE), java.util.Map.entry("048", DA_NANG),
+            java.util.Map.entry("049", DA_NANG), java.util.Map.entry("051", QUANG_NGAI),
+            java.util.Map.entry("052", GIA_LAI), java.util.Map.entry("054", DAK_LAK),
+            java.util.Map.entry("056", KHANH_HOA), java.util.Map.entry("058", KHANH_HOA),
+            java.util.Map.entry("060", LAM_DONG), java.util.Map.entry("062", QUANG_NGAI),
+            java.util.Map.entry("064", GIA_LAI), java.util.Map.entry("066", DAK_LAK),
+            java.util.Map.entry("067", LAM_DONG), java.util.Map.entry("068", LAM_DONG),
+            java.util.Map.entry("070", DONG_NAI), java.util.Map.entry("072", TAY_NINH),
+            java.util.Map.entry("074", HO_CHI_MINH), java.util.Map.entry("075", DONG_NAI),
+            java.util.Map.entry("077", HO_CHI_MINH), java.util.Map.entry("079", HO_CHI_MINH),
+            java.util.Map.entry("080", TAY_NINH), java.util.Map.entry("082", DONG_THAP),
+            java.util.Map.entry("083", VINH_LONG), java.util.Map.entry("084", VINH_LONG),
+            java.util.Map.entry("086", VINH_LONG), java.util.Map.entry("087", DONG_THAP),
+            java.util.Map.entry("089", AN_GIANG), java.util.Map.entry("091", AN_GIANG),
+            java.util.Map.entry("092", CAN_THO), java.util.Map.entry("093", CAN_THO),
+            java.util.Map.entry("094", CAN_THO), java.util.Map.entry("095", CA_MAU),
+            java.util.Map.entry("096", CA_MAU));
+
+    /** Tỉnh mới theo 3 số đầu của số CCCD 12 chữ số; rỗng nếu số không hợp lệ hoặc mã không có trong bảng. */
+    public static Optional<VnProvince> fromCitizenIdPrefix(String citizenId) {
+        if (citizenId == null) {
+            return Optional.empty();
+        }
+        String digits = citizenId.replaceAll("\\s", "");
+        if (!digits.matches("\\d{12}")) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(BY_BIRTH_CODE.get(digits.substring(0, 3)));
+    }
+
     private static boolean isWordBoundary(String s, int start, int len) {
         boolean before = start == 0 || !Character.isLetterOrDigit(s.charAt(start - 1));
         int end = start + len;
