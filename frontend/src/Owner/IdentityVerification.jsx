@@ -43,6 +43,8 @@ export default function IdentityVerification() {
     const [aiConsent, setAiConsent] = useState(false);
     const [form, setForm] = useState(EMPTY_FORM);
     const [warnings, setWarnings] = useState([]);
+    // Tỉnh gợi ý theo 3 số đầu CCCD khi không đọc được tỉnh từ địa chỉ: chỉ đưa lên đầu danh sách, không chọn sẵn
+    const [suggestedProvince, setSuggestedProvince] = useState('');
     const [reading, setReading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -90,6 +92,7 @@ export default function IdentityVerification() {
             source: data.source || 'MANUAL',
         });
         setWarnings(data.warnings || []);
+        setSuggestedProvince(data.residenceProvince ? '' : (data.suggestedProvince || ''));
         setStep('review');
     };
 
@@ -331,7 +334,9 @@ export default function IdentityVerification() {
                                 <Card title={t('review.title')} icon="fact_check">
                                     <p className="text-sm text-on-surface-variant mb-4">{t(`review.hint.${form.source}`)}</p>
                                     {warnings.filter((w) => w !== 'REVIEW_AI_RESULT').map((w) => (
-                                        <Alert key={w} type="warning">{t(`review.warnings.${w}`)}</Alert>
+                                        <Alert key={w} type="warning">
+                                            {t(`review.warnings.${w}`, { province: provinceName(suggestedProvince) })}
+                                        </Alert>
                                     ))}
                                     <div className="grid sm:grid-cols-2 gap-4">
                                         <Field label={t('fields.citizenId')} hint={t('fields.citizenIdHint')}>
@@ -358,7 +363,16 @@ export default function IdentityVerification() {
                                         <Field label={t('fields.province')} hint={t('fields.provinceHint')}>
                                             <select value={form.residenceProvince} onChange={set('residenceProvince')} className={inputClass}>
                                                 <option value="">{t('fields.choose')}</option>
-                                                {(status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+                                                {suggestedProvince && (
+                                                    <optgroup label={t('fields.suggested')}>
+                                                        <option value={suggestedProvince}>{provinceName(suggestedProvince)}</option>
+                                                    </optgroup>
+                                                )}
+                                                {suggestedProvince ? (
+                                                    <optgroup label={t('fields.allProvinces')}>
+                                                        {(status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+                                                    </optgroup>
+                                                ) : (status?.provinces || []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
                                             </select>
                                         </Field>
                                     </div>

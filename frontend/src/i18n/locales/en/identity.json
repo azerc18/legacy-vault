@@ -62,6 +62,7 @@
     },
     "warnings": {
       "PROVINCE_NOT_DETECTED": "Could not detect your province or city. Please pick one from the list.",
+      "PROVINCE_SUGGESTED_FROM_ID": "Could not read the province from the address. Suggested from the birth-registration code on your citizen ID: {{province}}. Please choose where you actually live.",
       "NOT_A_CITIZEN_ID_CARD": "This does not look like the front of a citizen ID card. Please check.",
       "CITIZEN_ID_UNREADABLE": "The ID number could not be read clearly. Please re-enter it.",
       "DATE_OF_BIRTH_UNREADABLE": "The date of birth could not be read clearly. Please re-enter it."
@@ -92,7 +93,9 @@
     "province": "Province / city of residence",
     "provinceHint": "From the list of 34 provinces and cities effective 1 July 2025.",
     "phone": "Phone number",
-    "choose": "— Choose —"
+    "choose": "— Choose —",
+    "suggested": "Suggested",
+    "allProvinces": "All provinces"
   },
   "phone": {
     "title": "Verify your phone number",
