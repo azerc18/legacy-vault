@@ -34,15 +34,73 @@ const readPos = () => {
 };
 const writePos = (p) => { try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch { /* bỏ qua */ } };
 
-// Giữ cả khối widget (cú + khung chat) nằm trọn trong màn hình
+// Giữ con cú nằm trọn trong màn hình. Chỉ đo con cú, không đo khung chat, nên mở/đóng chat cú đứng yên.
 function clampPos(pos, el) {
     if (!el) return pos;
     const { width, height } = el.getBoundingClientRect();
+    if (!width && !height) return pos;   // đang bị ẩn (có hộp thoại mở): chưa đo được, giữ nguyên
     const maxRight = Math.max(0, window.innerWidth - width);
     const maxBottom = Math.max(0, window.innerHeight - height);
     return {
         right: Math.round(Math.min(Math.max(pos.right, 0), maxRight)),
         bottom: Math.round(Math.min(Math.max(pos.bottom, 0), maxBottom)),
+    };
+}
+
+const PANEL_GAP = 8;      // khe giữa con cú và khung chat
+const SCREEN_MARGIN = 8;  // khung chat luôn cách mép màn hình ít nhất chừng này
+const MIN_PANEL_H = 220;  // thấp hơn mức này thì thử phía khác trước khi chịu thu nhỏ
+
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+
+// Chọn chỗ đặt khung chat quanh con cú: ưu tiên phía trên, rồi dưới, rồi bên trái/phải
+// (bên nào rộng hơn). Không phía nào đủ chỗ thì lấy phía rộng nhất và cho khung chat thấp lại.
+// `keep` = giữ nguyên phía cũ (đang kéo widget bằng thanh tiêu đề, đổi phía giữa chừng sẽ giật).
+function placePanel(owl, panel, vw, vh, keep) {
+    const M = SCREEN_MARGIN;
+    const G = PANEL_GAP;
+    const space = {
+        top: owl.top - G - M,
+        bottom: vh - owl.bottom - G - M,
+        left: owl.left - G - M,
+        right: vw - owl.right - G - M,
+    };
+    const fitsV = (side) => space[side] >= panel.height && panel.width <= vw - 2 * M;
+    const fitsH = (side) => space[side] >= panel.width && panel.height <= vh - 2 * M;
+
+    let side = keep;
+    if (!side) {
+        const horiz = space.left >= space.right ? ['left', 'right'] : ['right', 'left'];
+        side = ['top', 'bottom'].find(fitsV) || horiz.find(fitsH);
+        if (!side) {
+            // Không phía nào đủ: lấy phía trên/dưới rộng hơn nếu còn chứa được khung thấp tối thiểu,
+            // không thì bên trái/phải rộng hơn (màn hình ngang thấp)
+            const v = space.top >= space.bottom ? 'top' : 'bottom';
+            side = space[v] >= Math.min(panel.height, MIN_PANEL_H) || space[horiz[0]] < panel.width ? v : horiz[0];
+        }
+    }
+
+    const vertical = side === 'top' || side === 'bottom';
+    const maxHeight = vertical ? Math.max(space[side], 0) : vh - 2 * M;
+    const h = Math.min(panel.height, maxHeight);
+    const ownerOnRight = owl.left + owl.width / 2 > vw / 2;
+    const ownerOnBottom = owl.top + owl.height / 2 > vh / 2;
+
+    let left;
+    let top;
+    if (vertical) {
+        // Canh mép khung chat theo mép con cú ở phía gần mép màn hình
+        left = ownerOnRight ? owl.right - panel.width : owl.left;
+        top = side === 'top' ? owl.top - G - h : owl.bottom + G;
+    } else {
+        left = side === 'left' ? owl.left - G - panel.width : owl.right + G;
+        top = ownerOnBottom ? owl.bottom - h : owl.top;
+    }
+    return {
+        side,
+        left: Math.round(clamp(left, M, vw - panel.width - M)),
+        top: Math.round(clamp(top, M, vh - h - M)),
+        maxHeight: h < panel.height ? Math.floor(h) : null,
     };
 }
 
@@ -69,12 +127,17 @@ export default function AssistantWidget() {
     const bubbleTimer = useRef(null);
     const actionTimer = useRef(null);
     const bubbleRef = useRef(null);
-    const boxRef = useRef(null);
+    const boxRef = useRef(null);      // khối con cú (không gồm khung chat)
+    const panelRef = useRef(null);
+    const panelSide = useRef(null);   // phía khung chat đang nằm, giữ nguyên trong lúc kéo
     const drag = useRef(null);        // thông tin lượt kéo đang diễn ra
     const justDragged = useRef(false); // chặn cú click ngay sau khi thả chuột
     const [pos, setPos] = useState(readPos);     // vị trí user chọn (đã lưu)
     const [view, setView] = useState(pos);       // vị trí đang hiện, đã kẹp vào màn hình
     const [dragging, setDragging] = useState(false);
+    const [panelBox, setPanelBox] = useState(null);   // {side,left,top,maxHeight} của khung chat
+    const [bubbleSide, setBubbleSide] = useState({ below: false, alignLeft: false });
+    const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
 
     // Chạy 1 animation rồi quay về idle
     const play = useCallback((name, ms) => {
@@ -177,20 +240,50 @@ export default function AssistantWidget() {
 
     const dragHandlers = { onPointerDown: startDrag, onPointerMove: moveDrag, onPointerUp: endDrag, onPointerCancel: endDrag };
 
-    // Mở/đóng khung chat, hiện câu thoại hay đổi cỡ cửa sổ thì kéo widget về lại trong màn hình
-    // Chỉ đổi vị trí đang hiện; đóng khung chat thì cú về lại đúng chỗ user đã chọn
+    // Đổi cỡ cửa sổ / xoay điện thoại: kéo con cú về lại trong màn hình (chỉ vị trí đang hiện,
+    // vị trí user đã chọn vẫn giữ để nới cửa sổ ra là cú về đúng chỗ cũ).
+    // Mở/đóng khung chat hay hiện câu thoại KHÔNG đụng tới vị trí con cú.
     useLayoutEffect(() => {
-        if (hidden || drag.current?.moved) return;   // đang kéo thì moveDrag tự kẹp, đừng kéo widget về chỗ cũ
+        if (hidden || drag.current?.moved) return;   // đang kéo thì moveDrag tự kẹp
         const c = clampPos(pos, boxRef.current);
         setView((v) => (c.right === v.right && c.bottom === v.bottom ? v : c));
-    }, [hidden, open, bubble, pos]);
+    }, [hidden, pos, viewport]);
 
     useEffect(() => {
         if (hidden) return;
-        const onResize = () => { if (!drag.current?.moved) setView(clampPos(pos, boxRef.current)); };
+        const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
         window.addEventListener('resize', onResize);
-        return () => window.removeEventListener('resize', onResize);
-    }, [hidden, pos]);
+        // Con cú đổi cỡ (bản 2D tạm -> bản 3D, hết bị ẩn sau hộp thoại): đo lại cho chắc
+        const ro = typeof ResizeObserver !== 'undefined' && boxRef.current ? new ResizeObserver(onResize) : null;
+        ro?.observe(boxRef.current);
+        return () => { window.removeEventListener('resize', onResize); ro?.disconnect(); };
+    }, [hidden]);
+
+    // Đặt khung chat dính vào con cú ở phía còn trống (trên/dưới/trái/phải), kẹp trong màn hình.
+    // Chạy trước khi vẽ nên không bị chớp ở vị trí sai.
+    useLayoutEffect(() => {
+        if (hidden || !open) { panelSide.current = null; return; }
+        const owlEl = boxRef.current;
+        const wrap = panelRef.current;
+        const inner = wrap?.firstElementChild;
+        if (!owlEl || !inner) return;
+        inner.style.maxHeight = '';   // đo cỡ tự nhiên, không tính lần thu nhỏ trước
+        const panel = { width: inner.offsetWidth, height: inner.offsetHeight };
+        const keep = dragging ? panelSide.current : null;
+        const next = placePanel(owlEl.getBoundingClientRect(), panel, window.innerWidth, window.innerHeight, keep);
+        if (next.maxHeight != null) inner.style.maxHeight = `${next.maxHeight}px`;
+        panelSide.current = next.side;
+        setPanelBox((b) => (b && b.side === next.side && b.left === next.left && b.top === next.top
+            && b.maxHeight === next.maxHeight ? b : next));
+    }, [hidden, open, view, viewport, dragging]);
+
+    // Câu thoại: hiện phía trên con cú, sát mép trên thì xuống dưới; canh theo phía gần mép màn hình
+    useLayoutEffect(() => {
+        if (hidden || !bubble || !boxRef.current) return;
+        const r = boxRef.current.getBoundingClientRect();
+        const next = { below: r.top < 110, alignLeft: r.left + r.width / 2 < window.innerWidth / 2 };
+        setBubbleSide((b) => (b.below === next.below && b.alignLeft === next.alignLeft ? b : next));
+    }, [hidden, bubble, view, viewport]);
 
     const toggle = () => {
         if (justDragged.current) { justDragged.current = false; return; }
@@ -203,11 +296,15 @@ export default function AssistantWidget() {
 
     if (hidden) return null;
 
+    const panelStyle = panelBox
+        ? { left: panelBox.left, top: panelBox.top }
+        : { left: 0, top: 0, visibility: 'hidden' };   // lần vẽ đầu chỉ để đo, chưa cho thấy
+
     return (
-        <div ref={boxRef} style={{ right: view.right, bottom: view.bottom }}
-             className={`lv-assistant fixed z-50 flex flex-col items-end gap-2 pointer-events-none${dragging ? ' lv-assistant--dragging' : ''}`}>
+        <>
             {open && (
-                <div className="pointer-events-auto">
+                <div ref={panelRef} style={panelStyle} data-side={panelBox?.side}
+                     className={`lv-assistant lv-assistant-panel fixed z-50${dragging ? ' lv-assistant--dragging' : ''}`}>
                     <ChatPanel
                         messages={messages}
                         setMessages={setMessages}
@@ -222,21 +319,27 @@ export default function AssistantWidget() {
                 </div>
             )}
 
-            {bubble && !open && (
-                <button type="button" onClick={toggle}
-                        className="chibi-bubble lv-glass-thick pointer-events-auto relative max-w-[220px] mr-3 px-3.5 py-2.5 rounded-2xl
-                                   text-sm text-on-surface text-left">
-                    {bubble}
-                </button>
-            )}
+            <div ref={boxRef} style={{ right: view.right, bottom: view.bottom }}
+                 className={`lv-assistant fixed z-50 flex pointer-events-none${dragging ? ' lv-assistant--dragging' : ''}`}>
+                {bubble && !open && (
+                    // Đặt tuyệt đối theo con cú nên câu thoại không làm cú xê dịch
+                    <button type="button" onClick={toggle}
+                            className={`chibi-bubble lv-glass-thick pointer-events-auto absolute w-[max-content] max-w-[220px] px-3.5 py-2.5 rounded-2xl
+                                       text-sm text-on-surface text-left ${bubbleSide.below ? 'top-full mt-2' : 'bottom-full mb-2'}
+                                       ${bubbleSide.alignLeft ? 'left-3' : 'right-3'}`}>
+                        {bubble}
+                    </button>
+                )}
 
-            <button type="button" onClick={toggle} aria-label={t(open ? 'assistant.close' : 'assistant.open')}
-                    title={t('assistant.launcherHint')} {...dragHandlers}
-                    className={`lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
-                <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
-                    <Owl3D action={thinking ? 'think' : action} costume={shownCostume} />
-                </Suspense>
-            </button>
-        </div>
+                <button type="button" onClick={toggle} aria-label={t(open ? 'assistant.close' : 'assistant.open')}
+                        aria-expanded={open}
+                        title={t('assistant.launcherHint')} {...dragHandlers}
+                        className={`lv-assistant-launcher lv-assistant-handle pointer-events-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-primary`}>
+                    <Suspense fallback={<ChibiAvatar action={thinking ? 'think' : action} />}>
+                        <Owl3D action={thinking ? 'think' : action} costume={shownCostume} />
+                    </Suspense>
+                </button>
+            </div>
+        </>
     );
 }
