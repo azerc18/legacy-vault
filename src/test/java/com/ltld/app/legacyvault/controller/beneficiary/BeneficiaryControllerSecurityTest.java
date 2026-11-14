@@ -5,6 +5,8 @@ import com.ltld.app.legacyvault.dto.beneficiarydto.AssetDownloadResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultPreviewResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.CloseVaultResponse;
 import com.ltld.app.legacyvault.dto.beneficiarydto.DocumentDownloadResponse;
+import com.ltld.app.legacyvault.dto.beneficiarydto.VerificationMethodsResponse;
+import com.ltld.app.legacyvault.enums.VerificationMethod;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.beneficiaryservice.BeneficiaryService;
 import com.ltld.app.legacyvault.service.beneficiaryservice.InheritanceDossierPdfService;
@@ -45,6 +47,27 @@ class BeneficiaryControllerSecurityTest {
         SimpleGrantedAuthority[] granted = java.util.Arrays.stream(authorities)
                 .map(SimpleGrantedAuthority::new).toArray(SimpleGrantedAuthority[]::new);
         return jwt().jwt(j -> j.subject(UUID.randomUUID().toString())).authorities(granted);
+    }
+
+    @Test
+    void verificationMethods_noToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/verifications/methods"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void verificationMethods_ownerOnly_returns403() throws Exception {
+        mockMvc.perform(get("/api/beneficiaries/verifications/methods").with(token("ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+        verify(beneficiaryService, never()).getAvailableVerificationMethods();
+    }
+
+    @Test
+    void verificationMethods_beneficiary_returns200() throws Exception {
+        when(beneficiaryService.getAvailableVerificationMethods()).thenReturn(
+                VerificationMethodsResponse.builder().methods(List.of(VerificationMethod.OTP)).build());
+        mockMvc.perform(get("/api/beneficiaries/verifications/methods").with(token("ROLE_BENEFICIARY")))
+                .andExpect(status().isOk());
     }
 
     @Test

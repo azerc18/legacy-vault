@@ -42,6 +42,10 @@ export const beneficiaryApi = {
     downloadDossier: (vaultId) =>
         downloadBlob(`/beneficiaries/vaults/${vaultId}/dossier`, 'ho-so-khai-nhan.pdf'),
 
+    // FR-17: phương thức xác thực đang bật (EKYC_MOCK chỉ có khi BE bật mock eKYC)
+    getVerificationMethods: () =>
+        http.get('/beneficiaries/verifications/methods').then((res) => res.data?.data?.methods ?? ['OTP']),
+
     // FR-17: gửi OTP (chỉ dùng cho method OTP, cách nhau tối thiểu 60s)
     sendOtp: (vaultId) =>
         http.post('/beneficiaries/verifications/otp', { vaultId }),
