@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa", "aiSettings": "Cấu hình AI" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -367,5 +367,49 @@
     "byProvider": "Theo cổng thanh toán",
     "providers": { "VNPAY": "VNPay", "PAYPAL": "PayPal" },
     "loadError": "Không tải được báo cáo doanh thu."
+  },
+  "aiSettings": {
+    "title": "Cấu hình AI",
+    "subtitle": "Bật / tắt từng chức năng dùng AI và chọn model. API key không nhập ở đây: key chỉ đặt bằng biến môi trường trên máy chủ.",
+    "loadError": "Không tải được cấu hình AI.",
+    "saveError": "Không lưu được cấu hình AI.",
+    "saved": "Đã lưu cấu hình cho {{name}}.",
+    "status": {
+      "title": "Kết nối AI",
+      "provider": "Nhà cung cấp",
+      "apiKey": "API key chính",
+      "backupKey": "API key dự phòng",
+      "set": "Đã đặt",
+      "notSet": "Chưa đặt",
+      "mockNote": "AI_PROVIDER đang là mock: Vaulty trả lời mẫu, hai chức năng đọc ảnh không gọi AI. Model chọn ở dưới chỉ có tác dụng khi chuyển sang gemini.",
+      "noKeyNote": "Chưa đặt GEMINI_API_KEY nên các chức năng AI chưa chạy được.",
+      "keyHint": "Đổi key: sửa biến môi trường GEMINI_API_KEY / GEMINI_BACKUP_API_KEY trên Azure (App Service tự khởi động lại)."
+    },
+    "features": {
+      "ASSISTANT": {
+        "name": "Trợ lý Vaulty",
+        "desc": "Chat hướng dẫn sử dụng. Tắt thì người dùng nhận thông báo Vaulty đang tắt."
+      },
+      "DEATH_CERTIFICATE_OCR": {
+        "name": "Đọc giấy chứng tử",
+        "desc": "Executor và Legal Verifier nhận gợi ý từ AI. Tắt thì họ tự kiểm tra tài liệu."
+      },
+      "CITIZEN_ID_OCR": {
+        "name": "Đọc ảnh CCCD (xác minh Owner)",
+        "desc": "Đọc ảnh CCCD khi không quét được QR. Tắt thì Owner quét QR hoặc nhập tay."
+      }
+    },
+    "enabled": "Đang bật",
+    "disabled": "Đang tắt",
+    "primary": "Model chính",
+    "backup": "Model dự phòng",
+    "useDefault": "Mặc định ({{model}})",
+    "backupHint": "Dùng khi model chính hết hạn mức, quá tải hoặc bị ngừng.",
+    "sameModel": "Model dự phòng phải khác model chính.",
+    "save": "Lưu",
+    "updated": "Sửa lần cuối {{when}} bởi {{who}}",
+    "neverUpdated": "Chưa ai sửa, đang dùng mặc định.",
+    "modelsHint": "Danh sách model lấy từ GEMINI_MODEL, GEMINI_BACKUP_MODEL và GEMINI_ALLOWED_MODELS. Muốn thêm model thì thêm vào biến môi trường.",
+    "auditHint": "Mỗi lần lưu được ghi vào Nhật ký (AI_SETTINGS_UPDATED)."
   }
 }

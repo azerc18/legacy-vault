@@ -122,7 +122,11 @@ public enum ErrorCode {
     IDENTITY_OCR_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE),
 
     // Giới hạn số request theo IP ở các API công khai /api/auth/* (data: retryAfterSeconds)
-    IP_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS);
+    IP_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
+
+    // Cấu hình AI: Admin tắt chức năng / chọn model ngoài danh sách cho phép
+    AI_FEATURE_DISABLED(HttpStatus.SERVICE_UNAVAILABLE),
+    AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST);
 
     private final HttpStatus status;
 

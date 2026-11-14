@@ -3,8 +3,13 @@ package com.ltld.app.legacyvault.service.assistantservice;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatMessage;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatRequest;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatResponse;
+import com.ltld.app.legacyvault.enums.AiFeature;
 import com.ltld.app.legacyvault.exception.AssistantException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
@@ -46,11 +51,23 @@ public class AssistantServiceImpl implements AssistantService {
         this.guide = guideResource.getContentAsString(StandardCharsets.UTF_8);
     }
 
+    // Trang Cấu hình AI: Admin tắt Vaulty / chọn model. Không có (unit test) thì luôn bật, model mặc định.
+    private AiSettingsService aiSettings;
+
+    @Autowired(required = false)
+    void setAiSettings(AiSettingsService aiSettings) {
+        this.aiSettings = aiSettings;
+    }
+
     @Override
     public ChatResponse chat(UUID userId, List<String> roles, ChatRequest request) {
         List<ChatMessage> messages = request.messages();
         if (!"user".equals(messages.get(messages.size() - 1).role())) {
             throw new AssistantException("The last message must be from the user.", HttpStatus.BAD_REQUEST);
+        }
+        AiFeatureConfig config = aiSettings == null ? null : aiSettings.forFeature(AiFeature.ASSISTANT);
+        if (config != null && !config.enabled()) {
+            throw new AssistantException(ErrorCode.AI_FEATURE_DISABLED, "Vaulty is turned off by the administrator.");
         }
         checkRate(userId);
 
@@ -59,7 +76,7 @@ public class AssistantServiceImpl implements AssistantService {
 
         String reply;
         try {
-            reply = aiClient.chat(systemPrompt, messages);
+            reply = aiClient.chat(systemPrompt, messages, config);
         } catch (RuntimeException e) {
             // Không log nội dung tin nhắn, chỉ log lỗi
             log.warn("Assistant call failed for user {}: {}", userId, e.getMessage());

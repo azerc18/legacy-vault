@@ -234,7 +234,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ## Administrator
 
-The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked.
+The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked, AI settings.
 
 - "Overview": users, vaults, open alerts, DMS needing attention, revenue, VIP users, and a "To handle" list. "Refresh" reloads.
 - "Users": search by email or name, filter by role and status. "Roles…" to grant or remove Legal Verifier or Admin (Owner, Beneficiary and Executor are set by the system). "Lock account" / "Unlock account", "Suspend DMS" / "Resume DMS". "Assign executor" appoints an emergency executor when a triggered DMS has nobody who can act. "Open profile" shows a user's details, vaults, asset verification, payments, alerts and recent logs.
@@ -246,6 +246,7 @@ The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Pla
 - "Plans": "Change price / name" (10,000–100,000,000 VND, with a reason). New prices only apply to future purchases. Limits cannot be changed here.
 - "Failed emails": notification emails that could not be delivered. "Resend" after mail is fixed.
 - "Locked": beneficiaries locked after 5 wrong identity codes. "Unlock" gives them 5 new attempts.
+- "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list, then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
 
 ## Emails
 - System emails use the language set in "My profile" → "Email and invoice language". People without an account get Vietnamese.

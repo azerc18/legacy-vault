@@ -102,5 +102,7 @@ public enum AuditAction {
     // Trang Hồ sơ: người dùng tự xoá tài khoản (thành công / bị chặn / sai xác nhận)
     ACCOUNT_DELETED, ACCOUNT_DELETE_FAILED,
     // Một IP gọi API công khai /api/auth/* vượt giới hạn (ghi 1 lần mỗi khi bắt đầu bị chặn, không ghi mỗi request)
-    IP_RATE_LIMITED
+    IP_RATE_LIMITED,
+    // Admin bật / tắt chức năng AI hoặc đổi model (trang Cấu hình AI)
+    AI_SETTINGS_UPDATED
 }

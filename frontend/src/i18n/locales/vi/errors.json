@@ -86,5 +86,7 @@
   "IDENTITY_NAME_MISMATCH": "Họ tên trên CCCD khác họ tên tài khoản.",
   "IDENTITY_UNDERAGE": "Bạn cần đủ 18 tuổi để bật Dead Man's Switch.",
   "IDENTITY_LOCKED": "Dead Man's Switch đang được kích hoạt nên không thể sửa thông tin danh tính.",
-  "IDENTITY_OCR_UNAVAILABLE": "Chưa đọc được ảnh CCCD lúc này. Hãy quét mã QR hoặc nhập tay."
+  "IDENTITY_OCR_UNAVAILABLE": "Chưa đọc được ảnh CCCD lúc này. Hãy quét mã QR hoặc nhập tay.",
+  "AI_FEATURE_DISABLED": "Chức năng AI này đang được quản trị viên tắt.",
+  "AI_MODEL_NOT_ALLOWED": "Model không hợp lệ: chọn model trong danh sách và khác model chính."
 }

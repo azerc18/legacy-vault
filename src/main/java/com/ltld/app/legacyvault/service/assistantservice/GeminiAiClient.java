@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.service.assistantservice;
 
 import com.ltld.app.legacyvault.dto.assistantdto.ChatMessage;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig;
 import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,14 @@ public class GeminiAiClient implements AiClient {
 
     @Override
     public String chat(String systemPrompt, List<ChatMessage> messages) {
+        return chat(systemPrompt, messages, null);
+    }
+
+    /** Model chính / dự phòng lấy theo trang Cấu hình AI; config null thì dùng model của biến môi trường. */
+    @Override
+    public String chat(String systemPrompt, List<ChatMessage> messages, AiFeatureConfig config) {
+        String model = config != null && config.primaryModel() != null ? config.primaryModel() : this.model;
+        String backupModel = config != null ? config.backupModel() : this.backupModel;
         Map<String, Object> body = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt))),
                 "contents", messages.stream().map(m -> Map.of(
