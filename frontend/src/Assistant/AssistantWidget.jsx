@@ -129,6 +129,7 @@ export default function AssistantWidget() {
     const bubbleRef = useRef(null);
     const boxRef = useRef(null);      // khối con cú (không gồm khung chat)
     const panelRef = useRef(null);
+    const bubbleEl = useRef(null);
     const panelSide = useRef(null);   // phía khung chat đang nằm, giữ nguyên trong lúc kéo
     const drag = useRef(null);        // thông tin lượt kéo đang diễn ra
     const justDragged = useRef(false); // chặn cú click ngay sau khi thả chuột
@@ -277,11 +278,13 @@ export default function AssistantWidget() {
             && b.maxHeight === next.maxHeight ? b : next));
     }, [hidden, open, view, viewport, dragging]);
 
-    // Câu thoại: hiện phía trên con cú, sát mép trên thì xuống dưới; canh theo phía gần mép màn hình
+    // Câu thoại: hiện phía trên con cú, phía trên không đủ chỗ cho cả câu (đo chiều cao thật,
+    // câu dài 3-4 dòng cao hơn) thì xuống dưới; canh theo phía gần mép màn hình
     useLayoutEffect(() => {
         if (hidden || !bubble || !boxRef.current) return;
         const r = boxRef.current.getBoundingClientRect();
-        const next = { below: r.top < 110, alignLeft: r.left + r.width / 2 < window.innerWidth / 2 };
+        const need = (bubbleEl.current?.offsetHeight || 0) + PANEL_GAP + SCREEN_MARGIN;
+        const next = { below: r.top < need, alignLeft: r.left + r.width / 2 < window.innerWidth / 2 };
         setBubbleSide((b) => (b.below === next.below && b.alignLeft === next.alignLeft ? b : next));
     }, [hidden, bubble, view, viewport]);
 
@@ -323,7 +326,7 @@ export default function AssistantWidget() {
                  className={`lv-assistant fixed z-50 flex pointer-events-none${dragging ? ' lv-assistant--dragging' : ''}`}>
                 {bubble && !open && (
                     // Đặt tuyệt đối theo con cú nên câu thoại không làm cú xê dịch
-                    <button type="button" onClick={toggle}
+                    <button type="button" onClick={toggle} ref={bubbleEl}
                             className={`chibi-bubble lv-glass-thick pointer-events-auto absolute w-[max-content] max-w-[220px] px-3.5 py-2.5 rounded-2xl
                                        text-sm text-on-surface text-left ${bubbleSide.below ? 'top-full mt-2' : 'bottom-full mb-2'}
                                        ${bubbleSide.alignLeft ? 'left-3' : 'right-3'}`}>
