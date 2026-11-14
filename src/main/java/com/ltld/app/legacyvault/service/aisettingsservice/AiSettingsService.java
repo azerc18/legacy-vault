@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -144,14 +146,32 @@ public class AiSettingsService {
             repository.save(s);
             String email = userRepository.findById(adminId).map(User::getEmail).orElse(null);
             auditLogService.log(AuditAction.AI_SETTINGS_UPDATED, AuditResult.SUCCESS, adminId, email,
-                    "AiFeatureSetting", feature.name(), feature.name() + ": " + String.join("; ", changes));
+                    // targetId phải là UUID (AuditLogServiceImpl parse); tên chức năng đã nằm ở đầu detail
+                    "AiFeatureSetting", null, feature.name() + ": " + String.join("; ", changes));
             log.info("AI settings for {} changed by admin {}: {}", feature, adminId, changes);
-            cache = null;
+            invalidateCacheAfterCommit();
         }
         return toResponse(feature, s, new HashMap<>());
     }
 
     // ------------------------------------------------------------------ nội bộ
+
+    /**
+     * Xoá cache SAU khi transaction commit. Xoá ngay lúc lưu thì một lời gọi AI chen vào giữa lúc xoá và lúc
+     * commit sẽ đọc lại giá trị cũ rồi giữ nó thêm {@link #CACHE_TTL_MS} (vd. Vaulty vẫn trả lời sau khi đã tắt).
+     */
+    private void invalidateCacheAfterCommit() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cache = null;
+                }
+            });
+        } else {
+            cache = null;
+        }
+    }
 
     private Map<AiFeature, AiFeatureSetting> settings() {
         Map<AiFeature, AiFeatureSetting> c = cache;

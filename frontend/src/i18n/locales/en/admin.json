@@ -419,7 +419,7 @@
     "backup": "Backup model",
     "useDefault": "Default ({{model}})",
     "backupHint": "Used when the main model hits its quota, is overloaded or retired.",
-    "sameModel": "The backup model must differ from the main model.",
+    "sameModel": "The backup model must differ from the main model. The backup is {{model}} (the default when left empty); pick another backup model.",
     "save": "Save",
     "updated": "Last changed {{when}} by {{who}}",
     "neverUpdated": "Never changed, using defaults.",

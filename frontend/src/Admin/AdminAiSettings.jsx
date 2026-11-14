@@ -118,7 +118,7 @@ export default function AdminAiSettings() {
                                         </label>
                                     </div>
                                     <p className="text-xs text-on-surface-variant mt-2">{t('aiSettings.backupHint')}</p>
-                                    {same && <p className="text-xs text-error mt-1">{t('aiSettings.sameModel')}</p>}
+                                    {same && <p className="text-xs text-error mt-1">{t('aiSettings.sameModel', { model: effective(draft, 'backupModel') })}</p>}
 
                                     <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
                                         <p className="text-xs text-outline">

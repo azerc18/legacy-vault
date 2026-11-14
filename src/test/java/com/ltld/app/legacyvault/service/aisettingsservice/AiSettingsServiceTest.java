@@ -136,7 +136,7 @@ class AiSettingsServiceTest {
         assertThat(res.backupOverride()).isNull();
         assertThat(existing.getUpdatedBy()).isEqualTo(adminId);
         verify(auditLogService).log(eq(AuditAction.AI_SETTINGS_UPDATED), eq(AuditResult.SUCCESS), eq(adminId),
-                eq("admin@legacyvault.local"), eq("AiFeatureSetting"), eq("ASSISTANT"),
+                eq("admin@legacyvault.local"), eq("AiFeatureSetting"), isNull(),
                 eq("ASSISTANT: enabled true -> false; primary default -> " + EXTRA));
         // Cache bị xoá khi lưu: lần đọc sau truy vấn lại DB
         service.forFeature(AiFeature.ASSISTANT);
@@ -169,5 +169,48 @@ class AiSettingsServiceTest {
                 new UpdateAiFeatureSettingRequest(true, BACKUP, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.AI_MODEL_NOT_ALLOWED);
+    }
+
+    // Review #290 M1: chạy AuditLogServiceImpl THẬT (không mock) để bắt lỗi targetId không phải UUID
+    @Test
+    void update_withRealAuditLogService_publishesAuditEventWithoutTargetId() {
+        org.springframework.context.ApplicationEventPublisher publisher =
+                mock(org.springframework.context.ApplicationEventPublisher.class);
+        AiSettingsService real = new AiSettingsService(repository, userRepository,
+                new com.ltld.app.legacyvault.service.auditservice.AuditLogServiceImpl(publisher),
+                Clock.systemUTC(), "gemini", "k", "", PRIMARY, BACKUP, EXTRA);
+        when(repository.findById(AiFeature.ASSISTANT)).thenReturn(Optional.of(row(AiFeature.ASSISTANT, true, null, null)));
+
+        real.update(adminId, AiFeature.ASSISTANT, new UpdateAiFeatureSettingRequest(false, null, null));
+
+        org.mockito.ArgumentCaptor<com.ltld.app.legacyvault.service.auditservice.AuditEvent> event =
+                org.mockito.ArgumentCaptor.forClass(com.ltld.app.legacyvault.service.auditservice.AuditEvent.class);
+        verify(publisher).publishEvent(event.capture());
+        assertThat(event.getValue().action()).isEqualTo(AuditAction.AI_SETTINGS_UPDATED);
+        assertThat(event.getValue().entityType()).isEqualTo("AiFeatureSetting");
+        verify(repository).save(any());
+    }
+
+    // Review #290 m1: trong transaction, cache chỉ bị xoá sau commit
+    @Test
+    void update_insideTransaction_keepsCacheUntilAfterCommit() {
+        AiFeatureSetting existing = row(AiFeature.ASSISTANT, true, null, null);
+        when(repository.findAll()).thenReturn(List.of(existing));
+        when(repository.findById(AiFeature.ASSISTANT)).thenReturn(Optional.of(existing));
+        service.forFeature(AiFeature.ASSISTANT);
+
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.update(adminId, AiFeature.ASSISTANT, new UpdateAiFeatureSettingRequest(false, null, null));
+            service.forFeature(AiFeature.ASSISTANT);
+            verify(repository, times(1)).findAll();   // chưa commit: vẫn dùng cache
+
+            org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+        }
+        service.forFeature(AiFeature.ASSISTANT);
+        verify(repository, times(2)).findAll();       // sau commit: đọc lại DB
     }
 }
