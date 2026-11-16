@@ -19,7 +19,7 @@ One account can have several roles. If you were just given a new role, sign out 
   - What appears there: being named or removed as a beneficiary, being appointed or removed as an executor, DMS check-in reminders, a missed check-in (the owner and the trusted confirmers who have an account), a confirmer confirming you are safe, an administrator pausing or resuming your DMS, asset verified or needing re-verification, payment and VIP expiry, vault unlocked, legacy messages, claim deadline reminders, executor task results and verification results.
   - Click a notification to mark it as read and open the related page. "Unread" shows only unread ones, "Mark all as read" clears the number, "Show older" loads earlier notifications.
   - Notifications follow the language chosen with the EN / VI switch. Security emails (OTP codes, password reset, new device, account lock) and the confirmer's confirmation link are sent by email only.
-- Vaulty (this assistant) is the owl button. Click it to chat, drag it to move it.
+- Vaulty (this assistant) is the owl button. Click it to chat, drag it to move it (or drag the chat window by its title bar). The owl stays where you put it; the chat window opens right next to it on whichever side has room (above, below, left or right) and always fits on the screen, phones included.
 
 ### Guide and tours
 - On first sign-in you may see "Are you new to Legacy Vault?". Choose "I'm a new user (Start Guide)" for an on-screen tour, or "I've used it before".
