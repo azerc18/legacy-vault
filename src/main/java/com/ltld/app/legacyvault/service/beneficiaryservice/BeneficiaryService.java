@@ -34,6 +34,11 @@ public interface BeneficiaryService {
     void sendIdentityOtp(SendIdentityOtpRequest request, UUID currentUserId);
 
     /**
+     * FR-17: Phương thức xác thực đang bật. OTP luôn có; EKYC_MOCK chỉ có khi app.kyc.mock.enabled=true.
+     */
+    VerificationMethodsResponse getAvailableVerificationMethods();
+
+    /**
      * FR-17: Xác thực danh tính bằng OTP hoặc mock eKYC.
      * Sai quá số lần cho phép thì phiên chuyển FAILED và Beneficiary bị tạm khóa (423),
      * cần Admin hỗ trợ. Thành công thì mở phiên xem tài sản trong một khoảng thời gian.

@@ -343,6 +343,14 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
     }
 
     @Override
+    public VerificationMethodsResponse getAvailableVerificationMethods() {
+        List<VerificationMethod> methods = mockKycVerifier.isEnabled()
+                ? List.of(VerificationMethod.OTP, VerificationMethod.EKYC_MOCK)
+                : List.of(VerificationMethod.OTP);
+        return VerificationMethodsResponse.builder().methods(methods).build();
+    }
+
+    @Override
     @Transactional(noRollbackFor = BeneficiaryException.class)
     public VerifyIdentityResponse verifyIdentity(VerifyIdentityRequest request, UUID currentUserId) {
         Vault vault = loadAccessibleVault(request.getVaultId(), currentUserId).vault();

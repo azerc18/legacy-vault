@@ -201,6 +201,16 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
+    // Chỉ hiện eKYC khi BE báo đang bật (production tắt mock). Lỗi mạng -> chỉ OTP (fail-closed)
+    const [methods, setMethods] = useState(['OTP']);
+
+    useEffect(() => {
+        let alive = true;
+        beneficiaryApi.getVerificationMethods()
+            .then((list) => { if (alive && Array.isArray(list) && list.includes('OTP')) setMethods(list); })
+            .catch(() => {});
+        return () => { alive = false; };
+    }, []);
 
     useEffect(() => {
         if (cooldown <= 0) return;
@@ -276,11 +286,11 @@ function VerifyIdentity({ vaultId, onVerified, onLocked }) {
 
             {!started ? (
                 <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className={`grid gap-3 ${methods.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         {[
                             { value: 'OTP', label: t('verify.methodOtp'), icon: 'mail' },
                             { value: 'EKYC_MOCK', label: t('verify.methodKyc'), icon: 'badge' },
-                        ].map((m) => (
+                        ].filter((m) => methods.includes(m.value)).map((m) => (
                             <button
                                 key={m.value}
                                 type="button"

@@ -71,6 +71,12 @@ public class BeneficiaryController {
         return ResponseEntity.ok(ApiResponse.success("Marked as read."));
     }
 
+    // FR-17: phương thức xác thực đang bật (ẩn eKYC khi mock tắt, ví dụ trên production)
+    @GetMapping("/verifications/methods")
+    public ResponseEntity<ApiResponse<VerificationMethodsResponse>> getVerificationMethods() {
+        return ResponseEntity.ok(ApiResponse.success(beneficiaryService.getAvailableVerificationMethods()));
+    }
+
     // FR-17: Gửi OTP xác thực danh tính qua email
     @PostMapping("/verifications/otp")
     public ResponseEntity<ApiResponse<Void>> sendIdentityOtp(

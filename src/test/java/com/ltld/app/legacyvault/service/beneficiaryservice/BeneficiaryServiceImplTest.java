@@ -1089,6 +1089,22 @@ public class BeneficiaryServiceImplTest {
     }
 
     @Test
+    void availableVerificationMethods_mockDisabled_onlyOtp() {
+        when(mockKycVerifier.isEnabled()).thenReturn(false);
+
+        assertEquals(List.of(VerificationMethod.OTP),
+                beneficiaryService.getAvailableVerificationMethods().getMethods());
+    }
+
+    @Test
+    void availableVerificationMethods_mockEnabled_otpAndEkyc() {
+        when(mockKycVerifier.isEnabled()).thenReturn(true);
+
+        assertEquals(List.of(VerificationMethod.OTP, VerificationMethod.EKYC_MOCK),
+                beneficiaryService.getAvailableVerificationMethods().getMethods());
+    }
+
+    @Test
     void sendIdentityOtp_sessionAboutToExpire_throws400() {
         IdentityVerification session = pendingSession(VerificationMethod.OTP);
         session.setCreatedAt(LocalDateTime.now().minusMinutes(12)); // còn 3 phút < 5 phút của một OTP
