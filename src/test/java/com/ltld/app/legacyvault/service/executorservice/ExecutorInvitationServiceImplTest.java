@@ -83,7 +83,7 @@ class ExecutorInvitationServiceImplTest {
                 auditLogService, eventPublisher, dmsPolicyService);
         // Chính sách hệ thống: Admin đổi số ngày chờ Executor dự phòng thành 21 (mặc định 14)
         when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
-                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21));
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21, DmsPolicy.DEFAULT_CONFIRMER_WAIT_HOURS));
 
         ownerId = UUID.randomUUID();
         execId = UUID.randomUUID();

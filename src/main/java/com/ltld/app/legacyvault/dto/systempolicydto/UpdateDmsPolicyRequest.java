@@ -10,7 +10,9 @@ import jakarta.validation.constraints.NotNull;
 public record UpdateDmsPolicyRequest(@NotNull @Valid RangeInput checkinIntervalDays,
                                      @NotNull @Valid RangeInput gracePeriodDays,
                                      @NotNull @Valid RangeInput reminderCount,
-                                     @NotNull Integer backupActivationWaitDays) {
+                                     @NotNull Integer backupActivationWaitDays,
+                                     // null = giữ giá trị đang lưu (client cũ chưa gửi ô này)
+                                     Integer confirmerWaitHours) {
 
     public record RangeInput(@NotNull Integer min, @NotNull Integer defaultValue, @NotNull Integer max) {
     }

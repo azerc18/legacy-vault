@@ -2,13 +2,15 @@ package com.ltld.app.legacyvault.dto.systempolicydto;
 
 /**
  * Chính sách Dead Man's Switch đang có hiệu lực: khoảng cho phép + giá trị gợi ý cho form của Owner,
- * và số ngày chờ trước khi chuyển sang Executor dự phòng (BR-03) cho cấu hình DMS mới.
+ * số ngày chờ trước khi chuyển sang Executor dự phòng (BR-03) cho cấu hình DMS mới, và số giờ chờ
+ * Trusted Confirmer trả lời trước khi DMS tự kích hoạt (cho đợt chờ xác nhận bắt đầu sau khi lưu).
  * Owner cũng đọc được (GET /api/dms/policy) để form hiện đúng giới hạn.
  */
 public record DmsPolicy(Range checkinIntervalDays,
                         Range gracePeriodDays,
                         Range reminderCount,
-                        int backupActivationWaitDays) {
+                        int backupActivationWaitDays,
+                        int confirmerWaitHours) {
 
     /** Giới hạn cứng = @Min/@Max của DmsConfigRequest. Admin chỉ thu hẹp được trong khoảng này. */
     public static final Range HARD_CHECKIN_INTERVAL = new Range(1, 30, 365);
@@ -16,10 +18,15 @@ public record DmsPolicy(Range checkinIntervalDays,
     public static final Range HARD_REMINDER_COUNT = new Range(1, 3, 10);
     public static final int HARD_BACKUP_WAIT_MIN = 1;
     public static final int HARD_BACKUP_WAIT_MAX = 90;
+    /** Ít nhất nửa ngày để người thân kịp đọc mail; nhiều nhất 7 ngày để Executor không phải chờ quá lâu. */
+    public static final int HARD_CONFIRMER_WAIT_MIN = 12;
+    public static final int HARD_CONFIRMER_WAIT_MAX = 168;
+    public static final int DEFAULT_CONFIRMER_WAIT_HOURS = 72;
 
     /** Giá trị trước khi có trang này (và khi không đọc được DB): giữ đúng hành vi cũ. */
     public static final DmsPolicy DEFAULTS =
-            new DmsPolicy(HARD_CHECKIN_INTERVAL, HARD_GRACE_PERIOD, HARD_REMINDER_COUNT, 14);
+            new DmsPolicy(HARD_CHECKIN_INTERVAL, HARD_GRACE_PERIOD, HARD_REMINDER_COUNT, 14,
+                    DEFAULT_CONFIRMER_WAIT_HOURS);
 
     public record Range(int min, int defaultValue, int max) {
         public boolean contains(int value) {

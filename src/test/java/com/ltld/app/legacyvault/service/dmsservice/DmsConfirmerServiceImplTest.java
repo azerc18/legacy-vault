@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.dmsservice;
 
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmationDecisionResponse;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfirmerRequest;
 import com.ltld.app.legacyvault.entity.DmsConfig;
@@ -79,6 +81,7 @@ class DmsConfirmerServiceImplTest {
     @Mock private EmailSender emailSender;
     @Mock private EntitlementService entitlementService;
     @Mock private VaultRepository vaultRepository;
+    @Mock private DmsPolicyService dmsPolicyService;
 
     private DmsActivationProcessor processor;
     private DmsConfirmerServiceImpl confirmerService;
@@ -125,8 +128,10 @@ class DmsConfirmerServiceImplTest {
                 props,
                 emailSender,
                 auditLogService,
-                eventPublisher
+                eventPublisher,
+                dmsPolicyService
         );
+        when(dmsPolicyService.current()).thenReturn(DmsPolicy.DEFAULTS);   // 72 giờ như trước
 
         now = LocalDateTime.of(2026, 10, 31, 12, 0);
         lastCheckin = now.minusDays(38);
@@ -204,6 +209,32 @@ class DmsConfirmerServiceImplTest {
         verify(auditLogService).log(eq(AuditAction.DMS_CONFIRMATION_REQUESTED), eq(AuditResult.SUCCESS),
                 isNull(), isNull(), isNull(), eq(DmsActivationProcessor.ENTITY_DMS_CONFIG),
                 eq(config.getId().toString()), contains("confirmers=1"));
+    }
+
+    @Test
+    @DisplayName("Chính sách hệ thống: Admin đặt 48 giờ -> đợt chờ xác nhận mới dùng 48 giờ, audit ghi waitHours")
+    void trigger_usesConfirmerWaitFromPolicy() {
+        when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 14, 48));
+
+        LocalDateTime deadline = enterPending();
+
+        assertEquals(now.plusHours(48), deadline);
+        verify(auditLogService).log(eq(AuditAction.DMS_CONFIRMATION_REQUESTED), any(), any(), any(), any(), any(),
+                any(), contains("waitHours=48"));
+    }
+
+    @Test
+    @DisplayName("Link xác nhận: hết hạn sau số giờ của chính sách, nhưng không bao giờ trước hạn chờ của đợt")
+    void tokenExpiry_neverBeforeRoundDeadline() {
+        java.time.Instant created = java.time.Instant.parse("2026-11-18T05:00:00Z");
+        LocalDateTime deadline = LocalDateTime.ofInstant(created.plusSeconds(72 * 3600), java.time.ZoneId.systemDefault());
+
+        // Admin vừa giảm còn 24 giờ sau khi đợt (72 giờ) bắt đầu: link vẫn sống tới hạn của đợt
+        assertEquals(created.plusSeconds(72 * 3600), DmsConfirmerServiceImpl.tokenExpiry(deadline, created, 24));
+        // Số giờ chính sách dài hơn: theo chính sách (giống hành vi cũ "72 giờ kể từ lúc tạo link")
+        assertEquals(created.plusSeconds(96 * 3600), DmsConfirmerServiceImpl.tokenExpiry(deadline, created, 96));
+        assertEquals(created.plusSeconds(72 * 3600), DmsConfirmerServiceImpl.tokenExpiry(null, created, 72));
     }
 
     @Test

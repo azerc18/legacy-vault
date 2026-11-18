@@ -451,12 +451,16 @@
       "defaultValue": "Gợi ý",
       "max": "Tối đa",
       "hardLimit": "Giới hạn hệ thống {{min}}–{{max}}",
-      "backupHint": "Số ngày Executor chính có để nộp hồ sơ trước khi chuyển sang Executor dự phòng (1–{{max}}).",
+      "hints": {
+        "backupActivationWaitDays": "Số ngày Executor chính có để nộp hồ sơ trước khi chuyển sang Executor dự phòng ({{min}}–{{max}}).",
+        "confirmerWaitHours": "Số giờ chờ người xác nhận chéo (Trusted Confirmer) trả lời trước khi Dead Man's Switch tự kích hoạt ({{min}}–{{max}}, mặc định 72)."
+      },
       "fields": {
         "checkinIntervalDays": "Chu kỳ check-in (ngày)",
         "gracePeriodDays": "Thời gian chờ sau hạn (ngày)",
         "reminderCount": "Số lần nhắc",
-        "backupActivationWaitDays": "Chờ Executor dự phòng (ngày)"
+        "backupActivationWaitDays": "Chờ Executor dự phòng (ngày)",
+        "confirmerWaitHours": "Chờ người xác nhận chéo (giờ)"
       },
       "errors": {
         "notInteger": "Nhập số nguyên.",
@@ -473,7 +477,8 @@
       "impactError": "Không tính được số Dead Man's Switch bị ảnh hưởng. Bạn vẫn lưu được; con số sẽ hiện sau khi lưu.",
       "noteOwner": "Owner thấy khoảng mới ngay trên form Dead Man's Switch (tối đa 30 giây sau khi lưu).",
       "noteRunning": "Không sửa và không dừng Dead Man's Switch nào đang chạy.",
-      "noteBackup": "Số ngày chờ Executor dự phòng chỉ áp dụng cho Dead Man's Switch bật mới; cái đã bật giữ số đã chốt."
+      "noteBackup": "Số ngày chờ Executor dự phòng chỉ áp dụng cho Dead Man's Switch bật mới; cái đã bật giữ số đã chốt.",
+      "noteConfirmer": "Số giờ chờ người xác nhận chéo áp dụng cho đợt chờ xác nhận bắt đầu sau khi lưu; đợt đang chờ giữ hạn đã báo trong email."
     },
     "info": {
       "loadError": "Không tải được thông tin mã hoá, lưu trữ và sao lưu.",

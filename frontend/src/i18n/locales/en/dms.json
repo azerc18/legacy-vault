@@ -74,7 +74,7 @@
     },
     "confirmers": {
       "title": "Trusted Social Confirmers (Anti-False-Trigger)",
-      "subtitle": "Up to 2 trusted relatives/friends who will receive an emergency confirmation email (72h window) before your Executor is activated.",
+      "subtitle": "Up to 2 trusted relatives/friends who will receive an emergency confirmation email ({{hours}}-hour window) before your Executor is activated.",
       "empty": "No trusted confirmers configured yet. Add up to 2 contacts below so accidental missed check-ins (e.g., travel or hospital stay) can be checked in for you by a confirmer.",
       "remove": "Remove",
       "namePlaceholder": "Full name",

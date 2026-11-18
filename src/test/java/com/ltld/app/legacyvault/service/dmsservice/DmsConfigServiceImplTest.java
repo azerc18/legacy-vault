@@ -263,7 +263,7 @@ class DmsConfigServiceImplTest {
     @DisplayName("Chính sách hệ thống: DMS bật mới lấy số ngày chờ Executor dự phòng Admin đặt (21 thay vì 14)")
     void upsert_newConfig_takesBackupWaitFromPolicy() {
         when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
-                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21));
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21, DmsPolicy.DEFAULT_CONFIRMER_WAIT_HOURS));
 
         service.upsertConfig(ownerId, request(30, 7, 3));
 
@@ -275,7 +275,7 @@ class DmsConfigServiceImplTest {
     void upsert_existingConfig_keepsItsBackupWait() {
         existingConfig(DmsStatus.ACTIVE);   // đã chốt 21 ngày
         when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
-                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 30));
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 30, DmsPolicy.DEFAULT_CONFIRMER_WAIT_HOURS));
 
         service.upsertConfig(ownerId, request(30, 7, 3));
 

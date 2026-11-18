@@ -61,6 +61,7 @@ class FlywayMigrationIntegrationTest {
         assertThat(rows).isEqualTo(1);
         AdminDmsPolicyResponse res = dmsPolicyService.getForAdmin();
         assertThat(res.policy()).isEqualTo(DmsPolicy.DEFAULTS);
+        assertThat(res.policy().confirmerWaitHours()).isEqualTo(72);   // V20261118_1400: cột mới mặc định 72 như trước
         assertThat(res.configsOutsideLimits()).isZero();
         assertThat(res.updatedAt()).isNull();
     }
