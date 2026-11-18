@@ -1307,7 +1307,7 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         InheritanceDossierData.Signature signature = sig.map(s -> new InheritanceDossierData.Signature(
                 s.getVerifier().getFullName(), s.getVerifier().getEmail(),
                 String.valueOf(s.getSignatureMethod()), s.getSignatureHash(), s.getSignedAt(),
-                s.getRequest().getId())).orElse(null);
+                s.getRequest().getId(), handwrittenSignaturePng(s))).orElse(null);
         User executorUser = sig.map(s -> s.getRequest().getExecutor())
                 .or(() -> executorAssignmentRepository.findActiveWithUserByOwnerIdIn(List.of(vault.getOwner().getId()))
                         .stream().findFirst().map(ExecutorAssignment::getExecutorUser))
@@ -1453,5 +1453,18 @@ public class BeneficiaryServiceImpl implements BeneficiaryService {
         if (al == null || al.getConsensusThreshold() == null) return null;
         int total = assetAllocationRepository.findByAssetId(asset.getId()).size();
         return "Cần " + al.getConsensusThreshold() + "/" + total + " người thụ hưởng cùng đồng ý mới mở được tài sản";
+    }
+
+    // Ảnh chữ ký tay của Verifier để in vào hồ sơ thừa kế; lỗi giải mã thì bỏ ảnh, PDF vẫn tạo được
+    private byte[] handwrittenSignaturePng(DigitalSignature s) {
+        if (s.getSignatureImageEncrypted() == null) {
+            return null;
+        }
+        try {
+            return java.util.Base64.getDecoder().decode(cryptoService.decrypt(s.getSignatureImageEncrypted()));
+        } catch (Exception e) {
+            log.warn("Could not decrypt the handwritten signature of request {}", s.getRequest().getId(), e);
+            return null;
+        }
     }
 }

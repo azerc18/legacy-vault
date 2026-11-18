@@ -13,8 +13,8 @@ import java.util.Locale;
 @Component
 public class IntegrationEnvironment {
 
-    /** Ký xác nhận của Legal Verifier hiện xác thực bằng OTP gửi qua email (VerificationMethod MOCK_OTP). */
-    static final String VERIFIER_AUTH_METHOD = "EMAIL_OTP";
+    /** Ký xác nhận của Legal Verifier: chọn OTP gửi qua email (MOCK_OTP) hoặc ký tay (HANDWRITTEN), ngang hàng. */
+    static final String VERIFIER_AUTH_METHOD = "EMAIL_OTP_OR_HANDWRITTEN";
 
     private final boolean kycMockEnvDefault;
     private final boolean kycMockToggleAllowed;

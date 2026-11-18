@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 /**
  * V3: ký thật bằng ECDSA (không mock phần mật mã), chỉ mock lưu trữ file và mã hóa khóa riêng.
@@ -98,6 +99,98 @@ class VerifierSignatureSealServiceTest {
                 .containsEntry("method", "MOCK_OTP")
                 .containsEntry("vault_ids", b + "," + a)
                 .containsEntry("key_ref", "lv-sign-v1");
+    }
+
+    // ---------- Ký tay: mã băm ảnh nằm trong payload, ảnh lưu mã hóa ----------
+
+    private final byte[] handwriting = SignaturePngFixture.signed(600, 200);
+
+    private DigitalSignature sealedHandwritten() {
+        DigitalSignature s = DigitalSignature.builder()
+                .id(UUID.randomUUID()).request(request).verifier(verifier)
+                .signatureMethod(SignatureMethod.HANDWRITTEN).signatureHash("old").build();
+        sealService.seal(s, request, verifier.getEmail(), List.of(UUID.randomUUID()), handwriting);
+        return s;
+    }
+
+    @Test
+    void seal_handwritten_putsImageHashInPayload_andStoresEncryptedImage() throws Exception {
+        DigitalSignature s = sealedHandwritten();
+
+        String imageSha = SigningKeyService.sha256Hex(handwriting);
+        assertThat(s.getSignatureImageSha256()).isEqualTo(imageSha);
+        assertThat(VerifierSignatureSealService.parsePayload(s.getSignedPayload()))
+                .containsEntry("method", "HANDWRITTEN")
+                .containsEntry("signature_image_sha256", imageSha);
+        // lưu qua CryptoService.encrypt (Base64 của PNG), không lưu PNG thô
+        verify(cryptoService).encrypt(java.util.Base64.getEncoder().encodeToString(handwriting));
+        assertThat(sealService.decryptImage(s.getSignatureImageEncrypted())).isEqualTo(handwriting);
+    }
+
+    @Test
+    void check_handwrittenUntouched_isValid() {
+        VerifierSignatureDto dto = sealService.check(sealedHandwritten());
+
+        assertThat(dto.getStatus()).isEqualTo(SignatureSealStatus.VALID);
+        assertThat(dto.isHasSignatureImage()).isTrue();
+        assertThat(dto.getSignatureImageMatches()).isTrue();
+    }
+
+    @Test
+    void check_handwrittenImageSwapped_isInvalid() {
+        DigitalSignature s = sealedHandwritten();
+        s.setSignatureImageEncrypted(java.util.Base64.getEncoder()
+                .encodeToString(SignaturePngFixture.signed(700, 220)));
+
+        VerifierSignatureDto dto = sealService.check(s);
+
+        assertThat(dto.getStatus()).isEqualTo(SignatureSealStatus.INVALID);
+        assertThat(dto.getSignatureValid()).isTrue();
+        assertThat(dto.getSignatureImageMatches()).isFalse();
+    }
+
+    @Test
+    void check_handwrittenImageHashColumnChanged_isInvalid() {
+        DigitalSignature s = sealedHandwritten();
+        // Ai đó thay cả ảnh lẫn cột mã băm: payload đã ký vẫn giữ mã băm cũ -> lộ
+        byte[] other = SignaturePngFixture.signed(700, 220);
+        s.setSignatureImageEncrypted(java.util.Base64.getEncoder().encodeToString(other));
+        s.setSignatureImageSha256(SigningKeyService.sha256Hex(other));
+
+        VerifierSignatureDto dto = sealService.check(s);
+
+        assertThat(dto.getStatus()).isEqualTo(SignatureSealStatus.INVALID);
+        assertThat(dto.getPayloadMatches()).isFalse();
+    }
+
+    @Test
+    void check_methodColumnChangedAfterSigning_isInvalid() {
+        DigitalSignature s = sealed(List.of(UUID.randomUUID()));
+        s.setSignatureMethod(SignatureMethod.HANDWRITTEN); // payload đã ký vẫn ghi MOCK_OTP
+
+        VerifierSignatureDto dto = sealService.check(s);
+
+        assertThat(dto.getStatus()).isEqualTo(SignatureSealStatus.INVALID);
+        assertThat(dto.getSignatureValid()).isTrue();
+        assertThat(dto.getPayloadMatches()).isFalse();
+    }
+
+    @Test
+    void check_otpSignature_hasNoImage() {
+        VerifierSignatureDto dto = sealService.check(sealed(List.of(UUID.randomUUID())));
+
+        assertThat(dto.isHasSignatureImage()).isFalse();
+        assertThat(dto.getSignatureImageMatches()).isNull();
+        assertThat(VerifierSignatureSealService.parsePayload(dto.getSignedPayload()))
+                .doesNotContainKey("signature_image_sha256");
+    }
+
+    @Test
+    void decryptImage_garbage_returnsNull() throws Exception {
+        when(cryptoService.decrypt("bad")).thenThrow(new IllegalStateException("tag mismatch"));
+
+        assertThat(sealService.decryptImage("bad")).isNull();
+        assertThat(sealService.decryptImage(null)).isNull();
     }
 
     @Test

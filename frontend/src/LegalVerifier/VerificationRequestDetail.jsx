@@ -3,7 +3,7 @@ import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-    getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
+    getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest, signHandwritten,
     getDocumentBlob, getRejectionReasons, analyzeDocumentOcr, inspectDocumentSignatures,
 } from '../api/verifierApi.js';
 import { getErrorCode, getErrorMessage } from '../api/http.js';
@@ -19,6 +19,7 @@ import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 import PdfSignatureCard from './PdfSignatureCard.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
+import SignaturePad from './SignaturePad.jsx';
 
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
 const OTP_VALID_SECONDS = 5 * 60;   // khớp SIGN_OTP_EXPIRE_MINUTES của BE
@@ -58,6 +59,9 @@ export default function VerificationRequestDetail() {
     const [docCheck, setDocCheck] = useState(null);   // { valid, message }
     const [codeSent, setCodeSent] = useState(false);
     const [code, setCode] = useState('');
+    // Bước ký cuối: 'otp' (mã qua email) hoặc 'handwritten' (ký tay), hai cách ngang hàng
+    const [signMethod, setSignMethod] = useState('otp');
+    const [signatureImage, setSignatureImage] = useState(null); // data URL PNG, null = chưa ký đủ nét
     const [cooldown, setCooldown] = useState(0);
     const [confirm, setConfirm] = useState(null);     // null | 'approve' | 'reject' | 'sign'
 
@@ -124,7 +128,9 @@ export default function VerificationRequestDetail() {
 
     const askSign = (e) => {
         e?.preventDefault();
-        if (!/^\d{6}$/.test(code)) return setError(t('detail.err.codeFormat'));
+        if (signMethod === 'handwritten') {
+            if (!signatureImage) return setError(t('detail.err.signatureEmpty'));
+        } else if (!/^\d{6}$/.test(code)) return setError(t('detail.err.codeFormat'));
         setError('');
         setConfirm('sign');
     };
@@ -133,7 +139,9 @@ export default function VerificationRequestDetail() {
         const action = confirm;
         if (action === 'approve') await run(() => approveRequest(req.id), t('detail.err.approve'));
         if (action === 'reject') await run(() => rejectRequest(req.id, rejectChoice, rejectNoteText), t('detail.err.reject'));
-        if (action === 'sign') {
+        if (action === 'sign' && signMethod === 'handwritten') {
+            await run(() => signHandwritten(req.id, signatureImage), t('detail.err.sign'));
+        } else if (action === 'sign') {
             const ok = await run(() => signRequest(req.id, code), t('detail.err.sign'), (message, errorCode) => {
                 // Mã hết hạn / hết lượt thử: bỏ trạng thái "đã gửi mã", quay về nút Send code
                 if (OTP_UNUSABLE_CODES.includes(errorCode)) {
@@ -530,34 +538,68 @@ export default function VerificationRequestDetail() {
                                     {t('detail.approvedBanner')}
                                 </div>
 
-                                {!codeSent ? (
-                                    <button
-                                        onClick={handleSendCode}
-                                        disabled={busy}
-                                        className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
-                                    >
-                                        {busy ? t('detail.sendingCode') : t('detail.sendCode')}
-                                    </button>
-                                ) : (
-                                    <form onSubmit={askSign} className="space-y-4">
-                                        <label htmlFor="sign-code" className="text-sm text-on-surface-variant block">{t('detail.codeLabel')}</label>
-                                        <OtpInput id="sign-code" label={t('detail.codeLabel')} value={code} onChange={setCode} />
+                                {/* Hai cách ký ngang hàng: mã OTP qua email hoặc ký tay */}
+                                <div role="radiogroup" aria-label={t('detail.signMethod.label')} className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-surface-container-high">
+                                    {['otp', 'handwritten'].map((m) => (
                                         <button
+                                            key={m}
                                             type="button"
-                                            onClick={handleSendCode}
-                                            disabled={busy || cooldown > 0}
-                                            className="text-sm font-semibold text-secondary disabled:text-outline"
+                                            role="radio"
+                                            aria-checked={signMethod === m}
+                                            onClick={() => { setSignMethod(m); setSignatureImage(null); setError(''); }}
+                                            disabled={busy}
+                                            className={`h-11 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all ${signMethod === m ? 'bg-surface text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                                         >
-                                            {cooldown > 0 ? t('detail.resendIn', { s: cooldown }) : t('detail.resend')}
+                                            <span className="material-symbols-outlined text-[20px]">{m === 'otp' ? 'mail_lock' : 'draw'}</span>
+                                            {t(`detail.signMethod.${m}`)}
                                         </button>
+                                    ))}
+                                </div>
+
+                                {signMethod === 'handwritten' ? (
+                                    <form onSubmit={askSign} className="space-y-4">
+                                        <SignaturePad onChange={setSignatureImage} disabled={busy} />
                                         <button
                                             type="submit"
-                                            disabled={busy}
+                                            disabled={busy || !signatureImage}
                                             className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
                                         >
                                             {t('detail.signUnlock')}
                                         </button>
                                     </form>
+                                ) : (
+                                    <>
+                                    {!codeSent ? (
+                                        <button
+                                            onClick={handleSendCode}
+                                            disabled={busy}
+                                            className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
+                                        >
+                                            {busy ? t('detail.sendingCode') : t('detail.sendCode')}
+                                        </button>
+                                    ) : (
+                                        <form onSubmit={askSign} className="space-y-4">
+                                            <label htmlFor="sign-code" className="text-sm text-on-surface-variant block">{t('detail.codeLabel')}</label>
+                                            <OtpInput id="sign-code" label={t('detail.codeLabel')} value={code} onChange={setCode} />
+                                            <button
+                                                type="button"
+                                                onClick={handleSendCode}
+                                                disabled={busy || cooldown > 0}
+                                                className="text-sm font-semibold text-secondary disabled:text-outline"
+                                            >
+                                                {cooldown > 0 ? t('detail.resendIn', { s: cooldown }) : t('detail.resend')}
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={busy}
+                                                className="w-full h-14 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container transition-all disabled:opacity-50 lv-pill"
+                                            >
+                                                {t('detail.signUnlock')}
+                                            </button>
+                                        </form>
+                                    )}
+
+                                    </>
                                 )}
 
                                 {/* Chỉ verifier đã duyệt mới xem được hồ sơ APPROVED, nên được phép từ chối trước khi ký */}

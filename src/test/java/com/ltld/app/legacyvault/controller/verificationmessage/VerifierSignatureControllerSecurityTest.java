@@ -95,4 +95,41 @@ class VerifierSignatureControllerSecurityTest {
         mockMvc.perform(get(URL, requestId).with(token(verifierId, "ROLE_LEGAL_VERIFIER", "LEGAL_REVIEW")))
                 .andExpect(status().isNotFound());
     }
+
+    // ---------- Ảnh chữ ký tay ----------
+
+    private static final String IMAGE_URL = "/api/verifier/requests/{id}/signature/image";
+
+    @Test
+    void image_noToken_returns401() throws Exception {
+        mockMvc.perform(get(IMAGE_URL, requestId)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void image_ownerOrExecutor_returns403() throws Exception {
+        mockMvc.perform(get(IMAGE_URL, requestId).with(token(UUID.randomUUID(), "ROLE_OWNER")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void image_verifier_returnsPngNoStore() throws Exception {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G'};
+        when(legalVerificationService.getSignatureImage(eq(requestId), eq(verifierId))).thenReturn(png);
+
+        mockMvc.perform(get(IMAGE_URL, requestId).with(token(verifierId, "ROLE_LEGAL_VERIFIER", "LEGAL_REVIEW")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("image/png"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().bytes(png))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Content-Type-Options", "nosniff"));
+    }
+
+    @Test
+    void image_otpSignature_returns404() throws Exception {
+        when(legalVerificationService.getSignatureImage(eq(requestId), eq(verifierId)))
+                .thenThrow(new BusinessException(ErrorCode.NOT_FOUND, "This request has no handwritten signature."));
+
+        mockMvc.perform(get(IMAGE_URL, requestId).with(token(verifierId, "ROLE_LEGAL_VERIFIER", "LEGAL_REVIEW")))
+                .andExpect(status().isNotFound());
+    }
 }

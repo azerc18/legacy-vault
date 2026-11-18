@@ -121,6 +121,24 @@ class FlywayMigrationIntegrationTest {
         }
     }
 
+    // Ký tay: mọi SignatureMethod (kể cả HANDWRITTEN) phải có trong digital_signatures.signature_method
+    @Test
+    void signatureMethod_columnAcceptsEveryJavaEnumValue_andHasImageColumns() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'digital_signatures' AND COLUMN_NAME = 'signature_method'
+                """, String.class);
+        for (com.ltld.app.legacyvault.enums.SignatureMethod m : com.ltld.app.legacyvault.enums.SignatureMethod.values()) {
+            assertThat(col).contains("'" + m.name() + "'");
+        }
+        Integer imageCols = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'digital_signatures'
+                  AND COLUMN_NAME IN ('signature_image_encrypted', 'signature_image_sha256')
+                """, Integer.class);
+        assertThat(imageCols).isEqualTo(2);
+    }
+
     // N2b: mọi ClaimStatus phải có trong cột DB, nếu không Decline sẽ lỗi "Data truncated"
     @Test
     void claimStatus_columnAcceptsEveryJavaEnumValue() {

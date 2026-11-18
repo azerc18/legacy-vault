@@ -97,4 +97,62 @@ class InheritanceDossierPdfServiceTest {
 
         assertThat(text).contains("Theo tỷ lệ", "Cần 2/3 người thụ hưởng cùng đồng ý");
     }
+
+    // Ký tay: in phương thức tiếng Việt và nhúng ảnh chữ ký vào bảng chữ ký
+    private InheritanceDossierData withSignature(InheritanceDossierData.Signature sig) {
+        var d = sample(false);
+        return new InheritanceDossierData(d.vaultId(), d.vaultName(), d.unlockedAt(), d.claimDeadlineAt(),
+                d.owner(), d.beneficiary(), d.executor(), sig, d.assets(), d.documents(), d.generatedAt());
+    }
+
+    private static byte[] handwritingPng() throws Exception {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(600, 200,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        g.setColor(java.awt.Color.BLACK);
+        g.setStroke(new java.awt.BasicStroke(3f));
+        g.drawLine(20, 150, 300, 40);
+        g.drawLine(300, 40, 580, 160);
+        g.dispose();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", out);
+        return out.toByteArray();
+    }
+
+    @Test
+    void render_handwrittenSignature_embedsImageAndVietnameseMethod() throws Exception {
+        var sig = new InheritanceDossierData.Signature("Trần Văn Kiểm", "verifier@example.com", "HANDWRITTEN",
+                "a3f1".repeat(16), LocalDateTime.now(), UUID.randomUUID(), handwritingPng());
+        byte[] pdf = service.render(withSignature(sig));
+
+        assertThat(text(pdf)).contains("Ký tay trên màn hình", "Chữ ký tay");
+        PdfReader reader = new PdfReader(pdf);
+        boolean hasImage = false;
+        for (int n = 1; n < reader.getXrefSize(); n++) {
+            com.lowagie.text.pdf.PdfObject o = reader.getPdfObject(n);
+            if (o instanceof com.lowagie.text.pdf.PdfDictionary dict
+                    && com.lowagie.text.pdf.PdfName.IMAGE.equals(dict.get(com.lowagie.text.pdf.PdfName.SUBTYPE))) {
+                hasImage = true;
+            }
+        }
+        assertThat(hasImage).isTrue();
+    }
+
+    @Test
+    void render_otpSignature_showsVietnameseMethodWithoutImageRow() throws Exception {
+        var sig = new InheritanceDossierData.Signature("Trần Văn Kiểm", "verifier@example.com", "MOCK_OTP",
+                "a3f1".repeat(16), LocalDateTime.now(), UUID.randomUUID());
+        String text = text(service.render(withSignature(sig)));
+
+        assertThat(text).contains("Mã OTP gửi qua email").doesNotContain("Chữ ký tay");
+    }
+
+    @Test
+    void render_corruptHandwrittenImage_stillProducesPdf() throws Exception {
+        var sig = new InheritanceDossierData.Signature("Trần Văn Kiểm", "verifier@example.com", "HANDWRITTEN",
+                "a3f1".repeat(16), LocalDateTime.now(), UUID.randomUUID(), new byte[]{1, 2, 3});
+        String text = text(service.render(withSignature(sig)));
+
+        assertThat(text).contains("không hiển thị được ảnh chữ ký");
+    }
 }

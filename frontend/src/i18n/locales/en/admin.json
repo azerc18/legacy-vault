@@ -506,9 +506,10 @@
     },
     "signature": {
       "title": "Confirmation signing (Legal Verifier)",
-      "method": "Check before signing",
+      "method": "How the verifier signs",
       "methods": {
-        "EMAIL_OTP": "Email OTP"
+        "EMAIL_OTP": "Email OTP",
+        "EMAIL_OTP_OR_HANDWRITTEN": "Email OTP or handwritten signature"
       },
       "ca": "CA digital signature (VNPT, Viettel…)",
       "hint": "A CA-issued digital signature needs a contract with a provider, so it is not integrated yet."

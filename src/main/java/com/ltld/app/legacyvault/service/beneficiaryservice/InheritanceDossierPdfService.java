@@ -84,6 +84,11 @@ public class InheritanceDossierPdfService {
             Map.entry(AssetVerificationMethod.FILE_HASH, "mã băm tệp"),
             Map.entry(AssetVerificationMethod.SECOND_PERSON_CONFIRM, "người thứ hai xác nhận"),
             Map.entry(AssetVerificationMethod.DOCUMENT_TIMESTAMP, "dấu thời gian"));
+    // Phương thức ký của Legal Verifier (enum SignatureMethod)
+    private static final Map<String, String> SIGN_METHOD = Map.of(
+            "MOCK_OTP", "Mã OTP gửi qua email",
+            "HANDWRITTEN", "Ký tay trên màn hình",
+            "MOCK_PIN", "Mã PIN");
     private static final Map<String, String> FIELD_LABEL = Map.ofEntries(
             // Ngân hàng / sàn
             Map.entry("institutionName", "Ngân hàng / sàn"),
@@ -171,12 +176,17 @@ public class InheritanceDossierPdfService {
             var s = d.signature();
             PdfPTable sig = table(new float[]{30, 70});
             row(sig, "Người xác minh pháp lý", s.verifierName() + " <" + s.verifierEmail() + ">");
-            row(sig, "Phương thức ký", s.method());
+            row(sig, "Phương thức ký", SIGN_METHOD.getOrDefault(s.method(), s.method()));
             row(sig, "Thời điểm ký", fmt(s.signedAt()));
             row(sig, "Mã yêu cầu xác minh", String.valueOf(s.requestId()));
             PdfPCell k = cell("Mã băm chữ ký số", bold, 9); k.setBackgroundColor(HEAD_BG);
             sig.addCell(k);
             sig.addCell(cell(s.hash(), regular, 7.5f));   // hash dài -> chữ nhỏ, tự xuống dòng
+            if (s.handwrittenPng() != null) {
+                PdfPCell hl = cell("Chữ ký tay", bold, 9); hl.setBackgroundColor(HEAD_BG);
+                sig.addCell(hl);
+                sig.addCell(handwrittenCell(s.handwrittenPng()));
+            }
             sig.setSpacingBefore(8);
             doc.add(sig);
         } else {
@@ -326,6 +336,20 @@ public class InheritanceDossierPdfService {
         c.setPadding(5);
         c.setBorderColor(new Color(0xD0, 0xD5, 0xDD));
         return c;
+    }
+
+    // Ảnh chữ ký tay, thu nhỏ vừa ô (tối đa 200 x 70 pt); ảnh hỏng thì ghi chú thay vì làm hỏng cả PDF
+    private PdfPCell handwrittenCell(byte[] png) {
+        try {
+            Image img = Image.getInstance(png);
+            img.scaleToFit(200, 70);
+            PdfPCell c = new PdfPCell(img, false);
+            c.setPadding(6);
+            c.setBorderColor(new Color(0xD0, 0xD5, 0xDD));
+            return c;
+        } catch (Exception e) {
+            return cell("(không hiển thị được ảnh chữ ký)", regular, 9);
+        }
     }
 
     private void header(PdfPTable t, String text) {

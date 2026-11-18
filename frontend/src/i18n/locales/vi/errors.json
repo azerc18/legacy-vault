@@ -92,6 +92,7 @@
   "INTEGRATION_SETTING_LOCKED": "Máy chủ này không cho bật eKYC mô phỏng từ trang Admin. Chỉ có thể tắt hoặc chọn theo biến môi trường.",
   "DMS_POLICY_OUT_OF_RANGE": "Giá trị nằm ngoài khoảng Admin cho phép (có thể vừa được đổi). Xem lại giới hạn dưới mỗi ô rồi lưu lại.",
   "SYSTEM_POLICY_INVALID": "Chính sách không hợp lệ: cần tối thiểu ≤ gợi ý ≤ tối đa và nằm trong giới hạn hệ thống.",
+  "INVALID_SIGNATURE_IMAGE": "Hình chữ ký không hợp lệ. Hãy ký lại.",
   "EXECUTOR_ACCOUNT_NOT_FOUND": "Email này chưa có tài khoản LegacyVault đã xác minh. Người thi hành cần đăng ký và xác minh tài khoản trước.",
   "EXECUTOR_SELF_ASSIGN": "Bạn không thể tự chọn mình làm người thi hành.",
   "EXECUTOR_IS_CONFIRMER": "Người này đang là người xác nhận tin cậy của bạn nên không thể đồng thời làm người thi hành.",

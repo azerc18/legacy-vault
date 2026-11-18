@@ -42,9 +42,11 @@ export const rejectRequest = (id, reason, note) =>
 // UC14 bước 1: gửi mã ký 6 số qua email (hết hạn 5 phút, gửi lại sau 60s)
 export const sendSignOtp = (id) => http.post(`${BASE}/${id}/sign/otp`);
 
-// UC14 bước 2: ký và mở khoá vault. BE hiện chỉ chấp nhận method MOCK_OTP
+// UC14 bước 2: ký và mở khoá vault. Hai cách ngang hàng: mã OTP qua email, hoặc ký tay (ảnh PNG data URL)
 export const signRequest = (id, code) =>
     http.post(`${BASE}/${id}/sign`, { method: 'MOCK_OTP', code }).then(unwrap);
+export const signHandwritten = (id, signatureImage) =>
+    http.post(`${BASE}/${id}/sign`, { method: 'HANDWRITTEN', signatureImage }).then(unwrap);
 
 // UC15: lịch sử hồ sơ mình đã xử lý. status: APPROVED | REJECTED | SIGNED; from/to: 'YYYY-MM-DD'
 export async function getHistory({ status, from, to, page = 0, size = 20 } = {}) {
@@ -83,3 +85,7 @@ export const inspectDocumentSignatures = (id) => http.post(`${BASE}/${id}/docume
 //      documentSha256, currentDocumentSha256, algorithm, keyRef, keyFingerprint, publicKeyPem,
 //      signedPayload, signatureValue, signatureHash, signedAt, verifierName, verifierEmail, method }
 export const getSignature = (id) => http.get(`${BASE}/${id}/signature`).then(unwrap);
+
+// Ảnh chữ ký tay (PNG) của hồ sơ ký bằng HANDWRITTEN -> Blob
+export const getSignatureImageBlob = (id) =>
+    http.get(`${BASE}/${id}/signature/image`, { responseType: 'blob' }).then((r) => r.data);

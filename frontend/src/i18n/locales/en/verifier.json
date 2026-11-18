@@ -158,7 +158,7 @@
     "noteLabel": "Rejection note",
     "notePlaceholder": "Enter a note for this reason...",
     "rejectRequest": "Reject request",
-    "approvedBanner": "Request approved. Sign with a one-time code to unlock the vault(s).",
+    "approvedBanner": "Request approved. Sign with an email code or by hand to unlock the vault(s).",
     "sendCode": "Send signing code to my email",
     "sendingCode": "Sending...",
     "codeLabel": "Signing code (6 digits)",
@@ -185,12 +185,24 @@
       "openDocument": "Could not open the document (HTTP {{status}}).",
       "noResponse": "no response",
       "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site.",
-      "signatures": "Could not read the document's digital signatures."
+      "signatures": "Could not read the document's digital signatures.",
+      "signatureEmpty": "Please sign in the box first."
     },
     "vaultsTitle_one": "Vault to unlock ({{count}})",
     "vaultsTitle_other": "Vaults to unlock ({{count}})",
     "checkSignatures": "Check digital signatures",
-    "signaturesChecking": "Reading signatures..."
+    "signaturesChecking": "Reading signatures...",
+    "signMethod": {
+      "label": "How to sign",
+      "otp": "Email code",
+      "handwritten": "Handwritten"
+    },
+    "handwritten": {
+      "canvasLabel": "Handwritten signature pad",
+      "placeholder": "Sign your name here",
+      "hint": "Use a mouse, finger or pen. The signature image is encrypted and attached to the confirmation signature.",
+      "clear": "Clear"
+    }
   },
   "rejectReason": {
     "DOCUMENT_UNREADABLE": "The document is blurry or unreadable",
@@ -280,7 +292,8 @@
       "document": "Death certificate unchanged",
       "ok": "Passed",
       "fail": "Failed",
-      "unknown": "Not checked"
+      "unknown": "Not checked",
+      "image": "Signature image unchanged"
     },
     "signedBy": "Signed by",
     "signedAt": "Signed at",
@@ -292,7 +305,8 @@
     "legacyHash": "Old hash",
     "methods": {
       "MOCK_OTP": "One-time code sent by email",
-      "MOCK_PIN": "PIN"
+      "MOCK_PIN": "PIN",
+      "HANDWRITTEN": "Handwritten on screen"
     },
     "technical": "Technical details (for independent checks)",
     "technicalHint": "Algorithm, hashes and key, for cross-checking. Anyone with the payload, signature and public key can check it without LegacyVault.",
@@ -302,7 +316,11 @@
     "copy": "Copy",
     "copied": "Copied",
     "opensslHint": "Check with OpenSSL: save the payload as payload.txt (exact characters, LF line endings, no trailing newline; on Windows avoid Notepad, which may switch to CRLF), the signature as sig.b64 and the public key as public.pem, then run:",
-    "disclaimer": "This signature is issued by LegacyVault (the system's ECDSA P-256 key). It is not a digital signature backed by a licensed CA certificate."
+    "disclaimer": "This signature is issued by LegacyVault (the system's ECDSA P-256 key). It is not a digital signature backed by a licensed CA certificate.",
+    "handwritten": "Handwritten signature",
+    "handwrittenAlt": "Handwritten signature of {{name}}",
+    "handwrittenLoading": "Loading signature image...",
+    "imageHash": "Signature image hash (SHA-256)"
   },
   "pdfSig": {
     "overall": {

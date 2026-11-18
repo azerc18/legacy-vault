@@ -52,4 +52,7 @@ public interface LegalVerificationService {
 
     // V3: xem + kiểm lại chữ ký xác nhận (ECDSA) của hồ sơ đã ký
     VerifierSignatureDto getSignature(UUID requestId, UUID verifierId);
+
+    // Ảnh chữ ký tay (PNG) của hồ sơ đã ký; 404 nếu hồ sơ ký bằng OTP
+    byte[] getSignatureImage(UUID requestId, UUID verifierId);
 }

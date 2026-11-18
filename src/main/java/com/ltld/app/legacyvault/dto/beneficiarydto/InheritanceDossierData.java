@@ -41,8 +41,14 @@ public record InheritanceDossierData(
 
     public record Person(String fullName, String email) {}
 
+    /** {@code handwrittenPng}: ảnh chữ ký tay đã giải mã khi Verifier ký tay; null khi ký OTP. */
     public record Signature(String verifierName, String verifierEmail, String method,
-                            String hash, LocalDateTime signedAt, UUID requestId) {}
+                            String hash, LocalDateTime signedAt, UUID requestId, byte[] handwrittenPng) {
+        public Signature(String verifierName, String verifierEmail, String method,
+                         String hash, LocalDateTime signedAt, UUID requestId) {
+            this(verifierName, verifierEmail, method, hash, signedAt, requestId, null);
+        }
+    }
 
     /** Trạng thái xác thực của tài sản TẠI THỜI ĐIỂM BÀN GIAO (lấy từ bản chụp), không phải trạng thái hiện tại. */
     public record Verification(AssetVerificationStatus status, AssetVerificationMethod method,

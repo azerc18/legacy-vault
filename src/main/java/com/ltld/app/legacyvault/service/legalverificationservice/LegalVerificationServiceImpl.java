@@ -366,10 +366,16 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     @Transactional(noRollbackFor = InvalidSignCodeException.class)
     public VerificationRequestResponseDto sign(UUID requestId, UUID verifierId,
                                                SignVerificationRequestDto dto) {
-        // N4: Chỉ chấp nhận method MOCK_OTP
-        if (dto.getMethod() != SignatureMethod.MOCK_OTP) {
-            throw new InvalidSignCodeException("The only supported signing method is MOCK_OTP.");
+        // N4: hai cách ký ngang hàng: mã OTP qua email HOẶC chữ ký tay (MOCK_PIN không dùng)
+        boolean handwritten = dto.getMethod() == SignatureMethod.HANDWRITTEN;
+        if (!handwritten && dto.getMethod() != SignatureMethod.MOCK_OTP) {
+            throw new InvalidSignCodeException("Supported signing methods are MOCK_OTP and HANDWRITTEN.");
         }
+        if (!handwritten && (dto.getCode() == null || dto.getCode().isBlank())) {
+            throw new InvalidSignCodeException("Please enter the confirmation code");
+        }
+        // Kiểm hình trước khi khóa row: hình sai thì trả lỗi ngay, không đụng tới hồ sơ
+        byte[] signatureImage = handwritten ? HandwrittenSignatureImage.decodeAndValidate(dto.getSignatureImage()) : null;
 
         // PESSIMISTIC_WRITE: khóa row, tránh 2 request ký song song gây lỗi 500
         LegalVerificationRequest request = requestRepository.findByIdForUpdate(requestId)
@@ -393,42 +399,44 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         // để Verifier biết ngay hồ sơ không ký được, khỏi nhập mã rồi mới bị báo lỗi
         assertHandoverStillValid(request);
 
-        // FR-14 bước 3: xác thực OTP ký số
-        if (request.getSignOtpHash() == null
-                || request.getSignOtpExpiresAt() == null
-                || LocalDateTime.now().isAfter(request.getSignOtpExpiresAt())) {
-            throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_EXPIRED,
-                    "The confirmation code has expired or was not generated. Please request a new code.");
-        }
-
-        request.setSignAttempts(request.getSignAttempts() + 1);
-        if (request.getSignAttempts() > MAX_SIGN_ATTEMPTS) {
-            request.setSignOtpHash(null); // buộc yêu cầu mã mới
-            requestRepository.save(request);
-            auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
-                    verifierId, emailOf(verifierId),
-                    "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
-            throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
-                    "Too many attempts. Please request a new code.");
-        }
-
-        if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
-            int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
-            if (remaining <= 0) {
-                request.setSignOtpHash(null); // hết lượt: huỷ mã luôn, giống nhánh "quá lượt"
+        if (!handwritten) {
+            // FR-14 bước 3: xác thực OTP ký số
+            if (request.getSignOtpHash() == null
+                    || request.getSignOtpExpiresAt() == null
+                    || LocalDateTime.now().isAfter(request.getSignOtpExpiresAt())) {
+                throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_EXPIRED,
+                        "The confirmation code has expired or was not generated. Please request a new code.");
             }
-            requestRepository.save(request);
-            auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
-                    verifierId, emailOf(verifierId),
-                    "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
-            throw remaining > 0
-                    ? new InvalidSignCodeException("Incorrect confirmation code. Attempts left: " + remaining + ".")
-                    : new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
-                            "Incorrect confirmation code. No attempts left; please request a new code.");
-        }
 
-        // Xác thực thành công: hủy mã OTP đã dùng
-        request.setSignOtpHash(null);
+            request.setSignAttempts(request.getSignAttempts() + 1);
+            if (request.getSignAttempts() > MAX_SIGN_ATTEMPTS) {
+                request.setSignOtpHash(null); // buộc yêu cầu mã mới
+                requestRepository.save(request);
+                auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
+                        verifierId, emailOf(verifierId),
+                        "LegalVerificationRequest", requestId.toString(), "Too many sign attempts");
+                throw new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
+                        "Too many attempts. Please request a new code.");
+            }
+
+            if (!otpHasher.matches(requestId, dto.getCode(), request.getSignOtpHash())) {
+                int remaining = MAX_SIGN_ATTEMPTS - request.getSignAttempts();
+                if (remaining <= 0) {
+                    request.setSignOtpHash(null); // hết lượt: huỷ mã luôn, giống nhánh "quá lượt"
+                }
+                requestRepository.save(request);
+                auditLogService.log(AuditAction.LEGAL_SIGN_FAILED, AuditResult.FAILURE,
+                        verifierId, emailOf(verifierId),
+                        "LegalVerificationRequest", requestId.toString(), "Wrong sign code");
+                throw remaining > 0
+                        ? new InvalidSignCodeException("Incorrect confirmation code. Attempts left: " + remaining + ".")
+                        : new InvalidSignCodeException(ErrorCode.SIGN_CODE_ATTEMPTS_EXHAUSTED,
+                                "Incorrect confirmation code. No attempts left; please request a new code.");
+            }
+
+            // Xác thực thành công: hủy mã OTP đã dùng
+            request.setSignOtpHash(null);
+        }
 
         // Mọi Vault phải ACTIVE và thuộc đúng chủ sở hữu; sai 1 cái hủy cả lô
         List<VerificationRequestVault> links =
@@ -459,7 +467,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                 .build();
         // V3: ký ECDSA lên mã băm giấy chứng tử + thông tin hồ sơ để sau này kiểm lại được
         signatureSealService.seal(signature, request, emailOf(verifierId),
-                links.stream().map(l -> l.getVault().getId()).toList());
+                links.stream().map(l -> l.getVault().getId()).toList(), signatureImage);
         signatureRepository.save(signature);
 
         // Mở khóa từng Vault, đặt hạn nhận 60 ngày (BR-04), ghi audit mỗi vault
@@ -486,7 +494,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         auditLogService.log(AuditAction.LEGAL_REQUEST_SIGNED, AuditResult.SUCCESS,
                 verifierId, verifierEmail,
                 "LegalVerificationRequest", requestId.toString(),
-                "signatureId=" + signature.getId());
+                "signatureId=" + signature.getId() + ", method=" + signature.getSignatureMethod());
 
         // FR-14 bước 6: Bắn sự kiện mở khóa để module FR-16/FR-07 thông báo cho Beneficiary & Executor
         List<UUID> unlockedVaultIds = links.stream().map(l -> l.getVault().getId()).toList();
@@ -508,6 +516,23 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         DigitalSignature signature = signatureRepository.findWithDetailsByRequestId(requestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Signature not found for this request."));
         return signatureSealService.check(signature);
+    }
+
+    // Ảnh chữ ký tay: cùng guard như xem chữ ký; không có ảnh (ký OTP) hoặc giải mã lỗi -> 404
+    @Override
+    public byte[] getSignatureImage(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
+        if (request.getStatus() != LegalVerificationStatus.SIGNED) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "This request has not been signed yet.");
+        }
+        byte[] png = signatureRepository.findByRequestId(requestId)
+                .map(DigitalSignature::getSignatureImageEncrypted)
+                .map(signatureSealService::decryptImage)
+                .orElse(null);
+        if (png == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "This request has no handwritten signature.");
+        }
+        return png;
     }
 
     // UC15: lịch sử hồ sơ đã xử lý, lọc tùy chọn theo trạng thái và khoảng ngày

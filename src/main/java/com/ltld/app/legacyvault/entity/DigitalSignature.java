@@ -55,4 +55,12 @@ public class DigitalSignature {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "signing_key_id")
     private SigningKey signingKey;
+
+    // Chữ ký tay (method = HANDWRITTEN): ảnh PNG Base64 đã mã hóa bằng CRYPTO_MASTER_KEY; null với OTP
+    @Column(name = "signature_image_encrypted", columnDefinition = "MEDIUMTEXT")
+    private String signatureImageEncrypted;
+
+    // SHA-256 (hex) của ảnh PNG gốc; nằm trong payload đã ký
+    @Column(name = "signature_image_sha256", length = 64)
+    private String signatureImageSha256;
 }

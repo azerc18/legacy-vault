@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getSignature } from '../api/verifierApi.js';
+import { getSignature, getSignatureImageBlob } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { formatDate } from './verifierUi.js';
 
@@ -19,6 +19,7 @@ export default function SignatureSealCard({ requestId }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState('');
+    const [imageUrl, setImageUrl] = useState(null); // ảnh chữ ký tay (object URL), chỉ khi ký tay
 
     // Chỉ nhận kết quả của lần gọi mới nhất: đổi hồ sơ hoặc bấm "Kiểm tra lại" liên tục thì
     // phản hồi cũ về muộn sẽ bị bỏ qua (review #293 n2)
@@ -36,6 +37,26 @@ export default function SignatureSealCard({ requestId }) {
         fetchSeal();
         return () => { latestCall.current += 1; }; // rời trang / đổi hồ sơ: bỏ kết quả đang bay về
     }, [fetchSeal]);
+
+    // Ký tay: tải ảnh chữ ký (API riêng, no-store) rồi hiện bằng object URL; thu hồi khi đổi hồ sơ / rời trang
+    const hasImage = !!seal?.hasSignatureImage;
+    useEffect(() => {
+        if (!hasImage) return undefined;
+        let url = null;
+        let cancelled = false;
+        getSignatureImageBlob(requestId)
+            .then((blob) => {
+                if (cancelled) return;
+                url = URL.createObjectURL(blob);
+                setImageUrl(url);
+            })
+            .catch(() => { if (!cancelled) setImageUrl(null); });
+        return () => {
+            cancelled = true;
+            if (url) URL.revokeObjectURL(url);
+            setImageUrl(null);
+        };
+    }, [requestId, hasImage]);
 
     // Bấm "Kiểm tra lại": BE đọc lại file và kiểm lại chữ ký từ đầu
     const recheck = () => { setLoading(true); fetchSeal(); };
@@ -83,10 +104,13 @@ export default function SignatureSealCard({ requestId }) {
                     </div>
 
                     {seal.status !== 'LEGACY' && (
-                        <ul className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <ul className={`grid grid-cols-1 gap-3 ${seal.hasSignatureImage ? 'md:grid-cols-2 xl:grid-cols-4' : 'md:grid-cols-3'}`}>
                             <CheckItem ok={seal.signatureValid} label={t('seal.check.signature')} t={t} />
                             <CheckItem ok={seal.payloadMatches} label={t('seal.check.payload')} t={t} />
                             <CheckItem ok={seal.documentMatches} label={t('seal.check.document')} t={t} />
+                            {seal.hasSignatureImage && (
+                                <CheckItem ok={seal.signatureImageMatches} label={t('seal.check.image')} t={t} />
+                            )}
                         </ul>
                     )}
 
@@ -96,6 +120,18 @@ export default function SignatureSealCard({ requestId }) {
                         <Item label={t('seal.method')} value={t(`seal.methods.${seal.method}`, { defaultValue: seal.method })} />
                         {seal.status === 'LEGACY' && seal.signatureHash && <Item label={t('seal.legacyHash')} value={seal.signatureHash} mono />}
                     </dl>
+
+                    {seal.hasSignatureImage && (
+                        <figure className="space-y-2">
+                            <figcaption className="text-sm text-on-surface-variant">{t('seal.handwritten')}</figcaption>
+                            {/* Nền trắng cố định: nét ký màu đen vẫn đọc được ở giao diện tối */}
+                            <div className="rounded-xl border border-outline-variant/50 bg-white p-3 max-w-md">
+                                {imageUrl
+                                    ? <img src={imageUrl} alt={t('seal.handwrittenAlt', { name: seal.verifierName || '' })} className="w-full h-auto" />
+                                    : <p className="text-xs text-slate-500 py-6 text-center">{t('seal.handwrittenLoading')}</p>}
+                            </div>
+                        </figure>
+                    )}
 
                     {seal.signedPayload && (
                         // Mã băm, khóa, payload: chỉ cần khi kiểm độc lập hoặc khi có lỗi, nên gập lại (mở sẵn nếu KHÔNG hợp lệ)
@@ -112,6 +148,7 @@ export default function SignatureSealCard({ requestId }) {
                                 {seal.documentMatches === false && seal.currentDocumentSha256 && (
                                     <Item label={t('seal.currentDocumentHash')} value={seal.currentDocumentSha256} mono />
                                 )}
+                                {seal.signatureImageSha256 && <Item label={t('seal.imageHash')} value={seal.signatureImageSha256} mono />}
                             </dl>
                             {[
                                 ['payload', t('seal.payload'), seal.signedPayload],

@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,15 @@ public class VerifierSignatureSealService {
      */
     public void seal(DigitalSignature signature, LegalVerificationRequest request,
                      String verifierEmail, Collection<UUID> vaultIds) {
+        seal(signature, request, verifierEmail, vaultIds, null);
+    }
+
+    /**
+     * Như trên, kèm ảnh chữ ký tay (PNG đã kiểm) khi Verifier ký tay: mã băm ảnh vào payload,
+     * ảnh mã hóa bằng CRYPTO_MASTER_KEY lưu cùng chữ ký. {@code signatureImagePng == null} với OTP.
+     */
+    public void seal(DigitalSignature signature, LegalVerificationRequest request,
+                     String verifierEmail, Collection<UUID> vaultIds, byte[] signatureImagePng) {
         String documentSha256 = SigningKeyService.sha256Hex(readDocument(request));
         SigningKey key = signingKeyService.getOrCreateActiveKey();
 
@@ -66,6 +77,13 @@ public class VerifierSignatureSealService {
         fields.put("vault_ids", vaultIds.stream().map(String::valueOf).sorted().collect(Collectors.joining(",")));
         fields.put("issued_at", Instant.now().truncatedTo(ChronoUnit.SECONDS).toString());
         fields.put("key_ref", key.getKeyRef());
+        String imageSha256 = null;
+        if (signatureImagePng != null) {
+            imageSha256 = SigningKeyService.sha256Hex(signatureImagePng);
+            fields.put("signature_image_sha256", imageSha256);
+            signature.setSignatureImageSha256(imageSha256);
+            signature.setSignatureImageEncrypted(encryptImage(signatureImagePng));
+        }
         String payload = buildPayload(fields);
 
         signature.setDocumentSha256(documentSha256);
@@ -102,7 +120,18 @@ public class VerifierSignatureSealService {
                 && String.valueOf(verifier.getId()).equals(fields.get("verifier_id"))
                 && signature.getDocumentSha256() != null
                 && signature.getDocumentSha256().equals(fields.get("document_sha256"))
-                && key.getKeyRef().equals(fields.get("key_ref"));
+                && key.getKeyRef().equals(fields.get("key_ref"))
+                // Cột signature_method phải đúng phương thức đã ký (sửa OTP -> HANDWRITTEN trong DB sẽ lộ)
+                && String.valueOf(signature.getSignatureMethod()).equals(fields.get("method"))
+                // Ký tay: mã băm ảnh phải nằm trong payload; ký OTP: payload không được có dòng này
+                && Objects.equals(signature.getSignatureImageSha256(), fields.get("signature_image_sha256"));
+
+        // Ký tay: ảnh đang lưu phải còn đúng mã băm lúc ký (null = không có ảnh, không kiểm)
+        Boolean imageMatches = null;
+        if (signature.getSignatureImageSha256() != null) {
+            byte[] png = decryptImage(signature.getSignatureImageEncrypted());
+            imageMatches = png != null && signature.getSignatureImageSha256().equals(SigningKeyService.sha256Hex(png));
+        }
 
         String currentSha = null;
         try {
@@ -113,7 +142,8 @@ public class VerifierSignatureSealService {
         Boolean documentMatches = currentSha == null ? null : currentSha.equals(signature.getDocumentSha256());
 
         SignatureSealStatus status;
-        if (!signatureValid || !payloadMatches || Boolean.FALSE.equals(documentMatches)) {
+        if (!signatureValid || !payloadMatches || Boolean.FALSE.equals(documentMatches)
+                || Boolean.FALSE.equals(imageMatches)) {
             status = SignatureSealStatus.INVALID;
         } else if (documentMatches == null) {
             status = SignatureSealStatus.DOCUMENT_UNAVAILABLE;
@@ -125,6 +155,9 @@ public class VerifierSignatureSealService {
                 .signatureValid(signatureValid)
                 .payloadMatches(payloadMatches)
                 .documentMatches(documentMatches)
+                .hasSignatureImage(signature.getSignatureImageSha256() != null)
+                .signatureImageMatches(imageMatches)
+                .signatureImageSha256(signature.getSignatureImageSha256())
                 .documentSha256(signature.getDocumentSha256())
                 .currentDocumentSha256(currentSha)
                 .algorithm(signature.getSignatureAlgorithm())
@@ -156,6 +189,27 @@ public class VerifierSignatureSealService {
             }
         }
         return out;
+    }
+
+    /** Ảnh chữ ký tay (PNG) đã giải mã; null nếu không có hoặc giải mã lỗi. Không ném lỗi. */
+    public byte[] decryptImage(String encrypted) {
+        if (encrypted == null) {
+            return null;
+        }
+        try {
+            return Base64.getDecoder().decode(cryptoService.decrypt(encrypted));
+        } catch (Exception e) {
+            log.warn("V3: could not decrypt a handwritten signature image", e);
+            return null;
+        }
+    }
+
+    private String encryptImage(byte[] png) {
+        try {
+            return cryptoService.encrypt(Base64.getEncoder().encodeToString(png));
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not encrypt the signature image.", e);
+        }
     }
 
     private byte[] readDocument(LegalVerificationRequest request) {

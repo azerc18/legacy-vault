@@ -74,6 +74,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -535,7 +536,7 @@ public class LegalVerificationServiceImplTest {
         assertThat(vault.getClaimDeadlineAt()).isEqualTo(vault.getUnlockedAt().plusDays(60));
         verify(signatureRepository, times(1)).save(any());
         // V3: chữ ký được gắn con dấu ECDSA trước khi lưu, kèm đúng danh sách vault
-        verify(signatureSealService).seal(any(), eq(pendingRequest), isNull(), eq(List.of(vault.getId())));
+        verify(signatureSealService).seal(any(), eq(pendingRequest), isNull(), eq(List.of(vault.getId())), isNull());
         verify(auditLogService, times(1)).log(
                 eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
                 isNull(), eq("Vault"), eq(vault.getId().toString()), anyString());
@@ -690,6 +691,115 @@ public class LegalVerificationServiceImplTest {
                 .isInstanceOf(RequestAlreadyReviewedException.class);
 
         verifyNoInteractions(emailSender);
+    }
+
+    // ---------- Ký tay (HANDWRITTEN), ngang hàng với OTP ----------
+
+    private SignVerificationRequestDto handwrittenDto(byte[] png) {
+        SignVerificationRequestDto dto = new SignVerificationRequestDto();
+        dto.setMethod(SignatureMethod.HANDWRITTEN);
+        dto.setSignatureImage(SignaturePngFixture.dataUrl(png));
+        return dto;
+    }
+
+    @Test
+    void sign_handwritten_noOtpNeeded_sealsWithImageAndUnlocks() {
+        approvedByVerifier();
+        handoverStillValid();
+        // Không có mã OTP nào được gửi: ký tay không cần
+        Vault vault = vaultOf(VaultStatus.ACTIVE);
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+        when(userRepository.getReferenceById(verifierId)).thenReturn(User.builder().id(verifierId).build());
+        when(requestVaultRepository.findByRequestIdFetchVault(requestId)).thenReturn(List.of(
+                VerificationRequestVault.builder().request(pendingRequest).vault(vault).build()));
+        byte[] png = SignaturePngFixture.signed(600, 200);
+
+        service.sign(requestId, verifierId, handwrittenDto(png));
+
+        assertThat(vault.getStatus()).isEqualTo(VaultStatus.UNLOCKED);
+        assertThat(pendingRequest.getStatus()).isEqualTo(LegalVerificationStatus.SIGNED);
+        org.mockito.ArgumentCaptor<DigitalSignature> sig = org.mockito.ArgumentCaptor.forClass(DigitalSignature.class);
+        verify(signatureSealService).seal(sig.capture(), eq(pendingRequest), isNull(), eq(List.of(vault.getId())), eq(png));
+        assertThat(sig.getValue().getSignatureMethod()).isEqualTo(SignatureMethod.HANDWRITTEN);
+        verifyNoInteractions(otpHasher);
+        verify(auditLogService).log(eq(AuditAction.LEGAL_REQUEST_SIGNED), eq(AuditResult.SUCCESS), eq(verifierId),
+                isNull(), eq("LegalVerificationRequest"), eq(requestId.toString()), contains("method=HANDWRITTEN"));
+    }
+
+    @Test
+    void sign_handwrittenBlankCanvas_rejectedBeforeTouchingRequest() {
+        assertThatThrownBy(() -> service.sign(requestId, verifierId,
+                handwrittenDto(SignaturePngFixture.blank(600, 200))))
+                .isInstanceOf(com.ltld.app.legacyvault.exception.BusinessException.class)
+                .satisfies(e -> assertThat(((com.ltld.app.legacyvault.exception.BusinessException) e).getErrorCode())
+                        .isEqualTo(ErrorCode.INVALID_SIGNATURE_IMAGE));
+
+        verifyNoInteractions(requestRepository, signatureRepository, signatureSealService, eventPublisher);
+    }
+
+    @Test
+    void sign_handwrittenWithoutImage_rejected() {
+        SignVerificationRequestDto dto = new SignVerificationRequestDto();
+        dto.setMethod(SignatureMethod.HANDWRITTEN);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, dto))
+                .hasMessageContaining("draw your signature");
+        verifyNoInteractions(requestRepository, signatureRepository);
+    }
+
+    @Test
+    void sign_handwrittenStillChecksHandover_andVerifier() {
+        approvedByVerifier();
+        pendingRequest.setVerifier(User.builder().id(UUID.randomUUID()).build());
+        when(requestRepository.findByIdForUpdate(requestId)).thenReturn(Optional.of(pendingRequest));
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId,
+                handwrittenDto(SignaturePngFixture.signed(600, 200))))
+                .isInstanceOf(NotAssignedVerifierException.class);
+        verify(signatureRepository, never()).save(any());
+    }
+
+    @Test
+    void sign_otpWithoutCode_rejected() {
+        SignVerificationRequestDto dto = new SignVerificationRequestDto();
+        dto.setMethod(SignatureMethod.MOCK_OTP);
+
+        assertThatThrownBy(() -> service.sign(requestId, verifierId, dto))
+                .isInstanceOf(InvalidSignCodeException.class)
+                .hasMessageContaining("confirmation code");
+        verifyNoInteractions(requestRepository);
+    }
+
+    @Test
+    void getSignatureImage_handwritten_returnsDecryptedPng() {
+        pendingRequest.setStatus(LegalVerificationStatus.SIGNED);
+        byte[] png = SignaturePngFixture.signed(600, 200);
+        DigitalSignature sig = DigitalSignature.builder().signatureImageEncrypted("enc").build();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(signatureRepository.findByRequestId(requestId)).thenReturn(Optional.of(sig));
+        when(signatureSealService.decryptImage("enc")).thenReturn(png);
+
+        assertThat(service.getSignatureImage(requestId, verifierId)).isEqualTo(png);
+    }
+
+    @Test
+    void getSignatureImage_otpSignature_notFound() {
+        pendingRequest.setStatus(LegalVerificationStatus.SIGNED);
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(signatureRepository.findByRequestId(requestId)).thenReturn(Optional.of(DigitalSignature.builder().build()));
+
+        assertThatThrownBy(() -> service.getSignatureImage(requestId, verifierId))
+                .hasMessageContaining("no handwritten signature");
+    }
+
+    @Test
+    void getSignatureImage_notSigned_notFound() {
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+
+        assertThatThrownBy(() -> service.getSignatureImage(requestId, verifierId))
+                .hasMessageContaining("not been signed");
+        verifyNoInteractions(signatureRepository);
     }
 
     // T5: method = MOCK_PIN bị từ chối (N4)
