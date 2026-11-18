@@ -9,6 +9,7 @@ import com.ltld.app.legacyvault.exception.AssistantException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig;
 import com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService;
+import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -88,7 +89,7 @@ public class AssistantServiceImpl implements AssistantService {
             reply = aiClient.chat(systemPrompt, messages, config);
         } catch (RuntimeException e) {
             // Không log nội dung tin nhắn, chỉ log lỗi
-            log.warn("Assistant call failed for user {}: {}", userId, com.ltld.app.legacyvault.utility.GeminiErrors.describe(e));
+            log.warn("Assistant call failed for user {}: {}", userId, GeminiErrors.describe(e));
             reply = fallbackReply(userId, systemPrompt, messages, config);
         }
         return new ChatResponse(reply == null || reply.isBlank()
@@ -108,7 +109,7 @@ public class AssistantServiceImpl implements AssistantService {
                 return reply;
             } catch (RuntimeException fe) {
                 log.warn("Assistant fallback {} failed for user {}: {}", fallback.describeText(config), userId,
-                        com.ltld.app.legacyvault.utility.GeminiErrors.describe(fe));
+                        GeminiErrors.describe(fe));
             }
         }
         throw new AssistantException("Assistant is unavailable right now. Please try again later.",

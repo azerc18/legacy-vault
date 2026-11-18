@@ -3,7 +3,10 @@ package com.ltld.app.legacyvault.service.aifallbackservice;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
@@ -177,5 +180,42 @@ class AiImagesTest {
         BufferedImage out = ImageIO.read(new ByteArrayInputStream(AiImages.shrinkToJpeg(png(8000, 2000))));
         assertThat(out.getWidth()).isEqualTo(AiImages.MAX_EDGE_PX);
         assertThat(out.getHeight()).isEqualTo(400);
+    }
+
+    /**
+     * PDF khổ A4 nhúng 1 ảnh FlateDecode khai {@code w x h} px. Dữ liệu ảnh chỉ là vài byte nén: kích thước khai
+     * phải bị chặn trước khi PDFBox giải nén (ảnh thật 20000x20000 RGB nén toàn số 0 chỉ khoảng 1-2MB).
+     */
+    static byte[] pdfWithEmbeddedImage(int w, int h) throws Exception {
+        try (PDDocument doc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            doc.addPage(page);
+            ByteArrayOutputStream z = new ByteArrayOutputStream();
+            try (var dz = new java.util.zip.DeflaterOutputStream(z)) {
+                dz.write(new byte[3 * w]);   // 1 hàng
+            }
+            PDImageXObject img = new PDImageXObject(doc, new ByteArrayInputStream(z.toByteArray()),
+                    COSName.FLATE_DECODE, w, h, 8, PDDeviceRGB.INSTANCE);
+            try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                cs.drawImage(img, 50, 50, 200, 200);
+            }
+            doc.save(out);
+            return out.toByteArray();
+        }
+    }
+
+    @Test
+    void pdfPagesAsJpeg_embeddedImageDeclaringTooManyPixels_isRejected_beforeDecoding() throws Exception {
+        byte[] pdf = pdfWithEmbeddedImage(20_000, 20_000);
+        assertThat(pdf.length).isLessThan(5_000);
+        assertThatThrownBy(() -> AiImages.pdfPagesAsJpeg(pdf, 2))
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Embedded image too large");
+    }
+
+    @Test
+    void pdfPagesAsJpeg_normalEmbeddedImage_stillRenders() throws Exception {
+        List<byte[]> pages = AiImages.pdfPagesAsJpeg(pdfWithEmbeddedImage(800, 600), 2);
+        assertThat(pages).hasSize(1);
     }
 }

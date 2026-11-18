@@ -1,8 +1,13 @@
 package com.ltld.app.legacyvault.service.aifallbackservice;
 
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -40,6 +45,8 @@ public final class AiImages {
     static final long MAX_SOURCE_PIXELS = 100_000_000L;
     /** Chỉ lấy chữ ở vài trang đầu: giấy chứng tử chỉ 1-2 trang, PDF nhiều trang không tốn thời gian vô ích. */
     static final int MAX_TEXT_PAGES = 5;
+    /** Độ sâu tối đa khi duyệt form XObject lồng nhau tìm ảnh nhúng (chống vòng lặp / PDF lồng sâu). */
+    private static final int MAX_FORM_DEPTH = 5;
     private static final float JPEG_QUALITY = 0.85f;
     private static final int RENDER_DPI = 150;
 
@@ -70,11 +77,34 @@ public final class AiImages {
             renderer.setSubsamplingAllowed(true);
             int pages = Math.min(maxPages, doc.getNumberOfPages());
             for (int i = 0; i < pages; i++) {
+                // Ảnh nhúng (vd. FlateDecode 20000x20000) được giải nén hết trước khi đọc thưa: chặn từ kích thước khai
+                rejectHugeImages(doc.getPage(i).getResources(), 0);
                 PDRectangle box = doc.getPage(i).getCropBox();
                 out.add(toJpeg(renderer.renderImage(i, renderScale(box.getWidth(), box.getHeight()), ImageType.RGB)));
             }
         }
         return out;
+    }
+
+    /**
+     * Ảnh nhúng trong trang (cả trong form XObject) khai quá {@link #MAX_SOURCE_PIXELS} thì báo lỗi. Chỉ đọc
+     * Width / Height trong dictionary của ảnh, không giải nén dữ liệu.
+     */
+    static void rejectHugeImages(PDResources resources, int depth) throws IOException {
+        if (resources == null || depth > MAX_FORM_DEPTH) {
+            return;
+        }
+        for (COSName name : resources.getXObjectNames()) {
+            PDXObject x = resources.getXObject(name);
+            if (x instanceof PDImageXObject img) {
+                long px = (long) img.getWidth() * img.getHeight();
+                if (img.getWidth() <= 0 || img.getHeight() <= 0 || px > MAX_SOURCE_PIXELS) {
+                    throw new IOException("Embedded image too large: " + img.getWidth() + "x" + img.getHeight());
+                }
+            } else if (x instanceof PDFormXObject form) {
+                rejectHugeImages(form.getResources(), depth + 1);
+            }
+        }
     }
 
     /** Tỉ lệ render (1 = 72 DPI): 150 DPI, nhưng nhỏ lại để cạnh dài không quá {@link #MAX_EDGE_PX}. */
