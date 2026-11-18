@@ -466,6 +466,11 @@
       },
       "outside_one": "{{count}} Dead Man's Switch đang chạy có cấu hình nằm ngoài khoảng này. Nó vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
       "outside_other": "{{count}} Dead Man's Switch đang chạy có cấu hình nằm ngoài khoảng này. Chúng vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impactPending": "Đang tính số Dead Man's Switch bị ảnh hưởng…",
+      "impactNone": "Nếu lưu: không Dead Man's Switch đang chạy nào nằm ngoài khoảng mới.",
+      "impact_one": "Nếu lưu: {{count}} Dead Man's Switch đang chạy sẽ nằm ngoài khoảng mới. Nó vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impact_other": "Nếu lưu: {{count}} Dead Man's Switch đang chạy sẽ nằm ngoài khoảng mới. Chúng vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impactError": "Không tính được số Dead Man's Switch bị ảnh hưởng. Bạn vẫn lưu được; con số sẽ hiện sau khi lưu.",
       "noteOwner": "Owner thấy khoảng mới ngay trên form Dead Man's Switch (tối đa 30 giây sau khi lưu).",
       "noteRunning": "Không sửa và không dừng Dead Man's Switch nào đang chạy.",
       "noteBackup": "Số ngày chờ Executor dự phòng chỉ áp dụng cho Dead Man's Switch bật mới; cái đã bật giữ số đã chốt."

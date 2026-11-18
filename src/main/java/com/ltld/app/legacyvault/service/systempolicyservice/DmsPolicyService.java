@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.service.systempolicyservice;
 
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.systempolicydto.AdminDmsPolicyResponse;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicyImpactResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
 import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy.Range;
 import com.ltld.app.legacyvault.dto.systempolicydto.UpdateDmsPolicyRequest;
@@ -107,21 +108,27 @@ public class DmsPolicyService {
                 row == null ? null : row.getUpdatedAt(), email);
     }
 
+    /**
+     * Xem trước khi lưu: cùng kiểm tra như {@link #update} (400 SYSTEM_POLICY_INVALID nếu khoảng sai),
+     * rồi đếm số DMS đang chạy sẽ nằm ngoài khoảng mới. Không ghi DB, không audit, không đụng cache.
+     */
+    @Transactional(readOnly = true)
+    public DmsPolicyImpactResponse previewImpact(UpdateDmsPolicyRequest req) {
+        return new DmsPolicyImpactResponse(countOutside(validated(req)));
+    }
+
     @Transactional
     public AdminDmsPolicyResponse update(UUID adminId, UpdateDmsPolicyRequest req) {
-        Range interval = validate("Check-in interval", req.checkinIntervalDays(), DmsPolicy.HARD_CHECKIN_INTERVAL);
-        Range grace = validate("Grace period", req.gracePeriodDays(), DmsPolicy.HARD_GRACE_PERIOD);
-        Range reminders = validate("Reminder count", req.reminderCount(), DmsPolicy.HARD_REMINDER_COUNT);
-        int backupWait = req.backupActivationWaitDays();
-        if (backupWait < DmsPolicy.HARD_BACKUP_WAIT_MIN || backupWait > DmsPolicy.HARD_BACKUP_WAIT_MAX) {
-            throw new BusinessException(ErrorCode.SYSTEM_POLICY_INVALID, "Backup executor wait must be between "
-                    + DmsPolicy.HARD_BACKUP_WAIT_MIN + " and " + DmsPolicy.HARD_BACKUP_WAIT_MAX + " days.");
-        }
+        DmsPolicy after = validated(req);
+        Range interval = after.checkinIntervalDays();
+        Range grace = after.gracePeriodDays();
+        Range reminders = after.reminderCount();
+        int backupWait = after.backupActivationWaitDays();
 
-        DmsPolicySetting row = repository.findById(DmsPolicySetting.SINGLETON_ID)
+        // Khoá dòng tới hết transaction: Admin thứ hai chờ, rồi so sánh với giá trị Admin thứ nhất vừa lưu
+        DmsPolicySetting row = repository.findByIdForUpdate(DmsPolicySetting.SINGLETON_ID)
                 .orElseGet(() -> DmsPolicySetting.builder().id(DmsPolicySetting.SINGLETON_ID).build());
         DmsPolicy before = toPolicy(row);
-        DmsPolicy after = new DmsPolicy(interval, grace, reminders, backupWait);
         List<String> changes = diff(before, after);
         if (!changes.isEmpty()) {
             row.setCheckinIntervalMinDays(interval.min());
@@ -149,6 +156,18 @@ public class DmsPolicyService {
     }
 
     // ------------------------------------------------------------------ nội bộ
+
+    private static DmsPolicy validated(UpdateDmsPolicyRequest req) {
+        Range interval = validate("Check-in interval", req.checkinIntervalDays(), DmsPolicy.HARD_CHECKIN_INTERVAL);
+        Range grace = validate("Grace period", req.gracePeriodDays(), DmsPolicy.HARD_GRACE_PERIOD);
+        Range reminders = validate("Reminder count", req.reminderCount(), DmsPolicy.HARD_REMINDER_COUNT);
+        int backupWait = req.backupActivationWaitDays();
+        if (backupWait < DmsPolicy.HARD_BACKUP_WAIT_MIN || backupWait > DmsPolicy.HARD_BACKUP_WAIT_MAX) {
+            throw new BusinessException(ErrorCode.SYSTEM_POLICY_INVALID, "Backup executor wait must be between "
+                    + DmsPolicy.HARD_BACKUP_WAIT_MIN + " and " + DmsPolicy.HARD_BACKUP_WAIT_MAX + " days.");
+        }
+        return new DmsPolicy(interval, grace, reminders, backupWait);
+    }
 
     static DmsPolicy hardLimits() {
         return new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL, DmsPolicy.HARD_GRACE_PERIOD,

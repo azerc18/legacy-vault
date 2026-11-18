@@ -23,6 +23,8 @@ const LIMITS = {
 const isRange = (r) => r && Number.isInteger(r.min) && Number.isInteger(r.max) && Number.isInteger(r.defaultValue);
 const limitsFrom = (policy) => Object.fromEntries(Object.keys(LIMITS).map((k) => [k, isRange(policy?.[k]) ? policy[k] : LIMITS[k]]));
 const defaultsOf = (limits) => Object.fromEntries(Object.entries(limits).map(([k, l]) => [k, l.defaultValue]));
+// DMS đã cấu hình: lấy số đã lưu; ô nào BE chưa trả thì dùng giá trị gợi ý của chính sách (không viết cứng 30/7/3)
+const formFromConfig = (c, limits) => Object.fromEntries(Object.entries(limits).map(([k, l]) => [k, c?.[k] ?? l.defaultValue]));
 
 // KYC: lưu tạm cấu hình đang nhập khi phải sang trang Xác minh danh tính, để quay lại vẫn còn
 const DRAFT_KEY = 'lv:dms-draft';
@@ -103,7 +105,7 @@ export default function DeadMansSwitch() {
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm(formFromConfig(c, limits));
         else {
             const draft = readDraft();
             if (draft) setForm((f) => ({ ...f, ...draft }));
@@ -133,7 +135,7 @@ export default function DeadMansSwitch() {
             .then(([c, next]) => {
                 setConfig(c);
                 if (c?.configured) {
-                    setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+                    setForm(formFromConfig(c, next || LIMITS));
                 } else {
                     const draft = readDraft();
                     setForm({ ...defaultsOf(next || LIMITS), ...(draft || {}) });

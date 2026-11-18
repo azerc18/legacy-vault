@@ -4,6 +4,7 @@ import com.ltld.app.legacyvault.controller.AdminSystemPolicyController;
 import com.ltld.app.legacyvault.controller.DmsController;
 import com.ltld.app.legacyvault.dto.systempolicydto.AdminDmsPolicyResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicyImpactResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.SystemInfoResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.UpdateDmsPolicyRequest;
 import com.ltld.app.legacyvault.exception.BusinessException;
@@ -31,7 +32,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,8 +89,7 @@ class AdminSystemPolicyControllerSecurityTest {
 
         mockMvc.perform(get("/api/admin/system-policies/dms").with(admin()))
                 .andExpect(status().isOk())
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
-                        .string("Cache-Control", "no-store"))
+                .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.data.policy.checkinIntervalDays.defaultValue").value(30))
                 .andExpect(jsonPath("$.data.policy.backupActivationWaitDays").value(14));
     }
@@ -129,6 +131,35 @@ class AdminSystemPolicyControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("SYSTEM_POLICY_INVALID"));
+    }
+
+    @Test
+    void previewImpact_owner_returns403() throws Exception {
+        mockMvc.perform(post("/api/admin/system-policies/dms/impact").with(token(UUID.randomUUID(), "ROLE_OWNER"))
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(dmsPolicyService);
+    }
+
+    @Test
+    void previewImpact_admin_returnsCountAndNoStore_withoutSaving() throws Exception {
+        when(dmsPolicyService.previewImpact(any(UpdateDmsPolicyRequest.class))).thenReturn(new DmsPolicyImpactResponse(4));
+
+        mockMvc.perform(post("/api/admin/system-policies/dms/impact").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(jsonPath("$.data.configsOutsideLimits").value(4));
+        verify(dmsPolicyService).previewImpact(argThat(r -> r.checkinIntervalDays().min() == 7));
+        verify(dmsPolicyService, never()).update(any(), any());
+    }
+
+    @Test
+    void previewImpact_missingField_returns400WithoutCallingService() throws Exception {
+        mockMvc.perform(post("/api/admin/system-policies/dms/impact").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"backupActivationWaitDays\":14}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(dmsPolicyService);
     }
 
     @Test

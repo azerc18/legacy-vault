@@ -61,8 +61,24 @@ export default function AdminSystemPolicies() {
         return out;
     }, [draft, data]);
 
-    const dirty = data && draft && JSON.stringify(normalize(draft)) !== JSON.stringify(normalize(draftOf(data.policy)));
+    const draftKey = draft ? JSON.stringify(normalize(draft)) : '';
+    const dirty = Boolean(data && draft) && draftKey !== JSON.stringify(normalize(draftOf(data.policy)));
     const invalid = Object.keys(errors).length > 0;
+
+    // Xem trước trước khi lưu: số DMS đang chạy sẽ nằm ngoài khoảng đang nhập. Chờ 400 ms sau lần gõ cuối;
+    // kết quả gắn với đúng bản nháp đã hỏi (key) nên số cũ không hiện cho bản nháp mới.
+    const [impact, setImpact] = useState(null);   // { key, count } — count null = không tính được
+    useEffect(() => {
+        if (!dirty || invalid) return undefined;
+        let alive = true;
+        const timer = setTimeout(() => {
+            adminApi.previewDmsPolicyImpact(JSON.parse(draftKey))
+                .then((r) => { if (alive) setImpact({ key: draftKey, count: r.configsOutsideLimits }); })
+                .catch(() => { if (alive) setImpact({ key: draftKey, count: null }); });
+        }, 400);
+        return () => { alive = false; clearTimeout(timer); };
+    }, [draftKey, dirty, invalid]);
+    const preview = dirty && !invalid ? (impact?.key === draftKey ? impact : 'pending') : null;
 
     const setPart = (key, part, value) => setDraft((d) => ({ ...d, [key]: { ...d[key], [part]: value } }));
 
@@ -142,11 +158,25 @@ export default function AdminSystemPolicies() {
                         </table>
                     </div>
 
-                    {data.configsOutsideLimits > 0 && (
-                        <div className="mt-4 rounded-xl border border-warning/25 bg-warning-container/85 text-on-warning-container px-4 py-3 text-sm flex gap-2" data-testid="dms-policy-outside">
-                            <Icon name="warning" className="text-[18px]" />
-                            <span>{t('systemPolicies.dms.outside', { count: data.configsOutsideLimits })}</span>
-                        </div>
+                    {/* Chưa sửa: số DMS ngoài khoảng ĐANG lưu. Đang sửa: xem trước theo khoảng đang nhập */}
+                    {!dirty && data.configsOutsideLimits > 0 && <OutsideBox testId="dms-policy-outside" text={t('systemPolicies.dms.outside', { count: data.configsOutsideLimits })} />}
+                    {preview === 'pending' && (
+                        <p className="mt-4 text-sm text-outline flex gap-2" aria-live="polite" data-testid="dms-policy-impact-pending">
+                            <Icon name="hourglass_top" className="text-[18px]" />{t('systemPolicies.dms.impactPending')}
+                        </p>
+                    )}
+                    {preview && preview !== 'pending' && preview.count > 0 && (
+                        <OutsideBox testId="dms-policy-impact" text={t('systemPolicies.dms.impact', { count: preview.count })} />
+                    )}
+                    {preview && preview !== 'pending' && preview.count === 0 && (
+                        <p className="mt-4 text-sm text-on-surface-variant flex gap-2" aria-live="polite" data-testid="dms-policy-impact-none">
+                            <Icon name="check_circle" className="text-[18px] text-primary" />{t('systemPolicies.dms.impactNone')}
+                        </p>
+                    )}
+                    {preview && preview !== 'pending' && preview.count == null && (
+                        <p className="mt-4 text-sm text-outline flex gap-2" data-testid="dms-policy-impact-error">
+                            <Icon name="info" className="text-[18px]" />{t('systemPolicies.dms.impactError')}
+                        </p>
                     )}
 
                     <ul className="text-xs text-on-surface-variant mt-4 space-y-1">
@@ -178,6 +208,16 @@ export default function AdminSystemPolicies() {
 
             <p className="text-xs text-on-surface-variant flex gap-1.5 mt-4"><Icon name="history" className="text-[16px]" />{t('systemPolicies.auditHint')}</p>
         </AdminLayout>
+    );
+}
+
+function OutsideBox({ text, testId }) {
+    return (
+        <div className="mt-4 rounded-xl border border-warning/25 bg-warning-container/85 text-on-warning-container px-4 py-3 text-sm flex gap-2"
+             aria-live="polite" data-testid={testId}>
+            <Icon name="warning" className="text-[18px]" />
+            <span>{text}</span>
+        </div>
     );
 }
 

@@ -188,6 +188,8 @@ export const adminApi = {
     getDmsPolicy: () => http.get('/admin/system-policies/dms').then(unwrap),
     // body cùng dạng policy; 400 SYSTEM_POLICY_INVALID nếu min > max, mặc định ngoài khoảng hoặc vượt giới hạn cứng
     updateDmsPolicy: (body) => http.put('/admin/system-policies/dms', body).then(unwrap),
+    // Xem trước (chưa lưu), body cùng dạng updateDmsPolicy -> { configsOutsideLimits }. 400 SYSTEM_POLICY_INVALID nếu khoảng sai
+    previewDmsPolicyImpact: (body) => http.post('/admin/system-policies/dms/impact', body).then(unwrap),
     // -> { crypto: {dataEncryption, masterKeyConfigured, passwordHashing, otpHashing, otpKeySeparate, identityKeySeparate},
     //      storage: {provider, bucket, encryptedAtRest}, backup: {provider, retentionDays, note}, schemaVersion }. Không có khoá.
     getSystemInfo: () => http.get('/admin/system-policies/system-info').then(unwrap),

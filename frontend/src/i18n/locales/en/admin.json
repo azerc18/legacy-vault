@@ -480,6 +480,11 @@
       },
       "outside_one": "{{count}} running Dead Man's Switch has a setting outside this range. It keeps running as is; when the owner saves it again they must pick a value in range.",
       "outside_other": "{{count}} running Dead Man's Switches have settings outside this range. They keep running as is; when an owner saves again they must pick a value in range.",
+      "impactPending": "Counting the affected Dead Man's Switches…",
+      "impactNone": "If you save: no running Dead Man's Switch falls outside the new range.",
+      "impact_one": "If you save: {{count}} running Dead Man's Switch will be outside the new range. It keeps running as is; when the owner saves it again they must pick a value in range.",
+      "impact_other": "If you save: {{count}} running Dead Man's Switches will be outside the new range. They keep running as is; when an owner saves again they must pick a value in range.",
+      "impactError": "Could not count the affected Dead Man's Switches. You can still save; the number appears after saving.",
       "noteOwner": "Owners see the new range on their Dead Man's Switch form right away (at most 30 seconds after saving).",
       "noteRunning": "No running Dead Man's Switch is changed or stopped.",
       "noteBackup": "The backup executor wait only applies to newly enabled switches; existing ones keep the value they started with."

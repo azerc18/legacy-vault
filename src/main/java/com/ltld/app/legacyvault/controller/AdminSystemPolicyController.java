@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.systempolicydto.AdminDmsPolicyResponse;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicyImpactResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.SystemInfoResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.UpdateDmsPolicyRequest;
 import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
@@ -38,6 +39,14 @@ public class AdminSystemPolicyController {
                                                                          @Valid @RequestBody UpdateDmsPolicyRequest request) {
         UUID adminId = UUID.fromString(principal.getName());
         return ResponseEntity.ok(ApiResponse.success("System policy saved", dmsPolicyService.update(adminId, request)));
+    }
+
+    // Xem trước số DMS đang chạy bị ảnh hưởng, gọi khi Admin đang gõ (chưa lưu). POST vì gửi body cùng dạng PUT.
+    @PostMapping("/dms/impact")
+    public ResponseEntity<ApiResponse<DmsPolicyImpactResponse>> previewDmsImpact(@Valid @RequestBody UpdateDmsPolicyRequest request) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(dmsPolicyService.previewImpact(request)));
     }
 
     @GetMapping("/system-info")

@@ -3,6 +3,7 @@ package com.ltld.app.legacyvault.service.systempolicyservice;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.systempolicydto.AdminDmsPolicyResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicyImpactResponse;
 import com.ltld.app.legacyvault.dto.systempolicydto.UpdateDmsPolicyRequest;
 import com.ltld.app.legacyvault.dto.systempolicydto.UpdateDmsPolicyRequest.RangeInput;
 import com.ltld.app.legacyvault.entity.DmsPolicySetting;
@@ -64,6 +65,7 @@ class DmsPolicyServiceTest {
         service = new DmsPolicyService(repository, dmsConfigRepository, userRepository, auditLogService, clock);
         row = DmsPolicySetting.builder().id(DmsPolicySetting.SINGLETON_ID).build();   // = seed của migration
         when(repository.findById(DmsPolicySetting.SINGLETON_ID)).thenAnswer(inv -> Optional.of(row));
+        when(repository.findByIdForUpdate(DmsPolicySetting.SINGLETON_ID)).thenAnswer(inv -> Optional.of(row));
         when(repository.save(any(DmsPolicySetting.class))).thenAnswer(inv -> inv.getArgument(0));
         when(userRepository.findById(adminId))
                 .thenReturn(Optional.of(User.builder().id(adminId).email("admin@example.test").build()));
@@ -173,6 +175,8 @@ class DmsPolicyServiceTest {
         assertThat(res.policy().checkinIntervalDays()).isEqualTo(new DmsPolicy.Range(7, 30, 180));
         assertThat(res.configsOutsideLimits()).isEqualTo(2L);
         assertThat(res.updatedByEmail()).isEqualTo("admin@example.test");
+        // n1: đọc dòng bằng SELECT ... FOR UPDATE, không dùng findById thường
+        verify(repository).findByIdForUpdate(DmsPolicySetting.SINGLETON_ID);
 
         ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
         verify(auditLogService).log(eq(AuditAction.SYSTEM_POLICY_UPDATED), eq(AuditResult.SUCCESS), eq(adminId),
@@ -200,5 +204,29 @@ class DmsPolicyServiceTest {
 
         verify(repository, never()).save(any());
         verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("Xem trước: đếm DMS ngoài khoảng MỚI (chưa lưu), không ghi DB, không audit, không khoá dòng")
+    void previewImpact_countsAgainstDraft_withoutWriting() {
+        when(dmsConfigRepository.countRunningOutsidePolicy(any(), eq(14), eq(90), eq(3), eq(30), eq(2), eq(5)))
+                .thenReturn(5L);
+
+        DmsPolicyImpactResponse res = service.previewImpact(req(14, 30, 90, 3, 7, 30, 2, 3, 5, 14));
+
+        assertThat(res.configsOutsideLimits()).isEqualTo(5L);
+        assertThat(row.getCheckinIntervalMinDays()).isEqualTo(1);   // dòng DB không đổi
+        verify(repository, never()).save(any());
+        verify(repository, never()).findByIdForUpdate(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("Xem trước với khoảng sai -> SYSTEM_POLICY_INVALID như khi lưu, không đếm")
+    void previewImpact_invalid_rejected() {
+        assertThatThrownBy(() -> service.previewImpact(req(100, 50, 60, 1, 7, 90, 1, 3, 10, 14)))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.SYSTEM_POLICY_INVALID);
+        verifyNoInteractions(dmsConfigRepository);
     }
 }
