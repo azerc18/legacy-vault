@@ -18,6 +18,9 @@ import com.ltld.app.legacyvault.service.fileservice.FileStorageService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
 import com.ltld.app.legacyvault.service.legalverificationservice.VerifierAccessGuard;
 import com.ltld.app.legacyvault.utility.GeminiErrors;
+import com.ltld.app.legacyvault.enums.AiFallbackProvider;
+import com.ltld.app.legacyvault.service.aifallbackservice.AiImages;
+import com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +73,17 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
 
     public static final String ENGINE_GEMINI = "GEMINI_VISION_AI";
     public static final String ENGINE_DEMO = "DEMO_SIMULATION";
+    // AI dự phòng khi Gemini hỏng
+    public static final String ENGINE_GROQ_VISION = "GROQ_VISION_AI";
+    public static final String ENGINE_GROQ_TEXT = "GROQ_TEXT_AI";
+    public static final String ENGINE_DEEPSEEK_TEXT = "DEEPSEEK_TEXT_AI";
+    private static final int PDF_TEXT_MIN_CHARS = 40;      // ít hơn = PDF scan (không có lớp chữ)
+    private static final int PDF_TEXT_MAX_CHARS = 20_000;
+    private static final int PDF_MAX_PAGES_AS_IMAGES = 2;
+    static final String TEXT_ONLY_NOTE = "\nLƯU Ý: Bạn chỉ nhận được CHỮ trích từ file PDF, KHÔNG có hình ảnh. "
+            + "Đặt hasOfficialSeal = false, imageQualityScore = null, imageClarityLabel = null.";
+    static final String TEXT_ONLY_WARNING = "AI dự phòng chỉ đọc được phần chữ trong file PDF: không kiểm tra được con dấu"
+            + " và chất lượng bản scan. Hãy xem trực tiếp bản gốc.";
     public static final String ENGINE_UNAVAILABLE = "UNAVAILABLE";
 
     public static final String DEFAULT_UNAVAILABLE_MESSAGE =
@@ -116,6 +130,10 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     // Trang Cấu hình AI (bật / tắt, model). Không có (unit test dựng tay) thì luôn bật, model của biến môi trường.
     @Autowired(required = false)
     private AiSettingsService aiSettings;
+
+    // AI dự phòng (Groq / DeepSeek) khi Gemini hỏng. Không có (unit test dựng tay) thì chỉ Gemini.
+    @Autowired(required = false)
+    private FallbackAiClient fallback;
 
     /*
      * Không đặt @Transactional cho cả hàm: lời gọi Gemini có thể mất tới 25 giây, giữ transaction
@@ -179,7 +197,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         DeathCertificateOcrResponseDto result = analyzeBytes(plainBytes, documentRef, ownerFullName);
         attachOwnerIdMatch(result, ctx.ownerId());
 
-        if (ENGINE_GEMINI.equals(result.getEngineSource())) {
+        if (isAiEngine(result.getEngineSource())) {
             if (verifierCache.size() >= MAX_IN_MEMORY_KEYS) {
                 verifierCache.values().removeIf(CachedOcrEntry::isExpired);
             }
@@ -356,8 +374,16 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                                 backupModel, fileName, backupEx.getMessage());
                     }
                 }
-                return buildUnavailableResult(expectedOwnerName, DEFAULT_UNAVAILABLE_MESSAGE);
+                DeathCertificateOcrResponseDto fallbackResult = analyzeWithFallback(plainBytes, expectedOwnerName, aiConfig, fileName);
+                return fallbackResult != null ? fallbackResult
+                        : buildUnavailableResult(expectedOwnerName, DEFAULT_UNAVAILABLE_MESSAGE);
             }
+        }
+
+        // Chưa cấu hình Gemini (hoặc AI_PROVIDER=mock): vẫn đọc được nếu có AI dự phòng
+        DeathCertificateOcrResponseDto fallbackResult = analyzeWithFallback(plainBytes, expectedOwnerName, aiConfig, fileName);
+        if (fallbackResult != null) {
+            return fallbackResult;
         }
 
         if (demoScenariosEnabled) {
@@ -365,6 +391,70 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         }
 
         return buildUnavailableResult(expectedOwnerName, DEFAULT_UNAVAILABLE_MESSAGE);
+    }
+
+    /**
+     * Gemini hỏng hoặc chưa cấu hình: thử AI dự phòng theo loại file.
+     * <ul>
+     *   <li>PDF có chữ: gửi phần chữ cho nhà cung cấp văn bản Admin chọn (mặc định DeepSeek). Không thấy con dấu,
+     *       nên luôn kèm cảnh báo xem bản gốc.</li>
+     *   <li>Ảnh JPG/PNG, PDF scan (không có chữ) hoặc bước trên lỗi: Groq vision (render tối đa 2 trang đầu PDF).</li>
+     * </ul>
+     * Trả null khi không có dự phòng nào dùng được, để nơi gọi trả kết quả "AI không khả dụng" như trước.
+     */
+    DeathCertificateOcrResponseDto analyzeWithFallback(byte[] plainBytes, String expectedOwnerName,
+                                                        AiFeatureConfig aiConfig, String fileName) {
+        if (fallback == null) {
+            return null;
+        }
+        boolean pdf = "application/pdf".equals(UploadedDocumentValidator.detectContentType(plainBytes));
+        if (pdf && fallback.textAvailable(aiConfig)) {
+            try {
+                String text = AiImages.pdfText(plainBytes, PDF_TEXT_MAX_CHARS);
+                if (text.length() >= PDF_TEXT_MIN_CHARS) {
+                    String raw = fallback.textJson(aiConfig, ocrPrompt(expectedOwnerName) + TEXT_ONLY_NOTE,
+                            "NỘI DUNG CHỮ TRÍCH TỪ FILE PDF:\n" + text, MAX_OUTPUT_TOKENS);
+                    DeathCertificateOcrResponseDto result = parseGeminiJson(FallbackAiClient.jsonObject(raw), expectedOwnerName);
+                    result.setHasOfficialSeal(false);
+                    result.setImageQualityScore(null);
+                    result.setImageClarityLabel(null);
+                    List<String> warnings = result.getWarnings() == null ? new ArrayList<>() : new ArrayList<>(result.getWarnings());
+                    warnings.add(0, TEXT_ONLY_WARNING);
+                    result.setWarnings(warnings);
+                    result.setEngineSource(fallback.textProvider(aiConfig) == AiFallbackProvider.GROQ
+                            ? ENGINE_GROQ_TEXT : ENGINE_DEEPSEEK_TEXT);
+                    log.info("Death certificate OCR answered by fallback {} (PDF text) for document '{}'",
+                            fallback.describeText(aiConfig), fileName);
+                    return result;
+                }
+            } catch (Exception e) {
+                log.warn("Fallback PDF-text OCR failed for document '{}': {}", fileName, e.getClass().getSimpleName());
+            }
+        }
+        if (fallback.visionAvailable(aiConfig)) {
+            try {
+                List<byte[]> images = pdf
+                        ? AiImages.pdfPagesAsJpeg(plainBytes, PDF_MAX_PAGES_AS_IMAGES)
+                        : List.of(AiImages.shrinkToJpeg(plainBytes));
+                if (!images.isEmpty()) {
+                    String raw = fallback.visionJson(aiConfig, ocrPrompt(expectedOwnerName), images, MAX_OUTPUT_TOKENS);
+                    DeathCertificateOcrResponseDto result = parseGeminiJson(FallbackAiClient.jsonObject(raw), expectedOwnerName);
+                    result.setEngineSource(ENGINE_GROQ_VISION);
+                    log.info("Death certificate OCR answered by fallback Groq '{}' for document '{}'",
+                            fallback.visionModelName(aiConfig), fileName);
+                    return result;
+                }
+            } catch (Exception e) {
+                log.warn("Fallback vision OCR failed for document '{}': {}", fileName, e.getClass().getSimpleName());
+            }
+        }
+        return null;
+    }
+
+    /** Kết quả do một AI thật trả về (không phải mô phỏng / không khả dụng): được lưu cache phía Verifier. */
+    static boolean isAiEngine(String engine) {
+        return ENGINE_GEMINI.equals(engine) || ENGINE_GROQ_VISION.equals(engine)
+                || ENGINE_GROQ_TEXT.equals(engine) || ENGINE_DEEPSEEK_TEXT.equals(engine);
     }
 
     private static boolean isDemoScenarioFilename(String fileName) {
@@ -419,23 +509,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         String mimeType = UploadedDocumentValidator.detectContentType(plainBytes);
         String base64Data = Base64.getEncoder().encodeToString(plainBytes);
 
-        String prompt = "Bạn là hệ thống AI Cố vấn Thẩm định Tài liệu Pháp lý của LegacyVault. "
-                + "Bạn CHỈ đưa ra đánh giá, phân tích và gợi ý tham khảo cho Người thừa hành (Executor) và Cán bộ xác minh (Legal Verifier), không quyết định thay con người.\n"
-                + "QUY TẮC TUYỆT ĐỐI: Chỉ trích xuất thông tin thực sự đọc được trong tài liệu. Nếu trường nào không có hoặc không đọc được, BẮT BUỘC trả về null cho trường đó, TUYỆT ĐỐI KHÔNG tự bịa số hiệu, ngày tháng, họ tên hay cơ quan cấp.\n"
-                + "Hãy phân tích tài liệu đính kèm và đối chiếu với tên Chủ két dự kiến: \"" + expectedOwnerName + "\".\n"
-                + "Trả về đúng JSON gồm các trường:\n"
-                + "- documentCategory: \"VALID_DEATH_CERTIFICATE\" (Trích lục khai tử/Giấy chứng tử UBND) | \"RELATED_SUPPORTING_DOCUMENT\" (Giấy báo tử bệnh viện, CCCD, Hồ sơ bệnh án, Di chúc...) | \"UNRELATED_DOCUMENT\"\n"
-                + "- documentType: tên loại văn bản tiếng Việt (hoặc null nếu không xác định được)\n"
-                + "- detectedHeaderTitle: trích nguyên văn dòng tiêu đề chính bên trong tài liệu (hoặc null nếu không có)\n"
-                + "- titleAssessment: đánh giá ngắn gọn về tiêu đề bên trong tài liệu\n"
-                + "- imageQualityScore: số nguyên 0-100 đánh giá chất lượng hình ảnh, độ rõ nét, độ tương phản\n"
-                + "- imageClarityLabel: nhận xét độ rõ nét\n"
-                + "- deathProofRelevancePercent: số nguyên 0-100 đánh giá nội dung tài liệu chứng minh được sự qua đời của Chủ két ở mức độ bao nhiêu %\n"
-                + "- deathProofExplanation: giải thích ngắn gọn mức độ chứng minh sự qua đời\n"
-                + "- executorSuggestion: lời khuyên tham khảo cho Người thừa hành (Executor)\n"
-                + "- verifierSuggestion: lời khuyên tham khảo cho Cán bộ xác minh (Legal Verifier)\n"
-                + "- certificateNumber, bookNumber, deceasedFullName, dateOfBirth, gender, idNumber, dateOfDeath, placeOfDeath, causeOfDeath, issuingAuthority, issueDate, signerName (strings hoặc null nếu không đọc được)\n"
-                + "- hasOfficialSeal (boolean: chỉ true khi nhìn thấy rõ con dấu đỏ thực tế trên tài liệu, ngược lại là false), confidenceScore (int 0-100), warnings (array of strings).";
+        String prompt = ocrPrompt(expectedOwnerName);
 
         Map<String, Object> inlineData = Map.of(
                 "mime_type", mimeType,
@@ -477,6 +551,28 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         }
 
         return parseGeminiJson(rawJson, expectedOwnerName);
+    }
+
+
+    /** Prompt phân tích giấy chứng tử, dùng chung cho Gemini và AI dự phòng (Groq / DeepSeek). */
+    static String ocrPrompt(String expectedOwnerName) {
+        return "Bạn là hệ thống AI Cố vấn Thẩm định Tài liệu Pháp lý của LegacyVault. "
+                + "Bạn CHỈ đưa ra đánh giá, phân tích và gợi ý tham khảo cho Người thừa hành (Executor) và Cán bộ xác minh (Legal Verifier), không quyết định thay con người.\n"
+                + "QUY TẮC TUYỆT ĐỐI: Chỉ trích xuất thông tin thực sự đọc được trong tài liệu. Nếu trường nào không có hoặc không đọc được, BẮT BUỘC trả về null cho trường đó, TUYỆT ĐỐI KHÔNG tự bịa số hiệu, ngày tháng, họ tên hay cơ quan cấp.\n"
+                + "Hãy phân tích tài liệu đính kèm và đối chiếu với tên Chủ két dự kiến: \"" + expectedOwnerName + "\".\n"
+                + "Trả về đúng JSON gồm các trường:\n"
+                + "- documentCategory: \"VALID_DEATH_CERTIFICATE\" (Trích lục khai tử/Giấy chứng tử UBND) | \"RELATED_SUPPORTING_DOCUMENT\" (Giấy báo tử bệnh viện, CCCD, Hồ sơ bệnh án, Di chúc...) | \"UNRELATED_DOCUMENT\"\n"
+                + "- documentType: tên loại văn bản tiếng Việt (hoặc null nếu không xác định được)\n"
+                + "- detectedHeaderTitle: trích nguyên văn dòng tiêu đề chính bên trong tài liệu (hoặc null nếu không có)\n"
+                + "- titleAssessment: đánh giá ngắn gọn về tiêu đề bên trong tài liệu\n"
+                + "- imageQualityScore: số nguyên 0-100 đánh giá chất lượng hình ảnh, độ rõ nét, độ tương phản\n"
+                + "- imageClarityLabel: nhận xét độ rõ nét\n"
+                + "- deathProofRelevancePercent: số nguyên 0-100 đánh giá nội dung tài liệu chứng minh được sự qua đời của Chủ két ở mức độ bao nhiêu %\n"
+                + "- deathProofExplanation: giải thích ngắn gọn mức độ chứng minh sự qua đời\n"
+                + "- executorSuggestion: lời khuyên tham khảo cho Người thừa hành (Executor)\n"
+                + "- verifierSuggestion: lời khuyên tham khảo cho Cán bộ xác minh (Legal Verifier)\n"
+                + "- certificateNumber, bookNumber, deceasedFullName, dateOfBirth, gender, idNumber, dateOfDeath, placeOfDeath, causeOfDeath, issuingAuthority, issueDate, signerName (strings hoặc null nếu không đọc được)\n"
+                + "- hasOfficialSeal (boolean: chỉ true khi nhìn thấy rõ con dấu đỏ thực tế trên tài liệu, ngược lại là false), confidenceScore (int 0-100), warnings (array of strings).";
     }
 
     /**

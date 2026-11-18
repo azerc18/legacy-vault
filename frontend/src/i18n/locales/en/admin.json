@@ -424,6 +424,25 @@
     "updated": "Last changed {{when}} by {{who}}",
     "neverUpdated": "Never changed, using defaults.",
     "modelsHint": "Models come from GEMINI_MODEL, GEMINI_BACKUP_MODEL and GEMINI_ALLOWED_MODELS. Add a model through the environment variables.",
-    "auditHint": "Every save is written to the Audit log (AI_SETTINGS_UPDATED)."
+    "auditHint": "Every save is written to the Audit log (AI_SETTINGS_UPDATED).",
+    "fallback": {
+      "statusTitle": "Fallback AI when Gemini fails",
+      "statusHint": "Gemini is always tried first. When both its main and backup models fail, the system switches to: images (JPG/PNG, scanned PDF) → Groq; text (Vaulty chat, PDF with text) → the provider chosen per feature. Keys are set with the GROQ_API_KEY / DEEPSEEK_API_KEY environment variables.",
+      "providers": {
+        "GROQ": "Groq",
+        "DEEPSEEK": "DeepSeek"
+      },
+      "toggle": "Use fallback AI when Gemini fails",
+      "desc": {
+        "ASSISTANT": "Vaulty answers with the fallback provider instead of showing an error.",
+        "DEATH_CERTIFICATE_OCR": "Images and scanned PDFs are read by Groq (it can read images); PDFs with text send the text to the text provider (it cannot see the seal, so check the original).",
+        "CITIZEN_ID_OCR": "ID card photos are read by Groq (DeepSeek cannot read images)."
+      },
+      "textProvider": "Text provider",
+      "textModel": "Text model",
+      "visionModel": "Image model (Groq)",
+      "noKey": "No key is set for {{provider}}, so this fallback step cannot run yet.",
+      "modelsHint": "Fallback models come from GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL and DEEPSEEK_ALLOWED_MODELS."
+    }
   }
 }

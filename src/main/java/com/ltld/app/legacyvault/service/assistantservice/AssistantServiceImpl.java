@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.assistantservice;
 
+import com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatMessage;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatRequest;
 import com.ltld.app.legacyvault.dto.assistantdto.ChatResponse;
@@ -59,6 +60,14 @@ public class AssistantServiceImpl implements AssistantService {
         this.aiSettings = aiSettings;
     }
 
+    // AI dự phòng (Groq / DeepSeek) khi Gemini hỏng. Không có (unit test) thì lỗi Gemini trả 503 như trước.
+    private FallbackAiClient fallback;
+
+    @Autowired(required = false)
+    void setFallback(FallbackAiClient fallback) {
+        this.fallback = fallback;
+    }
+
     @Override
     public ChatResponse chat(UUID userId, List<String> roles, ChatRequest request) {
         List<ChatMessage> messages = request.messages();
@@ -80,12 +89,30 @@ public class AssistantServiceImpl implements AssistantService {
         } catch (RuntimeException e) {
             // Không log nội dung tin nhắn, chỉ log lỗi
             log.warn("Assistant call failed for user {}: {}", userId, e.getMessage());
-            throw new AssistantException("Assistant is unavailable right now. Please try again later.",
-                    HttpStatus.SERVICE_UNAVAILABLE);
+            reply = fallbackReply(userId, systemPrompt, messages, config);
         }
         return new ChatResponse(reply == null || reply.isBlank()
                 ? "Sorry, I couldn't answer that."
                 : reply.strip());
+    }
+
+    /**
+     * Gemini (cả model chính lẫn dự phòng) hỏng: trả lời bằng nhà cung cấp văn bản Admin chọn (Groq / DeepSeek).
+     * Không có dự phòng dùng được, hoặc dự phòng cũng lỗi, thì 503 như trước.
+     */
+    private String fallbackReply(UUID userId, String systemPrompt, List<ChatMessage> messages, AiFeatureConfig config) {
+        if (fallback != null && !(aiClient instanceof MockAiClient) && fallback.textAvailable(config)) {
+            try {
+                String reply = fallback.chat(config, systemPrompt, messages, 0.4, 1024);
+                log.info("Assistant answered by fallback {} for user {}", fallback.describeText(config), userId);
+                return reply;
+            } catch (RuntimeException fe) {
+                log.warn("Assistant fallback {} failed for user {}: {}", fallback.describeText(config), userId,
+                        fe.getClass().getSimpleName());
+            }
+        }
+        throw new AssistantException("Assistant is unavailable right now. Please try again later.",
+                HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     // Tối đa 20 tin / 60 giây / user, lưu trong bộ nhớ (reset khi restart, đủ cho demo)

@@ -1,5 +1,7 @@
 package com.ltld.app.legacyvault.service.identityservice;
 
+import com.ltld.app.legacyvault.service.aifallbackservice.AiImages;
+import com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient;
 import com.ltld.app.legacyvault.enums.AiFeature;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.UserProfileException;
@@ -41,6 +43,15 @@ public class CitizenIdOcrClient {
 
     private final ObjectMapper objectMapper;
 
+    // Dùng chung cho Gemini và Groq vision (AI dự phòng)
+    static final String PROMPT = "Ảnh đính kèm là mặt trước Căn cước công dân / Căn cước Việt Nam. "
+            + "CHỈ trích xuất thông tin thực sự đọc được; trường nào không đọc được thì trả null, "
+            + "TUYỆT ĐỐI không đoán hay bịa. Trả về đúng JSON với các trường: "
+            + "documentType (\"CCCD\" nếu đúng là thẻ căn cước Việt Nam, ngược lại \"OTHER\"), "
+            + "citizenId (12 chữ số, không khoảng trắng), fullName (giữ nguyên dấu), "
+            + "dateOfBirth (dd/MM/yyyy), gender (\"Nam\" hoặc \"Nữ\"), "
+            + "placeOfResidence (nơi thường trú / nơi cư trú, nguyên văn).";
+
     @Value("${app.ai.provider:mock}")
     private String aiProvider;
 
@@ -60,8 +71,22 @@ public class CitizenIdOcrClient {
     @Autowired(required = false)
     private AiSettingsService aiSettings;
 
+    // AI dự phòng (Groq vision) khi Gemini hỏng hoặc chưa cấu hình. Không có (unit test) thì chỉ Gemini.
+    @Autowired(required = false)
+    private FallbackAiClient fallback;
+
+    /** Đọc được ảnh: chức năng đang bật, và có Gemini hoặc Groq vision dùng được. */
     public boolean isAvailable() {
-        return "gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank() && config().enabled();
+        AiFeatureConfig c = config();
+        return c.enabled() && (geminiReady() || fallbackReady(c));
+    }
+
+    private boolean geminiReady() {
+        return "gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank();
+    }
+
+    private boolean fallbackReady(AiFeatureConfig c) {
+        return fallback != null && fallback.visionAvailable(c);
     }
 
     private AiFeatureConfig config() {
@@ -78,6 +103,9 @@ public class CitizenIdOcrClient {
             throw unavailable();
         }
         AiFeatureConfig c = config();
+        if (!geminiReady()) {
+            return readWithFallback(imageBytes, c);
+        }
         String primary = c.primaryModel() != null ? c.primaryModel() : model;
         try {
             return readWith(imageBytes, primary, apiKey);
@@ -101,6 +129,22 @@ public class CitizenIdOcrClient {
                             backupEx.getClass().getSimpleName());
                 }
             }
+            return readWithFallback(imageBytes, c);
+        }
+    }
+
+    /** Gemini không dùng được: đọc bằng Groq vision (DeepSeek không đọc được ảnh). Không có thì báo không đọc được. */
+    private Extracted readWithFallback(byte[] imageBytes, AiFeatureConfig c) {
+        if (!fallbackReady(c)) {
+            throw unavailable();
+        }
+        try {
+            String raw = fallback.visionJson(c, PROMPT, List.of(AiImages.shrinkToJpeg(imageBytes)), 512);
+            Extracted x = parse(FallbackAiClient.jsonObject(raw));
+            log.info("Citizen ID OCR succeeded on fallback Groq model '{}'", fallback.visionModelName(c));
+            return x;
+        } catch (Exception e) {
+            log.warn("Citizen ID OCR fallback failed: {}", e.getClass().getSimpleName());
             throw unavailable();
         }
     }
@@ -115,13 +159,7 @@ public class CitizenIdOcrClient {
                 .requestFactory(factory)
                 .build();
 
-        String prompt = "Ảnh đính kèm là mặt trước Căn cước công dân / Căn cước Việt Nam. "
-                + "CHỈ trích xuất thông tin thực sự đọc được; trường nào không đọc được thì trả null, "
-                + "TUYỆT ĐỐI không đoán hay bịa. Trả về đúng JSON với các trường: "
-                + "documentType (\"CCCD\" nếu đúng là thẻ căn cước Việt Nam, ngược lại \"OTHER\"), "
-                + "citizenId (12 chữ số, không khoảng trắng), fullName (giữ nguyên dấu), "
-                + "dateOfBirth (dd/MM/yyyy), gender (\"Nam\" hoặc \"Nữ\"), "
-                + "placeOfResidence (nơi thường trú / nơi cư trú, nguyên văn).";
+        String prompt = PROMPT;
 
         Map<String, Object> body = Map.of(
                 "contents", List.of(Map.of("role", "user", "parts", List.of(

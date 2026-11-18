@@ -184,6 +184,23 @@ app:
       # Trang Cấu hình AI: Admin chỉ chọn được model trong danh sách = model + backup-model + danh sách này
       # (phân tách bằng dấu phẩy). Thêm model mới thì đặt biến môi trường, không gõ tự do trên giao diện.
       allowed-models: ${GEMINI_ALLOWED_MODELS:}
+    # Dự phòng khi Gemini lỗi (model chính + dự phòng đều hỏng, hết quota, sai key...): API chuẩn OpenAI.
+    # Ảnh (JPG/PNG, PDF scan) -> Groq vision; PDF có chữ và chat Vaulty -> nhà cung cấp chọn ở trang Cấu hình AI.
+    # Không đặt key thì nhà cung cấp đó coi như tắt. Admin chọn model trong danh sách = model mặc định + *_ALLOWED_MODELS.
+    groq:
+      api-key: ${GROQ_API_KEY:}
+      base-url: ${GROQ_BASE_URL:https://api.groq.com/openai/v1}
+      text-model: ${GROQ_TEXT_MODEL:llama-3.3-70b-versatile}
+      vision-model: ${GROQ_VISION_MODEL:meta-llama/llama-4-scout-17b-16e-instruct}
+      allowed-models: ${GROQ_ALLOWED_MODELS:}
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+      model: ${DEEPSEEK_MODEL:deepseek-chat}
+      allowed-models: ${DEEPSEEK_ALLOWED_MODELS:}
+    fallback:
+      # Nhà cung cấp mặc định cho phần văn bản (chat Vaulty, PDF có chữ) khi Admin chưa chọn: deepseek | groq
+      text-provider: ${AI_FALLBACK_TEXT_PROVIDER:deepseek}
     ocr:
       # Chỉ bật khi trình diễn: tên file chứa từ khoá (mismatch, blur, cccd...) sẽ trả kết quả MÔ PHỎNG (engineSource=DEMO_SIMULATION).
       demo-scenarios: ${AI_OCR_DEMO_SCENARIOS:false}

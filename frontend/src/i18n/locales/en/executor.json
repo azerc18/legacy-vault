@@ -210,6 +210,7 @@
     "advisoryTag": "AI Advisory Assistant — Suggestions only, final decision is yours",
     "sourceLabel": "Analysis Source",
     "sourceGemini": "Gemini AI",
+    "sourceFallback": "Fallback AI ({{provider}})",
     "sourceDemo": "Simulated (Demo)",
     "sourceUnavailable": "Unavailable",
     "unavailableTitle": "Could not analyze with AI, please inspect manually",
