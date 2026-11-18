@@ -190,6 +190,9 @@ class ExecutorManagementServiceImplTest {
 
         assertStatus(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request("nobody@example.test", false)),
                 HttpStatus.UNPROCESSABLE_ENTITY);
+        assertThatThrownBy(() -> service.assignExecutor(ownerId, ExecutorType.PRIMARY, request("nobody@example.test", false)))
+                .isInstanceOfSatisfying(ExecutorManagementException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.EXECUTOR_ACCOUNT_NOT_FOUND));
 
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
         verifyNoInteractions(auditLogService, eventPublisher);
@@ -831,13 +834,16 @@ class ExecutorManagementServiceImplTest {
     // ---------- X2 (m1): Executor ≠ người xác nhận chéo DMS ----------
 
     @Test
-    @DisplayName("X2/m1: email đang là người xác nhận chéo của Owner -> 409 CONFLICT, không lưu, không audit, không event")
+    @DisplayName("X2/m1: email đang là người xác nhận chéo của Owner -> 409 EXECUTOR_IS_CONFIRMER, không lưu, không audit, không event")
     void assign_candidateIsTrustedConfirmer_conflict() {
         when(dmsConfirmerRepository.existsByOwnerIdAndEmail(ownerId, CANDIDATE_EMAIL)).thenReturn(true);
 
         assertThatThrownBy(() -> service.assignExecutor(ownerId, ExecutorType.BACKUP, request("  Exec@Example.TEST ", false)))
                 .isInstanceOfSatisfying(ExecutorManagementException.class,
-                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.CONFLICT));
+                        ex -> {
+                            assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.EXECUTOR_IS_CONFIRMER);
+                            assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                        });
         verify(dmsConfirmerRepository).existsByOwnerIdAndEmail(ownerId, CANDIDATE_EMAIL);
         verify(executorAssignmentRepository, never()).saveAndFlush(any());
         verifyNoInteractions(auditLogService, eventPublisher, roleRepository);

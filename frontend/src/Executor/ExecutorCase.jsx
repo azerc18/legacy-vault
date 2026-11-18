@@ -287,11 +287,6 @@ function SubmitVerification({ assignmentId, vaults, progress, onSubmitted }) {
                         </button>
                     )}
                 </div>
-                {file && (
-                    <p className="text-xs text-on-surface-variant">
-                        {t('case.submit.ocrPrivacyHint')}
-                    </p>
-                )}
 
                 {ocrResult && (
                     <OcrAnalysisCard
