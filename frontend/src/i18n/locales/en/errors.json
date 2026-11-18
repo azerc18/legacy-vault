@@ -88,5 +88,6 @@
   "IDENTITY_LOCKED": "The Dead Man's Switch is being activated, so identity details cannot be changed.",
   "IDENTITY_OCR_UNAVAILABLE": "The card photo cannot be read right now. Scan the QR code or enter the details manually.",
   "AI_FEATURE_DISABLED": "This AI feature is turned off by the administrator.",
-  "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model."
+  "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model.",
+  "INTEGRATION_SETTING_LOCKED": "This server does not allow turning on simulated eKYC from the admin page. You can only turn it off or follow the environment."
 }
