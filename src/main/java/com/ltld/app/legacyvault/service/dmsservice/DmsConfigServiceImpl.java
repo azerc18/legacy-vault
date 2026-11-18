@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -287,11 +287,12 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     }
 
     /**
-     * F2 (m7): mốc chu kỳ check-in đưa vào token (claim cyc) = lastCheckinAt, epoch giây UTC; null nếu chưa có.
-     * Cả lúc sinh token và lúc dùng đều đọc lastCheckinAt từ DB, nên so sánh ổn định.
+     * F2 (m7): mốc chu kỳ check-in đưa vào token (claim cyc) = lastCheckinAt, epoch giây; null nếu chưa có.
+     * Cả lúc sinh token và lúc dùng đều đọc lastCheckinAt từ DB, nên so sánh ổn định. Quy theo múi giờ JVM
+     * (giờ VN, xem AppTimeZone) ra đúng thời điểm thật, nên link trong mail gửi lúc server còn chạy UTC vẫn dùng được.
      */
     public static Long checkinCycleOf(DmsConfig config) {
-        return config.getLastCheckinAt() == null ? null : config.getLastCheckinAt().toEpochSecond(ZoneOffset.UTC);
+        return config.getLastCheckinAt() == null ? null : config.getLastCheckinAt().atZone(ZoneId.systemDefault()).toEpochSecond();
     }
 
     /**

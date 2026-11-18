@@ -16,5 +16,20 @@ public record AiFeatureSettingResponse(
         String primaryOverride,
         String backupOverride,
         LocalDateTime updatedAt,
-        String updatedByEmail) {
+        String updatedByEmail,
+        // AI dự phòng: giá trị đang có hiệu lực, và lựa chọn Admin đã lưu (null = mặc định)
+        boolean fallbackEnabled,
+        String textFallbackProvider,
+        String textFallbackModel,
+        String visionFallbackModel,
+        String textFallbackProviderOverride,
+        String textFallbackModelOverride,
+        String visionFallbackModelOverride) {
+
+    public AiFeatureSettingResponse(String feature, boolean enabled, String primaryModel, String backupModel,
+                                    String primaryOverride, String backupOverride, LocalDateTime updatedAt,
+                                    String updatedByEmail) {
+        this(feature, enabled, primaryModel, backupModel, primaryOverride, backupOverride, updatedAt, updatedByEmail,
+                true, null, null, null, null, null, null);
+    }
 }

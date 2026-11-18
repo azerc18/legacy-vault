@@ -16,5 +16,27 @@ public record AiSettingsResponse(
         String defaultPrimaryModel,
         String defaultBackupModel,
         List<String> allowedModels,
-        List<AiFeatureSettingResponse> features) {
+        List<AiFeatureSettingResponse> features,
+        Fallback fallback) {
+
+    public AiSettingsResponse(String provider, boolean apiKeyConfigured, boolean backupApiKeyConfigured,
+                              String defaultPrimaryModel, String defaultBackupModel, List<String> allowedModels,
+                              List<AiFeatureSettingResponse> features) {
+        this(provider, apiKeyConfigured, backupApiKeyConfigured, defaultPrimaryModel, defaultBackupModel,
+                allowedModels, features, null);
+    }
+
+    /**
+     * AI dự phòng (Groq / DeepSeek). Chỉ cho biết key đã đặt hay chưa, không trả giá trị key.
+     *
+     * @param defaultTextModels model văn bản mặc định theo nhà cung cấp (GROQ, DEEPSEEK)
+     */
+    public record Fallback(boolean groqKeyConfigured,
+                           boolean deepseekKeyConfigured,
+                           List<String> groqModels,
+                           List<String> deepseekModels,
+                           String defaultTextProvider,
+                           java.util.Map<String, String> defaultTextModels,
+                           String defaultVisionModel) {
+    }
 }

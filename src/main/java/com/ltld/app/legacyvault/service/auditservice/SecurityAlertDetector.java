@@ -180,7 +180,7 @@ public class SecurityAlertDetector {
             for (User admin : admins) {
                 for (String content : messages) {
                     try {
-                        notificationService.send(admin.getEmail(), content);
+                        notificationService.sendAdminAlert(admin.getEmail(), content);
                     } catch (RuntimeException e) {
                         log.warn("Security alert: notifying admin {} failed: {}", admin.getId(), e.getMessage());
                     }

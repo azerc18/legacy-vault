@@ -1,6 +1,8 @@
 // Kiểm CCCD 12 số trước khi gửi; cùng quy tắc với CitizenId.java ở BE (BE kiểm lại).
 // 3 số đầu: mã tỉnh nơi đăng ký khai sinh; số thứ 4: giới tính + thế kỷ; số 5-6: 2 số cuối năm sinh.
 
+import { appDateKey } from '../../i18n/format.js';
+
 const BIRTH_PROVINCE_CODES = new Set([
     '001', '002', '004', '006', '008', '010', '011', '012', '014', '015', '017', '019', '020', '022',
     '024', '025', '026', '027', '030', '031', '033', '034', '035', '036', '037', '038', '040', '042',
@@ -28,9 +30,11 @@ export function validateIdentity(form, today = new Date()) {
     if (!form.dateOfBirth) return 'dobRequired';
     const [y, m, d] = form.dateOfBirth.split('-').map(Number);
     const dob = new Date(y, m - 1, d);
-    if (Number.isNaN(dob.getTime()) || y < 1900 || dob >= today) return 'dobInvalid';
-    const eighteen = new Date(y + 18, m - 1, d);
-    if (eighteen > today) return 'underage';
+    // So theo ngày giờ VN như BE (VN_ZONE), không theo múi giờ máy khách
+    const todayKey = appDateKey(today);
+    const pad = (n) => String(n).padStart(2, '0');
+    if (Number.isNaN(dob.getTime()) || y < 1900 || form.dateOfBirth >= todayKey) return 'dobInvalid';
+    if (`${y + 18}-${pad(m)}-${pad(d)}` > todayKey) return 'underage';
 
     const genderDigit = Number(id[3]);
     if (CENTURY[Math.floor(genderDigit / 2)] + Number(id.slice(4, 6)) !== y) return 'citizenIdYear';

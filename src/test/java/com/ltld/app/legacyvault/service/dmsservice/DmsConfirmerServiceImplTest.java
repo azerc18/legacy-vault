@@ -110,7 +110,8 @@ class DmsConfirmerServiceImplTest {
                 userRepository,
                 eventPublisher,
                 lazyConfirmer,
-                vaultRepository
+                vaultRepository,
+                mock(com.ltld.app.legacyvault.service.notificationservice.InAppNotifier.class)
         );
         when(vaultRepository.existsByOwnerId(any())).thenReturn(true);
 

@@ -9,6 +9,7 @@ import { getErrorCode, getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, formatDate, inputClass, btnOutline, btnPrimary, LoadingSkeleton } from './ownerUi.jsx';
 import { VipChip, VipLocked } from '../Common/VipLock.jsx';
 import { useVipStatus } from '../Common/useVipStatus.js';
+import { serverTime } from '../i18n/format.js';
 
 // Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
 const LIMITS = {
@@ -131,7 +132,7 @@ export default function DeadMansSwitch() {
     const pausedNoVault = canCheckIn && config.hasVault === false;
     // Người xác nhận chéo đã check-in thay Owner: chu kỳ này coi như đã check-in, hiện ghi chú + đếm ngược.
     // Nút check-in KHÔNG khoá: Owner vẫn tự check-in được (BE bắt đầu chu kỳ mới từ lúc đó và xoá dấu check-in hộ)
-    const dueAtMs = configured && config.checkinDueAt ? new Date(config.checkinDueAt).getTime() : null;
+    const dueAtMs = configured && config.checkinDueAt ? serverTime(config.checkinDueAt) : null;
     const vouchActive = canCheckIn && config.status === 'ACTIVE' && !!config.vouchedAt
         && dueAtMs !== null && now < dueAtMs;
     // FR-03: chưa cấu hình = chưa có Primary để bật lần đầu; đã cấu hình = trigger không kích hoạt được ai

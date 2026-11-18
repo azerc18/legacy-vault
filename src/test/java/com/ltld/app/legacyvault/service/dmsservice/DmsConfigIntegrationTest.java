@@ -308,7 +308,7 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.ACTIVE);
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     // ---------- 4. Nối FR-03 với FR-07 ----------
@@ -329,7 +329,7 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         assertThat(assignment(s.primaryId).getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(assignment(s.backupId).getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
-        verify(executorNotificationService).send(eq(s.primaryEmail), anyString());
+        verify(executorNotificationService).sendExecutorActivated(eq(s.primaryEmail), any());
 
         assertThatThrownBy(() -> dmsConfigService.checkIn(s.ownerId))
                 .isInstanceOf(DmsException.class)
@@ -553,7 +553,7 @@ class DmsConfigIntegrationTest {
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
         verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     @Test
@@ -586,7 +586,7 @@ class DmsConfigIntegrationTest {
         assertThat(config(s).getStatus()).isEqualTo(DmsStatus.ACTIVE);
         assertThat(executorAssignmentRepository.findAllByOwnerId(s.ownerId))
                 .allSatisfy(a -> assertThat(a.getStatus()).isEqualTo(ExecutorStatus.INACTIVE));
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
         verify(emailSender, never()).sendDmsCheckinReminder(anyString(), any(), any(), anyInt(), anyInt(), any());
         assertThat(auditLogRepository.findByActor_IdOrderByCreatedAtDesc(adminId, Pageable.unpaged()))
                 .extracting(AuditLog::getAction)

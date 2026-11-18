@@ -1,9 +1,11 @@
 // Câu thoại có sẵn của Vaulty (không gọi AI)
 
+import { appHour } from '../i18n/format.js';
+
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 function timeGreeting() {
-    const h = new Date().getHours();
+    const h = appHour(); // giờ VN, không theo múi giờ máy
     if (h < 12) return 'Good morning';
     if (h < 18) return 'Good afternoon';
     return 'Good evening';

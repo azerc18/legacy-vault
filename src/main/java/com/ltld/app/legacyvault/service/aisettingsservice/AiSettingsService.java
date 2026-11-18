@@ -5,6 +5,7 @@ import com.ltld.app.legacyvault.dto.aisettingsdto.AiSettingsResponse;
 import com.ltld.app.legacyvault.dto.aisettingsdto.UpdateAiFeatureSettingRequest;
 import com.ltld.app.legacyvault.entity.AiFeatureSetting;
 import com.ltld.app.legacyvault.entity.User;
+import com.ltld.app.legacyvault.enums.AiFallbackProvider;
 import com.ltld.app.legacyvault.enums.AiFeature;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -12,8 +13,10 @@ import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.repository.AiFeatureSettingRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,9 @@ import java.util.*;
  * <p>API key KHÔNG đi qua đây: key vẫn chỉ đặt bằng biến môi trường (GEMINI_API_KEY, GEMINI_BACKUP_API_KEY),
  * API chỉ cho biết key đã được đặt hay chưa. Danh sách model cho phép = GEMINI_MODEL + GEMINI_BACKUP_MODEL +
  * GEMINI_ALLOWED_MODELS, nên Admin không gõ được tên model tuỳ ý.
+ *
+ * <p>AI dự phòng (Groq / DeepSeek) khi Gemini hỏng: Admin bật / tắt và chọn nhà cung cấp + model cho phần văn bản,
+ * model Groq cho phần đọc ảnh, cũng chỉ trong danh sách cho phép (GROQ_* / DEEPSEEK_*). Key vẫn chỉ ở biến môi trường.
  *
  * <p>Cấu hình được đọc lại từ DB tối đa {@link #CACHE_TTL_MS} một lần (mỗi lời gọi AI không phải truy vấn DB)
  * và làm mới ngay khi Admin lưu. Đọc DB lỗi thì dùng mặc định (bật, model của biến môi trường) để AI không
@@ -52,6 +58,14 @@ public class AiSettingsService {
     private final String defaultPrimary;
     private final String defaultBackup;
     private final List<String> allowedModels;
+
+    // AI dự phòng; không có (unit test dựng tay) thì không kiểm danh sách model dự phòng và không trả trạng thái
+    private FallbackAiClient fallback;
+
+    @Autowired(required = false)
+    void setFallback(FallbackAiClient fallback) {
+        this.fallback = fallback;
+    }
 
     private volatile Map<AiFeature, AiFeatureSetting> cache;
     private volatile long cacheLoadedAt;
@@ -97,8 +111,10 @@ public class AiSettingsService {
         if (s == null) {
             return new AiFeatureConfig(true, defaultPrimary, defaultBackup);
         }
+        AiFallbackProvider provider = effectiveTextProvider(s.getTextFallbackProvider());
         return new AiFeatureConfig(s.isEnabled(), effective(s.getPrimaryModel(), defaultPrimary),
-                effective(s.getBackupModel(), defaultBackup));
+                effective(s.getBackupModel(), defaultBackup), s.isFallbackEnabled(), provider,
+                effectiveTextModel(provider, s.getTextFallbackModel()), effectiveVisionModel(s.getVisionFallbackModel()));
     }
 
     @Transactional(readOnly = true)
@@ -109,7 +125,7 @@ public class AiSettingsService {
                 .map(f -> toResponse(f, all.get(f), emails))
                 .toList();
         return new AiSettingsResponse(provider, apiKeyConfigured, backupApiKeyConfigured,
-                defaultPrimary, defaultBackup, allowedModels, rows);
+                defaultPrimary, defaultBackup, allowedModels, rows, fallbackStatus());
     }
 
     @Transactional
@@ -125,9 +141,46 @@ public class AiSettingsService {
                     "The backup model must be different from the main model.");
         }
 
+        // AI dự phòng: provider phải đúng tên, model phải nằm trong danh sách của nhà cung cấp tương ứng
+        AiFallbackProvider textProvider = null;
+        String rawProvider = blankToNull(req.textFallbackProvider());
+        if (rawProvider != null) {
+            textProvider = AiFallbackProvider.parse(rawProvider);
+            if (textProvider == null) {
+                throw new BusinessException(ErrorCode.AI_MODEL_NOT_ALLOWED, "Unknown fallback provider.");
+            }
+        }
+        String textModel = blankToNull(req.textFallbackModel());
+        String visionModel = blankToNull(req.visionFallbackModel());
+        if (fallback != null) {
+            AiFallbackProvider effProvider = textProvider != null ? textProvider : fallback.defaultTextProvider();
+            if (textModel != null && !fallback.allowedModels(effProvider).contains(textModel)) {
+                throw new BusinessException(ErrorCode.AI_MODEL_NOT_ALLOWED,
+                        "This fallback model is not in the allowed list of the chosen provider.");
+            }
+            if (visionModel != null && !fallback.allowedModels(AiFallbackProvider.GROQ).contains(visionModel)) {
+                throw new BusinessException(ErrorCode.AI_MODEL_NOT_ALLOWED,
+                        "This image model is not in the allowed Groq list.");
+            }
+        }
+
         AiFeatureSetting s = repository.findById(feature)
                 .orElseGet(() -> AiFeatureSetting.builder().feature(feature).build());
+        boolean fallbackEnabled = req.fallbackEnabled() != null ? req.fallbackEnabled() : s.isFallbackEnabled();
         List<String> changes = new ArrayList<>();
+        if (s.isFallbackEnabled() != fallbackEnabled) {
+            changes.add("fallback " + s.isFallbackEnabled() + " -> " + fallbackEnabled);
+        }
+        if (s.getTextFallbackProvider() != textProvider) {
+            changes.add("textFallbackProvider " + label(s.getTextFallbackProvider() == null ? null
+                    : s.getTextFallbackProvider().name()) + " -> " + label(textProvider == null ? null : textProvider.name()));
+        }
+        if (!Objects.equals(s.getTextFallbackModel(), textModel)) {
+            changes.add("textFallbackModel " + label(s.getTextFallbackModel()) + " -> " + label(textModel));
+        }
+        if (!Objects.equals(s.getVisionFallbackModel(), visionModel)) {
+            changes.add("visionFallbackModel " + label(s.getVisionFallbackModel()) + " -> " + label(visionModel));
+        }
         if (s.isEnabled() != req.enabled()) {
             changes.add("enabled " + s.isEnabled() + " -> " + req.enabled());
         }
@@ -141,6 +194,10 @@ public class AiSettingsService {
             s.setEnabled(req.enabled());
             s.setPrimaryModel(primary);
             s.setBackupModel(backup);
+            s.setFallbackEnabled(fallbackEnabled);
+            s.setTextFallbackProvider(textProvider);
+            s.setTextFallbackModel(textModel);
+            s.setVisionFallbackModel(visionModel);
             s.setUpdatedBy(adminId);
             s.setUpdatedAt(LocalDateTime.now(clock));
             repository.save(s);
@@ -210,14 +267,49 @@ public class AiSettingsService {
     }
 
     private AiFeatureSettingResponse toResponse(AiFeature f, AiFeatureSetting s, Map<UUID, String> emails) {
-        if (s == null) {
-            return new AiFeatureSettingResponse(f.name(), true, defaultPrimary, defaultBackup, null, null, null, null);
-        }
-        String email = s.getUpdatedBy() == null ? null : emails.computeIfAbsent(s.getUpdatedBy(),
+        AiFeatureSetting row = s != null ? s : AiFeatureSetting.builder().feature(f).build();
+        String email = row.getUpdatedBy() == null ? null : emails.computeIfAbsent(row.getUpdatedBy(),
                 id -> userRepository.findById(id).map(User::getEmail).orElse(null));
-        return new AiFeatureSettingResponse(f.name(), s.isEnabled(),
-                effective(s.getPrimaryModel(), defaultPrimary), effective(s.getBackupModel(), defaultBackup),
-                s.getPrimaryModel(), s.getBackupModel(), s.getUpdatedAt(), email);
+        AiFallbackProvider provider = effectiveTextProvider(row.getTextFallbackProvider());
+        return new AiFeatureSettingResponse(f.name(), row.isEnabled(),
+                effective(row.getPrimaryModel(), defaultPrimary), effective(row.getBackupModel(), defaultBackup),
+                row.getPrimaryModel(), row.getBackupModel(), row.getUpdatedAt(), email,
+                row.isFallbackEnabled(), provider == null ? null : provider.name(),
+                effectiveTextModel(provider, row.getTextFallbackModel()),
+                effectiveVisionModel(row.getVisionFallbackModel()),
+                row.getTextFallbackProvider() == null ? null : row.getTextFallbackProvider().name(),
+                row.getTextFallbackModel(), row.getVisionFallbackModel());
+    }
+
+    // ------------------------------------------------------------------ AI dự phòng
+
+    private AiSettingsResponse.Fallback fallbackStatus() {
+        if (fallback == null) return null;
+        Map<String, String> textDefaults = new LinkedHashMap<>();
+        for (AiFallbackProvider p : AiFallbackProvider.values()) {
+            textDefaults.put(p.name(), fallback.defaultTextModel(p));
+        }
+        return new AiSettingsResponse.Fallback(
+                fallback.isConfigured(AiFallbackProvider.GROQ), fallback.isConfigured(AiFallbackProvider.DEEPSEEK),
+                fallback.allowedModels(AiFallbackProvider.GROQ), fallback.allowedModels(AiFallbackProvider.DEEPSEEK),
+                fallback.defaultTextProvider().name(), textDefaults, fallback.defaultVisionModel());
+    }
+
+    private AiFallbackProvider effectiveTextProvider(AiFallbackProvider chosen) {
+        if (chosen != null) return chosen;
+        return fallback == null ? null : fallback.defaultTextProvider();
+    }
+
+    /** Model dự phòng đã lưu nhưng nay không còn trong danh sách (đổi biến môi trường) thì về mặc định. */
+    private String effectiveTextModel(AiFallbackProvider provider, String chosen) {
+        if (fallback == null || provider == null) return chosen;
+        return chosen != null && fallback.allowedModels(provider).contains(chosen) ? chosen : fallback.defaultTextModel(provider);
+    }
+
+    private String effectiveVisionModel(String chosen) {
+        if (fallback == null) return chosen;
+        return chosen != null && fallback.allowedModels(AiFallbackProvider.GROQ).contains(chosen)
+                ? chosen : fallback.defaultVisionModel();
     }
 
     private static String label(String model) {

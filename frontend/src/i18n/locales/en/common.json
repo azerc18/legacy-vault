@@ -36,6 +36,8 @@
       "ASSET_VERIFIED": "Your asset \"{{asset}}\" has been verified.",
       "BENEFICIARY_ASSIGNED": "{{owner}} named you as a beneficiary of the vault \"{{vault}}\".",
       "BENEFICIARY_REMOVED": "{{owner}} removed you as a beneficiary of the vault \"{{vault}}\".",
+      "EXECUTOR_ACTIVATED": "The Dead Man's Switch of {{owner}} has been triggered. As their {{role}}, please sign in and acknowledge it to start the handover.",
+      "EXECUTOR_ACTIVATED_deadline": "The Dead Man's Switch of {{owner}} has been triggered. As their {{role}}, please acknowledge it before {{deadlineAt}} to start the handover.",
       "EXECUTOR_ASSIGNED": "{{owner}} invited you to be their {{role}}. Open the invitation to accept or decline.",
       "EXECUTOR_INVITATION_ACCEPTED": "{{executor}} accepted to be your {{role}}.",
       "EXECUTOR_INVITATION_DECLINED_reason": "{{executor}} declined to be your {{role}}. Reason: {{reason}}. Please assign someone else.",

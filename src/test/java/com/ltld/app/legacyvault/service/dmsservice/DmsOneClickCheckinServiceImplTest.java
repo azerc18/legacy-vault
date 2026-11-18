@@ -32,7 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,7 +86,7 @@ class DmsOneClickCheckinServiceImplTest {
     void checkInWithToken_validToken_delegatesWithJtiAndCycle() {
         String token = service.generateCheckinToken(dmsConfig);
         Jwt parsed = decodeWithoutValidation(token);
-        long cycle = dmsConfig.getLastCheckinAt().toEpochSecond(ZoneOffset.UTC);
+        long cycle = dmsConfig.getLastCheckinAt().atZone(ZoneId.systemDefault()).toEpochSecond();
         LocalDateTime due = LocalDateTime.of(2026, 12, 1, 9, 0);
         when(dmsConfigService.checkInFromEmailLink(owner.getId(), parsed.getId(), cycle))
                 .thenReturn(DmsConfigResponse.builder().checkinDueAt(due).triggerAt(due.plusDays(7)).build());
@@ -124,7 +124,7 @@ class DmsOneClickCheckinServiceImplTest {
         assertEquals(owner.getId().toString(), parsed.getSubject());
         assertEquals(DmsOneClickCheckinServiceImpl.PURPOSE_DMS_CHECKIN,
                 parsed.getClaimAsString(DmsOneClickCheckinServiceImpl.PURPOSE_CLAIM));
-        assertEquals(dmsConfig.getLastCheckinAt().toEpochSecond(ZoneOffset.UTC),
+        assertEquals(dmsConfig.getLastCheckinAt().atZone(ZoneId.systemDefault()).toEpochSecond(),
                 ((Number) parsed.getClaim(DmsOneClickCheckinServiceImpl.CYCLE_CLAIM)).longValue());
         assertNotNull(parsed.getId());
         assertEquals(DmsOneClickCheckinServiceImpl.TOKEN_TTL,

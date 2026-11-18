@@ -1,6 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
+// engineSource của AI dự phòng (DeathCertificateOcrServiceImpl) -> tên nhà cung cấp
+const FALLBACK_ENGINES = { GROQ_VISION_AI: 'Groq', GROQ_TEXT_AI: 'Groq', DEEPSEEK_TEXT_AI: 'DeepSeek' };
+
 export default function OcrAnalysisCard({
     data,
     role = 'executor',
@@ -69,7 +72,10 @@ export default function OcrAnalysisCard({
         : (data.executorSuggestion || data.verifierSuggestion);
 
     const isDemoSource = engineSource === 'DEMO_SIMULATION';
-    const sourceBadgeText = isDemoSource ? t('ocr.sourceDemo') : t('ocr.sourceGemini');
+    // Gemini lỗi thì BE dùng AI dự phòng: ghi rõ nguồn để người đọc biết kết quả không đến từ Gemini
+    const fallbackProvider = FALLBACK_ENGINES[engineSource];
+    const sourceBadgeText = isDemoSource ? t('ocr.sourceDemo')
+        : fallbackProvider ? t('ocr.sourceFallback', { provider: fallbackProvider }) : t('ocr.sourceGemini');
 
     let badgeText = t('ocr.matchedBadge');
     let badgeClass = 'bg-emerald-600 text-white';

@@ -6,9 +6,11 @@ import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, inputClass, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Pager, Stamp, toneOf } from './adminUi.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
+import { parseServerDate } from '../i18n/format.js';
 
 // <input type="datetime-local"> -> ISO string cho BE
-const toIso = (local) => (local ? new Date(local).toISOString() : undefined);
+// Ô datetime-local nhập theo giờ VN (như mọi giờ hiển thị trong app), không theo múi giờ của máy
+const toIso = (local) => parseServerDate(local)?.toISOString();
 
 // Nhóm mã hành động theo tiền tố (LOGIN_FAILED -> LOGIN) để dropdown ~100 mục dễ tìm
 const groupActions = (actions) => {
