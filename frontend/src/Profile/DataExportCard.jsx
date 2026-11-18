@@ -8,6 +8,7 @@ import { paymentApi } from '../api/paymentApi.js';
 import { sessionApi } from '../api/sessionApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Card, Alert, Icon, btnOutline } from '../Owner/ownerUi.jsx';
+import { appDateKey } from '../i18n/format.js';
 
 // So theo từng từ của tên khoá (camelCase / snake_case / kebab) để "pin" không bắt nhầm "shipping", "mapping"
 const SENSITIVE_WORD = /^(secrets?|passwords?|passphrases?|passcodes?|seeds?|pins?|otps?|tokens?|cvv|cvc|mfa)$/;
@@ -64,7 +65,7 @@ export default function DataExportCard({ profile }) {
             const href = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = href;
-            a.download = `legacyvault-${new Date().toISOString().slice(0, 10)}.json`;
+            a.download = `legacyvault-${appDateKey()}.json`;
             document.body.appendChild(a);
             a.click();
             a.remove();
