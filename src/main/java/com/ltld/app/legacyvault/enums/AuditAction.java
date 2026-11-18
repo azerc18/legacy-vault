@@ -107,4 +107,6 @@ public enum AuditAction {
     AI_SETTINGS_UPDATED,
     // Admin đổi cờ tích hợp (eKYC mô phỏng) ở trang Tích hợp
     INTEGRATION_SETTINGS_UPDATED
+    // Admin đổi mặc định / giới hạn DMS (trang Chính sách hệ thống)
+    SYSTEM_POLICY_UPDATED
 }

@@ -144,13 +144,13 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ### Executors
 1. Sidebar → "Executors".
-2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond in time (by default 14 days).
+2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond in time (14 days unless the admin changed it; the number is fixed when your Dead Man's Switch is turned on).
 3. Click "Assign", enter the person's email, then "Save". They must have a verified LegacyVault account.
 4. "Replace" changes the person, "Revoke" removes them.
 
 ### Dead Man's Switch (DMS)
 1. Sidebar → "Dead Man's Switch". You need a vault and a primary executor first.
-2. Under "Schedule": "Check-in every (days)" 1–365, "Grace period (days)" 1–90, "Reminders" 1–10 emails during the grace period.
+2. Under "Schedule": "Check-in every (days)", "Grace period (days)" and "Reminders" (emails during the grace period). The allowed range and the suggested value are shown under each box; they are set by the admin, at most 1–365 days, 1–90 days and 1–10 reminders. A Dead Man's Switch already running with a value outside a narrowed range keeps running; the next save must use a value in range.
 3. Click "Turn on" the first time, "Save changes" later.
 4. Check in with "I'm okay — check in", or with the one-click link in the reminder email ("I'm OK — check in now"; no sign-in needed).
 5. Trusted Social Confirmers (VIP, up to 2): add name, email and relationship, then "Add". When your grace period ends they get an email (72 hours) asking if you are safe. "The owner is safe" postpones the hand-over by 7 days. "I cannot reach the owner" notifies your executor. While waiting, the status is "Waiting for confirmers" and you can still check in to cancel.
@@ -177,7 +177,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 ### Acknowledge the notice
 1. When an owner's Dead Man's Switch is triggered you get an email and the case shows "You have been activated".
 2. Click "Acknowledge" on the case card or inside the case ("Open case"). The card shows the deadline ("Acknowledge before …").
-3. If the primary executor does not acknowledge in time (by default 14 days), the backup executor is activated.
+3. If the primary executor does not acknowledge in time (14 days unless the admin changed it), the backup executor is activated.
 
 ### Submit the death certificate
 1. Open the case → "Submit death certificate".
@@ -234,7 +234,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ## Administrator
 
-The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked, AI settings, Integrations.
+The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked, AI settings, Integrations, Policies.
 
 - "Overview": users, vaults, open alerts, DMS needing attention, revenue, VIP users, and a "To handle" list. "Refresh" reloads.
 - "Users": search by email or name, filter by role and status. "Roles…" to grant or remove Legal Verifier or Admin (Owner, Beneficiary and Executor are set by the system). "Lock account" / "Unlock account", "Suspend DMS" / "Resume DMS". "Assign executor" appoints an emergency executor when a triggered DMS has nobody who can act. "Open profile" shows a user's details, vaults, asset verification, payments, alerts and recent logs.
@@ -248,6 +248,7 @@ The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Pla
 - "Locked": beneficiaries locked after 5 wrong identity codes. "Unlock" gives them 5 new attempts.
 - "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list. Each feature can also use a fallback AI when Gemini fails (Groq for images, Groq or DeepSeek for text) and pick its provider and model. Then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
 - "Integrations": read-only status of outside services (AI and OCR, the Legal Verifier's sign-off by email code, VNPay and PayPal in sandbox or live mode, email, CAPTCHA, Google sign-in). Keys and passwords are never shown, only "Configured" or "Not configured". The only setting here is simulated eKYC: "Follow environment", "Turn simulated eKYC on" or "Turn simulated eKYC off", with a required reason (at least 5 characters), then "Save". When it is on, beneficiaries can also verify their identity with an ID card number, and any well-formed number is accepted, so only use it for demos and tests. Turning it on creates a HIGH security alert that is emailed to every admin. On the live server admins can only turn it off; turning it on there needs a server setting. Every change is written to the Audit log.
+- "Policies" (page "System policies"): set the Dead Man's Switch minimum, suggested value and maximum for the check-in interval, grace period and reminder count (only inside the system limits 1–365 days, 1–90 days and 1–10 reminders), and the days the primary executor has before the backup executor takes over. While you type, the page shows how many running Dead Man's Switches would fall outside the new range. Changes apply from an owner's next save: a running Dead Man's Switch keeps its settings and keeps running, and new owners see the new suggested values. "Restore defaults" puts back the system limits and 14 days. Every save is written to the Audit log. The same page shows, read-only, how data is encrypted, where files are stored and how backups are kept (no keys are shown).
 
 ## Emails
 - System emails use the language set in "My profile" → "Email and invoice language". People without an account get Vietnamese.

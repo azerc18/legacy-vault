@@ -58,6 +58,7 @@
       }
     },
     "rangeError": "{{field}} phải từ {{min}} đến {{max}}.",
+    "policyOutside": "Cấu hình hiện tại ({{value}}) nằm ngoài khoảng Admin vừa đặt ({{min}}–{{max}}). DMS vẫn chạy bình thường; lần lưu tới hãy chọn số trong khoảng.",
     "saving": "Đang lưu...",
     "saveChanges": "Lưu thay đổi",
     "turnOn": "Bật",

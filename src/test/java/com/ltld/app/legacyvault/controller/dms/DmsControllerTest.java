@@ -46,6 +46,7 @@ public class DmsControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockitoBean private DmsConfigService dmsConfigService;
+    @MockitoBean private com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService dmsPolicyService;
 
     private final UUID ownerId = UUID.randomUUID();
     private final Principal principal = () -> ownerId.toString();

@@ -5,7 +5,9 @@ import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigRequest;
 import com.ltld.app.legacyvault.dto.dmsdto.DmsConfigResponse;
 import com.ltld.app.legacyvault.exception.DmsException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
 import com.ltld.app.legacyvault.service.dmsservice.DmsConfigService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import com.ltld.app.legacyvault.utility.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,13 @@ import java.util.UUID;
 public class DmsController {
 
     private final DmsConfigService dmsConfigService;
+    private final DmsPolicyService dmsPolicyService;
+
+    // Chính sách hệ thống: khoảng cho phép + giá trị gợi ý, để form của Owner hiện đúng giới hạn Admin đặt.
+    @GetMapping("/policy")
+    public ResponseEntity<ApiResponse<DmsPolicy>> getPolicy() {
+        return ResponseEntity.ok(ApiResponse.success(dmsPolicyService.current()));
+    }
 
     @GetMapping
     public ResponseEntity<ApiResponse<DmsConfigResponse>> getConfig(Principal principal) {

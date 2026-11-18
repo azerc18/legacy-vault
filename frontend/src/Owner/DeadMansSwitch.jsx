@@ -11,12 +11,20 @@ import { VipChip, VipLocked } from '../Common/VipLock.jsx';
 import { useVipStatus } from '../Common/useVipStatus.js';
 import { serverTime } from '../i18n/format.js';
 
-// Giới hạn khớp DmsConfigRequest của BE; nhãn/gợi ý ở dms.fields.<key> (namespace dms)
+// Giới hạn cứng của DmsConfigRequest (BE); nhãn/gợi ý ở dms.fields.<key> (namespace dms).
+// Chính sách hệ thống: Admin có thể thu hẹp khoảng và đổi giá trị gợi ý; trang tải GET /api/dms/policy rồi dùng số đó.
+// Tải lỗi thì dùng khoảng cứng này (BE vẫn kiểm lại theo chính sách thật).
 const LIMITS = {
-    checkinIntervalDays: { min: 1, max: 365 },
-    gracePeriodDays: { min: 1, max: 90 },
-    reminderCount: { min: 1, max: 10 },
+    checkinIntervalDays: { min: 1, max: 365, defaultValue: 30 },
+    gracePeriodDays: { min: 1, max: 90, defaultValue: 7 },
+    reminderCount: { min: 1, max: 10, defaultValue: 3 },
 };
+// Chỉ nhận dòng đúng dạng {min, defaultValue, max} (chế độ demo trả dữ liệu DMS mẫu cho mọi URL /dms*)
+const isRange = (r) => r && Number.isInteger(r.min) && Number.isInteger(r.max) && Number.isInteger(r.defaultValue);
+const limitsFrom = (policy) => Object.fromEntries(Object.keys(LIMITS).map((k) => [k, isRange(policy?.[k]) ? policy[k] : LIMITS[k]]));
+const defaultsOf = (limits) => Object.fromEntries(Object.entries(limits).map(([k, l]) => [k, l.defaultValue]));
+// DMS đã cấu hình: lấy số đã lưu; ô nào BE chưa trả thì dùng giá trị gợi ý của chính sách (không viết cứng 30/7/3)
+const formFromConfig = (c, limits) => Object.fromEntries(Object.entries(limits).map(([k, l]) => [k, c?.[k] ?? l.defaultValue]));
 
 // KYC: lưu tạm cấu hình đang nhập khi phải sang trang Xác minh danh tính, để quay lại vẫn còn
 const DRAFT_KEY = 'lv:dms-draft';
@@ -82,7 +90,8 @@ export default function DeadMansSwitch() {
     const [config, setConfig] = useState(null);       // DmsConfigResponse; configured=false = chưa cấu hình
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
     const [loading, setLoading] = useState(true);
-    const [form, setForm] = useState({ checkinIntervalDays: 30, gracePeriodDays: 7, reminderCount: 3 });
+    const [limits, setLimits] = useState(LIMITS);
+    const [form, setForm] = useState(() => defaultsOf(LIMITS));
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
     const [justCheckedIn, setJustCheckedIn] = useState(false);
@@ -96,7 +105,7 @@ export default function DeadMansSwitch() {
 
     const applyConfig = (c) => {
         setConfig(c);
-        if (c?.configured) setForm({ checkinIntervalDays: c.checkinIntervalDays ?? 30, gracePeriodDays: c.gracePeriodDays ?? 7, reminderCount: c.reminderCount ?? 3 });
+        if (c?.configured) setForm(formFromConfig(c, limits));
         else {
             const draft = readDraft();
             if (draft) setForm((f) => ({ ...f, ...draft }));
@@ -111,10 +120,26 @@ export default function DeadMansSwitch() {
             .catch(() => {});
     };
 
+    // Chính sách hệ thống: khoảng cho phép + giá trị gợi ý. Lỗi thì giữ khoảng cứng (không chặn trang).
+    const loadPolicy = () => ownerApi.getDmsPolicy()
+        .then((p) => {
+            const next = limitsFrom(p);
+            setLimits(next);
+            return next;
+        })
+        .catch(() => null);
+
     useEffect(() => {
-        ownerApi.getDms()
-            .then((c) => {
-                applyConfig(c);
+        // Tải chính sách cùng lúc với cấu hình, để form chưa cấu hình hiện đúng giá trị gợi ý của Admin
+        Promise.all([ownerApi.getDms(), loadPolicy()])
+            .then(([c, next]) => {
+                setConfig(c);
+                if (c?.configured) {
+                    setForm(formFromConfig(c, next || LIMITS));
+                } else {
+                    const draft = readDraft();
+                    setForm({ ...defaultsOf(next || LIMITS), ...(draft || {}) });
+                }
                 loadConfirmers(c);
             })
             .catch((err) => setError(getErrorMessage(err, t('dms.errors.load'))))
@@ -141,7 +166,7 @@ export default function DeadMansSwitch() {
     const save = async (e) => {
         e.preventDefault();
         setError('');
-        for (const [k, l] of Object.entries(LIMITS)) {
+        for (const [k, l] of Object.entries(limits)) {
             const v = Number(form[k]);
             if (!Number.isInteger(v) || v < l.min || v > l.max) {
                 return setError(t('dms.rangeError', { field: t(`dms.fields.${k}.label`), min: l.min, max: l.max }));
@@ -164,6 +189,8 @@ export default function DeadMansSwitch() {
                 navigate(IDENTITY_URL);
                 return;
             }
+            // Admin vừa đổi chính sách trong lúc Owner đang mở trang: tải lại khoảng mới để ô sai hiện ngay
+            if (getErrorCode(err) === 'DMS_POLICY_OUT_OF_RANGE') loadPolicy();
             setError(getErrorMessage(err, t('dms.errors.save')));
         } finally {
             setSaving(false);
@@ -402,18 +429,29 @@ export default function DeadMansSwitch() {
                     <div data-tour="dms-interval">
                     <Card title={<>{t('dms.schedule')} <InfoTip term="dms" /></>} icon="tune">
                         <form onSubmit={save} className="space-y-4">
-                            {Object.entries(LIMITS).map(([k, l]) => (
-                                <label key={k} className="block">
-                                    <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
-                                    <input
-                                        type="number" min={l.min} max={l.max} disabled={locked || pausedNoVault}
-                                        value={form[k]}
-                                        onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
-                                        className={`${inputClass} mt-1`}
-                                    />
-                                    <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
-                                </label>
-                            ))}
+                            {Object.entries(limits).map(([k, l]) => {
+                                // DMS bật từ trước có thể đang dùng số nằm ngoài khoảng Admin vừa thu hẹp: vẫn chạy bình thường,
+                                // chỉ lần lưu kế tiếp phải chọn lại. Báo trước để Owner không bất ngờ khi bấm Lưu.
+                                const current = configured ? config[k] : null;
+                                const outside = current != null && (current < l.min || current > l.max);
+                                return (
+                                    <label key={k} className="block">
+                                        <span className="text-sm font-semibold text-on-surface-variant">{t(`dms.fields.${k}.label`)}</span>
+                                        <input
+                                            type="number" min={l.min} max={l.max} disabled={locked || pausedNoVault}
+                                            value={form[k]}
+                                            onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
+                                            className={`${inputClass} mt-1`}
+                                        />
+                                        <span className="text-xs text-outline">{t(`dms.fields.${k}.hint`)} ({l.min}–{l.max})</span>
+                                        {outside && !locked && (
+                                            <span className="block text-xs text-amber-700 dark:text-amber-400 mt-0.5" data-testid={`dms-outside-${k}`}>
+                                                {t('dms.policyOutside', { value: current, min: l.min, max: l.max })}
+                                            </span>
+                                        )}
+                                    </label>
+                                );
+                            })}
                             <button type="submit" disabled={saving || locked || pausedNoVault} className={`${btnPrimary} w-full`}>
                                 {saving ? t('dms.saving') : configured ? t('dms.saveChanges') : t('dms.turnOn')}
                             </button>

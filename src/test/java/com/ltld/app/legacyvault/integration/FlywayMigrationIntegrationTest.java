@@ -8,8 +8,11 @@ import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.enums.SecurityAlertRule;
 import com.ltld.app.legacyvault.service.integrationservice.IntegrationSettingsService;
-import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
+import com.ltld.app.legacyvault.dto.systempolicydto.AdminDmsPolicyResponse;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
+import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -63,6 +66,19 @@ class FlywayMigrationIntegrationTest {
         assertThat(rows).isEqualTo(1);
         assertThat(integrationSettingsService.get().kyc().mockOverride()).isNull();
         assertThat(mockKycVerifier.isEnabled()).isFalse();
+    }
+  
+    @Autowired private DmsPolicyService dmsPolicyService;
+
+    // Chính sách hệ thống: migration tạo đúng 1 dòng = các số trước đây viết cứng, và câu đếm DMS ngoài khoảng chạy được
+    @Test
+    void dmsPolicy_seededWithOldDefaults_andOutsideCountQueryRuns() {
+        Integer rows = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM dms_policy_settings", Integer.class);
+        assertThat(rows).isEqualTo(1);
+        AdminDmsPolicyResponse res = dmsPolicyService.getForAdmin();
+        assertThat(res.policy()).isEqualTo(DmsPolicy.DEFAULTS);
+        assertThat(res.configsOutsideLimits()).isZero();
+        assertThat(res.updatedAt()).isNull();
     }
 
     @Test

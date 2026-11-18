@@ -58,6 +58,7 @@
       }
     },
     "rangeError": "{{field}} must be between {{min}} and {{max}}.",
+    "policyOutside": "Your current value ({{value}}) is outside the range an admin just set ({{min}}–{{max}}). Your switch keeps running; pick a value in range next time you save.",
     "saving": "Saving...",
     "saveChanges": "Save changes",
     "turnOn": "Turn on",
