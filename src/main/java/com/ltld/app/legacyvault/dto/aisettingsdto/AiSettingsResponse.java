@@ -29,12 +29,14 @@ public record AiSettingsResponse(
     /**
      * AI dự phòng (Groq / DeepSeek). Chỉ cho biết key đã đặt hay chưa, không trả giá trị key.
      *
+     * @param groqVisionModels  model Groq đọc được ảnh (cho ô "Model đọc ảnh"), tách khỏi model văn bản
      * @param defaultTextModels model văn bản mặc định theo nhà cung cấp (GROQ, DEEPSEEK)
      */
     public record Fallback(boolean groqKeyConfigured,
                            boolean deepseekKeyConfigured,
                            List<String> groqModels,
                            List<String> deepseekModels,
+                           List<String> groqVisionModels,
                            String defaultTextProvider,
                            java.util.Map<String, String> defaultTextModels,
                            String defaultVisionModel) {

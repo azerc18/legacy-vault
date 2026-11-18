@@ -381,7 +381,7 @@
       "backupKey": "API key dự phòng",
       "set": "Đã đặt",
       "notSet": "Chưa đặt",
-      "mockNote": "AI_PROVIDER đang là mock: Vaulty trả lời mẫu, hai chức năng đọc ảnh không gọi AI. Model chọn ở dưới chỉ có tác dụng khi chuyển sang gemini.",
+      "mockNote": "AI_PROVIDER đang là mock: Vaulty trả lời mẫu và không gọi Gemini. Hai chức năng đọc ảnh vẫn gọi AI dự phòng thật (Groq / DeepSeek) nếu đã đặt GROQ_API_KEY / DEEPSEEK_API_KEY. Model Gemini chọn ở dưới chỉ có tác dụng khi chuyển sang gemini.",
       "noKeyNote": "Chưa đặt GEMINI_API_KEY nên các chức năng AI chưa chạy được.",
       "keyHint": "Đổi key: sửa biến môi trường GEMINI_API_KEY / GEMINI_BACKUP_API_KEY trên Azure (App Service tự khởi động lại)."
     },
@@ -428,7 +428,7 @@
       "textModel": "Model văn bản",
       "visionModel": "Model đọc ảnh (Groq)",
       "noKey": "Chưa đặt key cho {{provider}} nên bước dự phòng này chưa chạy được.",
-      "modelsHint": "Danh sách model dự phòng lấy từ GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL và DEEPSEEK_ALLOWED_MODELS."
+      "modelsHint": "Danh sách model dự phòng lấy từ GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL và DEEPSEEK_ALLOWED_MODELS. Model đọc ảnh chỉ gồm GROQ_VISION_MODEL và GROQ_VISION_ALLOWED_MODELS."
     }
   },
   "systemPolicies": {
