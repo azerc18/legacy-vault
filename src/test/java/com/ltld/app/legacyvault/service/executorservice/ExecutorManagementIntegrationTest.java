@@ -260,7 +260,7 @@ class ExecutorManagementIntegrationTest {
         assertThat(primary.getActivatedAt()).isEqualTo(T0);
         assertThat(executorAssignmentRepository.findById(backupId).orElseThrow().getStatus())
                 .isEqualTo(ExecutorStatus.INACTIVE);
-        verify(executorNotificationService).send(eq(a.getEmail()), anyString());
+        verify(executorNotificationService).sendExecutorActivated(eq(a.getEmail()), any());
 
         dmsAutomationService.escalateUnresponsivePrimaries(T0.plusDays(13));
         assertThat(executorAssignmentRepository.findById(backupId).orElseThrow().getStatus())
@@ -272,7 +272,7 @@ class ExecutorManagementIntegrationTest {
         ExecutorAssignment backup = executorAssignmentRepository.findById(backupId).orElseThrow();
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(backup.getExecutorUser().getId()).isEqualTo(b.getId());
-        verify(executorNotificationService).send(eq(b.getEmail()), anyString());
+        verify(executorNotificationService).sendExecutorActivated(eq(b.getEmail()), any());
     }
 
     // ---------- 3. Thu hồi rồi gán lại ----------

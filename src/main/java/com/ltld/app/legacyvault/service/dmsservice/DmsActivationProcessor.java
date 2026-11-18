@@ -25,6 +25,9 @@ import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChange
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent.ExecutorMail;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService.ExecutorActivatedMail;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
+import com.ltld.app.legacyvault.utility.AfterCommit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
@@ -54,7 +57,8 @@ public class DmsActivationProcessor {
     public static final String ENTITY_DMS_CONFIG = "DmsConfig";
     public static final String ENTITY_EXECUTOR_ASSIGNMENT = "ExecutorAssignment";
 
-    // Nội dung thông báo kích hoạt — tách thành constant để dễ thay đổi nội dung / i18n sau này.
+    // Bản tóm tắt tiếng Anh lưu vào Notification.content (trang Admin > Thông báo lỗi đọc cột này).
+    // Mail thật dựng từ dữ liệu có cấu trúc qua ExecutorNotificationService.sendExecutorActivated (HTML, EN/VI).
     // Tham số: Owner (tên + email), loại Executor (Primary/Backup), mã ExecutorAssignment.
     private static final String MSG_EXECUTOR_ACTIVATED =
             "The Dead Man's Switch of %s has been triggered. You are the %s executor.%n"
@@ -92,6 +96,7 @@ public class DmsActivationProcessor {
     // (service đó gọi activateConfirmedDms). Thiếu bean thì app báo lỗi khi khởi động, không tắt X2 im lặng.
     private final DmsConfirmerService dmsConfirmerService;
     private final VaultRepository vaultRepository;
+    private final InAppNotifier inAppNotifier;
 
     public DmsActivationProcessor(DmsConfigRepository dmsConfigRepository,
                                   DmsCheckinRepository dmsCheckinRepository,
@@ -103,7 +108,8 @@ public class DmsActivationProcessor {
                                   UserRepository userRepository,
                                   ApplicationEventPublisher eventPublisher,
                                   @Lazy DmsConfirmerService dmsConfirmerService,
-                                  VaultRepository vaultRepository) {
+                                  VaultRepository vaultRepository,
+                                  InAppNotifier inAppNotifier) {
         this.dmsConfigRepository = dmsConfigRepository;
         this.dmsCheckinRepository = dmsCheckinRepository;
         this.executorAssignmentRepository = executorAssignmentRepository;
@@ -115,6 +121,7 @@ public class DmsActivationProcessor {
         this.eventPublisher = eventPublisher;
         this.dmsConfirmerService = dmsConfirmerService;
         this.vaultRepository = vaultRepository;
+        this.inAppNotifier = inAppNotifier;
     }
 
     // Owner đã xoá hết vault: DMS tạm dừng, không kích hoạt bàn giao (không còn gì để bàn giao).
@@ -256,7 +263,7 @@ public class DmsActivationProcessor {
             }
             for (User admin : admins) {
                 try {
-                    executorNotificationService.send(admin.getEmail(), content);
+                    executorNotificationService.sendAdminAlert(admin.getEmail(), content);
                 } catch (RuntimeException e) {
                     log.warn("B6: notifying admin {} for dmsConfig {} failed: {}", admin.getId(), config.getId(),
                             e.getMessage());
@@ -382,9 +389,30 @@ public class DmsActivationProcessor {
     }
 
     private void notifyActivated(DmsConfig config, ExecutorAssignment assignment, LocalDateTime now) {
-        sendNotification(assignment.getExecutorUser(), config.getId(), activationMessage(config.getOwner(), assignment, config.getBackupActivationWaitDays()), now);
+        int waitDays = config.getBackupActivationWaitDays();
+        ExecutorActivatedMail mail = activationMail(config.getOwner(), assignment, waitDays);
+        sendNotification(assignment.getExecutorUser(), config.getId(),
+                activationMessage(config.getOwner(), assignment, waitDays), mail, now);
         audit(AuditAction.EXECUTOR_ACTIVATED, ENTITY_EXECUTOR_ASSIGNMENT, assignment.getId(),
                 ownerDetail(config.getOwner().getId()) + ", executorType=" + assignment.getExecutorType());
+        notifyInAppAfterCommit(config.getOwner(), assignment, mail);
+    }
+
+    /**
+     * Chuông thông báo cho Executor, ghi sau commit (rollback thì không có). Tham chiếu ExecutorAssignment, không phải
+     * DmsConfig: dòng EMAIL cùng type tham chiếu DmsConfig là dòng mà lượt gửi lại / đồng hồ BR-03 / nút xác nhận
+     * tìm theo, nên không được để dòng IN_APP chen vào kết quả của câu tìm đó.
+     */
+    private void notifyInAppAfterCommit(User ownerUser, ExecutorAssignment assignment, ExecutorActivatedMail mail) {
+        UUID executorId = assignment.getExecutorUser().getId();
+        String owner = ownerLabel(ownerUser);
+        String content = String.format("The Dead Man's Switch of %s has been triggered. You are their %s executor. "
+                + "Please sign in and acknowledge it.", owner, mail.type() == ExecutorType.PRIMARY ? "primary" : "backup");
+        InAppNotifier.Draft draft = InAppNotifier.draft(NotificationType.EXECUTOR_ACTIVATED,
+                InAppNotifier.REF_EXECUTOR_ASSIGNMENT, assignment.getId(), content,
+                "owner", owner, "role", mail.type().name(), "deadlineAt", mail.acknowledgeBy(),
+                "variant", mail.acknowledgeBy() != null ? "deadline" : null);
+        AfterCommit.run(() -> inAppNotifier.toUser(executorId, draft));
     }
 
     private void retryFailedNotification(DmsConfig config, ExecutorAssignment assignment, LocalDateTime now) {
@@ -398,7 +426,10 @@ public class DmsActivationProcessor {
                     n.setAttemptCount(n.getAttemptCount() + 1);
                     n.setLastAttemptAt(now);
                     try {
-                        executorNotificationService.send(recipient.getEmail(), n.getContent());
+                        // Dựng lại từ dữ liệu hiện tại (không gửi lại Notification.content) để lần gửi lại
+                        // cũng là mail HTML theo ngôn ngữ của người nhận.
+                        executorNotificationService.sendExecutorActivated(recipient.getEmail(),
+                                activationMail(config.getOwner(), assignment, config.getBackupActivationWaitDays()));
                         n.setStatus(NotificationStatus.SENT);
                         n.setSentAt(now);
                     } catch (RuntimeException e) {
@@ -424,6 +455,18 @@ public class DmsActivationProcessor {
         return primary ? message + String.format(MSG_PRIMARY_DEADLINE, waitDays) : message;
     }
 
+    /**
+     * Dữ liệu mail kích hoạt. Hạn xác nhận của Primary = activatedAt + waitDays, cùng cách tính với trang Người thực thi
+     * (ExecutorSelfServiceImpl): đồng hồ thật tính từ lúc gửi được (luôn sau activatedAt) nên hạn in ra không bao giờ muộn hơn hạn thật.
+     */
+    public static ExecutorActivatedMail activationMail(User owner, ExecutorAssignment assignment, int waitDays) {
+        boolean primary = assignment.getExecutorType() == ExecutorType.PRIMARY;
+        LocalDateTime acknowledgeBy = primary && assignment.getActivatedAt() != null
+                ? assignment.getActivatedAt().plusDays(waitDays) : null;
+        return new ExecutorActivatedMail(assignment.getExecutorUser().getFullName(), owner.getFullName(),
+                owner.getEmail(), assignment.getExecutorType(), primary ? waitDays : null, acknowledgeBy);
+    }
+
     private static String ownerLabel(User owner) {
         return owner.getFullName() == null || owner.getFullName().isBlank()
                 ? owner.getEmail()
@@ -437,11 +480,12 @@ public class DmsActivationProcessor {
     }
 
     /** Gửi mail; lỗi gửi không được làm rollback trạng thái DMS mà được ghi nhận FAILED để gửi lại ở lượt quét sau. */
-    private void sendNotification(User recipient, UUID referenceId, String content, LocalDateTime now) {
+    private void sendNotification(User recipient, UUID referenceId, String content, ExecutorActivatedMail mail,
+                                  LocalDateTime now) {
         NotificationStatus status;
         LocalDateTime sentAt = null;
         try {
-            executorNotificationService.send(recipient.getEmail(), content);
+            executorNotificationService.sendExecutorActivated(recipient.getEmail(), mail);
             status = NotificationStatus.SENT;
             sentAt = now;
         } catch (RuntimeException e) {

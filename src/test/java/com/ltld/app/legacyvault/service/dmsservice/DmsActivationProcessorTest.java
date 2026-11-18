@@ -24,6 +24,8 @@ import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorAssignmentChangedEvent;
 import com.ltld.app.legacyvault.service.executorservice.ExecutorRoleManager;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService.ExecutorActivatedMail;
+import com.ltld.app.legacyvault.service.notificationservice.InAppNotifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +76,7 @@ class DmsActivationProcessorTest {
     // X2 (m6): tham số constructor mới; mock trả false (chưa có confirmer) nên luồng kích hoạt cũ giữ nguyên.
     @Mock private DmsConfirmerService dmsConfirmerService;
     @Mock private VaultRepository vaultRepository;
+    @Mock private InAppNotifier inAppNotifier;
 
     private DmsActivationProcessor processor;
 
@@ -92,7 +95,7 @@ class DmsActivationProcessorTest {
         processor = new DmsActivationProcessor(dmsConfigRepository, dmsCheckinRepository, executorAssignmentRepository,
                 notificationRepository, new ExecutorRoleManager(roleRepository, executorAssignmentRepository),
                 auditLogService, executorNotificationService, userRepository, eventPublisher, dmsConfirmerService,
-                vaultRepository);
+                vaultRepository, inAppNotifier);
 
         ownerId = UUID.randomUUID();
         primaryUserId = UUID.randomUUID();
@@ -192,7 +195,7 @@ class DmsActivationProcessorTest {
         assertThat(primary.getActivatedAt()).isEqualTo(now);
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
         verify(dmsCheckinRepository).save(any());
-        verify(executorNotificationService).send(anyString(), anyString());
+        verify(executorNotificationService).sendExecutorActivated(anyString(), any());
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
         assertThat(captor.getValue().getType()).isEqualTo(NotificationType.EXECUTOR_ACTIVATED);
@@ -213,7 +216,7 @@ class DmsActivationProcessorTest {
         InOrder order = inOrder(executorAssignmentRepository, executorNotificationService, auditLogService);
         order.verify(executorAssignmentRepository).save(primary);
         order.verify(executorAssignmentRepository).flush();
-        order.verify(executorNotificationService).send(anyString(), anyString());
+        order.verify(executorNotificationService).sendExecutorActivated(anyString(), any());
         order.verify(auditLogService).log(eq(AuditAction.EXECUTOR_ACTIVATED), any(), any(), any(), any(),
                 any(), any(), any());
     }
@@ -227,7 +230,7 @@ class DmsActivationProcessorTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> processor.trigger(config.getId(), now))
                 .isInstanceOf(org.springframework.orm.ObjectOptimisticLockingFailureException.class);
 
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
         verifyNoInteractions(auditLogService);
     }
 
@@ -241,13 +244,13 @@ class DmsActivationProcessorTest {
         config.setNextCheckinDueAt(now.minusDays(1));
         config.setStatus(DmsStatus.TRIGGERED);
         processor.trigger(config.getId(), now);
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     @Test
     @DisplayName("Gửi mail lỗi: DMS vẫn TRIGGERED, thông báo ghi FAILED và không có sentAt")
     void trigger_mailFailureRecordedAsFailedWithoutRollback() {
-        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).send(anyString(), anyString());
+        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
 
         processor.trigger(config.getId(), now);
 
@@ -321,7 +324,7 @@ class DmsActivationProcessorTest {
         processor.trigger(config.getId(), now);
 
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendAdminAlert(anyString(), anyString());
         assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "DMS_TRIGGERED_NO_EXECUTOR");
     }
 
@@ -345,8 +348,8 @@ class DmsActivationProcessorTest {
         processor.trigger(config.getId(), now);
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(executorNotificationService).send(eq("admin1@example.test"), content.capture());
-        verify(executorNotificationService).send(eq("admin2@example.test"), anyString());
+        verify(executorNotificationService).sendAdminAlert(eq("admin1@example.test"), content.capture());
+        verify(executorNotificationService).sendAdminAlert(eq("admin2@example.test"), anyString());
         assertThat(content.getValue()).contains("Nguyễn Văn A (owner@example.test)", config.getId().toString());
         // Không tạo Notification EXECUTOR_ACTIVATED cho Admin.
         verify(notificationRepository, never()).save(any());
@@ -360,12 +363,12 @@ class DmsActivationProcessorTest {
                 User.builder().id(UUID.randomUUID()).email("down@example.test").build(),
                 User.builder().id(UUID.randomUUID()).email("ok@example.test").build()));
         doThrow(new RuntimeException("smtp down")).when(executorNotificationService)
-                .send(eq("down@example.test"), anyString());
+                .sendAdminAlert(eq("down@example.test"), anyString());
 
         processor.trigger(config.getId(), now);
 
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
-        verify(executorNotificationService).send(eq("ok@example.test"), anyString());
+        verify(executorNotificationService).sendAdminAlert(eq("ok@example.test"), anyString());
     }
 
     @Test
@@ -380,7 +383,7 @@ class DmsActivationProcessorTest {
         config.setStatus(DmsStatus.ACTIVE);
         processor.trigger(config.getId(), now);
 
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendAdminAlert(anyString(), anyString());
         verify(userRepository, times(2)).findActiveByRoleCode("ADMIN");
     }
 
@@ -598,7 +601,7 @@ class DmsActivationProcessorTest {
         primary.setStatus(ExecutorStatus.ACTIVE);
         Notification failed = activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED,
                 NotificationStatus.FAILED, null);
-        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).send(anyString(), anyString());
+        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
@@ -615,7 +618,7 @@ class DmsActivationProcessorTest {
         config.setStatus(DmsStatus.TRIGGERED);
         primary.setStatus(ExecutorStatus.ACTIVE);
         primary.setActivatedAt(activatedAt);
-        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).send(anyString(), anyString());
+        doThrow(new IllegalStateException("smtp down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
         return activationNotification(primaryUserId, NotificationType.EXECUTOR_ACTIVATED, NotificationStatus.FAILED, null);
     }
 
@@ -650,7 +653,7 @@ class DmsActivationProcessorTest {
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
         verify(notificationRepository, never()).save(any());
         assertThat(failed.getAttemptCount()).isEqualTo(3);
         assertThat(failed.getLastAttemptAt()).isEqualTo(now.minusHours(4).plusMinutes(1));
@@ -665,7 +668,7 @@ class DmsActivationProcessorTest {
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
         assertThat(failed.getAttemptCount()).isEqualTo(DmsActivationProcessor.MAX_ATTEMPTS);
     }
 
@@ -678,7 +681,7 @@ class DmsActivationProcessorTest {
 
         processor.escalateIfPrimaryUnresponsive(config.getId(), now);
 
-        verify(executorNotificationService).send(anyString(), anyString());
+        verify(executorNotificationService).sendExecutorActivated(anyString(), any());
         assertThat(failed.getAttemptCount()).isEqualTo(DmsActivationProcessor.MAX_ATTEMPTS);
         assertThat(failed.getLastAttemptAt()).isEqualTo(now);
     }
@@ -699,7 +702,7 @@ class DmsActivationProcessorTest {
         primary.setStatus(ExecutorStatus.ACTIVE);
         processor.escalateIfPrimaryUnresponsive(config.getId(), now); // config đang ACTIVE
         assertThat(backup.getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     @Test
@@ -724,7 +727,7 @@ class DmsActivationProcessorTest {
         verify(executorAssignmentRepository, never()).save(any());
         verify(dmsConfigRepository, never()).save(any());
         verify(notificationRepository, never()).save(any());
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
         verifyNoInteractions(auditLogService);
     }
 
@@ -787,19 +790,52 @@ class DmsActivationProcessorTest {
     // ---------- C4/T9: nội dung mail kích hoạt ----------
 
     @Test
-    @DisplayName("C4/T9: nội dung thông báo nêu tên + email Owner, loại Executor và mã assignment")
-    void trigger_notificationContentNamesOwnerTypeAndAssignment() {
+    @DisplayName("C4/T9: mail kích hoạt mang tên + email Owner, loại Executor và hạn xác nhận; content lưu bản tóm tắt")
+    void trigger_activationMailCarriesOwnerTypeAndDeadline() {
         processor.trigger(config.getId(), now);
 
-        ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
-        verify(executorNotificationService).send(eq("primary@example.test"), sent.capture());
-        assertThat(sent.getValue())
+        ArgumentCaptor<ExecutorActivatedMail> sent = ArgumentCaptor.forClass(ExecutorActivatedMail.class);
+        verify(executorNotificationService).sendExecutorActivated(eq("primary@example.test"), sent.capture());
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        assertThat(sent.getValue().ownerName()).isEqualTo("Nguyễn Văn A");
+        assertThat(sent.getValue().ownerEmail()).isEqualTo("owner@example.test");
+        assertThat(sent.getValue().type()).isEqualTo(ExecutorType.PRIMARY);
+        assertThat(sent.getValue().waitDays()).isEqualTo(14);
+        assertThat(sent.getValue().acknowledgeBy()).isEqualTo(now.plusDays(14));
+        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(saved.capture());
+        assertThat(saved.getValue().getContent())
                 .contains("Nguyễn Văn A (owner@example.test)")
                 .contains("Primary executor")
                 .contains(primary.getId().toString());
-        ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
-        verify(notificationRepository).save(saved.capture());
-        assertThat(saved.getValue().getContent()).isEqualTo(sent.getValue());
+    }
+
+    @Test
+    @DisplayName("Chuông: kích hoạt ghi thông báo IN_APP tham chiếu ExecutorAssignment, có hạn cho Primary")
+    void trigger_writesInAppNotificationForExecutor() {
+        processor.trigger(config.getId(), now);
+
+        ArgumentCaptor<InAppNotifier.Draft> draft = ArgumentCaptor.forClass(InAppNotifier.Draft.class);
+        verify(inAppNotifier).toUser(eq(primaryUserId), draft.capture());
+        assertThat(draft.getValue().type()).isEqualTo(NotificationType.EXECUTOR_ACTIVATED);
+        assertThat(draft.getValue().referenceType()).isEqualTo(InAppNotifier.REF_EXECUTOR_ASSIGNMENT);
+        assertThat(draft.getValue().referenceId()).isEqualTo(primary.getId());
+        assertThat(draft.getValue().params())
+                .containsEntry("owner", "Nguyễn Văn A (owner@example.test)")
+                .containsEntry("role", "PRIMARY")
+                .containsEntry("variant", "deadline")
+                .containsKey("deadlineAt");
+    }
+
+    @Test
+    @DisplayName("Backup: mail không có hạn xác nhận (BR-03 chỉ leo thang Primary)")
+    void activationMail_backupHasNoDeadline() {
+        backup.setActivatedAt(now);
+        ExecutorActivatedMail mail = DmsActivationProcessor.activationMail(config.getOwner(), backup, 14);
+
+        assertThat(mail.type()).isEqualTo(ExecutorType.BACKUP);
+        assertThat(mail.waitDays()).isNull();
+        assertThat(mail.acknowledgeBy()).isNull();
     }
 
     @Test

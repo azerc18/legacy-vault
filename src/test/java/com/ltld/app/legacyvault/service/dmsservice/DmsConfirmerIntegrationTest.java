@@ -162,7 +162,7 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
         assertThat(config(ownerId).getStatus()).isEqualTo(DmsStatus.TRIGGERED);
         verify(emailSender, times(1)).sendDmsCrossConfirmationRequest(
                 anyString(), any(), any(), any(), any(), anyString());
-        verify(executorNotificationService).send(anyString(), anyString());
+        verify(executorNotificationService).sendExecutorActivated(anyString(), any());
     }
 
     @Test
@@ -199,7 +199,7 @@ class DmsConfirmerIntegrationTest extends MySqlTestContainer {
 
         DmsConfig after = config(ownerId);
         assertThat(after.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
-        verify(executorNotificationService).send(anyString(), anyString());
+        verify(executorNotificationService).sendExecutorActivated(anyString(), any());
         verify(emailSender, never()).sendOwnerConfirmationPendingNotice(anyString(), any(), anyList(), any());
         Integer audits = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM audit_logs WHERE action = 'DMS_CONFIRMATION_UNDELIVERED'"
