@@ -144,7 +144,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ### Executors
 1. Sidebar → "Executors".
-2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond in time (14 days unless the admin changed it; the number shown on the invitation is the one that applies).
+2. "Primary Executor" is notified first when your Dead Man's Switch is triggered. "Backup Executor" takes over if the primary does not respond in time (14 days unless the admin changed it; the number is fixed when your Dead Man's Switch is turned on).
 3. Click "Assign", enter the person's email, then "Save". They must have a verified LegacyVault account.
 4. "Replace" changes the person, "Revoke" removes them.
 
