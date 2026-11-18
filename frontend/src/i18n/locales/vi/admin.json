@@ -492,9 +492,10 @@
     },
     "signature": {
       "title": "Ký xác nhận (Legal Verifier)",
-      "method": "Xác thực trước khi ký",
+      "method": "Cách ký",
       "methods": {
-        "EMAIL_OTP": "OTP qua email"
+        "EMAIL_OTP": "OTP qua email",
+        "EMAIL_OTP_OR_HANDWRITTEN": "OTP qua email hoặc ký tay"
       },
       "ca": "Chữ ký số CA (VNPT, Viettel…)",
       "hint": "Chữ ký số do CA cấp cần hợp đồng với nhà cung cấp, nên hiện chưa tích hợp."

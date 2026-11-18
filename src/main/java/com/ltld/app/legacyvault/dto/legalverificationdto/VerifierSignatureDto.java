@@ -31,6 +31,10 @@ public class VerifierSignatureDto {
     private Boolean signatureValid;
     private Boolean payloadMatches;
     private Boolean documentMatches;
+    // Ký tay: có ảnh chữ ký không, và ảnh đang lưu còn đúng mã băm lúc ký không (null khi không có ảnh)
+    private boolean hasSignatureImage;
+    private Boolean signatureImageMatches;
+    private String signatureImageSha256;
 
     private String documentSha256;
     private String currentDocumentSha256;

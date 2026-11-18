@@ -159,7 +159,7 @@
     "noteLabel": "Ghi chú từ chối",
     "notePlaceholder": "Nhập ghi chú cho lý do này...",
     "rejectRequest": "Từ chối yêu cầu",
-    "approvedBanner": "Yêu cầu đã được duyệt. Hãy ký bằng mã dùng một lần để mở khoá két.",
+    "approvedBanner": "Yêu cầu đã được duyệt. Hãy ký bằng mã OTP qua email hoặc ký tay để mở khoá két.",
     "sendCode": "Gửi mã ký đến email của tôi",
     "sendingCode": "Đang gửi...",
     "codeLabel": "Mã ký (6 chữ số)",
@@ -186,10 +186,22 @@
       "openDocument": "Không mở được tài liệu (HTTP {{status}}).",
       "noResponse": "không có phản hồi",
       "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này.",
-      "signatures": "Không đọc được chữ ký số của tài liệu."
+      "signatures": "Không đọc được chữ ký số của tài liệu.",
+      "signatureEmpty": "Hãy ký tên vào khung trước khi ký."
     },
     "checkSignatures": "Kiểm tra chữ ký số",
-    "signaturesChecking": "Đang đọc chữ ký..."
+    "signaturesChecking": "Đang đọc chữ ký...",
+    "signMethod": {
+      "label": "Cách ký",
+      "otp": "Mã OTP",
+      "handwritten": "Ký tay"
+    },
+    "handwritten": {
+      "canvasLabel": "Khung ký tay",
+      "placeholder": "Ký tên của bạn vào đây",
+      "hint": "Dùng chuột, ngón tay hoặc bút. Hình chữ ký được mã hóa và gắn vào chữ ký xác nhận.",
+      "clear": "Vẽ lại"
+    }
   },
   "rejectReason": {
     "DOCUMENT_UNREADABLE": "Tài liệu bị mờ hoặc không đọc được",
@@ -279,7 +291,8 @@
       "document": "Giấy chứng tử không đổi",
       "ok": "Đạt",
       "fail": "Không đạt",
-      "unknown": "Chưa kiểm được"
+      "unknown": "Chưa kiểm được",
+      "image": "Hình chữ ký không đổi"
     },
     "signedBy": "Người ký",
     "signedAt": "Thời điểm ký",
@@ -291,7 +304,8 @@
     "legacyHash": "Mã băm cũ",
     "methods": {
       "MOCK_OTP": "Mã OTP gửi qua email",
-      "MOCK_PIN": "Mã PIN"
+      "MOCK_PIN": "Mã PIN",
+      "HANDWRITTEN": "Ký tay trên màn hình"
     },
     "technical": "Chi tiết kỹ thuật (để kiểm độc lập)",
     "technicalHint": "Thuật toán, mã băm và khóa dùng khi cần đối chiếu. Ai có payload, chữ ký và khóa công khai đều tự kiểm được mà không cần LegacyVault.",
@@ -301,7 +315,11 @@
     "copy": "Sao chép",
     "copied": "Đã chép",
     "opensslHint": "Kiểm bằng OpenSSL: lưu payload thành payload.txt (đúng từng ký tự, xuống dòng kiểu LF, không thêm dòng trống cuối; trên Windows đừng lưu bằng Notepad vì có thể đổi sang CRLF), chữ ký thành sig.b64, khóa công khai thành public.pem, rồi chạy:",
-    "disclaimer": "Đây là chữ ký do hệ thống LegacyVault cấp (khóa ECDSA P-256 của hệ thống), chưa phải chữ ký số có chứng thư của tổ chức CA được cấp phép."
+    "disclaimer": "Đây là chữ ký do hệ thống LegacyVault cấp (khóa ECDSA P-256 của hệ thống), chưa phải chữ ký số có chứng thư của tổ chức CA được cấp phép.",
+    "handwritten": "Chữ ký tay",
+    "handwrittenAlt": "Chữ ký tay của {{name}}",
+    "handwrittenLoading": "Đang tải hình chữ ký...",
+    "imageHash": "Mã băm hình chữ ký (SHA-256)"
   },
   "pdfSig": {
     "overall": {

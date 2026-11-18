@@ -206,16 +206,25 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 1. The request page shows "Case information", the vaults to unlock and the "Death certificate".
 2. Step 1 "Check document": the system checks the file content automatically (real PDF, JPG or PNG) and shows Valid or Invalid; you only click the button. Step 2 "View document". Step 3 approve or reject.
 3. Optional: "✨ Analyze & Cross-Check with AI (OCR)" gives an AI advisory report (name match, seal, image quality). It is a suggestion only; the decision is yours.
-4. "Messages with the Executor": ask for more information or files, then "Send reply". "Refresh" loads new messages.
+4. Optional, for PDF files: "Check digital signatures" (after viewing the document) reads the digital signatures inside the PDF, such as those from VNPT-CA, Viettel-CA or BKAV-CA. For each signature it shows the signer, the issuer and the signing time, and checks that the content was not changed after signing, that the signature covers the whole file and that the certificate was valid when it signed. Green only when all of that holds and the certificate is not self-signed. It does not yet check revocation or the chain up to a national root, so it is advice only; the decision is yours.
+5. "Messages with the Executor": ask for more information or files, then "Send reply". "Refresh" loads new messages.
 
 ### Approve or reject
 - Approve: after checking and viewing, click "Approve request" and confirm. You still need to sign. An approved request that is not signed within 7 days goes back to "Pending review".
 - Reject: needs steps 1–2. Choose a "Rejection reason" (blurry or unreadable, not a valid death certificate, information does not match, suspected forgery, missing pages or stamp, or other with a note up to 500 characters), then "Reject request". The executor sees the reason.
 
-### Sign with OTP
-1. On an approved request, click "Send signing code to my email".
-2. Enter the 6-digit code (valid for 5 minutes; "Resend code" after the countdown).
-3. Click "Sign and unlock vault(s)" and confirm. The vaults are unlocked and the beneficiaries are notified.
+### Sign
+On an approved request, choose one of two equal ways to sign under "How to sign":
+- "Email code": click "Send signing code to my email", enter the 6-digit code (valid for 5 minutes; "Resend code" after the countdown), then "Sign and unlock vault(s)".
+- "Handwritten": sign your name in the box with a mouse, finger or pen ("Clear" to start again), then "Sign and unlock vault(s)". A box that is empty or has only a dot is refused.
+Confirm, and the vaults are unlocked and the beneficiaries are notified. This cannot be undone.
+
+### Confirmation signature of a signed request
+- A signed request shows a "Confirmation signature" card. Each time it opens (or you click "Check again"), LegacyVault checks that the signature matches its key, that the signed content is about this request and this verifier, that the death certificate was not replaced and, for a handwritten signature, that the signature image was not replaced.
+- Results: "Signature is valid", "Signature is NOT valid" (something was changed after signing: tell an admin), "Signature is correct, document not compared yet" (file storage was unreachable, try again later) or "Older signature" (signed before this check existed).
+- A handwritten signature is shown on the card and printed in the beneficiaries' inheritance dossier PDF.
+- "Technical details (for independent checks)" holds the algorithm, hashes, signed content, signature and public key, so anyone can check it with OpenSSL. It opens by itself when the signature is not valid.
+- This signature is issued by LegacyVault with its own key. It is not a digital signature backed by a licensed CA certificate.
 
 ## Beneficiary
 
@@ -227,7 +236,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 1. Verify your identity: open the vault → choose "Email code" (or "ID number (eKYC)" if offered) → "Start verification" → enter the code → "Verify". Verification lasts 30 minutes. 5 wrong codes lock verification for 24 hours (an administrator can unlock it).
 2. "Your response": "Accept" your share, or "Decline" (optional reason, then "Confirm decline"). Declining cannot be undone; your share goes to the backup beneficiary if there is one.
 3. "Assets": "View" or "Download" each asset allocated to you. For joint approval assets, click "Approve" and wait until enough people approve ("Refresh" to check).
-4. "Legal documents": download files. "Inheritance dossier" → "Download PDF" lists your assets and the steps to claim them (no passwords).
+4. "Legal documents": download files. "Inheritance dossier" → "Download PDF" lists your assets and the steps to claim them (no passwords), with the Legal Verifier's confirmation (and their handwritten signature if they signed by hand).
 5. "Executor progress on online accounts": see what the executor did. "Confirm" or "Dispute" (reason 5–500 characters) each completed task.
 6. "Legacy messages & Time-capsule": "Read" messages for you. Time-capsule messages stay sealed until their date.
 7. "Finish and close": "Review before closing" shows assets you have not viewed. Tick the confirmation, then "Confirm and close". After closing you can no longer view or download.
@@ -247,7 +256,7 @@ The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Pla
 - "Failed emails": notification emails that could not be delivered. "Resend" after mail is fixed.
 - "Locked": beneficiaries locked after 5 wrong identity codes. "Unlock" gives them 5 new attempts.
 - "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list. Each feature can also use a fallback AI when Gemini fails (Groq for images, Groq or DeepSeek for text) and pick its provider and model. Then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
-- "Integrations": read-only status of outside services (AI and OCR, the Legal Verifier's sign-off by email code, VNPay and PayPal in sandbox or live mode, email, CAPTCHA, Google sign-in). Keys and passwords are never shown, only "Configured" or "Not configured". The only setting here is simulated eKYC: "Follow environment", "Turn simulated eKYC on" or "Turn simulated eKYC off", with a required reason (at least 5 characters), then "Save". When it is on, beneficiaries can also verify their identity with an ID card number, and any well-formed number is accepted, so only use it for demos and tests. Turning it on creates a HIGH security alert that is emailed to every admin. On the live server admins can only turn it off; turning it on there needs a server setting. Every change is written to the Audit log.
+- "Integrations": read-only status of outside services (AI and OCR, how the Legal Verifier signs (email code or handwritten), VNPay and PayPal in sandbox or live mode, email, CAPTCHA, Google sign-in). Keys and passwords are never shown, only "Configured" or "Not configured". The only setting here is simulated eKYC: "Follow environment", "Turn simulated eKYC on" or "Turn simulated eKYC off", with a required reason (at least 5 characters), then "Save". When it is on, beneficiaries can also verify their identity with an ID card number, and any well-formed number is accepted, so only use it for demos and tests. Turning it on creates a HIGH security alert that is emailed to every admin. On the live server admins can only turn it off; turning it on there needs a server setting. Every change is written to the Audit log.
 - "Policies" (page "System policies"): set the Dead Man's Switch minimum, suggested value and maximum for the check-in interval, grace period and reminder count (only inside the system limits 1–365 days, 1–90 days and 1–10 reminders), the days the primary executor has before the backup executor takes over, and the hours trusted confirmers have to answer (12–168, default 72; a round already waiting keeps its deadline). While you type, the page shows how many running Dead Man's Switches would fall outside the new range. Changes apply from an owner's next save: a running Dead Man's Switch keeps its settings and keeps running, and new owners see the new suggested values. "Restore defaults" puts back the system limits, 14 days and 72 hours. Every save is written to the Audit log. The same page shows, read-only, how data is encrypted, where files are stored and how backups are kept (no keys are shown).
 
 ## Emails

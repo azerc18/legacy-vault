@@ -165,6 +165,18 @@ public class LegalVerificationController {
                 "Signature retrieved", service.getSignature(id, verifierId(jwt))));
     }
 
+    // Ảnh chữ ký tay (PNG) để hiện trên thẻ "Chữ ký xác nhận"; không cache vì là dữ liệu cá nhân
+    @GetMapping("/{id}/signature/image")
+    public ResponseEntity<byte[]> getSignatureImage(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .cacheControl(CacheControl.noStore())
+                .header("X-Content-Type-Options", "nosniff")
+                .body(service.getSignatureImage(id, verifierId(jwt)));
+    }
+
     // userId nằm ở claim "sub" của token
     // FR-12: sub trong token sai định dạng -> 401 (không để lỗi 500)
     private UUID verifierId(Jwt jwt) {

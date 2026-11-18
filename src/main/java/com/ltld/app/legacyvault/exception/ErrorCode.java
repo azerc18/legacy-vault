@@ -67,6 +67,8 @@ public enum ErrorCode {
     INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),
     SIGN_CODE_EXPIRED(HttpStatus.BAD_REQUEST),
     SIGN_CODE_ATTEMPTS_EXHAUSTED(HttpStatus.BAD_REQUEST),
+    // Ký tay: thiếu hình, hình không phải PNG, quá lớn hoặc gần như trống
+    INVALID_SIGNATURE_IMAGE(HttpStatus.BAD_REQUEST),
     VERIFICATION_STEP_REQUIRED(HttpStatus.CONFLICT),
     REQUEST_ALREADY_REVIEWED(HttpStatus.CONFLICT),
     REQUEST_NOT_APPROVED(HttpStatus.CONFLICT),
