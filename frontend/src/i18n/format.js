@@ -19,6 +19,14 @@ export function parseServerDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
+// Ngày "YYYY-MM-DD" theo giờ VN (không theo UTC như toISOString, không theo múi giờ máy khách)
+const DATE_KEY = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' });
+export const appDateKey = (date = new Date()) => DATE_KEY.format(date);
+
+// Giờ trong ngày (0-23) theo giờ VN
+const HOUR = new Intl.DateTimeFormat('en-GB', { timeZone: APP_TIME_ZONE, hour: '2-digit', hourCycle: 'h23' });
+export const appHour = (date = new Date()) => Number(HOUR.format(date));
+
 // Mili giây của mốc giờ BE (để so sánh/sắp xếp); 0 nếu trống.
 export const serverTime = (value) => parseServerDate(value)?.getTime() ?? 0;
 

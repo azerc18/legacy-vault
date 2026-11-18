@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.integration;
 
+import com.ltld.app.legacyvault.config.AppTimeZone;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.User;
 import com.ltld.app.legacyvault.enums.UserStatus;
@@ -13,8 +14,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -39,13 +43,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@ContextConfiguration(initializers = VietnamTimeZonePersistenceIntegrationTest.VietnamTimeZoneInitializer.class)
 class VietnamTimeZonePersistenceIntegrationTest {
 
     private static final TimeZone ORIGINAL = TimeZone.getDefault();
 
-    static {
-        // Như LegacyVaultApplication.main: đặt trước khi Spring/Hibernate khởi động
-        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+    /**
+     * Như LegacyVaultApplication.main: đặt giờ VN trước khi Hibernate khởi động. Đặt trong initializer (không phải
+     * static {}) để khi máy không có Docker và class bị bỏ qua thì múi giờ JVM không bị đổi cho các test sau.
+     */
+    static class VietnamTimeZoneInitializer implements ApplicationContextInitializer<ConfigurableApplicationContext> {
+        @Override
+        public void initialize(ConfigurableApplicationContext context) {
+            TimeZone.setDefault(TimeZone.getTimeZone(AppTimeZone.VN));
+        }
     }
 
     @Container

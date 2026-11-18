@@ -6,6 +6,7 @@ import { adminApi } from '../api/adminApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { Alert, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import { AdminLayout, Dossier, StatCard, formatVnd } from './adminUi.jsx';
+import { APP_TIME_ZONE } from '../i18n/format.js';
 
 const RANGES = ['30d', '12m'];
 const CHART_H = 220;
@@ -202,11 +203,13 @@ export default function AdminRevenue() {
 
     const locale = i18n.language === 'en' ? 'en-GB' : 'vi-VN';
     const fmt = useMemo(() => {
-        const day = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' });
-        const dayLong = new Intl.DateTimeFormat(locale, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
-        const mon = new Intl.DateTimeFormat(locale, { month: 'short' });
-        const monLong = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' });
-        const d = (iso) => new Date(`${iso}T00:00:00`);
+        const timeZone = APP_TIME_ZONE;
+        const day = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', timeZone });
+        const dayLong = new Intl.DateTimeFormat(locale, { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone });
+        const mon = new Intl.DateTimeFormat(locale, { month: 'short', timeZone });
+        const monLong = new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone });
+        // Ngày của BE là ngày VN: lấy 00:00 giờ VN rồi format theo giờ VN
+        const d = (iso) => new Date(`${iso}T00:00:00+07:00`);
         return {
             short: (iso) => (data?.range === '12m' ? mon.format(d(iso)) : day.format(d(iso))),
             long: (iso) => cap(data?.range === '12m' ? monLong.format(d(iso)) : dayLong.format(d(iso))),

@@ -11,7 +11,7 @@ spring:
     properties:
       logging.level.org.springframework.security=DEBUG
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${MYSQL_DATABASE:legacy_vault}
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${MYSQL_DATABASE:legacy_vault}?serverTimezone=UTC&characterEncoding=UTF-8
     username: ${MYSQL_USER:legacy_vault_user}
     password: ${MYSQL_PASSWORD:legacyvault_password}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -20,7 +20,8 @@ spring:
       ddl-auto: validate
     show-sql: false
     properties:
-      # DB luôn lưu giờ UTC, dù JVM chạy giờ VN (AppTimeZone) hay URL JDBC có serverTimezone hay không
+      # DB luôn lưu giờ UTC dù JVM chạy giờ VN (AppTimeZone). Mọi URL JDBC cũng phải có serverTimezone=UTC: thiếu nó,
+      # Connector/J lấy @@time_zone của MySQL (MySQL cài trên Windows là SYSTEM = +07:00) và ghi lệch 7 tiếng.
       hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
