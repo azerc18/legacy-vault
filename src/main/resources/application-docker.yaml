@@ -15,3 +15,5 @@ app:
   kyc:
     mock:
       enabled: true
+      # Máy dev / demo: Admin được bật eKYC mô phỏng từ trang Tích hợp (bản thật mặc định false)
+      admin-toggle-allowed: true

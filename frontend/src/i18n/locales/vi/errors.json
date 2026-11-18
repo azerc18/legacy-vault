@@ -89,6 +89,7 @@
   "IDENTITY_OCR_UNAVAILABLE": "Chưa đọc được ảnh CCCD lúc này. Hãy quét mã QR hoặc nhập tay.",
   "AI_FEATURE_DISABLED": "Chức năng AI này đang được quản trị viên tắt.",
   "AI_MODEL_NOT_ALLOWED": "Model không hợp lệ: chọn model trong danh sách và khác model chính.",
+  "INTEGRATION_SETTING_LOCKED": "Máy chủ này không cho bật eKYC mô phỏng từ trang Admin. Chỉ có thể tắt hoặc chọn theo biến môi trường.",
   "DMS_POLICY_OUT_OF_RANGE": "Giá trị nằm ngoài khoảng Admin cho phép (có thể vừa được đổi). Xem lại giới hạn dưới mỗi ô rồi lưu lại.",
   "SYSTEM_POLICY_INVALID": "Chính sách không hợp lệ: cần tối thiểu ≤ gợi ý ≤ tối đa và nằm trong giới hạn hệ thống."
 }

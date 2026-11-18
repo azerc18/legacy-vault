@@ -127,6 +127,8 @@ public enum ErrorCode {
     // Cấu hình AI: Admin tắt chức năng / chọn model ngoài danh sách cho phép
     AI_FEATURE_DISABLED(HttpStatus.SERVICE_UNAVAILABLE),
     AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST),
+    // Trang Tích hợp: máy chủ này không cho Admin bật eKYC mô phỏng (APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=false)
+    INTEGRATION_SETTING_LOCKED(HttpStatus.CONFLICT),
     // Chính sách hệ thống: Owner lưu DMS ngoài khoảng Admin cho phép / Admin lưu chính sách sai (min > max, ngoài giới hạn cứng)
     DMS_POLICY_OUT_OF_RANGE(HttpStatus.BAD_REQUEST),
     SYSTEM_POLICY_INVALID(HttpStatus.BAD_REQUEST);

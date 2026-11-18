@@ -52,6 +52,10 @@ app:
     # true = chưa nối nhà cung cấp SMS: mã OTP số điện thoại hiện ngay trên màn hình, "đã xác minh số" chưa chứng minh
     # Owner giữ số đó (audit OWNER_PHONE_VERIFIED ghi sandbox=true). Đặt false khi đã nối SMS thật.
     sms-sandbox: ${KYC_SMS_SANDBOX:true}
+    mock:
+      # Cho Admin BẬT eKYC mô phỏng từ trang Tích hợp. Mặc định false: trên bản thật muốn bật phải đổi biến môi trường
+      # và deploy lại, nên chiếm được 1 tài khoản Admin cũng không hạ được bước xác minh người thụ hưởng. Tắt thì luôn được.
+      admin-toggle-allowed: ${APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED:false}
   verification:
     bank:
       # Độ dài số tài khoản hợp lệ theo ngân hàng, dùng cho cách xác thực BANK_FORMAT_CHECK (chỉ kiểm định dạng).

@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa", "aiSettings": "Cấu hình AI", "systemPolicies": "Chính sách" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa", "aiSettings": "Cấu hình AI", "integrations": "Tích hợp", "systemPolicies": "Chính sách" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -299,11 +299,13 @@
       "LOGIN_FAILURES_FROM_IP": "Nhiều lần đăng nhập sai từ một IP",
       "REFRESH_TOKEN_REUSE": "Refresh token bị dùng lại (có thể bị đánh cắp)",
       "MASS_DOWNLOAD": "Một người dùng tải xuống hàng loạt",
-      "ADMIN_ROLE_GRANTED": "Đã cấp vai trò ADMIN"
+      "ADMIN_ROLE_GRANTED": "Đã cấp vai trò ADMIN",
+      "KYC_MOCK_ENABLED": "Đã bật eKYC mô phỏng"
     },
     "meta_other": "{{count}} sự kiện · đầu tiên {{first}} · gần nhất {{last}}",
     "acknowledgedAt": "xác nhận lúc {{date}}",
     "viewLogs": "Xem nhật ký",
+    "openIntegrations": "Mở trang Tích hợp",
     "acknowledge": "Xác nhận",
     "severityFilter": "Lọc theo mức độ",
     "allSeverities": "Mọi mức độ",
@@ -429,6 +431,96 @@
       "visionModel": "Model đọc ảnh (Groq)",
       "noKey": "Chưa đặt key cho {{provider}} nên bước dự phòng này chưa chạy được.",
       "modelsHint": "Danh sách model dự phòng lấy từ GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL và DEEPSEEK_ALLOWED_MODELS. Model đọc ảnh chỉ gồm GROQ_VISION_MODEL và GROQ_VISION_ALLOWED_MODELS."
+    }
+  },
+  "integrations": {
+    "title": "Tích hợp",
+    "subtitle": "Trạng thái các dịch vụ bên ngoài LegacyVault đang dùng, và cờ eKYC mô phỏng cho người thụ hưởng.",
+    "loadError": "Không tải được trạng thái tích hợp.",
+    "saveError": "Không lưu được thay đổi.",
+    "configured": "Đã cấu hình",
+    "notConfigured": "Chưa cấu hình",
+    "hidden": "Chưa cấu hình (đang ẩn)",
+    "integrated": "Đã tích hợp",
+    "notIntegrated": "Chưa tích hợp",
+    "on": "Bật",
+    "off": "Tắt",
+    "sandbox": "Sandbox",
+    "live": "Thật",
+    "updated": "Sửa lần cuối {{when}} bởi {{who}}",
+    "keyHint": "Mọi key, secret và mật khẩu chỉ đặt bằng biến môi trường; trang này chỉ cho biết đã đặt hay chưa.",
+    "auditHint": "Đổi cờ eKYC mô phỏng được ghi vào Nhật ký (INTEGRATION_SETTINGS_UPDATED) kèm lý do.",
+    "kyc": {
+      "title": "eKYC người thụ hưởng",
+      "mockOn": "Mock đang bật",
+      "mockOff": "Mock đang tắt",
+      "desc": "Khi bật, người thụ hưởng có thêm cách xác minh danh tính bằng số CCCD (eKYC mô phỏng) bên cạnh OTP qua email. Có hiệu lực trong tối đa 30 giây, không cần deploy lại.",
+      "choices": {
+        "env": "Theo biến môi trường",
+        "on": "Bật eKYC mô phỏng",
+        "off": "Tắt eKYC mô phỏng"
+      },
+      "choiceHints": {
+        "on": "Ghi đè APP_KYC_MOCK_ENABLED",
+        "onLocked": "Máy chủ này không cho bật từ trang Admin",
+        "off": "Chỉ còn OTP qua email"
+      },
+      "envNow": "APP_KYC_MOCK_ENABLED hiện: {{state}}",
+      "onWarning": "eKYC mô phỏng chấp nhận mọi số CCCD đúng định dạng (12 số, mã tỉnh hợp lệ), không kiểm với dữ liệu thật. Chỉ bật khi demo hoặc kiểm thử, nhớ tắt ngay sau đó.",
+      "onAlert": "Khi lưu, hệ thống tạo cảnh báo bảo mật mức HIGH và gửi email cho mọi Admin.",
+      "lockedNote": "Trên máy chủ này, Admin chỉ tắt được eKYC mô phỏng. Muốn bật phải đặt biến môi trường APP_KYC_MOCK_ENABLED=true (hoặc APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=true) rồi khởi động lại, để một tài khoản Admin bị chiếm cũng không tự bật được.",
+      "lockedIgnored": "Lựa chọn \"Bật\" đã lưu trước đây đang bị bỏ qua vì máy chủ này không cho Admin bật; eKYC mô phỏng đang theo biến môi trường. Nên chọn lại \"Theo biến môi trường\" hoặc \"Tắt eKYC mô phỏng\".",
+      "reason": "Lý do thay đổi",
+      "reasonPlaceholder": "Vd. Demo cho hội đồng ngày 20/11",
+      "reasonHint": "Bắt buộc, ít nhất {{min}} ký tự; được ghi vào Nhật ký.",
+      "provider": "Nhà cung cấp",
+      "providerMock": "Mô phỏng (kiểm định dạng CCCD)",
+      "sms": "OTP số điện thoại của Owner",
+      "smsSandbox": "Sandbox: mã hiện trên màn hình",
+      "smsReal": "Gửi SMS thật",
+      "neverUpdated": "Chưa ai đổi, đang theo biến môi trường.",
+      "save": "Lưu",
+      "saved": "Đã lưu cờ eKYC mô phỏng."
+    },
+    "ai": {
+      "title": "AI và OCR",
+      "provider": "AI_PROVIDER",
+      "geminiBackup": "Gemini dự phòng",
+      "demo": "Kịch bản OCR demo",
+      "mockNote": "Đang dùng AI mô phỏng: OCR và Vaulty trả kết quả mẫu.",
+      "link": "Chọn model ở trang Cấu hình AI"
+    },
+    "signature": {
+      "title": "Ký xác nhận (Legal Verifier)",
+      "method": "Xác thực trước khi ký",
+      "methods": {
+        "EMAIL_OTP": "OTP qua email"
+      },
+      "ca": "Chữ ký số CA (VNPT, Viettel…)",
+      "hint": "Chữ ký số do CA cấp cần hợp đồng với nhà cung cấp, nên hiện chưa tích hợp."
+    },
+    "payments": {
+      "title": "Thanh toán",
+      "reconcile": "Đối soát đơn chờ",
+      "hint": "Sandbox = URL cổng có chữ \"sandbox\" (VNPAY_PAY_URL, PAYPAL_BASE_URL). PayPal chưa cấu hình thì nút PayPal tự ẩn."
+    },
+    "mail": {
+      "title": "Email",
+      "host": "Máy chủ SMTP",
+      "account": "Tài khoản gửi",
+      "link": "Xem email gửi lỗi"
+    },
+    "captcha": {
+      "title": "CAPTCHA (Cloudflare Turnstile)",
+      "state": "Trạng thái",
+      "siteKey": "Site key",
+      "secretKey": "Secret key",
+      "missingKeys": "Đang bật nhưng thiếu key: đăng ký và quên mật khẩu sẽ lỗi."
+    },
+    "google": {
+      "title": "Đăng nhập Google",
+      "clientId": "Client ID",
+      "hint": "Chưa đặt GOOGLE_CLIENT_ID thì nút Đăng nhập Google tự ẩn."
     }
   },
   "systemPolicies": {

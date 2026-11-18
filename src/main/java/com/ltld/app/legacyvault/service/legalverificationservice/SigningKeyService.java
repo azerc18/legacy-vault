@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.service.cryptoservice.CryptoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -48,24 +49,32 @@ public class SigningKeyService {
         return repository.findFirstByActiveTrueOrderByCreatedAtDesc().orElseGet(this::createFirstKey);
     }
 
-    private SigningKey createFirstKey() {
+       private SigningKey createFirstKey() {
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         try {
             return tx.execute(status -> repository.saveAndFlush(generate(FIRST_KEY_REF)));
-        } catch (DataIntegrityViolationException e) {
-            // Hai lệnh ký đầu tiên chạy cùng lúc: bên thua đọc lại khóa bên thắng vừa tạo (key_ref unique).
-            // Đọc trong transaction MỚI: transaction ký bên ngoài (REPEATABLE READ) đã mở snapshot từ trước
-            // nên đọc ở đó sẽ không thấy dòng bên thắng vừa commit (review #293 m1).
-            log.info("Signing key {} was created concurrently, reloading", FIRST_KEY_REF);
+        } catch (DataIntegrityViolationException | ConcurrencyFailureException e) {
+            // Hai lệnh ký đầu tiên chạy cùng lúc: MySQL báo trùng key_ref (unique) HOẶC deadlock khi chèn cùng lúc.
+            // Bên thua đọc lại khóa bên thắng trong transaction MỚI (review #293 m1); bên thắng có thể chưa commit
+            // ngay nên thử lại vài lần.
+            log.info("Signing key {} was created concurrently ({}), reloading", FIRST_KEY_REF, e.getClass().getSimpleName());
             TransactionTemplate reload = new TransactionTemplate(transactionManager);
             reload.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             reload.setReadOnly(true);
-            SigningKey winner = reload.execute(status -> repository.findByKeyRef(FIRST_KEY_REF).orElse(null));
-            if (winner == null) {
-                throw new IllegalStateException("Signing key could not be created", e);
+            for (int attempt = 0; attempt < 5; attempt++) {
+                SigningKey winner = reload.execute(status -> repository.findByKeyRef(FIRST_KEY_REF).orElse(null));
+                if (winner != null) {
+                    return winner;
+                }
+                try {
+                    Thread.sleep(50L * (attempt + 1));
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
-            return winner;
+            throw new IllegalStateException("Signing key could not be created", e);
         }
     }
 
