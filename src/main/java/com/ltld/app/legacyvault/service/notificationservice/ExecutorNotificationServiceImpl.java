@@ -1,23 +1,24 @@
 package com.ltld.app.legacyvault.service.notificationservice;
 
+import com.ltld.app.legacyvault.utility.EmailSender;
 import lombok.RequiredArgsConstructor;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class ExecutorNotificationServiceImpl implements ExecutorNotificationService {
 
-    private final JavaMailSender javaMailSender;
+    private final EmailSender emailSender;
 
     // Dùng mail sender có sẵn, không gửi OTP hoặc thông tin nhạy cảm.
     @Override
     public void send(String recipientEmail, String content) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(recipientEmail);
-        message.setSubject("LegacyVault handover process notification");
-        message.setText(content);
-        javaMailSender.send(message);
+        emailSender.sendHandoverNotice(recipientEmail, content);
+    }
+
+    @Override
+    public void sendExecutorActivated(String recipientEmail, ExecutorActivatedMail mail) {
+        emailSender.sendExecutorActivatedNotice(recipientEmail, mail.executorName(), mail.ownerName(),
+                mail.ownerEmail(), mail.type(), mail.waitDays(), mail.acknowledgeBy());
     }
 }

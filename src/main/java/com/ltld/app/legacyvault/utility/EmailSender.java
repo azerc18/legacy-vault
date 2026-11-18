@@ -633,6 +633,45 @@ public class EmailSender {
                 roleLabel(lang, type), ownerLabel(ownerName, ownerEmail), ownerDisplayName(ownerName, ownerEmail))));
     }
 
+    /**
+     * FR-07: DMS của Owner kích hoạt, báo Executor (Primary hoặc Backup) đăng nhập xác nhận và bắt đầu bàn giao.
+     * Không @Async: DmsActivationProcessor cần biết gửi lỗi để ghi Notification FAILED và gửi lại sau.
+     * waitDays / acknowledgeBy chỉ có với Primary (BR-03); acknowledgeBy là giờ JVM, in ra theo giờ Việt Nam.
+     */
+    public void sendExecutorActivatedNotice(String to, String executorName, String ownerName, String ownerEmail,
+                                            ExecutorType type, Integer waitDays, LocalDateTime acknowledgeBy) {
+        AppLanguage lang = languageResolver.forEmail(to);
+        String owner = ownerLabel(ownerName, ownerEmail);
+        List<String> paras = new ArrayList<>();
+        paras.add(MailMessages.get(lang, "mail.greeting", displayName(executorName, to)));
+        paras.add(MailMessages.get(lang, "mail.execActivated.body", owner, roleLabel(lang, type)));
+        if (type == ExecutorType.BACKUP) {
+            paras.add(MailMessages.get(lang, "mail.execActivated.backup"));
+        } else if (waitDays != null && acknowledgeBy != null) {
+            paras.add(MailMessages.get(lang, "mail.execActivated.deadline", waitDays, formatDeadline(acknowledgeBy)));
+        }
+        paras.add(MailMessages.get(lang, "mail.execActivated.next"));
+        String base = frontendBase();
+        paras.add(base != null
+                ? MailMessages.get(lang, "mail.execActivated.button") + ": " + base + "/executor/home"
+                : MailMessages.get(lang, "mail.execActivated.noLink"));
+        deliver(to, lang, type == ExecutorType.PRIMARY ? Style.URGENT : Style.CASE,
+                MailMessages.get(lang, "mail.execActivated.subject", ownerDisplayName(ownerName, ownerEmail)),
+                MailMessages.get(lang, "mail.execActivated.title"), paras, null, null);
+    }
+
+    /**
+     * Mail bàn giao còn dùng câu tiếng Anh dựng sẵn (ExecutorNotificationService.send): bọc vào cùng bố cục HTML
+     * với các mail khác. Nội dung là tiếng Anh nên tiêu đề / chân trang cũng để tiếng Anh cho đồng nhất.
+     * Không @Async: người gọi cần biết gửi lỗi.
+     */
+    public void sendHandoverNotice(String to, String content) {
+        AppLanguage lang = AppLanguage.EN;
+        List<String> paras = content == null ? List.of() : List.of(content.split("\\R"));
+        deliver(to, lang, Style.NOTICE, MailMessages.get(lang, "mail.handover.subject"),
+                MailMessages.get(lang, "mail.handover.title"), paras, null, null);
+    }
+
     // N9: thanh toán thành công, đính kèm hóa đơn PDF (pdf null thì gửi không đính kèm)
     @Async
     public void sendPaymentSucceededNotice(String to, String fullName, String planName, long amountVnd,

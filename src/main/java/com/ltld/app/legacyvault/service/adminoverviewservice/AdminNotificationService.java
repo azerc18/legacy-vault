@@ -1,6 +1,8 @@
 package com.ltld.app.legacyvault.service.adminoverviewservice;
 
 import com.ltld.app.legacyvault.dto.adminoverviewdto.AdminNotificationResponse;
+import com.ltld.app.legacyvault.entity.DmsConfig;
+import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
@@ -10,7 +12,9 @@ import com.ltld.app.legacyvault.enums.NotificationType;
 import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService.ExecutorActivatedMail;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +34,8 @@ import java.util.UUID;
  * B1: Admin xem email thông báo gửi lỗi và gửi lại thủ công.
  * Gửi lại theo 3 bước để KHÔNG gửi mail trong transaction và không gửi trùng khi bấm 2 lần / job tự gửi lại cùng lúc:
  *   (1) "giữ chỗ" bằng UPDATE có điều kiện (status FAILED, lần thử gần nhất cách đây > 1 phút), tăng attemptCount
- *   (2) gửi mail ngoài transaction, dùng đúng nội dung đã lưu
+ *   (2) gửi mail ngoài transaction: dựng lại mail HTML kích hoạt từ DmsConfig + ExecutorAssignment; không tìm thấy
+ *       (dữ liệu đã đổi) thì gửi nội dung đã lưu trong bố cục chung
  *   (3) cập nhật SENT nếu gửi được (lỗi thì giữ FAILED)
  */
 @Slf4j
@@ -105,13 +110,17 @@ public class AdminNotificationService {
             if (claimed != 1) {
                 throw new BusinessException(ErrorCode.CONFLICT, "This email was just retried. Please wait a minute.");
             }
-            return new Object[]{n.getRecipient().getEmail(), n.getContent()};
+            return new Object[]{n.getRecipient().getEmail(), n.getContent(), activationMailFor(n)};
         });
 
         // (2) gửi ngoài transaction
         boolean sent;
         try {
-            mailSender.send((String) target[0], (String) target[1]);
+            if (target[2] instanceof ExecutorActivatedMail mail) {
+                mailSender.sendExecutorActivated((String) target[0], mail);
+            } else {
+                mailSender.send((String) target[0], (String) target[1]);
+            }
             sent = true;
         } catch (RuntimeException e) {
             log.warn("B1: admin retry of notification {} failed: {}", notificationId, e.getMessage());
@@ -134,6 +143,27 @@ public class AdminNotificationService {
             throw new BusinessException(ErrorCode.SERVICE_UNAVAILABLE, "The email could not be sent. Please try again later.");
         }
         return result;
+    }
+
+    // Dữ liệu để dựng lại mail kích hoạt; null nếu không còn DmsConfig hoặc assignment của người nhận.
+    private ExecutorActivatedMail activationMailFor(Notification n) {
+        if (!DmsActivationProcessor.ENTITY_DMS_CONFIG.equals(n.getReferenceType()) || n.getReferenceId() == null) {
+            return null;
+        }
+        DmsConfig config = em.find(DmsConfig.class, n.getReferenceId());
+        if (config == null || config.getBackupActivationWaitDays() == null) {
+            return null;
+        }
+        List<ExecutorAssignment> assignments = em.createQuery("""
+                        SELECT a FROM ExecutorAssignment a JOIN FETCH a.executorUser
+                        WHERE a.owner.id = :ownerId AND a.executorUser.id = :recipientId
+                        """, ExecutorAssignment.class)
+                .setParameter("ownerId", config.getOwner().getId())
+                .setParameter("recipientId", n.getRecipient().getId())
+                .getResultList();
+        return assignments.isEmpty() ? null
+                : DmsActivationProcessor.activationMail(config.getOwner(), assignments.get(0),
+                        config.getBackupActivationWaitDays());
     }
 
     private static AdminNotificationResponse toResponse(Notification n) {
