@@ -57,6 +57,7 @@ const AdminPlans = lazy(() => import('./Admin/AdminPlans.jsx'));
 const AdminNotifications = lazy(() => import('./Admin/AdminNotifications.jsx'));
 const AdminBeneficiaryLocks = lazy(() => import('./Admin/AdminBeneficiaryLocks.jsx'));
 const AdminAiSettings = lazy(() => import('./Admin/AdminAiSettings.jsx'));
+const AdminIntegrations = lazy(() => import('./Admin/AdminIntegrations.jsx'));
 const DemoEntry = lazy(() => import('./Common/DemoEntry.jsx'));
 
 // Bọc trang bằng kiểm tra role; roles = null => chỉ cần đăng nhập
@@ -141,6 +142,7 @@ function App() {
                 <Route path="/admin/notifications" element={guard(ADMIN, <AdminNotifications />)} />
                 <Route path="/admin/beneficiary-locks" element={guard(ADMIN, <AdminBeneficiaryLocks />)} />
                 <Route path="/admin/ai-settings" element={guard(ADMIN, <AdminAiSettings />)} />
+                <Route path="/admin/integrations" element={guard(ADMIN, <AdminIntegrations />)} />
 
                 <Route path="/me" element={guard(null, <ProfilePage />)} />
 

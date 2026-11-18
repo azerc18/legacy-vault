@@ -1,16 +1,13 @@
 package com.ltld.app.legacyvault.utility;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MockKycVerifierTest {
 
     private MockKycVerifier verifier(boolean enabled) {
-        MockKycVerifier v = new MockKycVerifier();
-        ReflectionTestUtils.setField(v, "enabled", enabled);
-        return v;
+        return new MockKycVerifier(() -> enabled);
     }
 
     @Test

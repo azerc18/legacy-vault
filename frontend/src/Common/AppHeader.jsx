@@ -35,6 +35,7 @@ const ADMIN_NAV_ITEMS = [
     { to: '/admin/notifications', key: 'notifications', icon: 'unsubscribe' },
     { to: '/admin/beneficiary-locks', key: 'beneficiaryLocks', icon: 'lock_open' },
     { to: '/admin/ai-settings', key: 'aiSettings', icon: 'smart_toy' },
+    { to: '/admin/integrations', key: 'integrations', icon: 'hub' },
 ];
 
 function buildRoleSections(roles, tCommon, tAdmin, openAlerts = 0) {

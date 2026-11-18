@@ -6,7 +6,9 @@ import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
+import com.ltld.app.legacyvault.service.integrationservice.IntegrationSettingsService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
+import com.ltld.app.legacyvault.utility.MockKycVerifier;
 import com.ltld.app.legacyvault.utility.EmailSender;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,18 @@ class FlywayMigrationIntegrationTest {
     @Autowired private JdbcTemplate jdbcTemplate;
 
     @Autowired private Flyway flyway;
+    @Autowired private IntegrationSettingsService integrationSettingsService;
+    @Autowired private MockKycVerifier mockKycVerifier;
+
+    // Trang Tích hợp: migration tạo đúng 1 dòng, cờ eKYC mô phỏng để NULL = theo biến môi trường (test không bật -> tắt)
+    @Test
+    void integrationSettings_seededWithoutOverride_kycMockFollowsEnv() {
+        Integer rows = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM integration_settings WHERE id = 1 AND kyc_mock_enabled IS NULL", Integer.class);
+        assertThat(rows).isEqualTo(1);
+        assertThat(integrationSettingsService.get().kyc().mockOverride()).isNull();
+        assertThat(mockKycVerifier.isEnabled()).isFalse();
+    }
 
     @Test
     void migrationsApplyOnEmptyDb_andMatchEntities() {

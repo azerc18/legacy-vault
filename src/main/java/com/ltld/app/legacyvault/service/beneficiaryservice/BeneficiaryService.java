@@ -34,7 +34,8 @@ public interface BeneficiaryService {
     void sendIdentityOtp(SendIdentityOtpRequest request, UUID currentUserId);
 
     /**
-     * FR-17: Phương thức xác thực đang bật. OTP luôn có; EKYC_MOCK chỉ có khi app.kyc.mock.enabled=true.
+     * FR-17: Phương thức xác thực đang bật. OTP luôn có; EKYC_MOCK chỉ có khi eKYC mô phỏng đang bật
+     * (Admin chọn ở trang Tích hợp; chưa chọn thì theo app.kyc.mock.enabled).
      */
     VerificationMethodsResponse getAvailableVerificationMethods();
 
