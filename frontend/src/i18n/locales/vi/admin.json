@@ -521,6 +521,8 @@
       "title": "Đăng nhập Google",
       "clientId": "Client ID",
       "hint": "Chưa đặt GOOGLE_CLIENT_ID thì nút Đăng nhập Google tự ẩn."
+    }
+  },
   "systemPolicies": {
     "title": "Chính sách hệ thống",
     "subtitle": "Mặc định và giới hạn cấu hình Dead Man's Switch, cùng thông tin mã hoá, lưu trữ và sao lưu của hệ thống.",
