@@ -10,12 +10,16 @@ import { AdminLayout, Dossier, Stamp } from './adminUi.jsx';
 
 const RANGE_KEYS = ['checkinIntervalDays', 'gracePeriodDays', 'reminderCount'];
 const RANGE_PARTS = ['min', 'defaultValue', 'max'];
-// Số ngày chờ Executor dự phòng trước khi có trang này (BR-03); nút "Khôi phục mặc định" đưa về số này
-const ORIGINAL_BACKUP_WAIT = 14;
+// Ô một giá trị (không phải khoảng Owner chọn): số ngày chờ Executor dự phòng (BR-03) và số giờ chờ Trusted Confirmer.
+// hardLimits của BE chỉ trả số tối đa cho 2 ô này; số tối thiểu khớp DmsPolicy.HARD_*_MIN.
+const SINGLE_KEYS = ['backupActivationWaitDays', 'confirmerWaitHours'];
+const SINGLE_MIN = { backupActivationWaitDays: 1, confirmerWaitHours: 12 };
+// Giá trị trước khi có trang này; nút "Khôi phục mặc định" đưa về các số này
+const ORIGINAL_SINGLE = { backupActivationWaitDays: 14, confirmerWaitHours: 72 };
 
 const draftOf = (p) => ({
     ...Object.fromEntries(RANGE_KEYS.map((k) => [k, { ...p[k] }])),
-    backupActivationWaitDays: p.backupActivationWaitDays,
+    ...Object.fromEntries(SINGLE_KEYS.map((k) => [k, p[k] ?? ORIGINAL_SINGLE[k]])),
 });
 
 // Lỗi của một dòng, kiểm giống BE (DmsPolicyService.validate) để nút Lưu khoá sớm và chỉ đúng dòng sai
@@ -56,8 +60,11 @@ export default function AdminSystemPolicies() {
             const e = rangeError(draft[k], data.hardLimits[k]);
             if (e) out[k] = e;
         });
-        const w = Number(draft.backupActivationWaitDays);
-        if (!Number.isInteger(w) || w < 1 || w > data.hardLimits.backupActivationWaitDays) out.backupActivationWaitDays = 'outsideHard';
+        SINGLE_KEYS.forEach((k) => {
+            const w = Number(draft[k]);
+            const max = data.hardLimits[k] ?? ORIGINAL_SINGLE[k];
+            if (!Number.isInteger(w) || w < SINGLE_MIN[k] || w > max) out[k] = 'outsideHard';
+        });
         return out;
     }, [draft, data]);
 
@@ -84,7 +91,7 @@ export default function AdminSystemPolicies() {
 
     const resetToOriginal = () => setDraft({
         ...Object.fromEntries(RANGE_KEYS.map((k) => [k, { ...data.hardLimits[k] }])),
-        backupActivationWaitDays: ORIGINAL_BACKUP_WAIT,
+        ...ORIGINAL_SINGLE,
     });
 
     const save = async () => {
@@ -138,22 +145,12 @@ export default function AdminSystemPolicies() {
                                         ))}
                                     </tr>
                                 ))}
-                                <tr className="border-t border-outline-variant/40 align-top">
-                                    <td className="py-3 pr-3">
-                                        <p className="font-semibold">{t('systemPolicies.dms.fields.backupActivationWaitDays')}</p>
-                                        <p className="text-xs text-outline">{t('systemPolicies.dms.backupHint', { max: data.hardLimits.backupActivationWaitDays })}</p>
-                                        {errors.backupActivationWaitDays && <p className="text-xs text-error mt-1">{t('systemPolicies.dms.errors.outsideHard', { min: 1, max: data.hardLimits.backupActivationWaitDays })}</p>}
-                                    </td>
-                                    <td className="py-3 px-2" />
-                                    <td className="py-3 px-2">
-                                        <input type="number" inputMode="numeric" aria-label={t('systemPolicies.dms.fields.backupActivationWaitDays')}
-                                               min={1} max={data.hardLimits.backupActivationWaitDays}
-                                               value={draft.backupActivationWaitDays}
-                                               onChange={(e) => setDraft((d) => ({ ...d, backupActivationWaitDays: e.target.value }))}
-                                               className={`${inputClass} ${errors.backupActivationWaitDays ? 'border-error' : ''}`} />
-                                    </td>
-                                    <td className="py-3 px-2" />
-                                </tr>
+                                {SINGLE_KEYS.map((k) => (
+                                    <SingleRow key={k} t={t} k={k} min={SINGLE_MIN[k]} max={data.hardLimits[k]}
+                                               hint={t(`systemPolicies.dms.hints.${k}`, { min: SINGLE_MIN[k], max: data.hardLimits[k] })}
+                                               error={errors[k]} value={draft[k]}
+                                               onChange={(v) => setDraft((d) => ({ ...d, [k]: v }))} />
+                                ))}
                             </tbody>
                         </table>
                     </div>
@@ -183,6 +180,7 @@ export default function AdminSystemPolicies() {
                         <li className="flex gap-1.5"><Icon name="person" className="text-[16px]" />{t('systemPolicies.dms.noteOwner')}</li>
                         <li className="flex gap-1.5"><Icon name="lock_clock" className="text-[16px]" />{t('systemPolicies.dms.noteRunning')}</li>
                         <li className="flex gap-1.5"><Icon name="group" className="text-[16px]" />{t('systemPolicies.dms.noteBackup')}</li>
+                        <li className="flex gap-1.5"><Icon name="verified_user" className="text-[16px]" />{t('systemPolicies.dms.noteConfirmer')}</li>
                     </ul>
 
                     <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
@@ -225,8 +223,27 @@ function OutsideBox({ text, testId }) {
 function normalize(d) {
     return {
         ...Object.fromEntries(RANGE_KEYS.map((k) => [k, Object.fromEntries(RANGE_PARTS.map((p) => [p, Number(d[k][p])]))])),
-        backupActivationWaitDays: Number(d.backupActivationWaitDays),
+        ...Object.fromEntries(SINGLE_KEYS.map((k) => [k, Number(d[k])])),
     };
+}
+
+function SingleRow({ t, k, min, max, hint, error, value, onChange }) {
+    return (
+        <tr className="border-t border-outline-variant/40 align-top">
+            <td className="py-3 pr-3">
+                <p className="font-semibold">{t(`systemPolicies.dms.fields.${k}`)}</p>
+                <p className="text-xs text-outline">{hint}</p>
+                {error && <p className="text-xs text-error mt-1">{t('systemPolicies.dms.errors.outsideHard', { min, max })}</p>}
+            </td>
+            <td className="py-3 px-2" />
+            <td className="py-3 px-2">
+                <input type="number" inputMode="numeric" aria-label={t(`systemPolicies.dms.fields.${k}`)}
+                       min={min} max={max} value={value} onChange={(e) => onChange(e.target.value)}
+                       className={`${inputClass} ${error ? 'border-error' : ''}`} />
+            </td>
+            <td className="py-3 px-2" />
+        </tr>
+    );
 }
 
 // Thông tin chỉ đọc: mã hoá, lưu trữ, sao lưu. Chỉ có "đã đặt / chưa đặt", không bao giờ có giá trị khoá.

@@ -191,7 +191,7 @@ export const adminApi = {
     updateKycMock: (body) => http.put('/admin/integrations/kyc-mock', body).then(unwrap),
     /* ---------- Chính sách hệ thống: mặc định / giới hạn DMS + thông tin chỉ đọc ---------- */
     // -> { policy: { checkinIntervalDays: {min, defaultValue, max}, gracePeriodDays, reminderCount, backupActivationWaitDays },
-    //      hardLimits (cùng dạng; backupActivationWaitDays = số ngày tối đa), configsOutsideLimits, updatedAt, updatedByEmail }
+    //      confirmerWaitHours, hardLimits (cùng dạng; backupActivationWaitDays / confirmerWaitHours = số tối đa), configsOutsideLimits, updatedAt, updatedByEmail }
     getDmsPolicy: () => http.get('/admin/system-policies/dms').then(unwrap),
     // body cùng dạng policy; 400 SYSTEM_POLICY_INVALID nếu min > max, mặc định ngoài khoảng hoặc vượt giới hạn cứng
     updateDmsPolicy: (body) => http.put('/admin/system-policies/dms', body).then(unwrap),

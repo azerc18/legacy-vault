@@ -557,12 +557,16 @@
       "defaultValue": "Suggested",
       "max": "Maximum",
       "hardLimit": "System limit {{min}}–{{max}}",
-      "backupHint": "Days the primary executor has to submit evidence before the backup executor takes over (1–{{max}}).",
+      "hints": {
+        "backupActivationWaitDays": "Days the primary executor has to submit evidence before the backup executor takes over ({{min}}–{{max}}).",
+        "confirmerWaitHours": "Hours the trusted confirmers have to answer before the Dead Man's Switch triggers on its own ({{min}}–{{max}}, default 72)."
+      },
       "fields": {
         "checkinIntervalDays": "Check-in interval (days)",
         "gracePeriodDays": "Grace period after the due date (days)",
         "reminderCount": "Number of reminders",
-        "backupActivationWaitDays": "Wait before backup executor (days)"
+        "backupActivationWaitDays": "Wait before backup executor (days)",
+        "confirmerWaitHours": "Wait for trusted confirmers (hours)"
       },
       "errors": {
         "notInteger": "Enter a whole number.",
@@ -579,7 +583,8 @@
       "impactError": "Could not count the affected Dead Man's Switches. You can still save; the number appears after saving.",
       "noteOwner": "Owners see the new range on their Dead Man's Switch form right away (at most 30 seconds after saving).",
       "noteRunning": "No running Dead Man's Switch is changed or stopped.",
-      "noteBackup": "The backup executor wait only applies to newly enabled switches; existing ones keep the value they started with."
+      "noteBackup": "The backup executor wait only applies to newly enabled switches; existing ones keep the value they started with.",
+      "noteConfirmer": "The trusted confirmer wait applies to confirmation rounds that start after saving; a round already waiting keeps the deadline sent in its email."
     },
     "info": {
       "loadError": "Could not load the encryption, storage and backup details.",

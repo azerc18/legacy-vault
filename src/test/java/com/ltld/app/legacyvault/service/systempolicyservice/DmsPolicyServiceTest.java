@@ -74,7 +74,12 @@ class DmsPolicyServiceTest {
     private static UpdateDmsPolicyRequest req(int imin, int idef, int imax, int gmin, int gdef, int gmax,
                                               int rmin, int rdef, int rmax, int backupWait) {
         return new UpdateDmsPolicyRequest(new RangeInput(imin, idef, imax), new RangeInput(gmin, gdef, gmax),
-                new RangeInput(rmin, rdef, rmax), backupWait);
+                new RangeInput(rmin, rdef, rmax), backupWait, null);
+    }
+
+    private static UpdateDmsPolicyRequest withConfirmerWait(Integer hours) {
+        return new UpdateDmsPolicyRequest(new RangeInput(1, 30, 365), new RangeInput(1, 7, 90),
+                new RangeInput(1, 3, 10), 14, hours);
     }
 
     private static DmsConfigRequest ownerReq(int interval, int grace, int reminders) {
@@ -228,5 +233,48 @@ class DmsPolicyServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.SYSTEM_POLICY_INVALID);
         verifyNoInteractions(dmsConfigRepository);
+    }
+
+    // ------------------------------------------------------------------ số giờ chờ Trusted Confirmer
+
+    @Test
+    @DisplayName("Admin đổi giờ chờ confirmer 72 -> 48: lưu DB, audit chỉ ghi ô này, current() đọc số mới")
+    void update_confirmerWait_savedAndAudited() {
+        service.current();
+
+        AdminDmsPolicyResponse res = service.update(adminId, withConfirmerWait(48));
+
+        assertThat(row.getConfirmerWaitHours()).isEqualTo(48);
+        assertThat(res.policy().confirmerWaitHours()).isEqualTo(48);
+        assertThat(res.hardLimits().confirmerWaitHours()).isEqualTo(DmsPolicy.HARD_CONFIRMER_WAIT_MAX);
+        assertThat(service.current().confirmerWaitHours()).isEqualTo(48);
+        verify(auditLogService).log(eq(AuditAction.SYSTEM_POLICY_UPDATED), eq(AuditResult.SUCCESS), eq(adminId),
+                any(), eq("DmsPolicySetting"), isNull(), eq("DMS: confirmerWaitHours 72 -> 48"));
+    }
+
+    @Test
+    @DisplayName("Client cũ không gửi confirmerWaitHours (null) -> giữ số đang lưu, không ghi gì")
+    void update_confirmerWaitMissing_keepsStoredValue() {
+        row.setConfirmerWaitHours(96);
+
+        AdminDmsPolicyResponse res = service.update(adminId, withConfirmerWait(null));
+
+        assertThat(res.policy().confirmerWaitHours()).isEqualTo(96);
+        assertThat(row.getConfirmerWaitHours()).isEqualTo(96);
+        verify(repository, never()).save(any());
+        verifyNoInteractions(auditLogService);
+    }
+
+    @Test
+    @DisplayName("Giờ chờ confirmer ngoài 12–168 -> SYSTEM_POLICY_INVALID, không lưu")
+    void update_confirmerWaitOutsideHardLimits_rejected() {
+        for (int hours : new int[]{0, 11, 169, 1000}) {
+            assertThatThrownBy(() -> service.update(adminId, withConfirmerWait(hours)))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Trusted confirmer wait")
+                    .extracting("errorCode").isEqualTo(ErrorCode.SYSTEM_POLICY_INVALID);
+        }
+        assertThatCode(() -> service.update(adminId, withConfirmerWait(12))).doesNotThrowAnyException();
+        assertThatCode(() -> service.update(adminId, withConfirmerWait(168))).doesNotThrowAnyException();
     }
 }

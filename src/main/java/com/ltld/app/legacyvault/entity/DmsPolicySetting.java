@@ -64,6 +64,11 @@ public class DmsPolicySetting {
     @Builder.Default
     private int backupActivationWaitDays = 14;
 
+    /** Số giờ chờ Trusted Confirmer trả lời trước khi DMS tự kích hoạt (trước đây viết cứng 72). */
+    @Column(name = "confirmer_wait_hours", nullable = false)
+    @Builder.Default
+    private int confirmerWaitHours = 72;
+
     @Column(name = "updated_by")
     private UUID updatedBy;
 

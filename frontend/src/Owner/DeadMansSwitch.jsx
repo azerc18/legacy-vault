@@ -21,6 +21,7 @@ const LIMITS = {
 };
 // Chỉ nhận dòng đúng dạng {min, defaultValue, max} (chế độ demo trả dữ liệu DMS mẫu cho mọi URL /dms*)
 const isRange = (r) => r && Number.isInteger(r.min) && Number.isInteger(r.max) && Number.isInteger(r.defaultValue);
+const DEFAULT_CONFIRMER_WAIT_HOURS = 72;
 const limitsFrom = (policy) => Object.fromEntries(Object.keys(LIMITS).map((k) => [k, isRange(policy?.[k]) ? policy[k] : LIMITS[k]]));
 const defaultsOf = (limits) => Object.fromEntries(Object.entries(limits).map(([k, l]) => [k, l.defaultValue]));
 // DMS đã cấu hình: lấy số đã lưu; ô nào BE chưa trả thì dùng giá trị gợi ý của chính sách (không viết cứng 30/7/3)
@@ -47,7 +48,7 @@ const saveDraft = (form) => {
 // Nhãn trạng thái ở dms.status.<STATUS>
 const STATUS = {
     ACTIVE: { cls: 'bg-success-container text-on-success-container', icon: 'favorite' },
-    // X2: đang chờ người xác nhận chéo trả lời (tối đa 72 giờ)
+    // X2: đang chờ người xác nhận chéo trả lời (số giờ do Admin đặt, mặc định 72)
     PENDING_CONFIRMATION: { cls: 'bg-warning-container text-on-warning-container', icon: 'verified_user' },
     TRIGGERED: { cls: 'bg-error-container text-on-error-container', icon: 'notifications_active' },
     SUSPENDED: { cls: 'bg-warning-container text-on-warning-container', icon: 'pause_circle' },
@@ -91,6 +92,8 @@ export default function DeadMansSwitch() {
     const [confirmers, setConfirmers] = useState([]); // X2: Trusted Social Confirmers
     const [loading, setLoading] = useState(true);
     const [limits, setLimits] = useState(LIMITS);
+    // Số giờ chờ Trusted Confirmer trả lời (trang "Chính sách hệ thống" của Admin); chưa tải được thì 72 như trước
+    const [confirmerWaitHours, setConfirmerWaitHours] = useState(DEFAULT_CONFIRMER_WAIT_HOURS);
     const [form, setForm] = useState(() => defaultsOf(LIMITS));
     const [saving, setSaving] = useState(false);
     const [checking, setChecking] = useState(false);
@@ -125,6 +128,7 @@ export default function DeadMansSwitch() {
         .then((p) => {
             const next = limitsFrom(p);
             setLimits(next);
+            if (Number.isInteger(p?.confirmerWaitHours)) setConfirmerWaitHours(p.confirmerWaitHours);
             return next;
         })
         .catch(() => null);
@@ -350,7 +354,7 @@ export default function DeadMansSwitch() {
                             (VIP hết hạn vẫn giữ), nên danh sách và nút Xoá luôn dùng được. */}
                         <Card title={<>{t('dms.confirmers.title')} <InfoTip term="crossConfirm" /> <VipChip className="ml-1" /></>} icon="verified_user">
                             {/* Card không có prop subtitle nên mô tả đặt trong thân card */}
-                            <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle')}</p>
+                            <p className="text-sm text-on-surface-variant mb-4">{t('dms.confirmers.subtitle', { hours: confirmerWaitHours })}</p>
                             {confirmers.length === 0 ? (
                                 <p className="text-sm text-on-surface-variant">{t('dms.confirmers.empty')}</p>
                             ) : (

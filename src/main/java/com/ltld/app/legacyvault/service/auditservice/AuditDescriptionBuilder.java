@@ -143,7 +143,7 @@ public class AuditDescriptionBuilder {
             case DMS_CONFIRMATION_REQUESTED -> "Requested cross-confirmation from trusted confirmers before triggering the Dead Man's Switch.";
             case DMS_CONFIRMED_ALIVE -> "A trusted confirmer verified that the owner is safe; a new check-in cycle started.";
             case DMS_CONFIRMED_UNREACHABLE -> "A trusted confirmer reported that the owner is unreachable; Dead Man's Switch triggered.";
-            case DMS_CONFIRMATION_TIMEOUT -> "No trusted confirmer responded within 72 hours; Dead Man's Switch triggered automatically.";
+            case DMS_CONFIRMATION_TIMEOUT -> "No trusted confirmer responded within the waiting time set by the admin; Dead Man's Switch triggered automatically.";
             case DMS_CONFIRMATION_UNDELIVERED -> "No confirmation email could be sent to any trusted confirmer; Dead Man's Switch triggered as usual.";
             case DMS_TRIGGERED -> "The Dead Man's Switch was triggered because the check-in deadline passed.";
             case DMS_TRIGGER_DEFERRED -> "Dead Man's Switch activation postponed 24 hours because the owner has not received any reminder.";

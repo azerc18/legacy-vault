@@ -21,6 +21,7 @@ import com.ltld.app.legacyvault.security.JwtProperties;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
 import com.ltld.app.legacyvault.service.paymentservice.EntitlementService;
 import com.ltld.app.legacyvault.utility.EmailSender;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
@@ -61,7 +62,6 @@ import java.util.UUID;
 public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
     public static final int MAX_CONFIRMERS = 2;
-    public static final int CONFIRMATION_TIMEOUT_HOURS = 72;
     // Chỉ dùng khi cấu hình thiếu lịch (không xảy ra với cấu hình đã lưu): lùi hạn tối thiểu
     public static final int POSTPONE_SAFE_DAYS = 7;
 
@@ -69,7 +69,6 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     public static final String PURPOSE_DMS_CONFIRM = "DMS_CONFIRM";
     // C1/M1: token không mang quyết định; claim round = hạn chờ của đợt (epoch giây, UTC) để token chỉ dùng trong đợt đó.
     public static final String ROUND_CLAIM = "round";
-    public static final Duration TOKEN_TTL = Duration.ofHours(CONFIRMATION_TIMEOUT_HOURS);
     // X2 (giống F2): audience riêng, KHÔNG chứa JwtConfig.AUDIENCE -> token xác nhận không dùng được như access token.
     public static final String CONFIRM_AUDIENCE = "legacyvault-dms-confirm";
 
@@ -84,6 +83,8 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
     private final EmailSender emailSender;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    // Số giờ chờ confirmer trả lời: Admin chỉnh ở trang "Chính sách hệ thống" (trước đây viết cứng 72)
+    private final DmsPolicyService dmsPolicyService;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
 
     public DmsConfirmerServiceImpl(
@@ -96,7 +97,8 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
             JwtProperties jwtProperties,
             EmailSender emailSender,
             AuditLogService auditLogService,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            DmsPolicyService dmsPolicyService
     ) {
         this.dmsConfigRepository = dmsConfigRepository;
         this.dmsConfirmerRepository = dmsConfirmerRepository;
@@ -108,6 +110,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         this.emailSender = emailSender;
         this.auditLogService = auditLogService;
         this.eventPublisher = eventPublisher;
+        this.dmsPolicyService = dmsPolicyService;
     }
 
     // Cùng khoá HS256 với JwtConfig (security.jwt.secret, UTF-8), nhưng validator đòi issuer JwtConfig.ISSUER
@@ -244,7 +247,8 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                 .subject(confirmerId.toString())
                 .id(jti)
                 .issuedAt(now)
-                .expiresAt(now.plus(TOKEN_TTL))
+                // Sống ít nhất tới hết hạn chờ của đợt (số giờ do Admin đặt, chốt lúc bắt đầu đợt)
+                .expiresAt(tokenExpiry(deadlineAt, now, dmsPolicyService.current().confirmerWaitHours()))
                 .claim(PURPOSE_CLAIM, PURPOSE_DMS_CONFIRM)
                 .claim(ROUND_CLAIM, roundOf(deadlineAt))
                 .build();
@@ -261,7 +265,9 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         }
 
         // DATETIME(6): cắt về micro giây để giá trị đọc lại từ DB trùng giá trị trong bộ nhớ (so sánh đợt).
-        LocalDateTime deadlineAt = now.plusHours(CONFIRMATION_TIMEOUT_HOURS).truncatedTo(ChronoUnit.MICROS);
+        // Số giờ chờ đọc từ chính sách lúc BẮT ĐẦU đợt rồi chốt vào nextCheckinDueAt: Admin đổi sau đó không ảnh hưởng đợt này.
+        int waitHours = dmsPolicyService.current().confirmerWaitHours();
+        LocalDateTime deadlineAt = now.plusHours(waitHours).truncatedTo(ChronoUnit.MICROS);
         config.setStatus(DmsStatus.PENDING_CONFIRMATION);
         config.setNextCheckinDueAt(deadlineAt);
         config.setNextReminderAt(null);
@@ -284,7 +290,7 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
                 DmsActivationProcessor.ENTITY_DMS_CONFIG,
                 config.getId().toString(),
                 DmsActivationProcessor.ownerDetail(ownerId) + ", confirmers=" + confirmers.size()
-                        + ", deadlineAt=" + deadlineAt
+                        + ", waitHours=" + waitHours + ", deadlineAt=" + deadlineAt
         );
 
         // M3: không gửi SMTP trong transaction đang khoá DmsConfig; listener gửi sau commit (rollback thì không gửi).
@@ -487,6 +493,20 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
 
     // Đợt xác nhận nhận diện bằng hạn chờ (cắt về giây) để không lệch vì độ chính xác DATETIME(6). Quy theo múi giờ
     // JVM ra thời điểm thật, nên link gửi lúc server còn chạy UTC vẫn khớp sau khi chuyển sang giờ VN (AppTimeZone).
+    /**
+     * Như trước (72 giờ kể từ lúc tạo link), nhưng số giờ lấy theo chính sách, và không bao giờ hết hạn TRƯỚC hạn chờ
+     * của đợt (Admin vừa giảm số giờ sau khi đợt bắt đầu). Link chỉ dùng được trong đúng đợt (claim round) và khi DMS
+     * còn PENDING_CONFIRMATION, nên sống lâu hơn hạn chờ một chút cũng không mở thêm quyền gì.
+     */
+    static Instant tokenExpiry(LocalDateTime deadlineAt, Instant now, int waitHours) {
+        Instant byPolicy = now.plus(Duration.ofHours(waitHours));
+        if (deadlineAt == null) {
+            return byPolicy;
+        }
+        Instant byDeadline = deadlineAt.atZone(ZoneId.systemDefault()).toInstant();
+        return byDeadline.isAfter(byPolicy) ? byDeadline : byPolicy;
+    }
+
     static long roundOf(LocalDateTime deadlineAt) {
         return deadlineAt.truncatedTo(ChronoUnit.SECONDS).atZone(ZoneId.systemDefault()).toEpochSecond();
     }

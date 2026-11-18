@@ -114,21 +114,21 @@ public class DmsPolicyService {
      */
     @Transactional(readOnly = true)
     public DmsPolicyImpactResponse previewImpact(UpdateDmsPolicyRequest req) {
-        return new DmsPolicyImpactResponse(countOutside(validated(req)));
+        // Số giờ chờ confirmer không làm DMS nào "ngoài khoảng" nên không ảnh hưởng con số này
+        return new DmsPolicyImpactResponse(countOutside(validated(req, DmsPolicy.DEFAULT_CONFIRMER_WAIT_HOURS)));
     }
 
     @Transactional
     public AdminDmsPolicyResponse update(UUID adminId, UpdateDmsPolicyRequest req) {
-        DmsPolicy after = validated(req);
-        Range interval = after.checkinIntervalDays();
-        Range grace = after.gracePeriodDays();
-        Range reminders = after.reminderCount();
-        int backupWait = after.backupActivationWaitDays();
-
         // Khoá dòng tới hết transaction: Admin thứ hai chờ, rồi so sánh với giá trị Admin thứ nhất vừa lưu
         DmsPolicySetting row = repository.findByIdForUpdate(DmsPolicySetting.SINGLETON_ID)
                 .orElseGet(() -> DmsPolicySetting.builder().id(DmsPolicySetting.SINGLETON_ID).build());
         DmsPolicy before = toPolicy(row);
+        DmsPolicy after = validated(req, before.confirmerWaitHours());
+        Range interval = after.checkinIntervalDays();
+        Range grace = after.gracePeriodDays();
+        Range reminders = after.reminderCount();
+        int backupWait = after.backupActivationWaitDays();
         List<String> changes = diff(before, after);
         if (!changes.isEmpty()) {
             row.setCheckinIntervalMinDays(interval.min());
@@ -141,6 +141,7 @@ public class DmsPolicyService {
             row.setReminderCountDefault(reminders.defaultValue());
             row.setReminderCountMax(reminders.max());
             row.setBackupActivationWaitDays(backupWait);
+            row.setConfirmerWaitHours(after.confirmerWaitHours());
             row.setUpdatedBy(adminId);
             row.setUpdatedAt(LocalDateTime.now(clock));
             repository.save(row);
@@ -157,7 +158,8 @@ public class DmsPolicyService {
 
     // ------------------------------------------------------------------ nội bộ
 
-    private static DmsPolicy validated(UpdateDmsPolicyRequest req) {
+    /** @param currentConfirmerWait dùng khi request không gửi confirmerWaitHours (client cũ) */
+    private static DmsPolicy validated(UpdateDmsPolicyRequest req, int currentConfirmerWait) {
         Range interval = validate("Check-in interval", req.checkinIntervalDays(), DmsPolicy.HARD_CHECKIN_INTERVAL);
         Range grace = validate("Grace period", req.gracePeriodDays(), DmsPolicy.HARD_GRACE_PERIOD);
         Range reminders = validate("Reminder count", req.reminderCount(), DmsPolicy.HARD_REMINDER_COUNT);
@@ -166,12 +168,17 @@ public class DmsPolicyService {
             throw new BusinessException(ErrorCode.SYSTEM_POLICY_INVALID, "Backup executor wait must be between "
                     + DmsPolicy.HARD_BACKUP_WAIT_MIN + " and " + DmsPolicy.HARD_BACKUP_WAIT_MAX + " days.");
         }
-        return new DmsPolicy(interval, grace, reminders, backupWait);
+        int confirmerWait = req.confirmerWaitHours() != null ? req.confirmerWaitHours() : currentConfirmerWait;
+        if (confirmerWait < DmsPolicy.HARD_CONFIRMER_WAIT_MIN || confirmerWait > DmsPolicy.HARD_CONFIRMER_WAIT_MAX) {
+            throw new BusinessException(ErrorCode.SYSTEM_POLICY_INVALID, "Trusted confirmer wait must be between "
+                    + DmsPolicy.HARD_CONFIRMER_WAIT_MIN + " and " + DmsPolicy.HARD_CONFIRMER_WAIT_MAX + " hours.");
+        }
+        return new DmsPolicy(interval, grace, reminders, backupWait, confirmerWait);
     }
 
     static DmsPolicy hardLimits() {
         return new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL, DmsPolicy.HARD_GRACE_PERIOD,
-                DmsPolicy.HARD_REMINDER_COUNT, DmsPolicy.HARD_BACKUP_WAIT_MAX);
+                DmsPolicy.HARD_REMINDER_COUNT, DmsPolicy.HARD_BACKUP_WAIT_MAX, DmsPolicy.HARD_CONFIRMER_WAIT_MAX);
     }
 
     private long countOutside(DmsPolicy p) {
@@ -215,6 +222,9 @@ public class DmsPolicyService {
         if (a.backupActivationWaitDays() != b.backupActivationWaitDays()) {
             out.add("backupActivationWaitDays " + a.backupActivationWaitDays() + " -> " + b.backupActivationWaitDays());
         }
+        if (a.confirmerWaitHours() != b.confirmerWaitHours()) {
+            out.add("confirmerWaitHours " + a.confirmerWaitHours() + " -> " + b.confirmerWaitHours());
+        }
         return out;
     }
 
@@ -233,7 +243,8 @@ public class DmsPolicyService {
                 new Range(s.getCheckinIntervalMinDays(), s.getCheckinIntervalDefaultDays(), s.getCheckinIntervalMaxDays()),
                 new Range(s.getGracePeriodMinDays(), s.getGracePeriodDefaultDays(), s.getGracePeriodMaxDays()),
                 new Range(s.getReminderCountMin(), s.getReminderCountDefault(), s.getReminderCountMax()),
-                s.getBackupActivationWaitDays());
+                s.getBackupActivationWaitDays(),
+                s.getConfirmerWaitHours());
     }
 
     /** Như AiSettingsService: xoá cache SAU commit để lời gọi chen giữa không giữ lại giá trị cũ thêm 30 giây. */

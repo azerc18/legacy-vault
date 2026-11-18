@@ -63,6 +63,14 @@ class DmsConfirmTokenSecurityTest {
     @MockitoBean private VaultService vaultService;
     @MockitoBean private DmsConfigRepository dmsConfigRepository;
     @MockitoBean private DmsConfirmerRepository dmsConfirmerRepository;
+    // DmsConfirmerServiceImpl đọc số giờ chờ confirmer từ chính sách hệ thống
+    @MockitoBean private com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService dmsPolicyService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void policyDefaults() {
+        org.mockito.Mockito.when(dmsPolicyService.current())
+                .thenReturn(com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy.DEFAULTS);
+    }
     @MockitoBean private ExecutorAssignmentRepository executorAssignmentRepository;
     @MockitoBean private DmsActivationProcessor dmsActivationProcessor;
     @MockitoBean private EntitlementService entitlementService;
