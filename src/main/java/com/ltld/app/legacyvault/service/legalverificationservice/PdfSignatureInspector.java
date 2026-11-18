@@ -8,6 +8,7 @@ import com.lowagie.text.pdf.PdfName;
 import com.lowagie.text.pdf.PdfNumber;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.PdfString;
+import com.ltld.app.legacyvault.config.AppTimeZone;
 import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto.DocumentKind;
 import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto.Overall;
@@ -74,8 +75,8 @@ import java.util.UUID;
 @Component
 public class PdfSignatureInspector {
 
-    // Cùng múi giờ với các LocalDateTime khác trong DTO (LocalDateTime.now() theo múi giờ JVM)
-    private static final ZoneId ZONE = ZoneId.systemDefault();
+    // Giờ Việt Nam cố định như phần còn lại của hệ thống (#291), không phụ thuộc múi giờ JVM lúc nạp class
+    private static final ZoneId ZONE = AppTimeZone.VN;
 
     private static final Map<ASN1ObjectIdentifier, String> DIGESTS = Map.of(
             OIWObjectIdentifiers.idSHA1, "SHA-1",
@@ -130,11 +131,15 @@ public class PdfSignatureInspector {
         if (infos.stream().anyMatch(i -> Boolean.FALSE.equals(i.getIntegrityValid()))) {
             return Overall.HAS_INVALID;
         }
-        boolean allChecked = infos.stream().allMatch(i -> Boolean.TRUE.equals(i.getIntegrityValid())
-                && !Boolean.FALSE.equals(i.getCertificateValidAtSigning()));
+        // Banner xanh chỉ khi MỌI điều kiện đã kiểm được và đạt (review #295 m1):
+        // - "chưa kiểm được" thời điểm ký (null) không được coi là đạt;
+        // - chứng thư tự ký thì ai cũng tạo được, nên luôn cần Verifier xem thêm.
+        boolean allPassed = infos.stream().allMatch(i -> Boolean.TRUE.equals(i.getIntegrityValid())
+                && Boolean.TRUE.equals(i.getCertificateValidAtSigning())
+                && !Boolean.TRUE.equals(i.getSelfSigned()));
         // Phải có ít nhất 1 chữ ký phủ cả file, nếu không thì có nội dung thêm sau khi ký
         boolean someCoversAll = infos.stream().anyMatch(i -> Boolean.TRUE.equals(i.getCoversWholeDocument()));
-        return allChecked && someCoversAll ? Overall.ALL_VALID : Overall.HAS_UNVERIFIED;
+        return allPassed && someCoversAll ? Overall.ALL_VALID : Overall.HAS_UNVERIFIED;
     }
 
     private SignatureInfo inspectOne(AcroFields fields, String name, byte[] file) {

@@ -262,7 +262,7 @@
       },
       "HAS_UNVERIFIED": {
         "title": "Có chữ ký số, cần xem thêm",
-        "text": "Chữ ký chưa kiểm hết được: có phần thêm vào sau khi ký, chứng thư hết hạn lúc ký, hoặc thuật toán chưa hỗ trợ. Xem từng chữ ký bên dưới."
+        "text": "Chưa đủ điều kiện để coi là hợp lệ: chứng thư tự ký (ai cũng tạo được), không rõ thời điểm ký, chứng thư hết hạn lúc ký, có phần thêm vào sau khi ký, hoặc thuật toán chưa hỗ trợ. Xem từng chữ ký bên dưới."
       },
       "NO_SIGNATURE": {
         "title": "File PDF không có chữ ký số",

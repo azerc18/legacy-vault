@@ -453,7 +453,8 @@ export default function VerificationRequestDetail() {
                                 <b>{checkResult.valid ? t('detail.valid') : t('detail.invalid')}</b>{checkResult.message ? ` — ${checkResult.message}` : ''}
                             </div>
                         )}
-                        <PdfSignatureCard report={sigReport} />
+                        {/* Chỉ hiện kết quả của đúng hồ sơ đang xem (đổi hồ sơ tại chỗ thì kết quả cũ tự ẩn, review #295 n3) */}
+                        <PdfSignatureCard report={sigReport?.requestId === req.id ? sigReport : null} />
                         {ocrResult && (
                             <OcrAnalysisCard
                                 data={ocrResult}

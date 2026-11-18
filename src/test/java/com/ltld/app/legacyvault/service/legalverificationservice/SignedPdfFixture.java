@@ -50,6 +50,7 @@ final class SignedPdfFixture {
 
     static final String SIGNER_CN = "Nguyen Van Cong Chung";
     static final String SIGNER_O = "UBND Phuong Ben Nghe";
+    static final String CA_CN = "LegacyVault Test CA";
     private static final int CONTENTS_SIZE = 8192;
 
     private SignedPdfFixture() {
@@ -65,13 +66,27 @@ final class SignedPdfFixture {
         return out.toByteArray();
     }
 
-    /** Ký PDF; notBefore/notAfter tính theo số ngày so với lúc ký. */
+    /** Ký PDF bằng chứng thư tự ký; notBefore/notAfter tính theo số ngày so với lúc ký. */
     static byte[] sign(byte[] pdf, int notBeforeDays, int notAfterDays) throws Exception {
+        return sign(pdf, notBeforeDays, notAfterDays, false);
+    }
+
+    /** caIssued = true: chứng thư người ký do một "CA" riêng cấp (không tự ký), như chữ ký VNPT-CA thật. */
+    static byte[] sign(byte[] pdf, int notBeforeDays, int notAfterDays, boolean caIssued) throws Exception {
         KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
         kpg.initialize(2048);
         KeyPair kp = kpg.generateKeyPair();
         long now = System.currentTimeMillis();
-        Certificate cert = selfSigned(kp, new Date(now + notBeforeDays * 86_400_000L), new Date(now + notAfterDays * 86_400_000L));
+        Date from = new Date(now + notBeforeDays * 86_400_000L);
+        Date to = new Date(now + notAfterDays * 86_400_000L);
+        X500Name subject = new X500Name("CN=" + SIGNER_CN + ", O=" + SIGNER_O + ", C=VN");
+        Certificate cert;
+        if (caIssued) {
+            KeyPair ca = kpg.generateKeyPair();
+            cert = issue(kp, subject, new X500Name("CN=" + CA_CN + ", O=Test CA, C=VN"), ca, from, to);
+        } else {
+            cert = issue(kp, subject, subject, kp, from, to);
+        }
 
         PdfReader reader = new PdfReader(pdf);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -108,20 +123,20 @@ final class SignedPdfFixture {
         return out.toByteArray();
     }
 
-    private static Certificate selfSigned(KeyPair kp, Date from, Date to) throws Exception {
-        X500Name name = new X500Name("CN=" + SIGNER_CN + ", O=" + SIGNER_O + ", C=VN");
+    private static Certificate issue(KeyPair subjectKp, X500Name subject, X500Name issuer, KeyPair issuerKp,
+                                     Date from, Date to) throws Exception {
         AlgorithmIdentifier alg = new AlgorithmIdentifier(PKCSObjectIdentifiers.sha256WithRSAEncryption, DERNull.INSTANCE);
         V3TBSCertificateGenerator gen = new V3TBSCertificateGenerator();
         gen.setSerialNumber(new ASN1Integer(BigInteger.valueOf(System.nanoTime())));
         gen.setSignature(alg);
-        gen.setIssuer(name);
-        gen.setSubject(name);
+        gen.setIssuer(issuer);
+        gen.setSubject(subject);
         gen.setStartDate(new org.bouncycastle.asn1.x509.Time(from));
         gen.setEndDate(new org.bouncycastle.asn1.x509.Time(to));
-        gen.setSubjectPublicKeyInfo(SubjectPublicKeyInfo.getInstance(kp.getPublic().getEncoded()));
+        gen.setSubjectPublicKeyInfo(SubjectPublicKeyInfo.getInstance(subjectKp.getPublic().getEncoded()));
         TBSCertificate tbs = gen.generateTBSCertificate();
         Signature s = Signature.getInstance("SHA256withRSA");
-        s.initSign(kp.getPrivate());
+        s.initSign(issuerKp.getPrivate());
         s.update(tbs.getEncoded(ASN1Encoding.DER));
         return Certificate.getInstance(new DERSequence(new ASN1Encodable[]{tbs, alg, new DERBitString(s.sign())}));
     }

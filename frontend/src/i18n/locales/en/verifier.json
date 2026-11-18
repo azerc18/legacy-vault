@@ -264,7 +264,7 @@
       },
       "HAS_UNVERIFIED": {
         "title": "Signed, needs a closer look",
-        "text": "Not every check passed: content added after signing, certificate expired at signing time, or an unsupported algorithm. See each signature below."
+        "text": "Not enough to call it valid: self-signed certificate (anyone can make one), unknown signing time, certificate expired at signing, content added after signing, or an unsupported algorithm. See each signature below."
       },
       "NO_SIGNATURE": {
         "title": "The PDF has no digital signature",

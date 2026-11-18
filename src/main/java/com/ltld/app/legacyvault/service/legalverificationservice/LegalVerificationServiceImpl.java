@@ -172,8 +172,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
 
     // V2: đọc chữ ký số nhúng trong giấy chứng tử PDF. Cùng điều kiện với "Xem": hồ sơ PENDING phải Check trước.
     // Chỉ để tham khảo, không ghi tiến độ duyệt, không tự duyệt/từ chối.
+    // Cố ý KHÔNG @Transactional: đọc file qua mạng + parse PDF không nên giữ kết nối DB (review #295 n1);
+    // requireReadable / progressOf là các lệnh đọc riêng lẻ, mỗi lệnh tự mở transaction ngắn.
     @Override
-    @Transactional(readOnly = true)
     public PdfSignatureReportDto inspectDocumentSignatures(UUID requestId, UUID verifierId) {
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         if (request.getStatus() == LegalVerificationStatus.PENDING) {
