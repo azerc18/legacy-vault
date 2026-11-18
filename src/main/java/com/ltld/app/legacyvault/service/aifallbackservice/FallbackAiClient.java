@@ -45,6 +45,8 @@ public class FallbackAiClient {
     private final String groqTextModel;
     private final String groqVisionModel;
     private final List<String> groqModels;
+    // Chỉ model đọc được ảnh: model văn bản (vd. llama-3.3-70b-versatile) gửi ảnh vào sẽ bị Groq trả 400
+    private final List<String> groqVisionModels;
 
     private final String deepseekKey;
     private final String deepseekBaseUrl;
@@ -59,19 +61,20 @@ public class FallbackAiClient {
                             @Value("${app.ai.groq.text-model:llama-3.3-70b-versatile}") String groqTextModel,
                             @Value("${app.ai.groq.vision-model:meta-llama/llama-4-scout-17b-16e-instruct}") String groqVisionModel,
                             @Value("${app.ai.groq.allowed-models:}") String groqExtra,
+                            @Value("${app.ai.groq.vision-allowed-models:}") String groqVisionExtra,
                             @Value("${app.ai.deepseek.api-key:}") String deepseekKey,
                             @Value("${app.ai.deepseek.base-url:https://api.deepseek.com}") String deepseekBaseUrl,
                             @Value("${app.ai.deepseek.model:deepseek-chat}") String deepseekModel,
                             @Value("${app.ai.deepseek.allowed-models:}") String deepseekExtra,
                             @Value("${app.ai.fallback.text-provider:deepseek}") String defaultTextProvider) {
-        this(groqKey, groqBaseUrl, groqTextModel, groqVisionModel, groqExtra,
+        this(groqKey, groqBaseUrl, groqTextModel, groqVisionModel, groqExtra, groqVisionExtra,
                 deepseekKey, deepseekBaseUrl, deepseekModel, deepseekExtra, defaultTextProvider,
                 RestClient.builder().requestFactory(timeouts()));
     }
 
     // Cho unit test truyền RestClient.Builder gắn MockRestServiceServer
     FallbackAiClient(String groqKey, String groqBaseUrl, String groqTextModel, String groqVisionModel, String groqExtra,
-                     String deepseekKey, String deepseekBaseUrl, String deepseekModel, String deepseekExtra,
+                     String groqVisionExtra, String deepseekKey, String deepseekBaseUrl, String deepseekModel, String deepseekExtra,
                      String defaultTextProvider, RestClient.Builder builder) {
         this.client = builder.build();
         this.groqKey = blankToNull(groqKey);
@@ -79,6 +82,7 @@ public class FallbackAiClient {
         this.groqTextModel = blankToNull(groqTextModel);
         this.groqVisionModel = blankToNull(groqVisionModel);
         this.groqModels = models(groqExtra, this.groqTextModel, this.groqVisionModel);
+        this.groqVisionModels = models(groqVisionExtra, this.groqVisionModel);
         this.deepseekKey = blankToNull(deepseekKey);
         this.deepseekBaseUrl = trimSlash(deepseekBaseUrl);
         this.deepseekModel = blankToNull(deepseekModel);
@@ -102,6 +106,11 @@ public class FallbackAiClient {
 
     public List<String> allowedModels(AiFallbackProvider provider) {
         return provider == AiFallbackProvider.GROQ ? groqModels : deepseekModels;
+    }
+
+    /** Model Groq cho phần đọc ảnh: GROQ_VISION_MODEL + GROQ_VISION_ALLOWED_MODELS (không gồm model chỉ đọc chữ). */
+    public List<String> visionModels() {
+        return groqVisionModels;
     }
 
     public AiFallbackProvider defaultTextProvider() {
@@ -145,7 +154,7 @@ public class FallbackAiClient {
 
     private String visionModel(AiFeatureConfig config) {
         String chosen = config == null ? null : config.visionFallbackModel();
-        return chosen != null && groqModels.contains(chosen) ? chosen : groqVisionModel;
+        return chosen != null && groqVisionModels.contains(chosen) ? chosen : groqVisionModel;
     }
 
     /** Tên hiển thị của bước dự phòng văn bản, vd. "DEEPSEEK deepseek-chat" (cho log / audit, không có nội dung). */

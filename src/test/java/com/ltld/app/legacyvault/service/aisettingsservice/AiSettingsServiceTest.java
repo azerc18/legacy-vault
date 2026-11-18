@@ -219,7 +219,7 @@ class AiSettingsServiceTest {
     private com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient fallbackClient(String groqKey, String dsKey) {
         return new com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient(
                 groqKey, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile",
-                "meta-llama/llama-4-scout-17b-16e-instruct", "", dsKey, "https://api.deepseek.com",
+                "meta-llama/llama-4-scout-17b-16e-instruct", "", "", dsKey, "https://api.deepseek.com",
                 "deepseek-chat", "deepseek-reasoner", "deepseek");
     }
 
@@ -248,6 +248,7 @@ class AiSettingsServiceTest {
         assertThat(res.fallback().groqKeyConfigured()).isTrue();
         assertThat(res.fallback().deepseekKeyConfigured()).isFalse();
         assertThat(res.fallback().deepseekModels()).containsExactly("deepseek-chat", "deepseek-reasoner");
+        assertThat(res.fallback().groqVisionModels()).containsExactly("meta-llama/llama-4-scout-17b-16e-instruct");
         assertThat(res.fallback().defaultTextProvider()).isEqualTo("DEEPSEEK");
         assertThat(res.toString()).doesNotContain("groq-secret");
         assertThat(res.features()).allSatisfy(f -> assertThat(f.fallbackEnabled()).isTrue());
@@ -283,6 +284,10 @@ class AiSettingsServiceTest {
         // Model đọc ảnh phải thuộc danh sách Groq
         assertThatThrownBy(() -> service.update(adminId, AiFeature.CITIZEN_ID_OCR,
                 new UpdateAiFeatureSettingRequest(true, null, null, true, null, null, "deepseek-chat")))
+                .isInstanceOf(BusinessException.class);
+        // Model Groq chỉ đọc chữ không được chọn cho phần đọc ảnh
+        assertThatThrownBy(() -> service.update(adminId, AiFeature.CITIZEN_ID_OCR,
+                new UpdateAiFeatureSettingRequest(true, null, null, true, null, null, "llama-3.3-70b-versatile")))
                 .isInstanceOf(BusinessException.class);
         verify(repository, never()).save(any());
     }

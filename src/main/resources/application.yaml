@@ -197,6 +197,8 @@ app:
       text-model: ${GROQ_TEXT_MODEL:llama-3.3-70b-versatile}
       vision-model: ${GROQ_VISION_MODEL:meta-llama/llama-4-scout-17b-16e-instruct}
       allowed-models: ${GROQ_ALLOWED_MODELS:}
+      # Model đọc ảnh Admin chọn được = vision-model + danh sách này (chỉ model vision, model văn bản không đọc được ảnh)
+      vision-allowed-models: ${GROQ_VISION_ALLOWED_MODELS:}
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:}
       base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}

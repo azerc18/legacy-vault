@@ -26,6 +26,25 @@ public final class GeminiErrors {
      * </ul>
      * Không chuyển với 400 (sai API key, file lỗi, nội dung bị chặn) hay 401/403: model dự phòng cũng sẽ lỗi y hệt.
      */
+    public static boolean isRetryable(Throwable ex) {
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (current instanceof HttpStatusCodeException hsce) {
+                int status = hsce.getStatusCode().value();
+                return status == 404 || status == 429 || hsce.getStatusCode().is5xxServerError();
+            }
+            if (current instanceof ResourceAccessException
+                    || current instanceof TimeoutException
+                    || current instanceof SocketTimeoutException) {
+                return true;
+            }
+            current = current.getCause();
+            depth++;
+        }
+        return false;
+    }
+
     /**
      * Mô tả lỗi để ghi log: chuỗi tên lớp exception (ngoài -> gốc), mã HTTP, và thông báo của lỗi mạng / nhà cung cấp.
      * KHÔNG lấy message của lỗi parse JSON vì Jackson chèn đoạn nội dung trả về (có thể chứa số CCCD, họ tên).
@@ -57,24 +76,5 @@ public final class GeminiErrors {
             return m == null ? null : (m.length() > 300 ? m.substring(0, 300) + "..." : m);
         }
         return null;
-    }
-
-    public static boolean isRetryable(Throwable ex) {
-        Throwable current = ex;
-        int depth = 0;
-        while (current != null && depth < MAX_CAUSE_DEPTH) {
-            if (current instanceof HttpStatusCodeException hsce) {
-                int status = hsce.getStatusCode().value();
-                return status == 404 || status == 429 || hsce.getStatusCode().is5xxServerError();
-            }
-            if (current instanceof ResourceAccessException
-                    || current instanceof TimeoutException
-                    || current instanceof SocketTimeoutException) {
-                return true;
-            }
-            current = current.getCause();
-            depth++;
-        }
-        return false;
     }
 }

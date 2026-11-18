@@ -41,7 +41,7 @@
     "camera": { "label": "Take a photo", "desc": "Photograph the front of the card with your phone." },
     "upload": { "label": "Upload a photo", "desc": "Pick an existing photo of the front of the card." },
     "manual": { "label": "Enter manually", "desc": "Type in the details printed on the card." },
-    "aiConsent": "If the QR code cannot be read from the photo, I agree to send the card photo to an AI service (Google Gemini) to read it. The photo is not stored.",
+    "aiConsent": "If the QR code cannot be read from the photo, I agree to send the card photo to an AI service (Google Gemini, or Groq when Gemini fails) to read it. The photo is not stored.",
     "needAiConsent": "No QR code was found in the photo. Tick the box to let AI read it, retake the photo with the QR code clearly visible, or enter the details manually.",
     "qrFoundInPhoto": "The QR code was read from the photo; nothing was sent to AI.",
     "reading": "Reading details…"

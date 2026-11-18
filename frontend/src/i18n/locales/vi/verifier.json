@@ -139,7 +139,7 @@
     "opening": "Đang mở...",
     "ocrDocument": "✨ Phân tích & Đối chiếu AI (OCR)",
     "ocrScanning": "Đang phân tích AI OCR...",
-    "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm phân tích AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để bóc tách (hành động được ghi nhận vào nhật ký hệ thống).",
+    "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm phân tích AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để bóc tách; khi Gemini lỗi, tệp được gửi tới AI dự phòng (Groq, hoặc phần chữ của PDF tới DeepSeek) (hành động được ghi nhận vào nhật ký hệ thống).",
     "checkFirst": "Hãy kiểm tra tài liệu trước",
     "viewFirst": "Hãy xem tài liệu trước",
     "valid": "Hợp lệ",
