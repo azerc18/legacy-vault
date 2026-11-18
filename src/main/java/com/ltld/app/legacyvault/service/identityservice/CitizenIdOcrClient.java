@@ -117,7 +117,7 @@ public class CitizenIdOcrClient {
                     && !backup.equalsIgnoreCase(primary);
             // Không ghi nội dung trả về vì có thể chứa số CCCD
             log.warn("Citizen ID OCR failed on model '{}': {}. Retryable: {}", primary,
-                    primaryEx.getClass().getSimpleName(), canRetry);
+                    GeminiErrors.describe(primaryEx), canRetry);
             if (canRetry) {
                 try {
                     String key = backupApiKey != null && !backupApiKey.isBlank() ? backupApiKey : apiKey;
@@ -126,7 +126,7 @@ public class CitizenIdOcrClient {
                     return x;
                 } catch (Exception backupEx) {
                     log.warn("Citizen ID OCR backup model '{}' also failed: {}", backup,
-                            backupEx.getClass().getSimpleName());
+                            GeminiErrors.describe(backupEx));
                 }
             }
             return readWithFallback(imageBytes, c);
@@ -144,7 +144,7 @@ public class CitizenIdOcrClient {
             log.info("Citizen ID OCR succeeded on fallback Groq model '{}'", fallback.visionModelName(c));
             return x;
         } catch (Exception e) {
-            log.warn("Citizen ID OCR fallback failed: {}", e.getClass().getSimpleName());
+            log.warn("Citizen ID OCR fallback ({}) failed: {}", fallback.visionModelName(c), GeminiErrors.describe(e));
             throw unavailable();
         }
     }
@@ -173,11 +173,16 @@ public class CitizenIdOcrClient {
                         "responseMimeType", "application/json",
                         "thinkingConfig", Map.of("thinkingBudget", 0)));
 
-        JsonNode res = client.post()
+        byte[] rawBytes = client.post()
                 .uri("/models/{model}:generateContent", targetModel)
+                .accept(org.springframework.http.MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(JsonNode.class);
+                // Đọc byte rồi tự parse: Gemini có lúc trả Content-Type application/octet-stream cho body JSON
+                .body(byte[].class);
+        // JSON luôn là UTF-8; không để Spring đoán charset theo Content-Type (octet-stream -> ISO-8859-1 làm hỏng tiếng Việt)
+        String rawBody = rawBytes == null ? null : new String(rawBytes, java.nio.charset.StandardCharsets.UTF_8);
+        JsonNode res = rawBody == null || rawBody.isBlank() ? null : objectMapper.readTree(rawBody);
         String json = res == null ? null
                 : res.path("candidates").path(0).path("content").path("parts").path(0).path("text").asString(null);
         if (json == null || json.isBlank()) {

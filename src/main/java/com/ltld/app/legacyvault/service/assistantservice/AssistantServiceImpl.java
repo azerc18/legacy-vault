@@ -108,7 +108,7 @@ public class AssistantServiceImpl implements AssistantService {
                 return reply;
             } catch (RuntimeException fe) {
                 log.warn("Assistant fallback {} failed for user {}: {}", fallback.describeText(config), userId,
-                        fe.getClass().getSimpleName());
+                        com.ltld.app.legacyvault.utility.GeminiErrors.describe(fe));
             }
         }
         throw new AssistantException("Assistant is unavailable right now. Please try again later.",

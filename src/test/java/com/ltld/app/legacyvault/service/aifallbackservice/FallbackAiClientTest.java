@@ -116,7 +116,9 @@ class FallbackAiClientTest {
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 
         assertThatThrownBy(() -> client.textJson(null, "sys", "text", 100))
-                .isInstanceOf(HttpServerErrorException.class);
+                .isInstanceOf(AiProviderException.class)
+                .hasCauseInstanceOf(HttpServerErrorException.class)
+                .hasMessageContaining("HTTP 503");
     }
 
     @Test
@@ -145,5 +147,33 @@ class FallbackAiClientTest {
     void jsonObject_stripsFencesAndProse() {
         assertThat(FallbackAiClient.jsonObject("Here you go:\n```json\n{\"a\":1}\n```")).isEqualTo("{\"a\":1}");
         assertThat(FallbackAiClient.jsonObject(null)).isEqualTo("{}");
+    }
+
+    @Test
+    void modelNotFound_isReportedWithProviderMessage_noContent() {
+        server.expect(requestTo(GROQ + "/chat/completions"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"error":{"message":"The model `meta-llama/llama-4-scout-17b-16e-instruct` does not exist or you do not have access to it.","type":"invalid_request_error","code":"model_not_found"}}
+                        """));
+
+        assertThatThrownBy(() -> client.visionJson(null, "Đọc giấy tờ bí mật", List.of(new byte[]{1}), 100))
+                .isInstanceOf(AiProviderException.class)
+                .hasMessageContaining("GROQ model 'meta-llama/llama-4-scout-17b-16e-instruct' HTTP 404")
+                .hasMessageContaining("does not exist")
+                .hasMessageNotContaining("Đọc giấy tờ bí mật");
+    }
+
+    @Test
+    void responseWithOctetStreamContentType_isStillParsed() {
+        server.expect(requestTo(DEEPSEEK + "/chat/completions"))
+                .andRespond(withSuccess(REPLY, MediaType.APPLICATION_OCTET_STREAM));
+
+        assertThat(client.textJson(null, "sys", "text", 100)).isEqualTo("Xin chào từ AI dự phòng");
+    }
+
+    @Test
+    void providerError_handlesEmptyOrOddBodies() {
+        assertThat(FallbackAiClient.providerError(null)).isEqualTo("(no message)");
+        assertThat(FallbackAiClient.providerError("<html>502</html>")).isEqualTo("(unreadable error body)");
     }
 }

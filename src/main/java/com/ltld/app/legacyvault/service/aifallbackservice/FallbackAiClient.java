@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 
@@ -34,6 +35,8 @@ import java.util.Map;
 @Slf4j
 @Component
 public class FallbackAiClient {
+
+    private static final tools.jackson.databind.json.JsonMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
     private final RestClient client;
 
@@ -205,12 +208,23 @@ public class FallbackAiClient {
         if (json) {
             body.put("response_format", Map.of("type", "json_object"));
         }
-        JsonNode res = client.post()
-                .uri(base + "/chat/completions")
-                .header("Authorization", "Bearer " + key)
-                .body(body)
-                .retrieve()
-                .body(JsonNode.class);
+        JsonNode res;
+        try {
+            byte[] rawBytes = client.post()
+                    .uri(base + "/chat/completions")
+                    .header("Authorization", "Bearer " + key)
+                    .accept(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+            // JSON luôn là UTF-8; không để Spring đoán charset theo Content-Type
+            String raw = rawBytes == null ? null : new String(rawBytes, java.nio.charset.StandardCharsets.UTF_8);
+            res = raw == null || raw.isBlank() ? null : JSON.readTree(raw);
+        } catch (HttpStatusCodeException e) {
+            // Ghi rõ lỗi của nhà cung cấp (vd. 404 "model ... does not exist") để Admin biết phải đổi model / key
+            throw new AiProviderException(provider + " model '" + model + "' HTTP " + e.getStatusCode().value()
+                    + ": " + providerError(e.getResponseBodyAsString()), e.getStatusCode().value(), e);
+        }
         String text = res == null ? null
                 : res.path("choices").path(0).path("message").path("content").asString(null);
         if (text == null || text.isBlank()) {
@@ -218,6 +232,18 @@ public class FallbackAiClient {
         }
         log.info("AI fallback {} model '{}' answered", provider, model);
         return text;
+    }
+
+    /** Thông báo lỗi trong body lỗi chuẩn OpenAI ({"error":{"message":...}}), cắt ngắn; không đọc được thì để trống. */
+    static String providerError(String body) {
+        if (body == null || body.isBlank()) return "(no message)";
+        try {
+            String m = JSON.readTree(body).path("error").path("message").asString(null);
+            if (m == null || m.isBlank()) return "(no message)";
+            return m.length() > 200 ? m.substring(0, 200) + "..." : m;
+        } catch (RuntimeException e) {
+            return "(unreadable error body)";
+        }
     }
 
     /** Lấy khối JSON {...} trong câu trả lời (model có thể bọc ```json hoặc thêm câu dẫn). */

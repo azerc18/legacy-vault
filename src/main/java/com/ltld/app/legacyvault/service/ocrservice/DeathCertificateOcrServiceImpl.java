@@ -361,7 +361,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                         PRIMARY_CONNECT_TIMEOUT_MS, PRIMARY_READ_TIMEOUT_MS);
             } catch (Exception primaryEx) {
                 log.warn("Primary Gemini Vision OCR model '{}' failed for document '{}': {}. Retryable: {}",
-                        model, fileName, primaryEx.getMessage(), GeminiErrors.isRetryable(primaryEx));
+                        model, fileName, GeminiErrors.describe(primaryEx), GeminiErrors.isRetryable(primaryEx));
                 if (GeminiErrors.isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                     try {
                         String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
@@ -371,7 +371,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                         return backupResult;
                     } catch (Exception backupEx) {
                         log.warn("Backup Gemini Vision OCR model '{}' also failed for document '{}': {}",
-                                backupModel, fileName, backupEx.getMessage());
+                                backupModel, fileName, GeminiErrors.describe(backupEx));
                     }
                 }
                 DeathCertificateOcrResponseDto fallbackResult = analyzeWithFallback(plainBytes, expectedOwnerName, aiConfig, fileName);
@@ -428,7 +428,7 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                     return result;
                 }
             } catch (Exception e) {
-                log.warn("Fallback PDF-text OCR failed for document '{}': {}", fileName, e.getClass().getSimpleName());
+                log.warn("Fallback PDF-text OCR failed for document '{}': {}", fileName, GeminiErrors.describe(e));
             }
         }
         if (fallback.visionAvailable(aiConfig)) {
@@ -445,7 +445,8 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                     return result;
                 }
             } catch (Exception e) {
-                log.warn("Fallback vision OCR failed for document '{}': {}", fileName, e.getClass().getSimpleName());
+                log.warn("Fallback vision OCR ({}) failed for document '{}': {}", fallback.visionModelName(aiConfig),
+                        fileName, GeminiErrors.describe(e));
             }
         }
         return null;
@@ -532,11 +533,17 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
                 "generationConfig", generationConfig
         );
 
-        GeminiResponse res = restClient.post()
+        byte[] rawBytes = restClient.post()
                 .uri("/models/{model}:generateContent", targetModel)
                 .body(body)
+                .accept(org.springframework.http.MediaType.APPLICATION_JSON)
                 .retrieve()
-                .body(GeminiResponse.class);
+                // Đọc byte rồi tự parse: Gemini có lúc trả Content-Type application/octet-stream cho body JSON
+                .body(byte[].class);
+        // JSON luôn là UTF-8; không để Spring đoán charset theo Content-Type (octet-stream -> ISO-8859-1 làm hỏng tiếng Việt)
+        String rawBody = rawBytes == null ? null : new String(rawBytes, java.nio.charset.StandardCharsets.UTF_8);
+        GeminiResponse res = rawBody == null || rawBody.isBlank() ? null
+                : objectMapper.readValue(rawBody, GeminiResponse.class);
 
         if (res == null || res.candidates() == null || res.candidates().isEmpty()) {
             throw new IllegalStateException("Empty candidates from Gemini Vision API");
