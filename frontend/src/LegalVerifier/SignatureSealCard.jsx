@@ -90,23 +90,29 @@ export default function SignatureSealCard({ requestId }) {
                         </ul>
                     )}
 
-                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                    <dl className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-sm">
                         <Item label={t('seal.signedBy')} value={[seal.verifierName, seal.verifierEmail].filter(Boolean).join(' · ')} />
                         <Item label={t('seal.signedAt')} value={formatDate(seal.signedAt, true)} />
                         <Item label={t('seal.method')} value={t(`seal.methods.${seal.method}`, { defaultValue: seal.method })} />
-                        {seal.algorithm && <Item label={t('seal.algorithm')} value={`${seal.algorithm} (P-256) · ${seal.keyRef}`} />}
-                        {seal.keyFingerprint && <Item label={t('seal.fingerprint')} value={seal.keyFingerprint} mono />}
-                        {seal.documentSha256 && <Item label={t('seal.documentHash')} value={seal.documentSha256} mono />}
-                        {seal.documentMatches === false && seal.currentDocumentSha256 && (
-                            <Item label={t('seal.currentDocumentHash')} value={seal.currentDocumentSha256} mono />
-                        )}
                         {seal.status === 'LEGACY' && seal.signatureHash && <Item label={t('seal.legacyHash')} value={seal.signatureHash} mono />}
                     </dl>
 
                     {seal.signedPayload && (
-                        <details className="rounded-xl border border-outline-variant/50 bg-surface-container-low p-4">
+                        // Mã băm, khóa, payload: chỉ cần khi kiểm độc lập hoặc khi có lỗi, nên gập lại (mở sẵn nếu KHÔNG hợp lệ)
+                        <details
+                            className="rounded-xl border border-outline-variant/50 bg-surface-container-low p-4"
+                            open={seal.status === 'INVALID'}
+                        >
                             <summary className="cursor-pointer font-semibold text-sm">{t('seal.technical')}</summary>
                             <p className="text-xs text-on-surface-variant mt-3">{t('seal.technicalHint')}</p>
+                            <dl className="grid grid-cols-1 gap-y-3 text-sm mt-4">
+                                {seal.algorithm && <Item label={t('seal.algorithm')} value={`${seal.algorithm} (P-256) · ${seal.keyRef}`} />}
+                                {seal.keyFingerprint && <Item label={t('seal.fingerprint')} value={seal.keyFingerprint} mono />}
+                                {seal.documentSha256 && <Item label={t('seal.documentHash')} value={seal.documentSha256} mono />}
+                                {seal.documentMatches === false && seal.currentDocumentSha256 && (
+                                    <Item label={t('seal.currentDocumentHash')} value={seal.currentDocumentSha256} mono />
+                                )}
+                            </dl>
                             {[
                                 ['payload', t('seal.payload'), seal.signedPayload],
                                 ['signature', t('seal.signatureValue'), seal.signatureValue],

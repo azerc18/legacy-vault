@@ -274,7 +274,7 @@
       }
     },
     "check": {
-      "signature": "Chữ ký ECDSA",
+      "signature": "Chữ ký đúng khóa",
       "payload": "Nội dung đúng hồ sơ",
       "document": "Giấy chứng tử không đổi",
       "ok": "Đạt",
@@ -294,7 +294,7 @@
       "MOCK_PIN": "Mã PIN"
     },
     "technical": "Chi tiết kỹ thuật (để kiểm độc lập)",
-    "technicalHint": "Ai có 3 phần dưới đây đều tự kiểm được chữ ký mà không cần LegacyVault.",
+    "technicalHint": "Thuật toán, mã băm và khóa dùng khi cần đối chiếu. Ai có payload, chữ ký và khóa công khai đều tự kiểm được mà không cần LegacyVault.",
     "payload": "Nội dung đã ký (payload)",
     "signatureValue": "Chữ ký (Base64, DER)",
     "publicKey": "Khóa công khai (PEM)",

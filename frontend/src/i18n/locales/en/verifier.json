@@ -276,7 +276,7 @@
       }
     },
     "check": {
-      "signature": "ECDSA signature",
+      "signature": "Signature matches key",
       "payload": "Content matches request",
       "document": "Death certificate unchanged",
       "ok": "Passed",
@@ -296,7 +296,7 @@
       "MOCK_PIN": "PIN"
     },
     "technical": "Technical details (for independent checks)",
-    "technicalHint": "Anyone with the three parts below can check the signature without LegacyVault.",
+    "technicalHint": "Algorithm, hashes and key, for cross-checking. Anyone with the payload, signature and public key can check it without LegacyVault.",
     "payload": "Signed content (payload)",
     "signatureValue": "Signature (Base64, DER)",
     "publicKey": "Public key (PEM)",
