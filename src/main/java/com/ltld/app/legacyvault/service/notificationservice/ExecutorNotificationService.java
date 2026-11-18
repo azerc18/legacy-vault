@@ -9,6 +9,9 @@ public interface ExecutorNotificationService {
     /** Mail bàn giao dạng câu tiếng Anh dựng sẵn (bọc trong bố cục HTML chung). Lỗi gửi ném RuntimeException. */
     void send(String recipientEmail, String content);
 
+    /** Mail cảnh báo cho Admin (câu tiếng Anh dựng sẵn, tiêu đề "Admin alert"). Lỗi gửi ném RuntimeException. */
+    void sendAdminAlert(String adminEmail, String content);
+
     /**
      * FR-07: mail "DMS đã kích hoạt" cho Executor, dịch theo ngôn ngữ của người nhận, có nút mở trang Người thực thi.
      * Lỗi gửi ném RuntimeException để người gọi ghi Notification FAILED.

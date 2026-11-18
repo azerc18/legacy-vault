@@ -17,6 +17,11 @@ public class ExecutorNotificationServiceImpl implements ExecutorNotificationServ
     }
 
     @Override
+    public void sendAdminAlert(String adminEmail, String content) {
+        emailSender.sendAdminAlertNotice(adminEmail, content);
+    }
+
+    @Override
     public void sendExecutorActivated(String recipientEmail, ExecutorActivatedMail mail) {
         emailSender.sendExecutorActivatedNotice(recipientEmail, mail.executorName(), mail.ownerName(),
                 mail.ownerEmail(), mail.type(), mail.waitDays(), mail.acknowledgeBy());

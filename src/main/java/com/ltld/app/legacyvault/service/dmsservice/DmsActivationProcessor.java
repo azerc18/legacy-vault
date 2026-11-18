@@ -263,7 +263,7 @@ public class DmsActivationProcessor {
             }
             for (User admin : admins) {
                 try {
-                    executorNotificationService.send(admin.getEmail(), content);
+                    executorNotificationService.sendAdminAlert(admin.getEmail(), content);
                 } catch (RuntimeException e) {
                     log.warn("B6: notifying admin {} for dmsConfig {} failed: {}", admin.getId(), config.getId(),
                             e.getMessage());

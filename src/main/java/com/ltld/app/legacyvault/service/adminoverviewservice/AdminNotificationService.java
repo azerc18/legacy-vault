@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.Notification;
 import com.ltld.app.legacyvault.enums.AuditAction;
 import com.ltld.app.legacyvault.enums.AuditResult;
+import com.ltld.app.legacyvault.enums.ExecutorStatus;
 import com.ltld.app.legacyvault.enums.NotificationChannel;
 import com.ltld.app.legacyvault.enums.NotificationStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
@@ -98,6 +99,7 @@ public class AdminNotificationService {
             if (n.getContent() == null || n.getContent().isBlank()) {
                 throw new BusinessException(ErrorCode.CONFLICT, "This email has no saved content to resend.");
             }
+            ExecutorActivatedMail activation = activationMailFor(n);
             int claimed = em.createQuery("""
                             UPDATE Notification n SET n.attemptCount = n.attemptCount + 1, n.lastAttemptAt = :now
                             WHERE n.id = :id AND n.status = :failed
@@ -110,7 +112,7 @@ public class AdminNotificationService {
             if (claimed != 1) {
                 throw new BusinessException(ErrorCode.CONFLICT, "This email was just retried. Please wait a minute.");
             }
-            return new Object[]{n.getRecipient().getEmail(), n.getContent(), activationMailFor(n)};
+            return new Object[]{n.getRecipient().getEmail(), n.getContent(), activation};
         });
 
         // (2) gửi ngoài transaction
@@ -145,7 +147,11 @@ public class AdminNotificationService {
         return result;
     }
 
-    // Dữ liệu để dựng lại mail kích hoạt; null nếu không còn DmsConfig hoặc assignment của người nhận.
+    /**
+     * Dữ liệu để dựng lại mail kích hoạt từ assignment ACTIVE của người nhận với Owner này; null (gửi nội dung đã lưu)
+     * nếu DmsConfig không còn. Người nhận không còn là Executor ACTIVE (đã bị thu hồi do quá hạn BR-03, bị thay...)
+     * thì từ chối: mail mời xác nhận khi đó là sai. Chạy trong transaction của bước (1) nên giữ chỗ cũng rollback.
+     */
     private ExecutorActivatedMail activationMailFor(Notification n) {
         if (!DmsActivationProcessor.ENTITY_DMS_CONFIG.equals(n.getReferenceType()) || n.getReferenceId() == null) {
             return null;
@@ -156,14 +162,20 @@ public class AdminNotificationService {
         }
         List<ExecutorAssignment> assignments = em.createQuery("""
                         SELECT a FROM ExecutorAssignment a JOIN FETCH a.executorUser
-                        WHERE a.owner.id = :ownerId AND a.executorUser.id = :recipientId
+                        WHERE a.owner.id = :ownerId AND a.executorUser.id = :recipientId AND a.status = :active
+                        ORDER BY a.activatedAt DESC
                         """, ExecutorAssignment.class)
                 .setParameter("ownerId", config.getOwner().getId())
                 .setParameter("recipientId", n.getRecipient().getId())
+                .setParameter("active", ExecutorStatus.ACTIVE)
+                .setMaxResults(1)
                 .getResultList();
-        return assignments.isEmpty() ? null
-                : DmsActivationProcessor.activationMail(config.getOwner(), assignments.get(0),
-                        config.getBackupActivationWaitDays());
+        if (assignments.isEmpty()) {
+            throw new BusinessException(ErrorCode.CONFLICT,
+                    "This person is no longer an active executor for this owner, so the email is not resent.");
+        }
+        return DmsActivationProcessor.activationMail(config.getOwner(), assignments.get(0),
+                config.getBackupActivationWaitDays());
     }
 
     private static AdminNotificationResponse toResponse(Notification n) {

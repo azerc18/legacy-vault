@@ -290,6 +290,17 @@ class EmailSenderExecutorNoticeTest {
         assertThat(message.getText()).contains("Line one.", "Line two.");
     }
 
+    // Mail cho Admin (cảnh báo bảo mật, DMS không có Executor): tiêu đề Admin alert, không phải "handover"
+    @Test
+    void adminAlertNotice_usesAdminSubjectAndTitle() {
+        emailSender.sendAdminAlertNotice("admin@example.test", "[LegacyVault] Security alert X: something");
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("LegacyVault admin alert");
+        assertThat(message.getHtml()).contains("Admin alert", "Security alert X: something")
+                .doesNotContain("Handover process notification");
+    }
+
     private SentMail sentMessage() {
         return SentMail.captureOne(javaMailSender);
     }

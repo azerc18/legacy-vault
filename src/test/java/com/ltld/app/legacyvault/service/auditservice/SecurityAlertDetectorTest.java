@@ -82,7 +82,7 @@ class SecurityAlertDetectorTest {
         assertThat(captor.getValue().getSeverity()).isEqualTo(SecurityAlertSeverity.HIGH);
         assertThat(captor.getValue().getEventCount()).isEqualTo(12);
         // Không có transaction trong unit test -> AfterCommit chạy ngay
-        verify(notificationService).send(eq("admin@example.test"), contains("1.2.3.4"));
+        verify(notificationService).sendAdminAlert(eq("admin@example.test"), contains("1.2.3.4"));
     }
 
     @Test
@@ -100,7 +100,7 @@ class SecurityAlertDetectorTest {
         assertThat(open.getEventCount()).isEqualTo(15);
         assertThat(open.getLastSeenAt()).isEqualTo(now);
         verify(alertRepository, never()).save(any());
-        verify(notificationService, never()).send(anyString(), anyString());
+        verify(notificationService, never()).sendAdminAlert(anyString(), anyString());
     }
 
     @Test
@@ -132,7 +132,7 @@ class SecurityAlertDetectorTest {
         verify(alertRepository).save(captor.capture());
         assertThat(captor.getValue().getRule()).isEqualTo(SecurityAlertRule.ADMIN_ROLE_GRANTED);
         assertThat(captor.getValue().getMessage()).contains("new-admin@example.test");
-        verify(notificationService, never()).send(anyString(), anyString());
+        verify(notificationService, never()).sendAdminAlert(anyString(), anyString());
     }
 
     @Test

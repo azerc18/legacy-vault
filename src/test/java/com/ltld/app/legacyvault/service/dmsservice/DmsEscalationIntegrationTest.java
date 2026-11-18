@@ -68,6 +68,8 @@ class DmsEscalationIntegrationTest {
     @Autowired
     private DmsAutomationService dmsAutomationService;
     @Autowired
+    private com.ltld.app.legacyvault.service.adminoverviewservice.AdminNotificationService adminNotificationService;
+    @Autowired
     private DmsActivationProcessor processor;
     @Autowired
     private UserRepository userRepository;
@@ -84,6 +86,8 @@ class DmsEscalationIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
     // Mốc T0 = lúc quét kích hoạt; cắt về giây để so sánh với DATETIME của MySQL không lệch.
@@ -98,6 +102,10 @@ class DmsEscalationIntegrationTest {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
                     "%ownerId=" + s.ownerId + "%");
             List<UUID> userIds = s.userIds();
+            // Audit "Admin gửi lại" (adminRetry_*) lấy Owner làm người thực hiện: xóa trước khi xóa user.
+            transactionTemplate.executeWithoutResult(tx -> entityManager
+                    .createQuery("DELETE FROM AuditLog l WHERE l.actor.id IN :ids")
+                    .setParameter("ids", userIds).executeUpdate());
             notificationRepository.deleteAll(notificationRepository.findAll().stream()
                     .filter(n -> userIds.contains(n.getRecipient().getId()))
                     .toList());
@@ -265,6 +273,48 @@ class DmsEscalationIntegrationTest {
         assertThat(backup(s).getStatus()).isEqualTo(ExecutorStatus.ACTIVE);
         assertThat(activationNotification(s, s.backupUserId).getStatus()).isEqualTo(NotificationStatus.FAILED);
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
+    }
+
+    // B1 (Admin gửi lại): dòng FAILED của Primary còn ACTIVE -> dựng lại mail kích hoạt HTML (không gửi content thô)
+    @Test
+    void adminRetry_activePrimary_rebuildsActivationMail() {
+        Seed s = seed(true, true, 14);
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
+        dmsAutomationService.processOverdueDms(T0);
+        reset(executorNotificationService);   // mail hoạt động lại
+        UUID notificationId = pastCooldown(activationNotification(s, s.primaryUserId));
+
+        adminNotificationService.retry(s.ownerId, notificationId);
+
+        var mail = org.mockito.ArgumentCaptor.forClass(ExecutorNotificationService.ExecutorActivatedMail.class);
+        verify(executorNotificationService).sendExecutorActivated(eq(s.primaryEmail), mail.capture());
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        assertThat(mail.getValue().type()).isEqualTo(ExecutorType.PRIMARY);
+        assertThat(mail.getValue().waitDays()).isEqualTo(14);
+        assertThat(mail.getValue().acknowledgeBy()).isEqualTo(T0.plusDays(14));
+        assertThat(activationNotification(s, s.primaryUserId).getStatus()).isEqualTo(NotificationStatus.SENT);
+    }
+
+    // B1: Primary đã bị thu hồi (quá hạn BR-03) -> không gửi lại mail mời xác nhận, giữ nguyên lượt thử
+    @Test
+    void adminRetry_revokedPrimary_isRefusedWithoutSending() {
+        Seed s = seed(true, true, 14);
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
+        dmsAutomationService.processOverdueDms(T0);
+        dmsAutomationService.escalateUnresponsivePrimaries(T0.plusDays(14));
+        assertThat(primary(s).getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        reset(executorNotificationService);
+        Notification failed = activationNotification(s, s.primaryUserId);
+        int attempts = failed.getAttemptCount();
+        UUID notificationId = pastCooldown(failed);
+
+        assertThatThrownBy(() -> adminNotificationService.retry(s.ownerId, notificationId))
+                .isInstanceOf(com.ltld.app.legacyvault.exception.BusinessException.class)
+                .hasMessageContaining("no longer an active executor");
+
+        verifyNoInteractions(executorNotificationService);
+        assertThat(activationNotification(s, s.primaryUserId).getAttemptCount()).isEqualTo(attempts);
+        assertThat(activationNotification(s, s.primaryUserId).getStatus()).isEqualTo(NotificationStatus.FAILED);
     }
 
     // Biến thể S6 của console cũ: gửi lại thành công thì đồng hồ BR-03 tính từ sentAt (lúc Primary thật sự được báo).
@@ -534,6 +584,12 @@ class DmsEscalationIntegrationTest {
     private java.util.List<Notification> notifications(UUID recipientId, NotificationChannel channel) {
         return notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(recipientId).stream()
                 .filter(n -> n.getChannel() == channel).toList();
+    }
+
+    // Lần thử gần nhất lùi về trước thời gian chờ 1 phút của nút Gửi lại.
+    private UUID pastCooldown(Notification n) {
+        n.setLastAttemptAt(LocalDateTime.now().minusMinutes(5));
+        return notificationRepository.save(n).getId();
     }
 
     private Notification activationNotification(Seed s, UUID recipientId) {

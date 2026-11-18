@@ -672,6 +672,17 @@ public class EmailSender {
                 MailMessages.get(lang, "mail.handover.title"), paras, null, null);
     }
 
+    /**
+     * Mail cho Admin (DMS kích hoạt mà không có Executor, cảnh báo bảo mật mức HIGH): câu tiếng Anh dựng sẵn,
+     * bọc vào bố cục chung với tiêu đề "Admin alert" thay vì tiêu đề bàn giao. Không @Async: người gọi tự bắt lỗi.
+     */
+    public void sendAdminAlertNotice(String to, String content) {
+        AppLanguage lang = AppLanguage.EN;
+        List<String> paras = content == null ? List.of() : List.of(content.split("\\R"));
+        deliver(to, lang, Style.SECURITY, MailMessages.get(lang, "mail.adminAlert.subject"),
+                MailMessages.get(lang, "mail.adminAlert.title"), paras, null, null);
+    }
+
     // N9: thanh toán thành công, đính kèm hóa đơn PDF (pdf null thì gửi không đính kèm)
     @Async
     public void sendPaymentSucceededNotice(String to, String fullName, String planName, long amountVnd,

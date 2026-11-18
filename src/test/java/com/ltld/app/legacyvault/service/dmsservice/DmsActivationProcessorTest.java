@@ -324,7 +324,7 @@ class DmsActivationProcessorTest {
         processor.trigger(config.getId(), now);
 
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendAdminAlert(anyString(), anyString());
         assertThat(auditActions()).containsExactly("DMS_TRIGGERED", "DMS_TRIGGERED_NO_EXECUTOR");
     }
 
@@ -348,8 +348,8 @@ class DmsActivationProcessorTest {
         processor.trigger(config.getId(), now);
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(executorNotificationService).send(eq("admin1@example.test"), content.capture());
-        verify(executorNotificationService).send(eq("admin2@example.test"), anyString());
+        verify(executorNotificationService).sendAdminAlert(eq("admin1@example.test"), content.capture());
+        verify(executorNotificationService).sendAdminAlert(eq("admin2@example.test"), anyString());
         assertThat(content.getValue()).contains("Nguyễn Văn A (owner@example.test)", config.getId().toString());
         // Không tạo Notification EXECUTOR_ACTIVATED cho Admin.
         verify(notificationRepository, never()).save(any());
@@ -363,12 +363,12 @@ class DmsActivationProcessorTest {
                 User.builder().id(UUID.randomUUID()).email("down@example.test").build(),
                 User.builder().id(UUID.randomUUID()).email("ok@example.test").build()));
         doThrow(new RuntimeException("smtp down")).when(executorNotificationService)
-                .send(eq("down@example.test"), anyString());
+                .sendAdminAlert(eq("down@example.test"), anyString());
 
         processor.trigger(config.getId(), now);
 
         assertThat(config.getStatus()).isEqualTo(DmsStatus.TRIGGERED);
-        verify(executorNotificationService).send(eq("ok@example.test"), anyString());
+        verify(executorNotificationService).sendAdminAlert(eq("ok@example.test"), anyString());
     }
 
     @Test
@@ -383,7 +383,7 @@ class DmsActivationProcessorTest {
         config.setStatus(DmsStatus.ACTIVE);
         processor.trigger(config.getId(), now);
 
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendAdminAlert(anyString(), anyString());
         verify(userRepository, times(2)).findActiveByRoleCode("ADMIN");
     }
 
