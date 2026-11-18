@@ -535,6 +535,8 @@
       "title": "Google sign-in",
       "clientId": "Client ID",
       "hint": "Without GOOGLE_CLIENT_ID the Google sign-in button hides itself."
+    }
+  },
   "systemPolicies": {
     "title": "System policies",
     "subtitle": "Defaults and limits for the Dead Man's Switch, plus how the system encrypts, stores and backs up data.",
