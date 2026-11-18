@@ -309,12 +309,14 @@
       "LOGIN_FAILURES_FROM_IP": "Many failed logins from one IP",
       "REFRESH_TOKEN_REUSE": "Refresh token reused (possible theft)",
       "MASS_DOWNLOAD": "Mass download by one user",
-      "ADMIN_ROLE_GRANTED": "ADMIN role granted"
+      "ADMIN_ROLE_GRANTED": "ADMIN role granted",
+      "KYC_MOCK_ENABLED": "Simulated eKYC turned on"
     },
     "meta_one": "{{count}} event · first {{first}} · last {{last}}",
     "meta_other": "{{count}} events · first {{first}} · last {{last}}",
     "acknowledgedAt": "acknowledged {{date}}",
     "viewLogs": "View logs",
+    "openIntegrations": "Open Integrations",
     "acknowledge": "Acknowledge",
     "severityFilter": "Filter by severity",
     "allSeverities": "All severities",
@@ -474,10 +476,14 @@
       },
       "choiceHints": {
         "on": "Overrides APP_KYC_MOCK_ENABLED",
+        "onLocked": "This server does not allow turning it on here",
         "off": "Email OTP only"
       },
       "envNow": "APP_KYC_MOCK_ENABLED is now: {{state}}",
       "onWarning": "Simulated eKYC accepts any ID number in the right format (12 digits, valid province code) without checking real records. Only turn it on for a demo or a test, and turn it off right after.",
+      "onAlert": "Saving creates a HIGH security alert and emails every admin.",
+      "lockedNote": "On this server admins can only turn simulated eKYC off. Turning it on needs APP_KYC_MOCK_ENABLED=true (or APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=true) and a restart, so a hijacked admin account cannot turn it on.",
+      "lockedIgnored": "The \"On\" choice saved earlier is ignored because this server does not let admins turn it on; simulated eKYC follows the environment variable. Pick \"Follow environment\" or \"Turn simulated eKYC off\" again.",
       "reason": "Reason for the change",
       "reasonPlaceholder": "e.g. Demo for the review board on 20/11",
       "reasonHint": "Required, at least {{min}} characters; written to the Audit log.",

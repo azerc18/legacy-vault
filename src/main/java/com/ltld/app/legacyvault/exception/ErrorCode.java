@@ -126,7 +126,9 @@ public enum ErrorCode {
 
     // Cấu hình AI: Admin tắt chức năng / chọn model ngoài danh sách cho phép
     AI_FEATURE_DISABLED(HttpStatus.SERVICE_UNAVAILABLE),
-    AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST);
+    AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST),
+    // Trang Tích hợp: máy chủ này không cho Admin bật eKYC mô phỏng (APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=false)
+    INTEGRATION_SETTING_LOCKED(HttpStatus.CONFLICT);
 
     private final HttpStatus status;
 

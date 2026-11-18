@@ -299,11 +299,13 @@
       "LOGIN_FAILURES_FROM_IP": "Nhiều lần đăng nhập sai từ một IP",
       "REFRESH_TOKEN_REUSE": "Refresh token bị dùng lại (có thể bị đánh cắp)",
       "MASS_DOWNLOAD": "Một người dùng tải xuống hàng loạt",
-      "ADMIN_ROLE_GRANTED": "Đã cấp vai trò ADMIN"
+      "ADMIN_ROLE_GRANTED": "Đã cấp vai trò ADMIN",
+      "KYC_MOCK_ENABLED": "Đã bật eKYC mô phỏng"
     },
     "meta_other": "{{count}} sự kiện · đầu tiên {{first}} · gần nhất {{last}}",
     "acknowledgedAt": "xác nhận lúc {{date}}",
     "viewLogs": "Xem nhật ký",
+    "openIntegrations": "Mở trang Tích hợp",
     "acknowledge": "Xác nhận",
     "severityFilter": "Lọc theo mức độ",
     "allSeverities": "Mọi mức độ",
@@ -460,10 +462,14 @@
       },
       "choiceHints": {
         "on": "Ghi đè APP_KYC_MOCK_ENABLED",
+        "onLocked": "Máy chủ này không cho bật từ trang Admin",
         "off": "Chỉ còn OTP qua email"
       },
       "envNow": "APP_KYC_MOCK_ENABLED hiện: {{state}}",
       "onWarning": "eKYC mô phỏng chấp nhận mọi số CCCD đúng định dạng (12 số, mã tỉnh hợp lệ), không kiểm với dữ liệu thật. Chỉ bật khi demo hoặc kiểm thử, nhớ tắt ngay sau đó.",
+      "onAlert": "Khi lưu, hệ thống tạo cảnh báo bảo mật mức HIGH và gửi email cho mọi Admin.",
+      "lockedNote": "Trên máy chủ này, Admin chỉ tắt được eKYC mô phỏng. Muốn bật phải đặt biến môi trường APP_KYC_MOCK_ENABLED=true (hoặc APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=true) rồi khởi động lại, để một tài khoản Admin bị chiếm cũng không tự bật được.",
+      "lockedIgnored": "Lựa chọn \"Bật\" đã lưu trước đây đang bị bỏ qua vì máy chủ này không cho Admin bật; eKYC mô phỏng đang theo biến môi trường. Nên chọn lại \"Theo biến môi trường\" hoặc \"Tắt eKYC mô phỏng\".",
       "reason": "Lý do thay đổi",
       "reasonPlaceholder": "Vd. Demo cho hội đồng ngày 20/11",
       "reasonHint": "Bắt buộc, ít nhất {{min}} ký tự; được ghi vào Nhật ký.",

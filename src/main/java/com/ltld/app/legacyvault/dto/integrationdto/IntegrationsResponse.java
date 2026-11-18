@@ -14,8 +14,10 @@ public record IntegrationsResponse(Kyc kyc, Ai ai, Signature signature, Payments
      * @param mockOverride  lựa chọn của Admin; null = theo biến môi trường
      * @param envDefault    giá trị APP_KYC_MOCK_ENABLED
      * @param smsSandbox    KYC_SMS_SANDBOX: mã OTP số điện thoại hiện trên màn hình thay vì gửi SMS thật
+     * @param toggleAllowed APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED: false = Admin không bật được (vẫn tắt được); FE khoá nút "Bật"
      */
     public record Kyc(boolean mockEnabled, Boolean mockOverride, boolean envDefault, boolean smsSandbox,
+                      boolean toggleAllowed,
                       LocalDateTime updatedAt, String updatedByEmail) {
     }
 

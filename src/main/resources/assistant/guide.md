@@ -234,19 +234,20 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 
 ## Administrator
 
-The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked, AI settings.
+The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Plans, Failed emails, Locked, AI settings, Integrations.
 
 - "Overview": users, vaults, open alerts, DMS needing attention, revenue, VIP users, and a "To handle" list. "Refresh" reloads.
 - "Users": search by email or name, filter by role and status. "Roles…" to grant or remove Legal Verifier or Admin (Owner, Beneficiary and Executor are set by the system). "Lock account" / "Unlock account", "Suspend DMS" / "Resume DMS". "Assign executor" appoints an emergency executor when a triggered DMS has nobody who can act. "Open profile" shows a user's details, vaults, asset verification, payments, alerts and recent logs.
 - "Roles": "New role", enter code, name and permissions, then "Create role". "Edit" → "Save changes", or "Delete".
 - "Vaults": search by vault name or owner, filter by status or "claim deadline within 7 days". "Details" shows metadata only (never asset contents). "Extend claim period" adds days with a reason (at most 2 times per vault).
 - "Audit log": every security-relevant action, last 30 days by default. Filter, then "Search"; "Reset" clears. "Export CSV" downloads.
-- "Alerts": suspicious activity found every 5 minutes (account locked after failed logins, many failed logins from one IP, reused refresh token, mass download, ADMIN role granted). HIGH alerts are also emailed. "View logs", "Lock this user", "Acknowledge" with a note.
+- "Alerts": suspicious activity found every 5 minutes (account locked after failed logins, many failed logins from one IP, reused refresh token, mass download, ADMIN role granted, simulated eKYC turned on). HIGH alerts are also emailed. "View logs", "Open Integrations" (for simulated eKYC), "Lock this user", "Acknowledge" with a note.
 - "Payments": all payments, read-only. Filter, download a receipt, "Export CSV".
 - "Plans": "Change price / name" (10,000–100,000,000 VND, with a reason). New prices only apply to future purchases. Limits cannot be changed here.
 - "Failed emails": notification emails that could not be delivered. "Resend" after mail is fixed.
 - "Locked": beneficiaries locked after 5 wrong identity codes. "Unlock" gives them 5 new attempts.
 - "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list, then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
+- "Integrations": read-only status of outside services (AI and OCR, the Legal Verifier's sign-off by email code, VNPay and PayPal in sandbox or live mode, email, CAPTCHA, Google sign-in). Keys and passwords are never shown, only "Configured" or "Not configured". The only setting here is simulated eKYC: "Follow environment", "Turn simulated eKYC on" or "Turn simulated eKYC off", with a required reason (at least 5 characters), then "Save". When it is on, beneficiaries can also verify their identity with an ID card number, and any well-formed number is accepted, so only use it for demos and tests. Turning it on creates a HIGH security alert that is emailed to every admin. On the live server admins can only turn it off; turning it on there needs a server setting. Every change is written to the Audit log.
 
 ## Emails
 - System emails use the language set in "My profile" → "Email and invoice language". People without an account get Vietnamese.

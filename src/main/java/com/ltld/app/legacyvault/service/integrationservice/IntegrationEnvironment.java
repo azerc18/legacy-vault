@@ -17,6 +17,7 @@ public class IntegrationEnvironment {
     static final String VERIFIER_AUTH_METHOD = "EMAIL_OTP";
 
     private final boolean kycMockEnvDefault;
+    private final boolean kycMockToggleAllowed;
     private final boolean smsSandbox;
     private final IntegrationsResponse.Ai ai;
     private final IntegrationsResponse.Payments payments;
@@ -24,7 +25,12 @@ public class IntegrationEnvironment {
     private final IntegrationsResponse.Captcha captcha;
     private final IntegrationsResponse.GoogleLogin googleLogin;
 
+    /**
+     * @param kycMockToggleAllowed APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED: máy chủ có cho Admin BẬT eKYC mô phỏng từ trang
+     *                             Tích hợp không. Mặc định false (bản thật); local / docker đặt true. Tắt thì luôn được.
+     */
     public IntegrationEnvironment(@Value("${app.kyc.mock.enabled:false}") boolean kycMockEnvDefault,
+                                  @Value("${app.kyc.mock.admin-toggle-allowed:false}") boolean kycMockToggleAllowed,
                                   @Value("${app.kyc.sms-sandbox:true}") boolean smsSandbox,
                                   @Value("${app.ai.provider:mock}") String aiProvider,
                                   @Value("${app.ai.gemini.api-key:}") String geminiKey,
@@ -47,6 +53,7 @@ public class IntegrationEnvironment {
                                   @Value("${app.captcha.secret-key:}") String captchaSecret,
                                   @Value("${app.google.client-id:}") String googleClient) {
         this.kycMockEnvDefault = kycMockEnvDefault;
+        this.kycMockToggleAllowed = kycMockToggleAllowed;
         this.smsSandbox = smsSandbox;
         this.ai = new IntegrationsResponse.Ai(aiProvider == null ? "mock" : aiProvider.trim().toLowerCase(Locale.ROOT),
                 set(geminiKey), set(geminiBackupKey), set(groqKey), set(deepseekKey), ocrDemoScenarios);
@@ -60,6 +67,8 @@ public class IntegrationEnvironment {
     }
 
     public boolean kycMockEnvDefault() { return kycMockEnvDefault; }
+
+    public boolean kycMockToggleAllowed() { return kycMockToggleAllowed; }
 
     public boolean smsSandbox() { return smsSandbox; }
 

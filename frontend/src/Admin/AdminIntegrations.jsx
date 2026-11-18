@@ -63,6 +63,9 @@ export default function AdminIntegrations() {
                 // Hiệu lực SAU khi lưu lựa chọn đang chọn, để cảnh báo đúng lúc Admin sắp bật mock
                 const willBeOn = choice === 'env' ? kyc.envDefault : choice === 'on';
                 const reasonOk = reason.trim().length >= MIN_REASON;
+                // Máy chủ không cho Admin BẬT (APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=false, mặc định trên bản thật): khoá ô "Bật".
+                // Tắt và "theo biến môi trường" vẫn chọn được. BE cũng chặn (409 INTEGRATION_SETTING_LOCKED).
+                const onLocked = !kyc.toggleAllowed;
                 return (
                     <>
                         {/* eKYC: phần duy nhất chỉnh được */}
@@ -74,27 +77,38 @@ export default function AdminIntegrations() {
 
                             <fieldset className="grid gap-2 sm:grid-cols-3" data-testid="kyc-mock-choice">
                                 <legend className="sr-only">{t('integrations.kyc.title')}</legend>
-                                {CHOICES.map((c) => (
-                                    <label key={c} className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 cursor-pointer text-sm ${
-                                        choice === c ? 'border-primary bg-primary/5' : 'border-outline-variant'}`}>
-                                        <input type="radio" name="kyc-mock" value={c} checked={choice === c}
-                                               onChange={() => setChoice(c)} className="mt-1" />
-                                        <span>
-                                            <span className="font-semibold block">{t(`integrations.kyc.choices.${c}`)}</span>
-                                            <span className="text-xs text-outline">
-                                                {c === 'env'
-                                                    ? t('integrations.kyc.envNow', { state: t(kyc.envDefault ? 'integrations.on' : 'integrations.off') })
-                                                    : t(`integrations.kyc.choiceHints.${c}`)}
+                                {CHOICES.map((c) => {
+                                    const disabled = c === 'on' && onLocked;
+                                    return (
+                                        <label key={c} className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm ${
+                                            disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${
+                                            choice === c ? 'border-primary bg-primary/5' : 'border-outline-variant'}`}>
+                                            <input type="radio" name="kyc-mock" value={c} checked={choice === c} disabled={disabled}
+                                                   onChange={() => setChoice(c)} className="mt-1" />
+                                            <span>
+                                                <span className="font-semibold block">{t(`integrations.kyc.choices.${c}`)}</span>
+                                                <span className="text-xs text-outline">
+                                                    {c === 'env'
+                                                        ? t('integrations.kyc.envNow', { state: t(kyc.envDefault ? 'integrations.on' : 'integrations.off') })
+                                                        : t(disabled ? 'integrations.kyc.choiceHints.onLocked' : `integrations.kyc.choiceHints.${c}`)}
+                                                </span>
                                             </span>
-                                        </span>
-                                    </label>
-                                ))}
+                                        </label>
+                                    );
+                                })}
                             </fieldset>
+
+                            {onLocked && (
+                                <p className="mt-3 text-xs text-on-surface-variant flex gap-1.5" data-testid="kyc-mock-locked">
+                                    <Icon name="lock" className="text-[16px]" />
+                                    <span>{t(kyc.mockOverride === true ? 'integrations.kyc.lockedIgnored' : 'integrations.kyc.lockedNote')}</span>
+                                </p>
+                            )}
 
                             {dirty && willBeOn && (
                                 <div className="mt-4 rounded-xl border border-error/25 bg-error-container/85 text-on-error-container px-4 py-3 text-sm flex gap-2" data-testid="kyc-mock-warning">
                                     <Icon name="gpp_maybe" className="text-[18px]" />
-                                    <span>{t('integrations.kyc.onWarning')}</span>
+                                    <span>{t('integrations.kyc.onWarning')} {t('integrations.kyc.onAlert')}</span>
                                 </div>
                             )}
 

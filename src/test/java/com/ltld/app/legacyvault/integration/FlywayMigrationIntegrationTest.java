@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.enums.DmsConfirmerStatus;
 import com.ltld.app.legacyvault.enums.DmsStatus;
 import com.ltld.app.legacyvault.enums.UserStatus;
 import com.ltld.app.legacyvault.enums.NotificationType;
+import com.ltld.app.legacyvault.enums.SecurityAlertRule;
 import com.ltld.app.legacyvault.service.integrationservice.IntegrationSettingsService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.MockKycVerifier;
@@ -153,6 +154,18 @@ class FlywayMigrationIntegrationTest {
                 """, String.class);
         for (DmsConfirmerStatus s : DmsConfirmerStatus.values()) {
             assertThat(col).contains("'" + s.name() + "'");
+        }
+    }
+
+    // #298 review M1: mọi SecurityAlertRule (kể cả KYC_MOCK_ENABLED) phải có trong enum security_alerts.rule
+    @Test
+    void securityAlertRule_columnAcceptsEveryJavaEnumValue() {
+        String col = jdbcTemplate.queryForObject("""
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'security_alerts' AND COLUMN_NAME = 'rule'
+                """, String.class);
+        for (SecurityAlertRule r : SecurityAlertRule.values()) {
+            assertThat(col).contains("'" + r.name() + "'");
         }
     }
 

@@ -3,6 +3,8 @@ package com.ltld.app.legacyvault.controller.admin;
 import com.ltld.app.legacyvault.controller.AdminIntegrationsController;
 import com.ltld.app.legacyvault.dto.integrationdto.IntegrationsResponse;
 import com.ltld.app.legacyvault.dto.integrationdto.UpdateKycMockRequest;
+import com.ltld.app.legacyvault.exception.BusinessException;
+import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.security.SecurityConfig;
 import com.ltld.app.legacyvault.service.integrationservice.IntegrationSettingsService;
 import org.junit.jupiter.api.Test;
@@ -52,7 +54,7 @@ class AdminIntegrationsControllerSecurityTest {
 
     private static IntegrationsResponse response(boolean mock) {
         return new IntegrationsResponse(
-                new IntegrationsResponse.Kyc(mock, mock ? Boolean.TRUE : null, false, true, null, null),
+                new IntegrationsResponse.Kyc(mock, mock ? Boolean.TRUE : null, false, true, true, null, null),
                 new IntegrationsResponse.Ai("gemini", true, false, true, false, false),
                 new IntegrationsResponse.Signature("EMAIL_OTP", false),
                 new IntegrationsResponse.Payments(new IntegrationsResponse.Gateway(true, true),
@@ -122,5 +124,16 @@ class AdminIntegrationsControllerSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":null,\"reason\":\"Hết buổi demo\"}"))
                 .andExpect(status().isOk());
         verify(integrationSettingsService).updateKycMock(ADMIN_ID, new UpdateKycMockRequest(null, "Hết buổi demo"));
+    }
+
+    @Test
+    void putKycMock_lockedOnThisServer_returns409WithErrorCode() throws Exception {
+        when(integrationSettingsService.updateKycMock(eq(ADMIN_ID), any())).thenThrow(new BusinessException(
+                ErrorCode.INTEGRATION_SETTING_LOCKED, "Simulated eKYC cannot be turned on from the admin page on this server."));
+
+        mockMvc.perform(put("/api/admin/integrations/kyc-mock").with(admin())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true,\"reason\":\"Demo hội đồng\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("INTEGRATION_SETTING_LOCKED"));
     }
 }

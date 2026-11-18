@@ -144,4 +144,43 @@ class SecurityAlertDetectorTest {
         assertThat(detector.detect(now)).isZero();
         verify(alertRepository, never()).save(any());
     }
+
+    // Trang Tích hợp (review M1 #298): Admin bật eKYC mô phỏng -> cảnh báo HIGH, mail mọi Admin
+    @Test
+    void kycMockTurnedOn_createsHighAlert_andMailsAdmins() {
+        AuditLog log = AuditLog.builder().id(UUID.randomUUID()).action(AuditAction.INTEGRATION_SETTINGS_UPDATED)
+                .actor(admin).ipAddress("10.0.0.7")
+                .metadata(Map.of("detail", "kycMock env(false) -> true (effective false -> true); reason=Demo hội đồng"))
+                .createdAt(now.minusSeconds(30)).build();
+        when(auditLogRepository.findByActionInAndCreatedAtAfter(any(), any())).thenReturn(List.of(log));
+        when(alertRepository.existsByRuleAndSubject(SecurityAlertRule.KYC_MOCK_ENABLED, log.getId().toString()))
+                .thenReturn(false);
+        when(alertRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findActiveByRoleCode("ADMIN")).thenReturn(List.of(admin));
+
+        assertThat(detector.detect(now)).isEqualTo(1);
+        ArgumentCaptor<SecurityAlert> captor = ArgumentCaptor.forClass(SecurityAlert.class);
+        verify(alertRepository).save(captor.capture());
+        assertThat(captor.getValue().getRule()).isEqualTo(SecurityAlertRule.KYC_MOCK_ENABLED);
+        assertThat(captor.getValue().getSeverity()).isEqualTo(SecurityAlertSeverity.HIGH);
+        assertThat(captor.getValue().getSubject()).isEqualTo(log.getId().toString());
+        assertThat(captor.getValue().getMessage())
+                .contains("admin@example.test").contains("10.0.0.7").contains("Reason: Demo hội đồng");
+        verify(notificationService).sendAdminAlert(eq("admin@example.test"), contains("KYC_MOCK_ENABLED"));
+    }
+
+    @Test
+    void kycMockTurnedOffOrUnchangedEffect_isIgnored() {
+        AuditLog off = AuditLog.builder().id(UUID.randomUUID()).action(AuditAction.INTEGRATION_SETTINGS_UPDATED)
+                .actor(admin).metadata(Map.of("detail", "kycMock true -> false (effective true -> false); reason=Hết demo"))
+                .createdAt(now.minusSeconds(30)).build();
+        AuditLog sameEffect = AuditLog.builder().id(UUID.randomUUID()).action(AuditAction.INTEGRATION_SETTINGS_UPDATED)
+                .actor(admin).metadata(Map.of("detail", "kycMock env(true) -> true (effective true -> true); reason=Ghim lại"))
+                .createdAt(now.minusSeconds(20)).build();
+        when(auditLogRepository.findByActionInAndCreatedAtAfter(any(), any())).thenReturn(List.of(off, sameEffect));
+
+        assertThat(detector.detect(now)).isZero();
+        verify(alertRepository, never()).save(any());
+        verify(notificationService, never()).sendAdminAlert(anyString(), anyString());
+    }
 }
