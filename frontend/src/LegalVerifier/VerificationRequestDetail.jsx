@@ -442,9 +442,6 @@ export default function VerificationRequestDetail() {
                                         </button>
                                     </div>
                                 )}
-                                <p className="text-xs text-on-surface-variant">
-                                    {t('detail.ocrPrivacyHint')}
-                                </p>
                             </div>
                         ) : (
                             <p className="text-on-surface-variant">{t('detail.noCertificate')}</p>
