@@ -6,6 +6,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequest
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
+import com.ltld.app.legacyvault.entity.DigitalSignature;
 import com.ltld.app.legacyvault.entity.DmsConfig;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
 import com.ltld.app.legacyvault.entity.User;
@@ -128,6 +129,12 @@ public class LegalVerificationServiceImplTest {
 
     @Mock
     private ReviewProgressRecorder progressRecorder;
+
+    @Mock
+    private PdfSignatureInspector pdfSignatureInspector;
+
+    @Mock
+    private VerifierSignatureSealService signatureSealService;
 
     @InjectMocks
     private LegalVerificationServiceImpl service;
@@ -527,6 +534,8 @@ public class LegalVerificationServiceImplTest {
         assertThat(vault.getUnlockedAt()).isNotNull();
         assertThat(vault.getClaimDeadlineAt()).isEqualTo(vault.getUnlockedAt().plusDays(60));
         verify(signatureRepository, times(1)).save(any());
+        // V3: chữ ký được gắn con dấu ECDSA trước khi lưu, kèm đúng danh sách vault
+        verify(signatureSealService).seal(any(), eq(pendingRequest), isNull(), eq(List.of(vault.getId())));
         verify(auditLogService, times(1)).log(
                 eq(AuditAction.VAULT_UNLOCK), eq(AuditResult.SUCCESS), eq(verifierId),
                 isNull(), eq("Vault"), eq(vault.getId().toString()), anyString());
@@ -1347,5 +1356,60 @@ public class LegalVerificationServiceImplTest {
         assertThat(summary.getAwaitingSignature()).isEqualTo(2L);
         assertThat(summary.getSigned()).isEqualTo(150L);
         assertThat(summary.getRejected()).isEqualTo(7L);
+    }
+
+    // ---------- getSignature (V3) ----------
+
+    @Test
+    void getSignature_signed_returnsCheckResult() {
+        pendingRequest.setStatus(LegalVerificationStatus.SIGNED);
+        DigitalSignature sig = DigitalSignature.builder().id(UUID.randomUUID()).request(pendingRequest).build();
+        com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto dto =
+                com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto.builder()
+                        .status(com.ltld.app.legacyvault.enums.SignatureSealStatus.VALID).build();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(signatureRepository.findWithDetailsByRequestId(requestId)).thenReturn(Optional.of(sig));
+        when(signatureSealService.check(sig)).thenReturn(dto);
+
+        assertThat(service.getSignature(requestId, verifierId)).isSameAs(dto);
+    }
+
+    @Test
+    void getSignature_notSignedYet_throwsNotFound() {
+        pendingRequest.setStatus(LegalVerificationStatus.APPROVED);
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+
+        assertThatThrownBy(() -> service.getSignature(requestId, verifierId))
+                .isInstanceOf(com.ltld.app.legacyvault.exception.BusinessException.class)
+                .hasMessageContaining("not been signed");
+        verifyNoInteractions(signatureSealService);
+    }
+
+    // ---------- inspectDocumentSignatures (V2) ----------
+
+    @Test
+    void inspectSignatures_pendingNotChecked_throwsStepRequired() {
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(progressRepository.findByRequestIdAndVerifierId(requestId, verifierId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.inspectDocumentSignatures(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verifyNoInteractions(pdfSignatureInspector, fileStorageService);
+    }
+
+    @Test
+    void inspectSignatures_checked_readsDecryptedFileAndInspects() throws Exception {
+        checkedOnly();
+        byte[] enc = {1, 2};
+        byte[] plain = {'%', 'P', 'D', 'F'};
+        com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto report =
+                com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto.builder().build();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(enc);
+        when(cryptoService.decryptBytes(enc)).thenReturn(plain);
+        when(pdfSignatureInspector.inspect(requestId, plain)).thenReturn(report);
+
+        assertThat(service.inspectDocumentSignatures(requestId, verifierId)).isSameAs(report);
+        verify(progressRepository, never()).save(any()); // chỉ đọc, không ghi tiến độ
     }
 }

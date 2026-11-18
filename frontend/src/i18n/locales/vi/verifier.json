@@ -139,7 +139,7 @@
     "opening": "Đang mở...",
     "ocrDocument": "✨ Phân tích & Đối chiếu AI (OCR)",
     "ocrScanning": "Đang phân tích AI OCR...",
-    "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm phân tích AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để bóc tách (hành động được ghi nhận vào nhật ký hệ thống).",
+    "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm phân tích AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để bóc tách; khi Gemini lỗi, tệp được gửi tới AI dự phòng (Groq, hoặc phần chữ của PDF tới DeepSeek) (hành động được ghi nhận vào nhật ký hệ thống).",
     "checkFirst": "Hãy kiểm tra tài liệu trước",
     "viewFirst": "Hãy xem tài liệu trước",
     "valid": "Hợp lệ",
@@ -168,7 +168,7 @@
     "signUnlock": "Ký và mở khoá két",
     "codeSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
     "signedTitle": "Đã ký thành công",
-    "signedText": "Két đã được mở khoá cho người thụ hưởng.",
+    "signedText": "Két đã được mở khoá cho người thụ hưởng. Chữ ký xác nhận và kết quả kiểm lại nằm ở thẻ \"Chữ ký xác nhận\".",
     "rejectedTitle": "Yêu cầu này đã bị từ chối",
     "reason": "Lý do: {{reason}}",
     "recorded": "Quyết định của bạn sẽ được ghi vào lịch sử hệ thống.",
@@ -185,8 +185,11 @@
       "sendCode": "Không gửi được mã.",
       "openDocument": "Không mở được tài liệu (HTTP {{status}}).",
       "noResponse": "không có phản hồi",
-      "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này."
-    }
+      "popupBlocked": "Trình duyệt đã chặn cửa sổ bật lên. Hãy cho phép cửa sổ bật lên cho trang này.",
+      "signatures": "Không đọc được chữ ký số của tài liệu."
+    },
+    "checkSignatures": "Kiểm tra chữ ký số",
+    "signaturesChecking": "Đang đọc chữ ký..."
   },
   "rejectReason": {
     "DOCUMENT_UNREADABLE": "Tài liệu bị mờ hoặc không đọc được",
@@ -246,5 +249,114 @@
       "UNVERIFIABLE": "Không đối chiếu được số giấy tờ trên giấy",
       "OWNER_NOT_VERIFIED": "Chủ két chưa xác minh CCCD, chỉ đối chiếu theo họ tên"
     }
+  },
+  "seal": {
+    "title": "Chữ ký xác nhận",
+    "checking": "Đang kiểm tra...",
+    "recheck": "Kiểm tra lại",
+    "loadError": "Không tải được chữ ký xác nhận.",
+    "status": {
+      "VALID": {
+        "title": "Chữ ký hợp lệ",
+        "text": "Chữ ký khớp khóa công khai của LegacyVault, nội dung đã ký đúng hồ sơ này và giấy chứng tử chưa bị thay kể từ lúc ký."
+      },
+      "INVALID": {
+        "title": "Chữ ký KHÔNG hợp lệ",
+        "text": "Ít nhất một điều kiện bên dưới không đạt. Hồ sơ hoặc tài liệu có thể đã bị sửa sau khi ký. Hãy báo Quản trị viên."
+      },
+      "DOCUMENT_UNAVAILABLE": {
+        "title": "Chữ ký đúng, chưa so được tài liệu",
+        "text": "Tạm thời không đọc được giấy chứng tử từ kho lưu trữ để so mã băm. Hãy thử kiểm tra lại sau."
+      },
+      "LEGACY": {
+        "title": "Chữ ký cũ",
+        "text": "Hồ sơ này được ký trước khi có chữ ký ECDSA, nên chỉ có mã băm cũ và không kiểm lại được."
+      }
+    },
+    "check": {
+      "signature": "Chữ ký ECDSA",
+      "payload": "Nội dung đúng hồ sơ",
+      "document": "Giấy chứng tử không đổi",
+      "ok": "Đạt",
+      "fail": "Không đạt",
+      "unknown": "Chưa kiểm được"
+    },
+    "signedBy": "Người ký",
+    "signedAt": "Thời điểm ký",
+    "method": "Xác thực khi ký",
+    "algorithm": "Thuật toán · khóa",
+    "fingerprint": "Dấu vân tay khóa công khai (SHA-256)",
+    "documentHash": "Mã băm giấy chứng tử lúc ký (SHA-256)",
+    "currentDocumentHash": "Mã băm giấy chứng tử hiện tại",
+    "legacyHash": "Mã băm cũ",
+    "methods": {
+      "MOCK_OTP": "Mã OTP gửi qua email",
+      "MOCK_PIN": "Mã PIN"
+    },
+    "technical": "Chi tiết kỹ thuật (để kiểm độc lập)",
+    "technicalHint": "Ai có 3 phần dưới đây đều tự kiểm được chữ ký mà không cần LegacyVault.",
+    "payload": "Nội dung đã ký (payload)",
+    "signatureValue": "Chữ ký (Base64, DER)",
+    "publicKey": "Khóa công khai (PEM)",
+    "copy": "Sao chép",
+    "copied": "Đã chép",
+    "opensslHint": "Kiểm bằng OpenSSL: lưu payload thành payload.txt (đúng từng ký tự, xuống dòng kiểu LF, không thêm dòng trống cuối; trên Windows đừng lưu bằng Notepad vì có thể đổi sang CRLF), chữ ký thành sig.b64, khóa công khai thành public.pem, rồi chạy:",
+    "disclaimer": "Đây là chữ ký do hệ thống LegacyVault cấp (khóa ECDSA P-256 của hệ thống), chưa phải chữ ký số có chứng thư của tổ chức CA được cấp phép."
+  },
+  "pdfSig": {
+    "overall": {
+      "ALL_VALID": {
+        "title": "Có {{count}} chữ ký số hợp lệ",
+        "text": "Nội dung trong vùng đã ký còn nguyên, chữ ký phủ toàn bộ file và chứng thư còn hạn lúc ký."
+      },
+      "HAS_INVALID": {
+        "title": "Chữ ký số KHÔNG hợp lệ",
+        "text": "Nội dung file đã bị sửa sau khi ký, hoặc chữ ký không khớp chứng thư. Nên từ chối với lý do \"Tài liệu bị nghi là giả mạo\" nếu không giải thích được."
+      },
+      "HAS_UNVERIFIED": {
+        "title": "Có chữ ký số, cần xem thêm",
+        "text": "Chưa đủ điều kiện để coi là hợp lệ: chứng thư tự ký (ai cũng tạo được), không rõ thời điểm ký, chứng thư hết hạn lúc ký, có phần thêm vào sau khi ký, hoặc thuật toán chưa hỗ trợ. Xem từng chữ ký bên dưới."
+      },
+      "NO_SIGNATURE": {
+        "title": "File PDF không có chữ ký số",
+        "text": "Bình thường với bản scan hay ảnh chụp giấy. Hãy xem kỹ con dấu, chữ ký tay và số hiệu trên giấy."
+      },
+      "NOT_PDF": {
+        "title": "Tài liệu là ảnh, không mang chữ ký số",
+        "text": "Chỉ file PDF mới chứa chữ ký số. Hãy xem kỹ con dấu và chữ ký tay trên ảnh."
+      },
+      "UNREADABLE": {
+        "title": "Không đọc được cấu trúc PDF",
+        "text": "File có thể bị hỏng hoặc dùng định dạng lạ. Hãy mở xem trực tiếp."
+      }
+    },
+    "check": {
+      "integrity": "Nội dung không bị sửa",
+      "whole": "Phủ toàn bộ file",
+      "certTime": "Chứng thư còn hạn lúc ký",
+      "ok": "Đạt",
+      "fail": "Không đạt",
+      "unknown": "Chưa kiểm được"
+    },
+    "unknownSigner": "Không rõ người ký",
+    "selfSigned": "Chứng thư tự ký",
+    "issuer": "Nơi cấp chứng thư",
+    "signedAt": "Thời điểm ký",
+    "validity": "Hiệu lực chứng thư",
+    "algorithm": "Thuật toán",
+    "reason": "Lý do ký",
+    "location": "Nơi ký",
+    "serial": "Số hiệu chứng thư",
+    "problem": {
+      "SIGNATURE_ALGORITHM_UNSUPPORTED": "Thuật toán chữ ký chưa được hỗ trợ (ví dụ RSA-PSS), chưa kết luận được.",
+      "DIGEST_ALGORITHM_UNSUPPORTED": "Thuật toán băm chưa được hỗ trợ, chưa kết luận được.",
+      "SIGNER_CERTIFICATE_MISSING": "Chữ ký không kèm chứng thư người ký.",
+      "SIGNATURE_DATA_CORRUPT": "Dữ liệu chữ ký bị hỏng.",
+      "BYTE_RANGE_INVALID": "Vùng ký (ByteRange) không hợp lệ.",
+      "NOT_CMS_SIGNED_DATA": "Chữ ký không theo chuẩn PKCS#7/CMS.",
+      "NO_SIGNER": "Chữ ký không có người ký.",
+      "SIGNATURE_DICTIONARY_MISSING": "Thiếu dữ liệu chữ ký."
+    },
+    "disclaimer": "Chỉ để tham khảo. Hệ thống chưa kiểm chuỗi chứng thư tới CA gốc được cấp phép, chưa tra thu hồi (CRL/OCSP). Quyết định duyệt vẫn do bạn."
   }
 }

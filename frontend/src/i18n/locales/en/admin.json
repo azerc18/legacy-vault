@@ -397,7 +397,7 @@
       "backupKey": "Backup API key",
       "set": "Set",
       "notSet": "Not set",
-      "mockNote": "AI_PROVIDER is mock: Vaulty gives sample answers and the two readers do not call AI. The models below only apply after switching to gemini.",
+      "mockNote": "AI_PROVIDER is mock: Vaulty gives sample answers and does not call Gemini. The two readers still call the real fallback AI (Groq / DeepSeek) when GROQ_API_KEY / DEEPSEEK_API_KEY is set. The Gemini models below only apply after switching to gemini.",
       "noKeyNote": "GEMINI_API_KEY is not set, so AI features cannot run yet.",
       "keyHint": "To change a key, edit GEMINI_API_KEY / GEMINI_BACKUP_API_KEY on Azure (App Service restarts by itself)."
     },
@@ -444,7 +444,7 @@
       "textModel": "Text model",
       "visionModel": "Image model (Groq)",
       "noKey": "No key is set for {{provider}}, so this fallback step cannot run yet.",
-      "modelsHint": "Fallback models come from GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL and DEEPSEEK_ALLOWED_MODELS."
+      "modelsHint": "Fallback models come from GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL and DEEPSEEK_ALLOWED_MODELS. Image models are only GROQ_VISION_MODEL and GROQ_VISION_ALLOWED_MODELS."
     }
   },
   "integrations": {

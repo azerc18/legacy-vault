@@ -41,7 +41,7 @@
     "camera": { "label": "Chụp ảnh", "desc": "Chụp mặt trước thẻ bằng điện thoại." },
     "upload": { "label": "Tải ảnh", "desc": "Chọn ảnh mặt trước thẻ có sẵn trên máy." },
     "manual": { "label": "Nhập tay", "desc": "Tự điền các thông tin trên thẻ." },
-    "aiConsent": "Nếu ảnh không đọc được mã QR, tôi đồng ý gửi ảnh CCCD cho dịch vụ AI (Google Gemini) để đọc thông tin. Ảnh không được lưu lại.",
+    "aiConsent": "Nếu ảnh không đọc được mã QR, tôi đồng ý gửi ảnh CCCD cho dịch vụ AI (Google Gemini; khi Gemini lỗi thì dùng Groq) để đọc thông tin. Ảnh không được lưu lại.",
     "needAiConsent": "Không tìm thấy mã QR trong ảnh. Hãy tích ô đồng ý gửi ảnh cho AI đọc, hoặc chụp lại rõ mã QR, hoặc nhập tay.",
     "qrFoundInPhoto": "Đã đọc được mã QR trong ảnh, không cần gửi ảnh cho AI.",
     "reading": "Đang đọc thông tin…"

@@ -129,7 +129,7 @@
       "ocrScan": "✨ Quét & Trích xuất bằng AI (OCR)",
       "ocrScanning": "Đang quét & đối chiếu AI OCR...",
       "ocrFailed": "Không thể phân tích tài liệu bằng AI OCR.",
-      "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm quét AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để phân tích (hành động được ghi nhận vào nhật ký hệ thống).",
+      "ocrPrivacyHint": "Lưu ý bảo mật: Khi bấm quét AI, tệp tài liệu sẽ được gửi tới dịch vụ Google Gemini AI để phân tích; khi Gemini lỗi, tệp được gửi tới AI dự phòng (Groq, hoặc phần chữ của PDF tới DeepSeek) (hành động được ghi nhận vào nhật ký hệ thống).",
       "notesPlaceholder": "Ghi chú cho người xác minh (không bắt buộc)",
       "button": "Gửi xác minh",
       "submitting": "Đang gửi...",

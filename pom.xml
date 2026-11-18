@@ -163,6 +163,13 @@
             <artifactId>bcprov-jdk18on</artifactId>
             <version>1.80</version>
         </dependency>
+        <!-- V2: cấu trúc CMS/PKCS#7 (org.bouncycastle.asn1.cms) để đọc chữ ký số nhúng trong giấy chứng tử PDF.
+             Từ 1.71 các lớp này tách khỏi bcprov sang bcutil; cùng phiên bản với bcprov ở trên -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcutil-jdk18on</artifactId>
+            <version>1.80</version>
+        </dependency>
 
     </dependencies>
 

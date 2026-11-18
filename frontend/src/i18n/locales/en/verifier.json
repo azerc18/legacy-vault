@@ -139,7 +139,7 @@
     "opening": "Opening...",
     "ocrDocument": "✨ Analyze & Cross-Check with AI (OCR)",
     "ocrScanning": "Analyzing with AI OCR...",
-    "ocrPrivacyHint": "Privacy notice: When analyzing with AI, the document is sent to Google Gemini AI for extraction (logged in system audit logs).",
+    "ocrPrivacyHint": "Privacy notice: When analyzing with AI, the document is sent to Google Gemini AI for extraction; when Gemini fails, it goes to the fallback AI instead (Groq, or the text of a PDF to DeepSeek) (logged in system audit logs).",
     "checkFirst": "Check the document first",
     "viewFirst": "View the document first",
     "valid": "Valid",
@@ -168,7 +168,7 @@
     "signUnlock": "Sign and unlock vault(s)",
     "codeSent": "A 6-digit code has been sent to your email. It expires in 5 minutes.",
     "signedTitle": "Signed successfully",
-    "signedText": "The vault(s) have been unlocked for the beneficiaries.",
+    "signedText": "The vault(s) have been unlocked for the beneficiaries. The confirmation signature and its check are in the \"Confirmation signature\" card.",
     "rejectedTitle": "This request has been rejected",
     "reason": "Reason: {{reason}}",
     "recorded": "Your decision will be recorded in the system history.",
@@ -185,10 +185,13 @@
       "sendCode": "Could not send the code.",
       "openDocument": "Could not open the document (HTTP {{status}}).",
       "noResponse": "no response",
-      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site."
+      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site.",
+      "signatures": "Could not read the document's digital signatures."
     },
     "vaultsTitle_one": "Vault to unlock ({{count}})",
-    "vaultsTitle_other": "Vaults to unlock ({{count}})"
+    "vaultsTitle_other": "Vaults to unlock ({{count}})",
+    "checkSignatures": "Check digital signatures",
+    "signaturesChecking": "Reading signatures..."
   },
   "rejectReason": {
     "DOCUMENT_UNREADABLE": "The document is blurry or unreadable",
@@ -248,5 +251,114 @@
       "UNVERIFIABLE": "The ID number on the document cannot be checked",
       "OWNER_NOT_VERIFIED": "Owner has not verified an ID; name check only"
     }
+  },
+  "seal": {
+    "title": "Confirmation signature",
+    "checking": "Checking...",
+    "recheck": "Check again",
+    "loadError": "Could not load the confirmation signature.",
+    "status": {
+      "VALID": {
+        "title": "Signature is valid",
+        "text": "The signature matches LegacyVault's public key, the signed content refers to this request, and the death certificate has not changed since signing."
+      },
+      "INVALID": {
+        "title": "Signature is NOT valid",
+        "text": "At least one check below failed. The request or the document may have been changed after signing. Please tell an administrator."
+      },
+      "DOCUMENT_UNAVAILABLE": {
+        "title": "Signature is correct, document not compared yet",
+        "text": "The death certificate could not be read from storage to compare its hash. Please check again later."
+      },
+      "LEGACY": {
+        "title": "Older signature",
+        "text": "This request was signed before ECDSA signatures existed, so it only has the old hash and cannot be re-checked."
+      }
+    },
+    "check": {
+      "signature": "ECDSA signature",
+      "payload": "Content matches request",
+      "document": "Death certificate unchanged",
+      "ok": "Passed",
+      "fail": "Failed",
+      "unknown": "Not checked"
+    },
+    "signedBy": "Signed by",
+    "signedAt": "Signed at",
+    "method": "Authentication used",
+    "algorithm": "Algorithm · key",
+    "fingerprint": "Public key fingerprint (SHA-256)",
+    "documentHash": "Death certificate hash at signing (SHA-256)",
+    "currentDocumentHash": "Current death certificate hash",
+    "legacyHash": "Old hash",
+    "methods": {
+      "MOCK_OTP": "One-time code sent by email",
+      "MOCK_PIN": "PIN"
+    },
+    "technical": "Technical details (for independent checks)",
+    "technicalHint": "Anyone with the three parts below can check the signature without LegacyVault.",
+    "payload": "Signed content (payload)",
+    "signatureValue": "Signature (Base64, DER)",
+    "publicKey": "Public key (PEM)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "opensslHint": "Check with OpenSSL: save the payload as payload.txt (exact characters, LF line endings, no trailing newline; on Windows avoid Notepad, which may switch to CRLF), the signature as sig.b64 and the public key as public.pem, then run:",
+    "disclaimer": "This signature is issued by LegacyVault (the system's ECDSA P-256 key). It is not a digital signature backed by a licensed CA certificate."
+  },
+  "pdfSig": {
+    "overall": {
+      "ALL_VALID": {
+        "title": "{{count}} valid digital signature(s)",
+        "text": "The signed content is intact, the signature covers the whole file and the certificate was valid at signing time."
+      },
+      "HAS_INVALID": {
+        "title": "Digital signature is NOT valid",
+        "text": "The file was changed after signing, or the signature does not match its certificate. Consider rejecting as \"suspected forgery\" unless it can be explained."
+      },
+      "HAS_UNVERIFIED": {
+        "title": "Signed, needs a closer look",
+        "text": "Not enough to call it valid: self-signed certificate (anyone can make one), unknown signing time, certificate expired at signing, content added after signing, or an unsupported algorithm. See each signature below."
+      },
+      "NO_SIGNATURE": {
+        "title": "The PDF has no digital signature",
+        "text": "Normal for a scan or photo of a paper certificate. Look closely at the stamp, handwritten signature and reference number."
+      },
+      "NOT_PDF": {
+        "title": "The document is an image, it cannot carry a digital signature",
+        "text": "Only PDF files hold digital signatures. Look closely at the stamp and handwritten signature."
+      },
+      "UNREADABLE": {
+        "title": "The PDF structure could not be read",
+        "text": "The file may be damaged or use an unusual format. Open it directly."
+      }
+    },
+    "check": {
+      "integrity": "Content not changed",
+      "whole": "Covers the whole file",
+      "certTime": "Certificate valid at signing",
+      "ok": "Passed",
+      "fail": "Failed",
+      "unknown": "Not checked"
+    },
+    "unknownSigner": "Unknown signer",
+    "selfSigned": "Self-signed certificate",
+    "issuer": "Certificate issuer",
+    "signedAt": "Signed at",
+    "validity": "Certificate validity",
+    "algorithm": "Algorithm",
+    "reason": "Reason",
+    "location": "Location",
+    "serial": "Certificate serial",
+    "problem": {
+      "SIGNATURE_ALGORITHM_UNSUPPORTED": "Signature algorithm not supported yet (e.g. RSA-PSS); no conclusion.",
+      "DIGEST_ALGORITHM_UNSUPPORTED": "Hash algorithm not supported yet; no conclusion.",
+      "SIGNER_CERTIFICATE_MISSING": "The signature does not include the signer's certificate.",
+      "SIGNATURE_DATA_CORRUPT": "The signature data is damaged.",
+      "BYTE_RANGE_INVALID": "The signed byte range is invalid.",
+      "NOT_CMS_SIGNED_DATA": "The signature is not PKCS#7/CMS.",
+      "NO_SIGNER": "The signature has no signer.",
+      "SIGNATURE_DICTIONARY_MISSING": "Signature data is missing."
+    },
+    "disclaimer": "For reference only. The chain to a licensed root CA and revocation (CRL/OCSP) are not checked. The decision is still yours."
   }
 }

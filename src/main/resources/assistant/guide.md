@@ -182,7 +182,7 @@ Backup beneficiary, percentage split and joint approval need a VIP plan.
 ### Submit the death certificate
 1. Open the case → "Submit death certificate".
 2. Select the vaults to unlock (at least one). Read the owner's instructions under each vault.
-3. Attach the death certificate (PDF, PNG or JPG, up to 10MB). Optional: "Scan & Extract with AI (OCR)" reads the document and gives advice only; "Insert AI summary into submission notes" copies it. The file is sent to Google Gemini for this.
+3. Attach the death certificate (PDF, PNG or JPG, up to 10MB). Optional: "Scan & Extract with AI (OCR)" reads the document and gives advice only; "Insert AI summary into submission notes" copies it. The file is sent to Google Gemini for this; when Gemini fails, it goes to the fallback AI instead (Groq, or the text of a PDF to DeepSeek).
 4. Add notes (up to 1000 characters) and click "Submit for verification".
 
 ### Track the hand-over
@@ -246,7 +246,7 @@ The admin menu: Overview, Users, Roles, Vaults, Audit log, Alerts, Payments, Pla
 - "Plans": "Change price / name" (10,000–100,000,000 VND, with a reason). New prices only apply to future purchases. Limits cannot be changed here.
 - "Failed emails": notification emails that could not be delivered. "Resend" after mail is fixed.
 - "Locked": beneficiaries locked after 5 wrong identity codes. "Unlock" gives them 5 new attempts.
-- "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list, then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
+- "AI settings": turn Vaulty, the death certificate reader and the ID card photo reader on or off, and pick the main and backup model from the allowed list. Each feature can also use a fallback AI when Gemini fails (Groq for images, Groq or DeepSeek for text) and pick its provider and model. Then "Save". API keys are not entered here (they are server settings). Every change is written to the Audit log.
 - "Integrations": read-only status of outside services (AI and OCR, the Legal Verifier's sign-off by email code, VNPay and PayPal in sandbox or live mode, email, CAPTCHA, Google sign-in). Keys and passwords are never shown, only "Configured" or "Not configured". The only setting here is simulated eKYC: "Follow environment", "Turn simulated eKYC on" or "Turn simulated eKYC off", with a required reason (at least 5 characters), then "Save". When it is on, beneficiaries can also verify their identity with an ID card number, and any well-formed number is accepted, so only use it for demos and tests. Turning it on creates a HIGH security alert that is emailed to every admin. On the live server admins can only turn it off; turning it on there needs a server setting. Every change is written to the Audit log.
 
 ## Emails
