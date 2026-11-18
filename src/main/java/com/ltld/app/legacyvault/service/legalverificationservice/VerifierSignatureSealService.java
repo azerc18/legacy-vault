@@ -121,6 +121,8 @@ public class VerifierSignatureSealService {
                 && signature.getDocumentSha256() != null
                 && signature.getDocumentSha256().equals(fields.get("document_sha256"))
                 && key.getKeyRef().equals(fields.get("key_ref"))
+                // Cột signature_method phải đúng phương thức đã ký (sửa OTP -> HANDWRITTEN trong DB sẽ lộ)
+                && String.valueOf(signature.getSignatureMethod()).equals(fields.get("method"))
                 // Ký tay: mã băm ảnh phải nằm trong payload; ký OTP: payload không được có dòng này
                 && Objects.equals(signature.getSignatureImageSha256(), fields.get("signature_image_sha256"));
 

@@ -164,6 +164,18 @@ class VerifierSignatureSealServiceTest {
     }
 
     @Test
+    void check_methodColumnChangedAfterSigning_isInvalid() {
+        DigitalSignature s = sealed(List.of(UUID.randomUUID()));
+        s.setSignatureMethod(SignatureMethod.HANDWRITTEN); // payload đã ký vẫn ghi MOCK_OTP
+
+        VerifierSignatureDto dto = sealService.check(s);
+
+        assertThat(dto.getStatus()).isEqualTo(SignatureSealStatus.INVALID);
+        assertThat(dto.getSignatureValid()).isTrue();
+        assertThat(dto.getPayloadMatches()).isFalse();
+    }
+
+    @Test
     void check_otpSignature_hasNoImage() {
         VerifierSignatureDto dto = sealService.check(sealed(List.of(UUID.randomUUID())));
 

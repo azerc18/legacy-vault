@@ -546,7 +546,7 @@ export default function VerificationRequestDetail() {
                                             type="button"
                                             role="radio"
                                             aria-checked={signMethod === m}
-                                            onClick={() => { setSignMethod(m); setError(''); }}
+                                            onClick={() => { setSignMethod(m); setSignatureImage(null); setError(''); }}
                                             disabled={busy}
                                             className={`h-11 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all ${signMethod === m ? 'bg-surface text-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
                                         >

@@ -14,7 +14,7 @@ export default function SignaturePad({ onChange, disabled = false }) {
     const drawing = useRef(false);
     const last = useRef(null);
     const length = useRef(0);
-    const [hasInk, setHasInk] = useState(false);
+    const [touched, setTouched] = useState(false); // đã đặt bút: ẩn chữ nhắc ngay, kể cả nét ngắn
 
     const setup = useCallback(() => {
         const canvas = canvasRef.current;
@@ -45,6 +45,7 @@ export default function SignaturePad({ onChange, disabled = false }) {
         e.preventDefault();
         canvasRef.current.setPointerCapture?.(e.pointerId);
         drawing.current = true;
+        setTouched(true);
         last.current = point(e);
         const ctx = canvasRef.current.getContext('2d');
         ctx.beginPath();
@@ -70,13 +71,12 @@ export default function SignaturePad({ onChange, disabled = false }) {
         if (!drawing.current) return;
         drawing.current = false;
         const enough = length.current >= MIN_STROKE_PX;
-        setHasInk(enough);
         onChange?.(enough ? canvasRef.current.toDataURL('image/png') : null);
     };
 
     const clear = () => {
         length.current = 0;
-        setHasInk(false);
+        setTouched(false);
         setup();
         onChange?.(null);
     };
@@ -98,7 +98,7 @@ export default function SignaturePad({ onChange, disabled = false }) {
                 />
                 {/* Đường kẻ ký + chữ mờ hướng dẫn, chỉ là trang trí, không nằm trong ảnh xuất ra */}
                 <div className="pointer-events-none absolute left-6 right-6 bottom-10 border-b border-slate-300" />
-                {!hasInk && (
+                {!touched && (
                     <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-sm text-slate-400">
                         {t('detail.handwritten.placeholder')}
                     </p>
