@@ -50,7 +50,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
@@ -485,9 +485,10 @@ public class DmsConfirmerServiceImpl implements DmsConfirmerService {
         config.setNextReminderAt(schedule.nextReminderAt(0).orElse(null));
     }
 
-    // Đợt xác nhận nhận diện bằng hạn chờ (cắt về giây, UTC) để không lệch vì độ chính xác DATETIME(6).
+    // Đợt xác nhận nhận diện bằng hạn chờ (cắt về giây) để không lệch vì độ chính xác DATETIME(6). Quy theo múi giờ
+    // JVM ra thời điểm thật, nên link gửi lúc server còn chạy UTC vẫn khớp sau khi chuyển sang giờ VN (AppTimeZone).
     static long roundOf(LocalDateTime deadlineAt) {
-        return deadlineAt.truncatedTo(ChronoUnit.SECONDS).toEpochSecond(ZoneOffset.UTC);
+        return deadlineAt.truncatedTo(ChronoUnit.SECONDS).atZone(ZoneId.systemDefault()).toEpochSecond();
     }
 
     private static boolean sameRound(LocalDateTime a, LocalDateTime b) {

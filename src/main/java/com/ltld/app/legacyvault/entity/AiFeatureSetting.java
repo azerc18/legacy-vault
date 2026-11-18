@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.entity;
 
+import com.ltld.app.legacyvault.enums.AiFallbackProvider;
 import com.ltld.app.legacyvault.enums.AiFeature;
 import jakarta.persistence.*;
 import lombok.*;
@@ -34,6 +35,21 @@ public class AiFeatureSetting {
 
     @Column(name = "backup_model", length = 100)
     private String backupModel;
+
+    // AI dự phòng khi Gemini lỗi (Groq / DeepSeek). Provider / model NULL = mặc định của biến môi trường.
+    @Column(name = "fallback_enabled", nullable = false)
+    @Builder.Default
+    private boolean fallbackEnabled = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "text_fallback_provider", length = 20)
+    private AiFallbackProvider textFallbackProvider;
+
+    @Column(name = "text_fallback_model", length = 100)
+    private String textFallbackModel;
+
+    @Column(name = "vision_fallback_model", length = 100)
+    private String visionFallbackModel;
 
     @Column(name = "updated_by")
     private UUID updatedBy;

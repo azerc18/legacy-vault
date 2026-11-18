@@ -221,6 +221,86 @@ class EmailSenderExecutorNoticeTest {
                 .doesNotContain("null");
     }
 
+    // FR-07: mail kích hoạt cho Primary: tiêu đề có tên Owner, hạn xác nhận theo giờ VN, nút mở trang Người thực thi,
+    // không còn dán mã assignment thô
+    @Test
+    void activatedNotice_primary_hasDeadlineAndButtonWithoutRawCode() {
+        org.springframework.test.util.ReflectionTestUtils.setField(emailSender, "frontendBaseUrl", "https://app.example.test/");
+        java.time.LocalDateTime ackBy = java.time.LocalDateTime.of(2026, 12, 2, 9, 30);
+
+        emailSender.sendExecutorActivatedNotice("exec@example.test", "Exec B", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, 14, ackBy);
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("Handover started for Owner A - LegacyVault");
+        assertThat(message.getText())
+                .contains("Hello Exec B,")
+                .contains("The Dead Man's Switch of Owner A (owner@example.test) has been triggered")
+                .contains("You are their Primary executor (PRIMARY)")
+                .contains("within 14 days, before " + EmailSender.formatDeadline(ackBy) + " (Vietnam time)")
+                .contains("Open the Executor page: https://app.example.test/executor/home")
+                .doesNotContain("code:")
+                .doesNotContain("null");
+        assertThat(message.getHtml()).contains("href=\"https://app.example.test/executor/home\"");
+    }
+
+    // Backup: không có hạn (BR-03 chỉ leo thang Primary), giải thích vì sao Backup nhận việc
+    @Test
+    void activatedNotice_backup_hasNoDeadline() {
+        emailSender.sendExecutorActivatedNotice("exec@example.test", null, null, "owner@example.test",
+                ExecutorType.BACKUP, null, null);
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("Handover started for owner@example.test - LegacyVault");
+        assertThat(message.getText())
+                .contains("Hello exec@example.test,")
+                .contains("You are their Backup executor (BACKUP)")
+                .contains("primary executor is not available")
+                .contains("Sign in to LegacyVault and open the Executor page to acknowledge this notice.")
+                .doesNotContain("Vietnam time")
+                .doesNotContain("null");
+    }
+
+    // Ngôn ngữ theo người nhận (email language preference)
+    @Test
+    void activatedNotice_vietnameseRecipient_getsVietnameseMail() {
+        SentMail.stub(javaMailSender, languageResolver, AppLanguage.VI);
+
+        emailSender.sendExecutorActivatedNotice("exec@example.test", "Exec B", "Owner A", "owner@example.test",
+                ExecutorType.PRIMARY, 14, java.time.LocalDateTime.of(2026, 12, 2, 9, 30));
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("Bắt đầu bàn giao di sản của Owner A - LegacyVault");
+        assertThat(message.getText())
+                .contains("Xin chào Exec B,")
+                .contains("Công tắc người chết của Owner A (owner@example.test) đã kích hoạt")
+                .contains("Người thực thi chính (PRIMARY)")
+                .contains("trong 14 ngày")
+                .contains("(giờ Việt Nam)");
+    }
+
+    // Các mail bàn giao còn lại (câu tiếng Anh dựng sẵn) được bọc vào cùng bố cục HTML, mỗi dòng một đoạn
+    @Test
+    void handoverNotice_wrapsPlainContentInSharedLayout() {
+        emailSender.sendHandoverNotice("exec@example.test", "Line one.\nLine two.");
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("LegacyVault handover process notification");
+        assertThat(message.getHtml()).contains("Line one.", "Line two.", "Handover process notification");
+        assertThat(message.getText()).contains("Line one.", "Line two.");
+    }
+
+    // Mail cho Admin (cảnh báo bảo mật, DMS không có Executor): tiêu đề Admin alert, không phải "handover"
+    @Test
+    void adminAlertNotice_usesAdminSubjectAndTitle() {
+        emailSender.sendAdminAlertNotice("admin@example.test", "[LegacyVault] Security alert X: something");
+
+        SentMail message = sentMessage();
+        assertThat(message.getSubject()).isEqualTo("LegacyVault admin alert");
+        assertThat(message.getHtml()).contains("Admin alert", "Security alert X: something")
+                .doesNotContain("Handover process notification");
+    }
+
     private SentMail sentMessage() {
         return SentMail.captureOne(javaMailSender);
     }

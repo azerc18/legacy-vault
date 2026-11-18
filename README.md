@@ -35,7 +35,7 @@ Repo gồm cả **backend** (Spring Boot, thư mục gốc) và **frontend** (Re
 | Lưu file | `APP_STORAGE_PROVIDER=local` (thư mục `uploads/`) hoặc `s3` (MinIO / Cloudflare R2 / AWS S3); file luôn được mã hóa trước khi lưu |
 | Mail | SMTP Gmail với App Password |
 | Thanh toán | VNPay (sandbox) cho gói VIP |
-| Trợ lý AI | `AI_PROVIDER=mock` (mặc định) hoặc `gemini` |
+| Trợ lý AI | `AI_PROVIDER=mock` (mặc định) hoặc `gemini`; dự phòng khi Gemini lỗi: Groq (ảnh, văn bản) / DeepSeek (văn bản) |
 | PDF | OpenPDF + font Noto Sans (`src/main/resources/fonts/`) |
 | CI/CD | GitHub Actions: `Java CI` (mọi PR và push `main`) → `Deploy` (build image, đẩy GHCR, cập nhật Azure Web App) |
 
@@ -92,6 +92,7 @@ Mở `.env` và điền giá trị. Danh sách đầy đủ có chú thích nằ
 | `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` | khi dùng thanh toán | Lấy từ cổng merchant VNPay sandbox |
 | `VNPAY_RETURN_URL`, `VNPAY_PAY_URL` | khi deploy | Mặc định trỏ `localhost` và URL sandbox; production đặt `VNPAY_RETURN_URL` theo domain thật |
 | `AI_PROVIDER`, `GEMINI_API_KEY`, `GEMINI_MODEL` | không | Trợ lý AI; `mock` không cần key |
+| `GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `AI_FALLBACK_TEXT_PROVIDER` | không | AI dự phòng khi Gemini lỗi: ảnh và PDF scan qua Groq vision, chat Vaulty và PDF có chữ qua nhà cung cấp chọn ở trang Cấu hình AI (mặc định `deepseek`). Model: `GROQ_TEXT_MODEL`, `GROQ_VISION_MODEL`, `DEEPSEEK_MODEL`, `*_ALLOWED_MODELS` |
 | `GOOGLE_CLIENT_ID` | không | OAuth Client ID; để trống thì ẩn nút đăng nhập Google |
 
 Sinh `CRYPTO_MASTER_KEY` và `JWT_SECRET`:

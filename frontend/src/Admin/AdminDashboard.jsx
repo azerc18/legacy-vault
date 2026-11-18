@@ -9,6 +9,7 @@ import { getErrorMessage } from '../api/http.js';
 import { Icon, Alert, formatDate, LoadingSkeleton } from '../Owner/ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { AdminLayout, Dossier, Stamp, StatCard, formatVnd } from './adminUi.jsx';
+import { APP_TIME_ZONE } from '../i18n/format.js';
 
 const USER_ORDER = ['ACTIVE', 'PENDING', 'LOCKED'];
 const VAULT_ORDER = ['ACTIVE', 'UNLOCKED', 'CLAIMED', 'ARCHIVED_LOCKED'];
@@ -147,7 +148,7 @@ export default function AdminDashboard() {
                     <div className="mt-8 flex items-end justify-between gap-3 flex-wrap">
                         <h2 className="lv-dossier-title text-xl">{t('overview.todo.title')}</h2>
                         <span className="text-xs text-outline">
-                            {loadedAt && t('overview.updatedAt', { time: loadedAt.toLocaleTimeString() })}
+                            {loadedAt && t('overview.updatedAt', { time: loadedAt.toLocaleTimeString(undefined, { timeZone: APP_TIME_ZONE }) })}
                         </span>
                     </div>
 

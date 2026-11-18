@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { notificationApi } from '../api/notificationApi.js';
 import { executorApi } from '../api/executorApi.js';
 import { getUser } from '../auth/auth.js';
+import { APP_TIME_ZONE, parseServerDate } from '../i18n/format.js';
 
 const POLL_MS = 60000;
 const PAGE_SIZE = 20;
@@ -134,13 +135,13 @@ async function targetOf(n) {
     }
 }
 
-const fmtDateTime = (v, lng) => new Date(v).toLocaleString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-const fmtDate = (v, lng) => new Date(v).toLocaleDateString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium' });
+const fmtDateTime = (v, lng) => parseServerDate(v)?.toLocaleString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: APP_TIME_ZONE }) ?? '';
+const fmtDate = (v, lng) => parseServerDate(v)?.toLocaleDateString(lng === 'vi' ? 'vi-VN' : 'en-GB', { dateStyle: 'medium', timeZone: APP_TIME_ZONE }) ?? '';
 
 // "5 phút trước"; quá 7 ngày thì hiện ngày giờ đầy đủ
 function timeAgo(value, lng, justNow) {
     if (!value) return '';
-    const diff = (new Date(value).getTime() - Date.now()) / 1000;
+    const diff = ((parseServerDate(value)?.getTime() ?? NaN) - Date.now()) / 1000;
     const abs = Math.abs(diff);
     if (Number.isNaN(abs)) return '';
     if (abs < 60) return justNow;

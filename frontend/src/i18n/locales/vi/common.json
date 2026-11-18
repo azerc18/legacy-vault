@@ -36,6 +36,8 @@
       "ASSET_VERIFIED": "Tài sản \"{{asset}}\" của bạn đã được xác thực.",
       "BENEFICIARY_ASSIGNED": "{{owner}} đã chỉ định bạn làm người thụ hưởng của két sắt \"{{vault}}\".",
       "BENEFICIARY_REMOVED": "{{owner}} đã gỡ bạn khỏi danh sách người thụ hưởng của két sắt \"{{vault}}\".",
+      "EXECUTOR_ACTIVATED": "Dead Man's Switch của {{owner}} đã kích hoạt. Bạn là {{role}} của họ, hãy xác nhận để bắt đầu bàn giao.",
+      "EXECUTOR_ACTIVATED_deadline": "Dead Man's Switch của {{owner}} đã kích hoạt. Bạn là {{role}} của họ, hãy xác nhận trước {{deadlineAt}} để bắt đầu bàn giao.",
       "EXECUTOR_ASSIGNED": "{{owner}} mời bạn làm {{role}}. Mở lời mời để đồng ý hoặc từ chối.",
       "EXECUTOR_INVITATION_ACCEPTED": "{{executor}} đã đồng ý làm {{role}} của bạn.",
       "EXECUTOR_INVITATION_DECLINED_reason": "{{executor}} đã từ chối làm {{role}} của bạn. Lý do: {{reason}}. Hãy chỉ định người khác.",

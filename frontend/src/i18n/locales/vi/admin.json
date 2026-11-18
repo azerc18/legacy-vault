@@ -410,6 +410,25 @@
     "updated": "Sửa lần cuối {{when}} bởi {{who}}",
     "neverUpdated": "Chưa ai sửa, đang dùng mặc định.",
     "modelsHint": "Danh sách model lấy từ GEMINI_MODEL, GEMINI_BACKUP_MODEL và GEMINI_ALLOWED_MODELS. Muốn thêm model thì thêm vào biến môi trường.",
-    "auditHint": "Mỗi lần lưu được ghi vào Nhật ký (AI_SETTINGS_UPDATED)."
+    "auditHint": "Mỗi lần lưu được ghi vào Nhật ký (AI_SETTINGS_UPDATED).",
+    "fallback": {
+      "statusTitle": "AI dự phòng khi Gemini lỗi",
+      "statusHint": "Gemini luôn được dùng trước. Khi cả model chính và dự phòng của Gemini đều lỗi, hệ thống chuyển sang: ảnh (JPG/PNG, PDF scan) → Groq; văn bản (chat Vaulty, PDF có chữ) → nhà cung cấp chọn ở từng chức năng. Key đặt bằng biến môi trường GROQ_API_KEY / DEEPSEEK_API_KEY.",
+      "providers": {
+        "GROQ": "Groq",
+        "DEEPSEEK": "DeepSeek"
+      },
+      "toggle": "Dùng AI dự phòng khi Gemini lỗi",
+      "desc": {
+        "ASSISTANT": "Vaulty trả lời bằng nhà cung cấp dự phòng thay vì báo lỗi.",
+        "DEATH_CERTIFICATE_OCR": "Ảnh và PDF scan đọc bằng Groq (đọc được ảnh); PDF có chữ gửi phần chữ cho nhà cung cấp văn bản (không thấy con dấu, cần xem bản gốc).",
+        "CITIZEN_ID_OCR": "Ảnh CCCD đọc bằng Groq (DeepSeek không đọc được ảnh)."
+      },
+      "textProvider": "Nhà cung cấp văn bản",
+      "textModel": "Model văn bản",
+      "visionModel": "Model đọc ảnh (Groq)",
+      "noKey": "Chưa đặt key cho {{provider}} nên bước dự phòng này chưa chạy được.",
+      "modelsHint": "Danh sách model dự phòng lấy từ GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL và DEEPSEEK_ALLOWED_MODELS."
+    }
   }
 }

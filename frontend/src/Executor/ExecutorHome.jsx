@@ -6,7 +6,7 @@ import {getErrorMessage} from '../api/http.js';
 import {executorApi, caseStep} from '../api/executorApi.js';
 import AppHeader, {PAGE_WIDTH, PageTitle} from '../Common/AppHeader.jsx';
 import EmptyState from "../Common/EmptyState.jsx";
-import {formatDate} from '../i18n/format.js';
+import {formatDate, serverTime} from '../i18n/format.js';
 import { LoadingSkeleton } from '../Owner/ownerUi.jsx';
 
 const EXECUTOR = 'EXECUTOR';
@@ -79,7 +79,7 @@ function CaseCard({c, busy, onAcknowledge}) {
                         </p>
                     )}
                     {c.acknowledgeDeadlineAt && (() => {
-                        const msLeft = new Date(c.acknowledgeDeadlineAt) - new Date();
+                        const msLeft = serverTime(c.acknowledgeDeadlineAt) - Date.now();
                         return (
                             <p className={`text-sm mt-1 ${msLeft <= URGENT_MS ? 'text-error font-semibold' : 'text-on-surface-variant'}`}>
                                 {msLeft < 0

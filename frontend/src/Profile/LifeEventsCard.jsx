@@ -9,6 +9,7 @@ import { ownerApi, PROTECTION_CHANGED } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { useToast } from '../Common/Toast.jsx';
 import { Card, Alert, Icon, formatDate, btnPrimary } from '../Owner/ownerUi.jsx';
+import { serverTime } from '../i18n/format.js';
 
 // Mỗi sự kiện: biểu tượng + các việc gợi ý (key i18n -> đường dẫn; '#id' = cuộn tới thẻ trên trang Hồ sơ)
 const EVENTS = [
@@ -43,7 +44,7 @@ export default function LifeEventsCard() {
     // Tính "quá 6 tháng" ngay khi nhận dữ liệu (không gọi Date.now trong lúc render)
     const setDms = (d) => {
         setDmsState(d);
-        setOverdue(!d?.lastCheckinAt || Date.now() - new Date(d.lastCheckinAt).getTime() > SIX_MONTHS);
+        setOverdue(!d?.lastCheckinAt || Date.now() - serverTime(d.lastCheckinAt) > SIX_MONTHS);
     };
     const [selected, setSelected] = useState([]);
     const [busy, setBusy] = useState(false);

@@ -10,5 +10,14 @@ import jakarta.validation.constraints.Size;
 public record UpdateAiFeatureSettingRequest(
         @NotNull Boolean enabled,
         @Size(max = 100) String primaryModel,
-        @Size(max = 100) String backupModel) {
+        @Size(max = 100) String backupModel,
+        // AI dự phòng; fallbackEnabled null = giữ nguyên. Provider: GROQ | DEEPSEEK; trống = mặc định cấu hình.
+        Boolean fallbackEnabled,
+        @Size(max = 20) String textFallbackProvider,
+        @Size(max = 100) String textFallbackModel,
+        @Size(max = 100) String visionFallbackModel) {
+
+    public UpdateAiFeatureSettingRequest(Boolean enabled, String primaryModel, String backupModel) {
+        this(enabled, primaryModel, backupModel, null, null, null, null);
+    }
 }

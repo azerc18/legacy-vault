@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -67,6 +68,8 @@ class DmsEscalationIntegrationTest {
     @Autowired
     private DmsAutomationService dmsAutomationService;
     @Autowired
+    private com.ltld.app.legacyvault.service.adminoverviewservice.AdminNotificationService adminNotificationService;
+    @Autowired
     private DmsActivationProcessor processor;
     @Autowired
     private UserRepository userRepository;
@@ -83,6 +86,8 @@ class DmsEscalationIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
+    private jakarta.persistence.EntityManager entityManager;
+    @Autowired
     private TransactionTemplate transactionTemplate;
 
     // Mốc T0 = lúc quét kích hoạt; cắt về giây để so sánh với DATETIME của MySQL không lệch.
@@ -97,6 +102,10 @@ class DmsEscalationIntegrationTest {
             jdbcTemplate.update("DELETE FROM audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.detail')) LIKE ?",
                     "%ownerId=" + s.ownerId + "%");
             List<UUID> userIds = s.userIds();
+            // Audit "Admin gửi lại" (adminRetry_*) lấy Owner làm người thực hiện: xóa trước khi xóa user.
+            transactionTemplate.executeWithoutResult(tx -> entityManager
+                    .createQuery("DELETE FROM AuditLog l WHERE l.actor.id IN :ids")
+                    .setParameter("ids", userIds).executeUpdate());
             notificationRepository.deleteAll(notificationRepository.findAll().stream()
                     .filter(n -> userIds.contains(n.getRecipient().getId()))
                     .toList());
@@ -140,8 +149,8 @@ class DmsEscalationIntegrationTest {
         assertThat(n.getChannel()).isEqualTo(NotificationChannel.EMAIL);
         assertThat(n.getSentAt()).isEqualTo(T0);
         assertThat(notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(s.backupUserId)).isEmpty();
-        verify(executorNotificationService).send(eq(s.primaryEmail), anyString());
-        verify(executorNotificationService, never()).send(eq(s.backupEmail), anyString());
+        verify(executorNotificationService).sendExecutorActivated(eq(s.primaryEmail), any());
+        verify(executorNotificationService, never()).sendExecutorActivated(eq(s.backupEmail), any());
 
         assertThat(auditCount(s, AuditAction.DMS_TRIGGERED)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(1);
@@ -159,7 +168,7 @@ class DmsEscalationIntegrationTest {
         assertThat(backup(s).getStatus()).isEqualTo(ExecutorStatus.INACTIVE);
         assertThat(notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(s.primaryUserId)).isEmpty();
         assertThat(totalAuditCount(s)).isZero();
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     @Test
@@ -186,7 +195,7 @@ class DmsEscalationIntegrationTest {
         Notification n = activationNotification(s, s.backupUserId);
         assertThat(n.getStatus()).isEqualTo(NotificationStatus.SENT);
         assertThat(n.getSentAt()).isEqualTo(day14);
-        verify(executorNotificationService).send(eq(s.backupEmail), anyString());
+        verify(executorNotificationService).sendExecutorActivated(eq(s.backupEmail), any());
 
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(2);   // Primary ở T0 + Backup ở ngày 14
@@ -243,7 +252,7 @@ class DmsEscalationIntegrationTest {
     @Test
     void s6_mailAlwaysFails_dmsStillTriggeredAndEscalates14DaysAfterActivatedAt() {
         Seed s = seed(true, true, 14);
-        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).send(anyString(), anyString());
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
 
         dmsAutomationService.processOverdueDms(T0);
 
@@ -266,11 +275,53 @@ class DmsEscalationIntegrationTest {
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
     }
 
+    // B1 (Admin gửi lại): dòng FAILED của Primary còn ACTIVE -> dựng lại mail kích hoạt HTML (không gửi content thô)
+    @Test
+    void adminRetry_activePrimary_rebuildsActivationMail() {
+        Seed s = seed(true, true, 14);
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
+        dmsAutomationService.processOverdueDms(T0);
+        reset(executorNotificationService);   // mail hoạt động lại
+        UUID notificationId = pastCooldown(activationNotification(s, s.primaryUserId));
+
+        adminNotificationService.retry(s.ownerId, notificationId);
+
+        var mail = org.mockito.ArgumentCaptor.forClass(ExecutorNotificationService.ExecutorActivatedMail.class);
+        verify(executorNotificationService).sendExecutorActivated(eq(s.primaryEmail), mail.capture());
+        verify(executorNotificationService, never()).send(anyString(), anyString());
+        assertThat(mail.getValue().type()).isEqualTo(ExecutorType.PRIMARY);
+        assertThat(mail.getValue().waitDays()).isEqualTo(14);
+        assertThat(mail.getValue().acknowledgeBy()).isEqualTo(T0.plusDays(14));
+        assertThat(activationNotification(s, s.primaryUserId).getStatus()).isEqualTo(NotificationStatus.SENT);
+    }
+
+    // B1: Primary đã bị thu hồi (quá hạn BR-03) -> không gửi lại mail mời xác nhận, giữ nguyên lượt thử
+    @Test
+    void adminRetry_revokedPrimary_isRefusedWithoutSending() {
+        Seed s = seed(true, true, 14);
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
+        dmsAutomationService.processOverdueDms(T0);
+        dmsAutomationService.escalateUnresponsivePrimaries(T0.plusDays(14));
+        assertThat(primary(s).getStatus()).isEqualTo(ExecutorStatus.REVOKED);
+        reset(executorNotificationService);
+        Notification failed = activationNotification(s, s.primaryUserId);
+        int attempts = failed.getAttemptCount();
+        UUID notificationId = pastCooldown(failed);
+
+        assertThatThrownBy(() -> adminNotificationService.retry(s.ownerId, notificationId))
+                .isInstanceOf(com.ltld.app.legacyvault.exception.BusinessException.class)
+                .hasMessageContaining("no longer an active executor");
+
+        verifyNoInteractions(executorNotificationService);
+        assertThat(activationNotification(s, s.primaryUserId).getAttemptCount()).isEqualTo(attempts);
+        assertThat(activationNotification(s, s.primaryUserId).getStatus()).isEqualTo(NotificationStatus.FAILED);
+    }
+
     // Biến thể S6 của console cũ: gửi lại thành công thì đồng hồ BR-03 tính từ sentAt (lúc Primary thật sự được báo).
     @Test
     void s6b_mailRetrySucceedsOnDay1_escalationClockStartsFromSentAt() {
         Seed s = seed(true, true, 14);
-        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).send(anyString(), anyString());
+        doThrow(new IllegalStateException("SMTP down")).when(executorNotificationService).sendExecutorActivated(anyString(), any());
         dmsAutomationService.processOverdueDms(T0);
         reset(executorNotificationService);   // mail hoạt động lại
 
@@ -335,7 +386,7 @@ class DmsEscalationIntegrationTest {
         assertThat(auditCount(s, AuditAction.DMS_TRIGGERED)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.DMS_TRIGGERED_NO_EXECUTOR)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isZero();
-        verify(executorNotificationService, never()).send(anyString(), anyString());
+        verify(executorNotificationService, never()).sendExecutorActivated(anyString(), any());
     }
 
     // ---------- Bổ sung ngoài S1–S9 ----------
@@ -362,7 +413,8 @@ class DmsEscalationIntegrationTest {
         dmsAutomationService.processOverdueDms(T0);
         dmsAutomationService.processOverdueDms(T0);
         assertThat(dmsCheckinRepository.findAllByDmsConfigIdOrderByOccurredAtDesc(s.configId)).hasSize(1);
-        assertThat(notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(s.primaryUserId)).hasSize(1);
+        assertThat(notifications(s.primaryUserId, NotificationChannel.EMAIL)).hasSize(1);
+        assertThat(notifications(s.primaryUserId, NotificationChannel.IN_APP)).hasSize(1);   // chuông, không ghi trùng
         assertThat(auditCount(s, AuditAction.DMS_TRIGGERED)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(1);
         assertThat(executorRoleCount(s.primaryUserId)).isEqualTo(1);   // C2/T7
@@ -376,10 +428,11 @@ class DmsEscalationIntegrationTest {
 
         assertThat(primary(s).getVersion()).isEqualTo(primaryVersion);
         assertThat(backup(s).getVersion()).isEqualTo(backupVersion);
-        assertThat(notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(s.backupUserId)).hasSize(1);
+        assertThat(notifications(s.backupUserId, NotificationChannel.EMAIL)).hasSize(1);
+        assertThat(notifications(s.backupUserId, NotificationChannel.IN_APP)).hasSize(1);   // chuông, không ghi trùng
         assertThat(auditCount(s, AuditAction.EXECUTOR_REVOKE)).isEqualTo(1);
         assertThat(auditCount(s, AuditAction.EXECUTOR_ACTIVATED)).isEqualTo(2);
-        verify(executorNotificationService, times(1)).send(eq(s.backupEmail), anyString());
+        verify(executorNotificationService, times(1)).sendExecutorActivated(eq(s.backupEmail), any());
         assertThat(executorRoleCount(s.backupUserId)).isEqualTo(1);
     }
 
@@ -526,6 +579,17 @@ class DmsEscalationIntegrationTest {
 
     private ExecutorAssignment backup(Seed s) {
         return executorAssignmentRepository.findById(s.backupId).orElseThrow();
+    }
+
+    private java.util.List<Notification> notifications(UUID recipientId, NotificationChannel channel) {
+        return notificationRepository.findAllByRecipientIdOrderByCreatedAtDesc(recipientId).stream()
+                .filter(n -> n.getChannel() == channel).toList();
+    }
+
+    // Lần thử gần nhất lùi về trước thời gian chờ 1 phút của nút Gửi lại.
+    private UUID pastCooldown(Notification n) {
+        n.setLastAttemptAt(LocalDateTime.now().minusMinutes(5));
+        return notificationRepository.save(n).getId();
     }
 
     private Notification activationNotification(Seed s, UUID recipientId) {

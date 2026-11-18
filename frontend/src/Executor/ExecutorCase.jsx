@@ -9,7 +9,7 @@ import FilePicker from '../Common/FilePicker.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
 // Dùng lại thành phần giao diện chung của module Owner
 import { Card, Icon, Alert, formatDate, inputClass, btnPrimary, btnOutline, LoadingSkeleton } from '../Owner/ownerUi.jsx';
-import { tEnum } from '../i18n/format.js';
+import { serverTime, tEnum } from '../i18n/format.js';
 import { showBlobInTab, getBlobErrorMessage } from '../LegalVerifier/blobUtils.js';
 import EmptyState from "../Common/EmptyState.jsx";
 import VerificationBadge from '../Common/VerificationBadge.jsx';
@@ -184,7 +184,7 @@ function VaultList({ vaults, progress }) {
 function latestProgress(progress, vaultId) {
     return progress
         .filter((p) => p.vaultId === vaultId)
-        .sort((a, b) => new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0))[0];
+        .sort((a, b) => serverTime(b.requestedAt) - serverTime(a.requestedAt))[0];
 }
 
 /* ---------- FR-09: nộp giấy chứng tử + AI OCR ---------- */

@@ -6,6 +6,7 @@ import { ownerApi } from '../api/ownerApi.js';
 import { getErrorMessage } from '../api/http.js';
 import { OwnerLayout, Card, Icon, Alert, formatDate, humanize, inputClass, LoadingSkeleton } from './ownerUi.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
+import { serverTime } from '../i18n/format.js';
 
 // Nhật ký cấp Owner (FR-05): sự kiện DMS và Executor — không gắn với vault nào nên không có trong nhật ký từng vault.
 // F6: tab thứ hai "Ai đã xem di sản" (Executor / Beneficiary / Admin / Khẩn cấp xem hoặc tải), chữ ở namespace accessLog.
@@ -64,7 +65,7 @@ export default function OwnerActivity() {
             request = Promise.all([ownerApi.getOwnerActivityLogs(args), ownerApi.getEstateAccessLogs(args)])
                 .then(([dms, access]) => ({
                     merged: [...tag(dms, 'dms'), ...tag(access, 'access')]
-                        .sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt)),
+                        .sort((x, y) => serverTime(y.createdAt) - serverTime(x.createdAt)),
                     // Một nguồn còn dòng cũ hơn 100 dòng đã lấy: báo để Owner mở tab riêng xem tiếp
                     truncated: (dms?.totalElements ?? 0) > FETCH_SIZE || (access?.totalElements ?? 0) > FETCH_SIZE,
                 }));

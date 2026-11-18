@@ -199,4 +199,16 @@ class GeminiAiClientTest {
         assertThat(reply).isEqualTo("OK");
         server.verify();
     }
+
+    @Test
+    void chat_parsesJsonBody_evenWhenContentTypeIsOctetStream() {
+        // Gemini có lúc gắn Content-Type application/octet-stream cho body JSON: không được coi là lỗi
+        server.expect(requestTo(PRIMARY_URL))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"parts":[{"text":"Vẫn đọc được"}]}}],"usageMetadata":{"totalTokenCount":3}}
+                        """, MediaType.APPLICATION_OCTET_STREAM));
+
+        assertThat(client.chat("sys", List.of(new ChatMessage("user", "hi")))).isEqualTo("Vẫn đọc được");
+        server.verify();
+    }
 }

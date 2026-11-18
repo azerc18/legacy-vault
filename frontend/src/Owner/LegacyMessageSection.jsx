@@ -8,6 +8,7 @@ import FilePicker from '../Common/FilePicker.jsx';
 import EmptyState from '../Common/EmptyState.jsx';
 import { VipChip, VipLocked } from '../Common/VipLock.jsx';
 import { useVipStatus } from '../Common/useVipStatus.js';
+import { appDateKey } from '../i18n/format.js';
 
 const textareaCls = 'w-full mt-1 px-4 py-2.5 rounded-xl border border-outline-variant/40 dark:border-white/15 bg-surface-container-lowest dark:bg-[#131c31] text-on-surface dark:text-white placeholder:text-on-surface-variant/50 dark:placeholder:text-white/40 focus:outline-none focus:border-primary';
 
@@ -263,7 +264,7 @@ export default function LegacyMessageSection({ vaultId, beneficiaries = [], edit
                                     <div>
                                         <label className="block font-medium mb-1">{t('detail.messages.scheduleDateLabel')}</label>
                                         <input type="date" required className={`${inputClass} bg-surface-container-lowest dark:bg-[#131c31] border border-outline-variant/40 dark:border-white/15 text-on-surface dark:text-white`} value={deliverDate}
-                                            min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
+                                            min={appDateKey(new Date(Date.now() + 86400000))}
                                             onChange={(e) => setDeliverDate(e.target.value)} />
                                     </div>
                                 )}
