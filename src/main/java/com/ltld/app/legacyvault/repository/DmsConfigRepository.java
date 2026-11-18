@@ -33,4 +33,14 @@ public interface DmsConfigRepository extends JpaRepository<DmsConfig, UUID> {
 
     // Admin: lấy DMS của nhiều Owner trong 1 query (danh sách user có phân trang; FR-07/FR-14 tính hạn xác nhận)
     List<DmsConfig> findAllByOwnerIdIn(Collection<UUID> ownerIds);
+
+    // Trang Chính sách hệ thống: số DMS đang chạy có cấu hình nằm ngoài khoảng Admin cho phép (cấu hình cũ, chưa lưu lại)
+    @Query("SELECT COUNT(c) FROM DmsConfig c WHERE c.status IN :statuses AND ("
+            + "c.checkinIntervalDays < :intervalMin OR c.checkinIntervalDays > :intervalMax "
+            + "OR c.gracePeriodDays < :graceMin OR c.gracePeriodDays > :graceMax "
+            + "OR c.reminderCount < :reminderMin OR c.reminderCount > :reminderMax)")
+    long countRunningOutsidePolicy(@Param("statuses") Collection<DmsStatus> statuses,
+                                   @Param("intervalMin") int intervalMin, @Param("intervalMax") int intervalMax,
+                                   @Param("graceMin") int graceMin, @Param("graceMax") int graceMax,
+                                   @Param("reminderMin") int reminderMin, @Param("reminderMax") int reminderMax);
 }

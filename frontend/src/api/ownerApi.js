@@ -156,6 +156,8 @@ export const ownerApi = {
     /* ---------- Dead Man's Switch (FR-03 & X2) ---------- */
     // configured=false = chưa cấu hình (chỉ có hasUsableExecutor, các trường khác null)
     getDms: () => http.get('/dms').then(unwrap),
+    // Chính sách hệ thống: khoảng cho phép + giá trị gợi ý do Admin đặt -> { checkinIntervalDays: {min, defaultValue, max}, ... }
+    getDmsPolicy: () => http.get('/dms/policy').then(unwrap),
     // { checkinIntervalDays 1-365, gracePeriodDays 1-90, reminderCount 1-10 }
     saveDms: (config) => http.put('/dms', config).then(unwrap).then(changed),
     checkIn: () => http.post('/dms/check-in').then(unwrap),

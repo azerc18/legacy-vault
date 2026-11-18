@@ -22,6 +22,7 @@ import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -46,8 +47,6 @@ import java.util.function.Predicate;
 @RequiredArgsConstructor
 public class DmsConfigServiceImpl implements DmsConfigService {
 
-    // Giữ backupActivationWaitDays hiện có; cấu hình mới dùng BR-03 (14 ngày).
-    static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String SUSPENDED_MESSAGE = "The Dead Man's Switch has been suspended by an administrator. Please contact an admin.";
     static final String TOO_SOON_MESSAGE = "You checked in a moment ago. Please try again later.";
     static final String HANDOVER_STARTED_MESSAGE = "The Dead Man's Switch has started the handover process and cannot be changed.";
@@ -81,6 +80,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
     private final VaultRepository vaultRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
+    // Chính sách hệ thống: khoảng Admin cho phép + số ngày chờ Executor dự phòng của DMS mới
+    private final DmsPolicyService dmsPolicyService;
     private final DmsScheduleCalculator scheduleCalculator = new DmsScheduleCalculator();
 
     // Chống bấm check-in liên tục: lần check-in TRONG ỨNG DỤNG cách lần check-in trong ứng dụng trước chưa đủ số phút này
@@ -134,6 +135,8 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         if (existing != null && existing.getStatus() == DmsStatus.SUSPENDED) {
             throw new DmsException(SUSPENDED_MESSAGE, HttpStatus.CONFLICT);
         }
+        // Chính sách hệ thống: Admin có thể thu hẹp khoảng 1–365 / 1–90 / 1–10 của DmsConfigRequest
+        dmsPolicyService.requireWithinPolicy(request);
         // FR-03 precondition: có ít nhất 1 Vault.
         if (!vaultRepository.existsByOwnerId(ownerId)) {
             throw new DmsException("Create at least one vault before configuring the Dead Man's Switch.",
@@ -153,12 +156,15 @@ public class DmsConfigServiceImpl implements DmsConfigService {
         if (existing == null && (owner.getKycLevel() == null || owner.getKycLevel() == KycLevel.NONE)) {
             throw new DmsException(ErrorCode.KYC_REQUIRED, KYC_REQUIRED_MESSAGE);
         }
+        // BR-03: DMS bật mới lấy số ngày chờ Executor dự phòng của chính sách hiện tại (mặc định 14);
+        // DMS đã có giữ nguyên số ngày đã chốt lúc bật, Admin đổi chính sách không đổi lại cam kết cũ.
+        int policyBackupWait = dmsPolicyService.current().backupActivationWaitDays();
         DmsConfig config = existing != null ? existing : DmsConfig.builder()
                 .owner(owner)
-                .backupActivationWaitDays(DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS)
+                .backupActivationWaitDays(policyBackupWait)
                 .build();
         if (config.getBackupActivationWaitDays() == null) {
-            config.setBackupActivationWaitDays(DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS);
+            config.setBackupActivationWaitDays(policyBackupWait);
         }
 
         LocalDateTime now = LocalDateTime.now();

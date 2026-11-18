@@ -128,6 +128,12 @@ app:
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
       path-style: ${S3_PATH_STYLE:true}
+  # Trang Chính sách hệ thống (chỉ đọc): app KHÔNG tự sao lưu, sao lưu do hạ tầng làm (vd. Azure Database for MySQL).
+  # Khai báo ở đây để Admin biết; để trống thì trang hiện "Chưa khai báo".
+  backup:
+    provider: ${APP_BACKUP_PROVIDER:}
+    retention-days: ${APP_BACKUP_RETENTION_DAYS:}
+    note: ${APP_BACKUP_NOTE:}
   claim:
     # BR-04: số ngày Beneficiary có để nhận tài sản, tính từ lúc Vault UNLOCKED
     timeout-days: ${CLAIM_TIMEOUT_DAYS:60}

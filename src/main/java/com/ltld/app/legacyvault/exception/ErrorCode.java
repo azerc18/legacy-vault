@@ -126,7 +126,10 @@ public enum ErrorCode {
 
     // Cấu hình AI: Admin tắt chức năng / chọn model ngoài danh sách cho phép
     AI_FEATURE_DISABLED(HttpStatus.SERVICE_UNAVAILABLE),
-    AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST);
+    AI_MODEL_NOT_ALLOWED(HttpStatus.BAD_REQUEST),
+    // Chính sách hệ thống: Owner lưu DMS ngoài khoảng Admin cho phép / Admin lưu chính sách sai (min > max, ngoài giới hạn cứng)
+    DMS_POLICY_OUT_OF_RANGE(HttpStatus.BAD_REQUEST),
+    SYSTEM_POLICY_INVALID(HttpStatus.BAD_REQUEST);
 
     private final HttpStatus status;
 
