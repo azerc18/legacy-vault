@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { paymentApi } from '../api/paymentApi.js';
 import { getErrorMessage } from '../api/http.js';
+import { publishSubscription } from '../Common/useVipStatus.js';
 import { Alert, btnOutline, btnPrimary, formatDate, Icon, inputClass } from './ownerUi.jsx';
 
 // coupon: kết quả GET /payments/coupons/preview đang áp dụng (hoặc null). onApply(preview | null)
@@ -70,7 +71,10 @@ export function TrialBanner({ sub, onStarted }) {
     const start = async () => {
         setBusy(true); setError('');
         try {
-            onStarted(await paymentApi.startTrial());
+            const newSub = await paymentApi.startTrial();
+            // Như PaymentResultPage sau VNPay: ghi cache gói + báo header, cú Vaulty, ổ khoá VIP đổi ngay
+            if (newSub) publishSubscription(newSub);
+            onStarted(newSub);
         } catch (err) {
             setError(getErrorMessage(err, t('pricing.trial.error')));
         } finally {
