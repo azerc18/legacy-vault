@@ -3,14 +3,32 @@ import i18n from './index.js';
 const LOCALE = { en: 'en-GB', vi: 'vi-VN' };
 const locale = () => LOCALE[i18n.resolvedLanguage] || 'en-GB';
 
-// LocalDateTime "2026-10-16T10:30:00" hoặc Instant "...Z"
+// Ứng dụng luôn hiển thị giờ Việt Nam, kể cả khi trình duyệt đặt múi giờ khác.
+export const APP_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+// Ngày giờ có giờ nhưng không kèm múi giờ ("2026-10-16T10:30:00", LocalDateTime từ BE hoặc ô datetime-local).
+const NO_OFFSET = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+// Đọc mốc giờ từ BE thành Date. LocalDateTime của BE là giờ VN (UTC+7) nên gắn +07:00 thay vì để trình duyệt
+// tự hiểu theo múi giờ máy; Instant "...Z" giữ nguyên. Trả null nếu trống/không hợp lệ.
+export function parseServerDate(value) {
+    if (value == null || value === '') return null;
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+    const text = typeof value === 'string' && NO_OFFSET.test(value) ? `${value.replace(' ', 'T')}+07:00` : value;
+    const d = new Date(text);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Mili giây của mốc giờ BE (để so sánh/sắp xếp); 0 nếu trống.
+export const serverTime = (value) => parseServerDate(value)?.getTime() ?? 0;
+
+// LocalDateTime "2026-10-16T10:30:00" (giờ VN) hoặc Instant "...Z" -> chuỗi theo giờ VN
 export function formatDate(value, withTime = false) {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '—';
+    const d = parseServerDate(value);
+    if (!d) return '—';
     return withTime
-        ? d.toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })
-        : d.toLocaleDateString(locale(), { dateStyle: 'medium' });
+        ? d.toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: APP_TIME_ZONE })
+        : d.toLocaleDateString(locale(), { dateStyle: 'medium', timeZone: APP_TIME_ZONE });
 }
 
 // "VAULT_CREATED" -> "Vault created" (dùng làm chữ dự phòng khi chưa có bản dịch)

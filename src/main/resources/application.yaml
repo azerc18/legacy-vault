@@ -19,6 +19,9 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+    properties:
+      # DB luôn lưu giờ UTC, dù JVM chạy giờ VN (AppTimeZone) hay URL JDBC có serverTimezone hay không
+      hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
     locations: classpath:db/migration
