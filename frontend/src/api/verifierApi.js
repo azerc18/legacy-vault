@@ -71,6 +71,13 @@ export const sendMessage = (id, content, file) => {
 export const getAttachmentBlob = (id, messageId) =>
     http.get(`${BASE}/${id}/messages/${messageId}/attachment`, { responseType: 'blob' });
 
+// V2: đọc chữ ký số nhúng trong giấy chứng tử PDF (chỉ tham khảo, không ghi tiến độ)
+// -> { documentKind: PDF|IMAGE|OTHER, overall: NO_SIGNATURE|ALL_VALID|HAS_INVALID|HAS_UNVERIFIED|NOT_PDF|UNREADABLE,
+//      signatureCount, signatures: [{ fieldName, subFilter, signerName, signerOrganization, issuer, serialNumber,
+//      signedAt, certificateNotBefore, certificateNotAfter, digestAlgorithm, reason, location,
+//      integrityValid, coversWholeDocument, certificateValidAtSigning, selfSigned, problem }] }
+export const inspectDocumentSignatures = (id) => http.post(`${BASE}/${id}/document/signatures`).then(unwrap);
+
 // V3: chữ ký xác nhận + kết quả kiểm lại ngay lúc gọi (chỉ hồ sơ SIGNED, chỉ verifier đã ký)
 // -> { status: VALID|INVALID|DOCUMENT_UNAVAILABLE|LEGACY, signatureValid, payloadMatches, documentMatches,
 //      documentSha256, currentDocumentSha256, algorithm, keyRef, keyFingerprint, publicKeyPem,

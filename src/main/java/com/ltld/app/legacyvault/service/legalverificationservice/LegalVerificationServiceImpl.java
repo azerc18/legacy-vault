@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
+import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
@@ -106,6 +107,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final ReviewProgressRecorder progressRecorder;
     private final VerifierAccessGuard verifierAccessGuard;
     private final VaultBeneficiaryRepository beneficiaryRepository;
+    private final PdfSignatureInspector pdfSignatureInspector;
     private final VerifierSignatureSealService signatureSealService;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
@@ -169,6 +171,22 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             log.error("Death certificate read/decrypt failed for request {}", requestId, e);
             throw new IllegalStateException("Could not read the document. Please try again later.");
         }
+    }
+
+    // V2: đọc chữ ký số nhúng trong giấy chứng tử PDF. Cùng điều kiện với "Xem": hồ sơ PENDING phải Check trước.
+    // Chỉ để tham khảo, không ghi tiến độ duyệt, không tự duyệt/từ chối.
+    // Cố ý KHÔNG @Transactional: đọc file qua mạng + parse PDF không nên giữ kết nối DB (review #295 n1);
+    // requireReadable / progressOf là các lệnh đọc riêng lẻ, mỗi lệnh tự mở transaction ngắn.
+    @Override
+    public PdfSignatureReportDto inspectDocumentSignatures(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
+        if (request.getStatus() == LegalVerificationStatus.PENDING) {
+            VerificationReviewProgress progress = progressOf(requestId, verifierId);
+            if (progress == null || progress.getCheckedAt() == null) {
+                throw new VerificationStepRequiredException("Please check the document before reading its signatures.");
+            }
+        }
+        return pdfSignatureInspector.inspect(requestId, readDecryptedDocument(request, requestId));
     }
 
     // D1: Verifier xem giấy chứng tử
