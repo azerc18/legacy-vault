@@ -16,6 +16,7 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import com.ltld.app.legacyvault.service.dmsservice.DmsActivationProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -40,7 +41,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ExecutorInvitationServiceImpl implements ExecutorInvitationService {
 
-    static final int DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS = 14;
     static final String NOT_FOUND_MESSAGE = "Executor invitation not found.";
     static final String CLOSED_MESSAGE =
             "This invitation has already been answered or was withdrawn by the owner.";
@@ -56,6 +56,8 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
     private final ExecutorInvitationPolicy invitationPolicy;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    // Owner chưa bật DMS: lời mời hiện số ngày chờ của chính sách hiện tại (DMS bật sau sẽ chốt đúng số này)
+    private final DmsPolicyService dmsPolicyService;
 
     @Override
     @Transactional(readOnly = true)
@@ -186,7 +188,7 @@ public class ExecutorInvitationServiceImpl implements ExecutorInvitationService 
                 .assignedAt(a.getAssignedAt() != null ? a.getAssignedAt() : a.getCreatedAt())
                 .respondedAt(a.getRespondedAt())
                 .invitationExpiresAt(a.getInvitationExpiresAt())
-                .backupActivationWaitDays(waitDays != null ? waitDays : DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS)
+                .backupActivationWaitDays(waitDays != null ? waitDays : dmsPolicyService.current().backupActivationWaitDays())
                 .canRespond(!handoverStarted && !expired && a.getStatus() != ExecutorStatus.REVOKED
                         && a.getResponseStatus() == ExecutorResponseStatus.PENDING)
                 .build();

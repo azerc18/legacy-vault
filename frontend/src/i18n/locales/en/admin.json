@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked", "aiSettings": "AI settings" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked", "aiSettings": "AI settings", "systemPolicies": "Policies" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -443,6 +443,91 @@
       "visionModel": "Image model (Groq)",
       "noKey": "No key is set for {{provider}}, so this fallback step cannot run yet.",
       "modelsHint": "Fallback models come from GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL and DEEPSEEK_ALLOWED_MODELS. Image models are only GROQ_VISION_MODEL and GROQ_VISION_ALLOWED_MODELS."
+    }
+  },
+  "systemPolicies": {
+    "title": "System policies",
+    "subtitle": "Defaults and limits for the Dead Man's Switch, plus how the system encrypts, stores and backs up data.",
+    "loadError": "Could not load the system policies.",
+    "saveError": "Could not save the policy.",
+    "saved": "Dead Man's Switch policy saved.",
+    "save": "Save policy",
+    "reset": "Restore defaults",
+    "updated": "Last changed {{when}} by {{who}}",
+    "neverUpdated": "Never changed, using the system defaults.",
+    "auditHint": "Every save is written to the Audit log (SYSTEM_POLICY_UPDATED) with the values before and after.",
+    "dms": {
+      "title": "Dead Man's Switch",
+      "appliesNext": "Applies from the next save",
+      "desc": "The range owners may choose and the value pre-filled on their form. You can only narrow it within the system limits.",
+      "setting": "Setting",
+      "min": "Minimum",
+      "defaultValue": "Suggested",
+      "max": "Maximum",
+      "hardLimit": "System limit {{min}}–{{max}}",
+      "backupHint": "Days the primary executor has to submit evidence before the backup executor takes over (1–{{max}}).",
+      "fields": {
+        "checkinIntervalDays": "Check-in interval (days)",
+        "gracePeriodDays": "Grace period after the due date (days)",
+        "reminderCount": "Number of reminders",
+        "backupActivationWaitDays": "Wait before backup executor (days)"
+      },
+      "errors": {
+        "notInteger": "Enter a whole number.",
+        "outsideHard": "Must be within {{min}}–{{max}}.",
+        "minAboveMax": "The minimum is greater than the maximum.",
+        "defaultOutside": "The suggested value must be between the minimum and the maximum."
+      },
+      "outside_one": "{{count}} running Dead Man's Switch has a setting outside this range. It keeps running as is; when the owner saves it again they must pick a value in range.",
+      "outside_other": "{{count}} running Dead Man's Switches have settings outside this range. They keep running as is; when an owner saves again they must pick a value in range.",
+      "impactPending": "Counting the affected Dead Man's Switches…",
+      "impactNone": "If you save: no running Dead Man's Switch falls outside the new range.",
+      "impact_one": "If you save: {{count}} running Dead Man's Switch will be outside the new range. It keeps running as is; when the owner saves it again they must pick a value in range.",
+      "impact_other": "If you save: {{count}} running Dead Man's Switches will be outside the new range. They keep running as is; when an owner saves again they must pick a value in range.",
+      "impactError": "Could not count the affected Dead Man's Switches. You can still save; the number appears after saving.",
+      "noteOwner": "Owners see the new range on their Dead Man's Switch form right away (at most 30 seconds after saving).",
+      "noteRunning": "No running Dead Man's Switch is changed or stopped.",
+      "noteBackup": "The backup executor wait only applies to newly enabled switches; existing ones keep the value they started with."
+    },
+    "info": {
+      "loadError": "Could not load the encryption, storage and backup details.",
+      "set": "Set",
+      "notSet": "Not set",
+      "separate": "Separate key",
+      "derived": "Derived from master key",
+      "yes": "Yes",
+      "no": "No",
+      "schemaVersion": "Database version",
+      "crypto": {
+        "title": "Encryption",
+        "data": "Data and files",
+        "masterKey": "Master key",
+        "password": "Passwords",
+        "otp": "OTP codes",
+        "otpKey": "OTP hashing key",
+        "identityKey": "ID number hashing key",
+        "hint": "Keys are only set through environment variables (CRYPTO_MASTER_KEY, OTP_HMAC_KEY, IDENTITY_HMAC_KEY); this page never shows a key."
+      },
+      "storage": {
+        "title": "File storage",
+        "provider": "Stored on",
+        "providers": {
+          "local": "Server disk",
+          "s3": "Object storage (S3 / R2)"
+        },
+        "bucket": "Bucket",
+        "encrypted": "Encrypted before storing",
+        "hint": "Change it with APP_STORAGE_PROVIDER and S3_*; the endpoint is hidden because it contains the account id."
+      },
+      "backup": {
+        "title": "Database backup",
+        "provider": "By",
+        "retention": "Kept for",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "notDeclared": "Not declared",
+        "hint": "The app does not back itself up; the infrastructure does (e.g. Azure Database for MySQL). Declare it with APP_BACKUP_PROVIDER, APP_BACKUP_RETENTION_DAYS, APP_BACKUP_NOTE."
+      }
     }
   }
 }

@@ -36,6 +36,7 @@ class DmsControllerSecurityTest {
 
     @Autowired private MockMvc mockMvc;
     @MockitoBean private DmsConfigService dmsConfigService;
+    @MockitoBean private com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService dmsPolicyService;
     @MockitoBean private JwtDecoder jwtDecoder; // SecurityConfig cần có JwtDecoder
 
     private static RequestPostProcessor token(String... authorities) {

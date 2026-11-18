@@ -1,6 +1,6 @@
 {
   "workspace": "Quản trị",
-  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa", "aiSettings": "Cấu hình AI" },
+  "nav": { "users": "Người dùng", "roles": "Vai trò", "vaults": "Kho", "auditLogs": "Nhật ký", "alerts": "Cảnh báo", "overview": "Tổng quan", "payments": "Thanh toán", "revenue": "Doanh thu", "plans": "Gói", "notifications": "Email lỗi", "beneficiaryLocks": "Người bị khóa", "aiSettings": "Cấu hình AI", "systemPolicies": "Chính sách" },
   "loading": "Đang tải...",
   "wait": "Vui lòng chờ...",
   "search": "Tìm",
@@ -429,6 +429,91 @@
       "visionModel": "Model đọc ảnh (Groq)",
       "noKey": "Chưa đặt key cho {{provider}} nên bước dự phòng này chưa chạy được.",
       "modelsHint": "Danh sách model dự phòng lấy từ GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL và DEEPSEEK_ALLOWED_MODELS. Model đọc ảnh chỉ gồm GROQ_VISION_MODEL và GROQ_VISION_ALLOWED_MODELS."
+    }
+  },
+  "systemPolicies": {
+    "title": "Chính sách hệ thống",
+    "subtitle": "Mặc định và giới hạn cấu hình Dead Man's Switch, cùng thông tin mã hoá, lưu trữ và sao lưu của hệ thống.",
+    "loadError": "Không tải được chính sách hệ thống.",
+    "saveError": "Không lưu được chính sách.",
+    "saved": "Đã lưu chính sách Dead Man's Switch.",
+    "save": "Lưu chính sách",
+    "reset": "Khôi phục mặc định",
+    "updated": "Sửa lần cuối {{when}} bởi {{who}}",
+    "neverUpdated": "Chưa ai sửa, đang dùng mặc định của hệ thống.",
+    "auditHint": "Mỗi lần lưu được ghi vào Nhật ký (SYSTEM_POLICY_UPDATED), kèm giá trị trước và sau.",
+    "dms": {
+      "title": "Dead Man's Switch",
+      "appliesNext": "Áp dụng từ lần lưu kế tiếp",
+      "desc": "Khoảng Owner được chọn và giá trị gợi ý sẵn trên form của Owner. Bạn chỉ thu hẹp được trong giới hạn hệ thống.",
+      "setting": "Thiết lập",
+      "min": "Tối thiểu",
+      "defaultValue": "Gợi ý",
+      "max": "Tối đa",
+      "hardLimit": "Giới hạn hệ thống {{min}}–{{max}}",
+      "backupHint": "Số ngày Executor chính có để nộp hồ sơ trước khi chuyển sang Executor dự phòng (1–{{max}}).",
+      "fields": {
+        "checkinIntervalDays": "Chu kỳ check-in (ngày)",
+        "gracePeriodDays": "Thời gian chờ sau hạn (ngày)",
+        "reminderCount": "Số lần nhắc",
+        "backupActivationWaitDays": "Chờ Executor dự phòng (ngày)"
+      },
+      "errors": {
+        "notInteger": "Nhập số nguyên.",
+        "outsideHard": "Phải nằm trong {{min}}–{{max}}.",
+        "minAboveMax": "Tối thiểu đang lớn hơn tối đa.",
+        "defaultOutside": "Giá trị gợi ý phải nằm giữa tối thiểu và tối đa."
+      },
+      "outside_one": "{{count}} Dead Man's Switch đang chạy có cấu hình nằm ngoài khoảng này. Nó vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "outside_other": "{{count}} Dead Man's Switch đang chạy có cấu hình nằm ngoài khoảng này. Chúng vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impactPending": "Đang tính số Dead Man's Switch bị ảnh hưởng…",
+      "impactNone": "Nếu lưu: không Dead Man's Switch đang chạy nào nằm ngoài khoảng mới.",
+      "impact_one": "Nếu lưu: {{count}} Dead Man's Switch đang chạy sẽ nằm ngoài khoảng mới. Nó vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impact_other": "Nếu lưu: {{count}} Dead Man's Switch đang chạy sẽ nằm ngoài khoảng mới. Chúng vẫn chạy bình thường; khi Owner lưu lại cấu hình thì phải chọn giá trị trong khoảng.",
+      "impactError": "Không tính được số Dead Man's Switch bị ảnh hưởng. Bạn vẫn lưu được; con số sẽ hiện sau khi lưu.",
+      "noteOwner": "Owner thấy khoảng mới ngay trên form Dead Man's Switch (tối đa 30 giây sau khi lưu).",
+      "noteRunning": "Không sửa và không dừng Dead Man's Switch nào đang chạy.",
+      "noteBackup": "Số ngày chờ Executor dự phòng chỉ áp dụng cho Dead Man's Switch bật mới; cái đã bật giữ số đã chốt."
+    },
+    "info": {
+      "loadError": "Không tải được thông tin mã hoá, lưu trữ và sao lưu.",
+      "set": "Đã đặt",
+      "notSet": "Chưa đặt",
+      "separate": "Khoá riêng",
+      "derived": "Suy ra từ khoá chính",
+      "yes": "Có",
+      "no": "Không",
+      "schemaVersion": "Phiên bản CSDL",
+      "crypto": {
+        "title": "Mã hoá",
+        "data": "Dữ liệu và tệp",
+        "masterKey": "Khoá chính",
+        "password": "Mật khẩu",
+        "otp": "Mã OTP",
+        "otpKey": "Khoá băm OTP",
+        "identityKey": "Khoá băm CCCD",
+        "hint": "Khoá chỉ đặt bằng biến môi trường (CRYPTO_MASTER_KEY, OTP_HMAC_KEY, IDENTITY_HMAC_KEY), trang này không bao giờ hiện giá trị khoá."
+      },
+      "storage": {
+        "title": "Lưu trữ tệp",
+        "provider": "Nơi lưu",
+        "providers": {
+          "local": "Ổ đĩa máy chủ",
+          "s3": "Object storage (S3 / R2)"
+        },
+        "bucket": "Bucket",
+        "encrypted": "Mã hoá trước khi lưu",
+        "hint": "Đổi nơi lưu bằng APP_STORAGE_PROVIDER và S3_*; không hiện endpoint vì có mã tài khoản."
+      },
+      "backup": {
+        "title": "Sao lưu CSDL",
+        "provider": "Do",
+        "retention": "Giữ bản sao lưu",
+        "days_one": "{{count}} ngày",
+        "days_other": "{{count}} ngày",
+        "notDeclared": "Chưa khai báo",
+        "hint": "Ứng dụng không tự sao lưu; hạ tầng (vd. Azure Database for MySQL) làm việc này. Khai báo bằng APP_BACKUP_PROVIDER, APP_BACKUP_RETENTION_DAYS, APP_BACKUP_NOTE."
+      }
     }
   }
 }

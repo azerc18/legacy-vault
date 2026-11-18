@@ -88,5 +88,7 @@
   "IDENTITY_LOCKED": "The Dead Man's Switch is being activated, so identity details cannot be changed.",
   "IDENTITY_OCR_UNAVAILABLE": "The card photo cannot be read right now. Scan the QR code or enter the details manually.",
   "AI_FEATURE_DISABLED": "This AI feature is turned off by the administrator.",
-  "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model."
+  "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model.",
+  "DMS_POLICY_OUT_OF_RANGE": "A value is outside the range allowed by an admin (it may have just changed). Check the limits under each field and save again.",
+  "SYSTEM_POLICY_INVALID": "Invalid policy: it needs minimum ≤ suggested ≤ maximum, within the system limits."
 }

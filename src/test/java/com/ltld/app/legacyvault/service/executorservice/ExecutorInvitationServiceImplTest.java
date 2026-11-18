@@ -19,7 +19,9 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.RoleRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,6 +65,7 @@ class ExecutorInvitationServiceImplTest {
     @Mock private RoleRepository roleRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private DmsPolicyService dmsPolicyService;
 
     private ExecutorInvitationServiceImpl service;
 
@@ -77,7 +80,10 @@ class ExecutorInvitationServiceImplTest {
         // ExecutorRoleManager thật dựng từ mock, để kiểm tra việc gỡ role EXECUTOR khi từ chối.
         service = new ExecutorInvitationServiceImpl(executorAssignmentRepository, dmsConfigRepository, userRepository,
                 new ExecutorRoleManager(roleRepository, executorAssignmentRepository), new ExecutorInvitationPolicy(7, 3),
-                auditLogService, eventPublisher);
+                auditLogService, eventPublisher, dmsPolicyService);
+        // Chính sách hệ thống: Admin đổi số ngày chờ Executor dự phòng thành 21 (mặc định 14)
+        when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21));
 
         ownerId = UUID.randomUUID();
         execId = UUID.randomUUID();
@@ -176,9 +182,8 @@ class ExecutorInvitationServiceImplTest {
         assertThat(res.getExecutorType()).isEqualTo(ExecutorType.PRIMARY);
         assertThat(res.getResponseStatus()).isEqualTo(ExecutorResponseStatus.PENDING);
         assertThat(res.isCanRespond()).isTrue();
-        // Owner chưa cấu hình DMS -> dùng mặc định BR-03 (14 ngày) cho câu mô tả trách nhiệm
-        assertThat(res.getBackupActivationWaitDays())
-                .isEqualTo(ExecutorInvitationServiceImpl.DEFAULT_BACKUP_ACTIVATION_WAIT_DAYS);
+        // Owner chưa cấu hình DMS -> dùng số ngày chờ của chính sách hệ thống hiện tại cho câu mô tả trách nhiệm
+        assertThat(res.getBackupActivationWaitDays()).isEqualTo(21);
     }
 
     @Test

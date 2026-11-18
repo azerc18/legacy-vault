@@ -21,7 +21,9 @@ import com.ltld.app.legacyvault.repository.DmsConfigRepository;
 import com.ltld.app.legacyvault.repository.ExecutorAssignmentRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
 import com.ltld.app.legacyvault.repository.VaultRepository;
+import com.ltld.app.legacyvault.dto.systempolicydto.DmsPolicy;
 import com.ltld.app.legacyvault.service.auditservice.AuditLogService;
+import com.ltld.app.legacyvault.service.systempolicyservice.DmsPolicyService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,6 +62,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -76,6 +79,7 @@ class DmsConfigServiceImplTest {
     @Mock private VaultRepository vaultRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService auditLogService;
+    @Mock private DmsPolicyService dmsPolicyService;
 
     @InjectMocks
     private DmsConfigServiceImpl service;
@@ -106,6 +110,8 @@ class DmsConfigServiceImplTest {
             return c;
         });
         when(dmsCheckinRepository.saveAndFlush(any(DmsCheckin.class))).thenAnswer(inv -> inv.getArgument(0));
+        // Chính sách hệ thống mặc định (= các số trước đây viết cứng: chờ Executor dự phòng 14 ngày)
+        when(dmsPolicyService.current()).thenReturn(DmsPolicy.DEFAULTS);
         // FR-03: mặc định Owner đã có Primary, để bật DMS / mở lại DMS được phép.
         executors(executor(ExecutorType.PRIMARY, ExecutorStatus.INACTIVE));
     }
@@ -251,6 +257,43 @@ class DmsConfigServiceImplTest {
         order.verify(dmsCheckinRepository).saveAndFlush(any(DmsCheckin.class));
         order.verify(auditLogService).log(eq(AuditAction.DMS_CONFIGURED), any(), any(), any(), any(), any(), any(),
                 anyString());
+    }
+
+    @Test
+    @DisplayName("Chính sách hệ thống: DMS bật mới lấy số ngày chờ Executor dự phòng Admin đặt (21 thay vì 14)")
+    void upsert_newConfig_takesBackupWaitFromPolicy() {
+        when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 21));
+
+        service.upsertConfig(ownerId, request(30, 7, 3));
+
+        assertThat(savedConfig().getBackupActivationWaitDays()).isEqualTo(21);
+    }
+
+    @Test
+    @DisplayName("Chính sách hệ thống: DMS đã có giữ số ngày chờ đã chốt dù Admin đổi chính sách")
+    void upsert_existingConfig_keepsItsBackupWait() {
+        existingConfig(DmsStatus.ACTIVE);   // đã chốt 21 ngày
+        when(dmsPolicyService.current()).thenReturn(new DmsPolicy(DmsPolicy.HARD_CHECKIN_INTERVAL,
+                DmsPolicy.HARD_GRACE_PERIOD, DmsPolicy.HARD_REMINDER_COUNT, 30));
+
+        service.upsertConfig(ownerId, request(30, 7, 3));
+
+        assertThat(savedConfig().getBackupActivationWaitDays()).isEqualTo(21);
+    }
+
+    @Test
+    @DisplayName("Chính sách hệ thống: giá trị ngoài khoảng Admin cho phép -> lỗi DMS_POLICY_OUT_OF_RANGE, không lưu, không audit")
+    void upsert_outsidePolicy_rejectedBeforeSaving() {
+        DmsConfigRequest req = request(200, 7, 3);
+        doThrow(new DmsException(ErrorCode.DMS_POLICY_OUT_OF_RANGE, "Check-in interval must be between 7 and 180 days"))
+                .when(dmsPolicyService).requireWithinPolicy(req);
+
+        assertThatThrownBy(() -> service.upsertConfig(ownerId, req))
+                .isInstanceOf(DmsException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.DMS_POLICY_OUT_OF_RANGE);
+        verify(dmsConfigRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(auditLogService);
     }
 
     @Test
