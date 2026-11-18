@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
@@ -24,6 +25,7 @@ import com.ltld.app.legacyvault.enums.VaultStatus;
 import com.ltld.app.legacyvault.event.VaultsUnlockedEvent;
 import com.ltld.app.legacyvault.event.VerificationRequestDecidedEvent;
 import com.ltld.app.legacyvault.exception.ConflictOfInterestException;
+import com.ltld.app.legacyvault.exception.BusinessException;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.InvalidDateRangeException;
 import com.ltld.app.legacyvault.exception.InvalidSignCodeException;
@@ -104,6 +106,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final ReviewProgressRecorder progressRecorder;
     private final VerifierAccessGuard verifierAccessGuard;
     private final VaultBeneficiaryRepository beneficiaryRepository;
+    private final VerifierSignatureSealService signatureSealService;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -436,6 +439,9 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
                         requestId, verifierId, dto.getMethod(),
                         request.getDeathCertificateFileUrlEncrypted()))
                 .build();
+        // V3: ký ECDSA lên mã băm giấy chứng tử + thông tin hồ sơ để sau này kiểm lại được
+        signatureSealService.seal(signature, request, emailOf(verifierId),
+                links.stream().map(l -> l.getVault().getId()).toList());
         signatureRepository.save(signature);
 
         // Mở khóa từng Vault, đặt hạn nhận 60 ngày (BR-04), ghi audit mỗi vault
@@ -470,6 +476,19 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         log.info("FR-14: Published VaultsUnlockedEvent for request {} with vaults {}", requestId, unlockedVaultIds);
 
         return toDto(request);
+    }
+
+    // V3: xem và kiểm lại chữ ký xác nhận của hồ sơ đã ký (chỉ verifier đã ký, guard như xem hồ sơ)
+    @Override
+    @Transactional(readOnly = true)
+    public VerifierSignatureDto getSignature(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
+        if (request.getStatus() != LegalVerificationStatus.SIGNED) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "This request has not been signed yet.");
+        }
+        DigitalSignature signature = signatureRepository.findByRequestId(requestId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Signature not found for this request."));
+        return signatureSealService.check(signature);
     }
 
     // UC15: lịch sử hồ sơ đã xử lý, lọc tùy chọn theo trạng thái và khoảng ngày
