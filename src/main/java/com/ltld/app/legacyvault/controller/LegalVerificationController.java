@@ -1,6 +1,7 @@
 package com.ltld.app.legacyvault.controller;
 
 import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectionReasonDto;
@@ -153,6 +154,15 @@ public class LegalVerificationController {
             @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Document signatures inspected", service.inspectDocumentSignatures(id, verifierId(jwt))));
+    }
+
+    // V3: chữ ký xác nhận + kết quả kiểm lại (chữ ký ECDSA, nội dung, mã băm giấy chứng tử)
+    @GetMapping("/{id}/signature")
+    public ResponseEntity<ApiResponse<VerifierSignatureDto>> getSignature(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Signature retrieved", service.getSignature(id, verifierId(jwt))));
     }
 
     // userId nằm ở claim "sub" của token

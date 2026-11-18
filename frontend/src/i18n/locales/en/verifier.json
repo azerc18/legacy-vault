@@ -168,7 +168,7 @@
     "signUnlock": "Sign and unlock vault(s)",
     "codeSent": "A 6-digit code has been sent to your email. It expires in 5 minutes.",
     "signedTitle": "Signed successfully",
-    "signedText": "The vault(s) have been unlocked for the beneficiaries.",
+    "signedText": "The vault(s) have been unlocked for the beneficiaries. The confirmation signature and its check are in the \"Confirmation signature\" card.",
     "rejectedTitle": "This request has been rejected",
     "reason": "Reason: {{reason}}",
     "recorded": "Your decision will be recorded in the system history.",
@@ -251,6 +251,59 @@
       "UNVERIFIABLE": "The ID number on the document cannot be checked",
       "OWNER_NOT_VERIFIED": "Owner has not verified an ID; name check only"
     }
+  },
+  "seal": {
+    "title": "Confirmation signature",
+    "checking": "Checking...",
+    "recheck": "Check again",
+    "loadError": "Could not load the confirmation signature.",
+    "status": {
+      "VALID": {
+        "title": "Signature is valid",
+        "text": "The signature matches LegacyVault's public key, the signed content refers to this request, and the death certificate has not changed since signing."
+      },
+      "INVALID": {
+        "title": "Signature is NOT valid",
+        "text": "At least one check below failed. The request or the document may have been changed after signing. Please tell an administrator."
+      },
+      "DOCUMENT_UNAVAILABLE": {
+        "title": "Signature is correct, document not compared yet",
+        "text": "The death certificate could not be read from storage to compare its hash. Please check again later."
+      },
+      "LEGACY": {
+        "title": "Older signature",
+        "text": "This request was signed before ECDSA signatures existed, so it only has the old hash and cannot be re-checked."
+      }
+    },
+    "check": {
+      "signature": "ECDSA signature",
+      "payload": "Content matches request",
+      "document": "Death certificate unchanged",
+      "ok": "Passed",
+      "fail": "Failed",
+      "unknown": "Not checked"
+    },
+    "signedBy": "Signed by",
+    "signedAt": "Signed at",
+    "method": "Authentication used",
+    "algorithm": "Algorithm · key",
+    "fingerprint": "Public key fingerprint (SHA-256)",
+    "documentHash": "Death certificate hash at signing (SHA-256)",
+    "currentDocumentHash": "Current death certificate hash",
+    "legacyHash": "Old hash",
+    "methods": {
+      "MOCK_OTP": "One-time code sent by email",
+      "MOCK_PIN": "PIN"
+    },
+    "technical": "Technical details (for independent checks)",
+    "technicalHint": "Anyone with the three parts below can check the signature without LegacyVault.",
+    "payload": "Signed content (payload)",
+    "signatureValue": "Signature (Base64, DER)",
+    "publicKey": "Public key (PEM)",
+    "copy": "Copy",
+    "copied": "Copied",
+    "opensslHint": "Check with OpenSSL: save the payload as payload.txt (exact characters, LF line endings, no trailing newline; on Windows avoid Notepad, which may switch to CRLF), the signature as sig.b64 and the public key as public.pem, then run:",
+    "disclaimer": "This signature is issued by LegacyVault (the system's ECDSA P-256 key). It is not a digital signature backed by a licensed CA certificate."
   },
   "pdfSig": {
     "overall": {
