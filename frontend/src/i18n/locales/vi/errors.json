@@ -90,5 +90,15 @@
   "AI_FEATURE_DISABLED": "Chức năng AI này đang được quản trị viên tắt.",
   "AI_MODEL_NOT_ALLOWED": "Model không hợp lệ: chọn model trong danh sách và khác model chính.",
   "DMS_POLICY_OUT_OF_RANGE": "Giá trị nằm ngoài khoảng Admin cho phép (có thể vừa được đổi). Xem lại giới hạn dưới mỗi ô rồi lưu lại.",
-  "SYSTEM_POLICY_INVALID": "Chính sách không hợp lệ: cần tối thiểu ≤ gợi ý ≤ tối đa và nằm trong giới hạn hệ thống."
+  "SYSTEM_POLICY_INVALID": "Chính sách không hợp lệ: cần tối thiểu ≤ gợi ý ≤ tối đa và nằm trong giới hạn hệ thống.",
+  "EXECUTOR_ACCOUNT_NOT_FOUND": "Email này chưa có tài khoản LegacyVault đã xác minh. Người thi hành cần đăng ký và xác minh tài khoản trước.",
+  "EXECUTOR_SELF_ASSIGN": "Bạn không thể tự chọn mình làm người thi hành.",
+  "EXECUTOR_IS_CONFIRMER": "Người này đang là người xác nhận tin cậy của bạn nên không thể đồng thời làm người thi hành.",
+  "EXECUTOR_SAME_PERSON": "Người này đã là người thi hành ở vị trí còn lại. Người thi hành chính và dự phòng phải là hai người khác nhau.",
+  "EXECUTOR_SLOT_TAKEN": "Vị trí này đã có người thi hành. Bạn có muốn thay bằng người mới không?",
+  "EXECUTOR_NOT_ASSIGNED": "Vị trí này chưa có người thi hành để thu hồi.",
+  "EXECUTOR_HANDOVER_STARTED": "Dead Man's Switch đã bắt đầu quy trình bàn giao nên không thể thay đổi người thi hành.",
+  "EXECUTOR_LAST_REVOKE": "Không thể thu hồi người thi hành cuối cùng khi Dead Man's Switch đang bật. Hãy chỉ định người thay thế trước.",
+  "EXECUTOR_LAST_REPLACE": "Không thể thay người thi hành cuối cùng khi Dead Man's Switch đang bật vì người mới chưa nhận lời. Hãy thêm người thi hành dự phòng, chờ họ nhận lời rồi mới thay.",
+  "EXECUTOR_SLOT_CHANGED": "Vị trí người thi hành vừa được cập nhật ở nơi khác. Vui lòng tải lại trang và thử lại."
 }

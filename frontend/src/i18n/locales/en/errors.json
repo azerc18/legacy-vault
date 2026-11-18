@@ -90,5 +90,15 @@
   "AI_FEATURE_DISABLED": "This AI feature is turned off by the administrator.",
   "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model.",
   "DMS_POLICY_OUT_OF_RANGE": "A value is outside the range allowed by an admin (it may have just changed). Check the limits under each field and save again.",
-  "SYSTEM_POLICY_INVALID": "Invalid policy: it needs minimum ≤ suggested ≤ maximum, within the system limits."
+  "SYSTEM_POLICY_INVALID": "Invalid policy: it needs minimum ≤ suggested ≤ maximum, within the system limits.",
+  "EXECUTOR_ACCOUNT_NOT_FOUND": "This email has no verified LegacyVault account. The executor must register and verify their account first.",
+  "EXECUTOR_SELF_ASSIGN": "You cannot assign yourself as an executor.",
+  "EXECUTOR_IS_CONFIRMER": "This person is your trusted confirmer and cannot also be your executor.",
+  "EXECUTOR_SAME_PERSON": "This person already holds the other executor position. The primary and backup executors must be different people.",
+  "EXECUTOR_SLOT_TAKEN": "This position already has an executor. Do you want to replace them with the new person?",
+  "EXECUTOR_NOT_ASSIGNED": "There is no executor in this position to revoke.",
+  "EXECUTOR_HANDOVER_STARTED": "The Dead Man's Switch has started the handover, so the executor cannot be changed.",
+  "EXECUTOR_LAST_REVOKE": "You cannot revoke your last executor while the Dead Man's Switch is on. Assign a replacement first.",
+  "EXECUTOR_LAST_REPLACE": "You cannot replace your last executor while the Dead Man's Switch is on, because the new person has not accepted yet. Add a backup executor, wait for them to accept, then replace this one.",
+  "EXECUTOR_SLOT_CHANGED": "This executor position was just updated elsewhere. Please reload and try again."
 }

@@ -186,4 +186,5 @@ export const ownerApi = {
 
 // BE báo "đã có người, gửi lại với confirmReplace=true" bằng 409 + message chứa "confirmReplace"
 export const needsReplaceConfirm = (err) =>
-    err.response?.status === 409 && /confirmReplace/i.test(err.response?.data?.message || '');
+    err.response?.status === 409
+    && (err.response?.data?.errorCode === 'EXECUTOR_SLOT_TAKEN' || /confirmReplace/i.test(err.response?.data?.message || ''));
