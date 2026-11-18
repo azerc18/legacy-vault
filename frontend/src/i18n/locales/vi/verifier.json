@@ -168,7 +168,7 @@
     "signUnlock": "Ký và mở khoá két",
     "codeSent": "Mã gồm 6 chữ số đã được gửi đến email của bạn. Mã hết hạn sau 5 phút.",
     "signedTitle": "Đã ký thành công",
-    "signedText": "Két đã được mở khoá cho người thụ hưởng.",
+    "signedText": "Két đã được mở khoá cho người thụ hưởng. Chữ ký xác nhận và kết quả kiểm lại nằm ở thẻ \"Chữ ký xác nhận\".",
     "rejectedTitle": "Yêu cầu này đã bị từ chối",
     "reason": "Lý do: {{reason}}",
     "recorded": "Quyết định của bạn sẽ được ghi vào lịch sử hệ thống.",
@@ -246,5 +246,58 @@
       "UNVERIFIABLE": "Không đối chiếu được số giấy tờ trên giấy",
       "OWNER_NOT_VERIFIED": "Chủ két chưa xác minh CCCD, chỉ đối chiếu theo họ tên"
     }
+  },
+  "seal": {
+    "title": "Chữ ký xác nhận",
+    "checking": "Đang kiểm tra...",
+    "recheck": "Kiểm tra lại",
+    "loadError": "Không tải được chữ ký xác nhận.",
+    "status": {
+      "VALID": {
+        "title": "Chữ ký hợp lệ",
+        "text": "Chữ ký khớp khóa công khai của LegacyVault, nội dung đã ký đúng hồ sơ này và giấy chứng tử chưa bị thay kể từ lúc ký."
+      },
+      "INVALID": {
+        "title": "Chữ ký KHÔNG hợp lệ",
+        "text": "Ít nhất một điều kiện bên dưới không đạt. Hồ sơ hoặc tài liệu có thể đã bị sửa sau khi ký. Hãy báo Quản trị viên."
+      },
+      "DOCUMENT_UNAVAILABLE": {
+        "title": "Chữ ký đúng, chưa so được tài liệu",
+        "text": "Tạm thời không đọc được giấy chứng tử từ kho lưu trữ để so mã băm. Hãy thử kiểm tra lại sau."
+      },
+      "LEGACY": {
+        "title": "Chữ ký cũ",
+        "text": "Hồ sơ này được ký trước khi có chữ ký ECDSA, nên chỉ có mã băm cũ và không kiểm lại được."
+      }
+    },
+    "check": {
+      "signature": "Chữ ký ECDSA",
+      "payload": "Nội dung đúng hồ sơ",
+      "document": "Giấy chứng tử không đổi",
+      "ok": "Đạt",
+      "fail": "Không đạt",
+      "unknown": "Chưa kiểm được"
+    },
+    "signedBy": "Người ký",
+    "signedAt": "Thời điểm ký",
+    "method": "Xác thực khi ký",
+    "algorithm": "Thuật toán · khóa",
+    "fingerprint": "Dấu vân tay khóa công khai (SHA-256)",
+    "documentHash": "Mã băm giấy chứng tử lúc ký (SHA-256)",
+    "currentDocumentHash": "Mã băm giấy chứng tử hiện tại",
+    "legacyHash": "Mã băm cũ",
+    "methods": {
+      "MOCK_OTP": "Mã OTP gửi qua email",
+      "MOCK_PIN": "Mã PIN"
+    },
+    "technical": "Chi tiết kỹ thuật (để kiểm độc lập)",
+    "technicalHint": "Ai có 3 phần dưới đây đều tự kiểm được chữ ký mà không cần LegacyVault.",
+    "payload": "Nội dung đã ký (payload)",
+    "signatureValue": "Chữ ký (Base64, DER)",
+    "publicKey": "Khóa công khai (PEM)",
+    "copy": "Sao chép",
+    "copied": "Đã chép",
+    "opensslHint": "Kiểm bằng OpenSSL: lưu payload thành payload.txt (đúng từng ký tự, xuống dòng kiểu LF, không thêm dòng trống cuối; trên Windows đừng lưu bằng Notepad vì có thể đổi sang CRLF), chữ ký thành sig.b64, khóa công khai thành public.pem, rồi chạy:",
+    "disclaimer": "Đây là chữ ký do hệ thống LegacyVault cấp (khóa ECDSA P-256 của hệ thống), chưa phải chữ ký số có chứng thư của tổ chức CA được cấp phép."
   }
 }

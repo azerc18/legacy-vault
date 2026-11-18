@@ -70,3 +70,9 @@ export const sendMessage = (id, content, file) => {
 
 export const getAttachmentBlob = (id, messageId) =>
     http.get(`${BASE}/${id}/messages/${messageId}/attachment`, { responseType: 'blob' });
+
+// V3: chữ ký xác nhận + kết quả kiểm lại ngay lúc gọi (chỉ hồ sơ SIGNED, chỉ verifier đã ký)
+// -> { status: VALID|INVALID|DOCUMENT_UNAVAILABLE|LEGACY, signatureValid, payloadMatches, documentMatches,
+//      documentSha256, currentDocumentSha256, algorithm, keyRef, keyFingerprint, publicKeyPem,
+//      signedPayload, signatureValue, signatureHash, signedAt, verifierName, verifierEmail, method }
+export const getSignature = (id) => http.get(`${BASE}/${id}/signature`).then(unwrap);

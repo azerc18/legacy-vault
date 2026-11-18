@@ -11,6 +11,7 @@ import {
     statusLabel, STATUS_CLASS, formatDate, shortId, REJECT_REASON_OTHER,
 } from './verifierUi.js';
 import VerificationMessages from './VerificationMessages.jsx';
+import SignatureSealCard from './SignatureSealCard.jsx';
 import VerifierHeader from './VerifierHeader.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
@@ -445,6 +446,9 @@ export default function VerificationRequestDetail() {
                             </div>
                         )}
                     </section>
+
+                    {/* V3: chữ ký xác nhận ECDSA, kiểm lại mỗi lần mở */}
+                    {req.status === 'SIGNED' && <SignatureSealCard requestId={req.id} />}
 
                     {/* Trao đổi với Executor — nằm ở cột trái để thẻ hành động bên phải luôn vừa màn hình */}
                     <section className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/30">
