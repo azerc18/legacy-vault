@@ -446,4 +446,108 @@ class DeathCertificateOcrServiceImplTest {
         assertThat(result.getUnavailableMessage()).isEqualTo(DeathCertificateOcrServiceImpl.DISABLED_BY_ADMIN_MESSAGE);
         assertThat(result.getDeceasedFullName()).isNull();
     }
+
+    // ===================== AI dự phòng khi Gemini hỏng =====================
+
+    private static final String FALLBACK_JSON = """
+            {"documentCategory":"VALID_DEATH_CERTIFICATE","deceasedFullName":"Trần Long Vân",
+             "hasOfficialSeal":true,"imageQualityScore":90,"confidenceScore":88,"warnings":[]}
+            """;
+
+    private com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient mockFallback(DeathCertificateOcrServiceImpl target) {
+        var fb = org.mockito.Mockito.mock(com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient.class);
+        ReflectionTestUtils.setField(target, "fallback", fb);
+        return fb;
+    }
+
+    @Test
+    void analyzeBytes_geminiFails_imageGoesToGroqVision() throws Exception {
+        DeathCertificateOcrServiceImpl spyService = spy(ocrService);
+        ReflectionTestUtils.setField(spyService, "aiProvider", "gemini");
+        ReflectionTestUtils.setField(spyService, "apiKey", "primary-key");
+        doThrow(new HttpServerErrorException(HttpStatus.SERVICE_UNAVAILABLE, "down"))
+                .when(spyService).callGeminiVisionOcr(any(), any(), any(), any(), anyInt(), anyInt());
+        var fb = mockFallback(spyService);
+        when(fb.visionAvailable(any())).thenReturn(true);
+        when(fb.visionJson(any(), any(), any(), anyInt())).thenReturn("```json\n" + FALLBACK_JSON + "\n```");
+
+        byte[] png = com.ltld.app.legacyvault.service.aifallbackservice.AiImagesTestSupport.png(800, 600);
+        DeathCertificateOcrResponseDto result = spyService.analyzeBytes(png, "cert.png", "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo(DeathCertificateOcrServiceImpl.ENGINE_GROQ_VISION);
+        assertThat(result.getDeceasedFullName()).isEqualTo("Trần Long Vân");
+        assertThat(result.isHasOfficialSeal()).isTrue();
+        verify(fb).visionJson(any(), eq(DeathCertificateOcrServiceImpl.ocrPrompt("Trần Long Vân")),
+                org.mockito.ArgumentMatchers.argThat(list -> list.size() == 1), anyInt());
+        verify(fb, never()).textJson(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void analyzeBytes_noGemini_pdfWithText_goesToTextProvider_sealOff_andWarns() throws Exception {
+        var fb = mockFallback(ocrService);
+        when(fb.textAvailable(any())).thenReturn(true);
+        when(fb.textProvider(any())).thenReturn(com.ltld.app.legacyvault.enums.AiFallbackProvider.DEEPSEEK);
+        when(fb.textJson(any(), any(), any(), anyInt())).thenReturn(FALLBACK_JSON);
+
+        byte[] pdf = com.ltld.app.legacyvault.service.aifallbackservice.AiImagesTestSupport
+                .textPdf("TRICH LUC KHAI TU - Ho va ten: Tran Long Van - So: 123/2026");
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(pdf, "cert.pdf", "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo(DeathCertificateOcrServiceImpl.ENGINE_DEEPSEEK_TEXT);
+        // Chỉ có chữ: không thấy con dấu / chất lượng ảnh, luôn nhắc xem bản gốc
+        assertThat(result.isHasOfficialSeal()).isFalse();
+        assertThat(result.getImageQualityScore()).isNull();
+        assertThat(result.getWarnings().get(0)).isEqualTo(DeathCertificateOcrServiceImpl.TEXT_ONLY_WARNING);
+        verify(fb).textJson(any(), org.mockito.ArgumentMatchers.endsWith(DeathCertificateOcrServiceImpl.TEXT_ONLY_NOTE),
+                org.mockito.ArgumentMatchers.contains("TRICH LUC KHAI TU"), anyInt());
+        verify(fb, never()).visionJson(any(), any(), any(), anyInt());
+    }
+
+    @Test
+    void analyzeBytes_noGemini_scannedPdf_isRenderedForGroqVision() throws Exception {
+        var fb = mockFallback(ocrService);
+        when(fb.textAvailable(any())).thenReturn(true);
+        when(fb.visionAvailable(any())).thenReturn(true);
+        when(fb.visionJson(any(), any(), any(), anyInt())).thenReturn(FALLBACK_JSON);
+
+        byte[] pdf = com.ltld.app.legacyvault.service.aifallbackservice.AiImagesTestSupport.scannedPdf();
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(pdf, "scan.pdf", "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo(DeathCertificateOcrServiceImpl.ENGINE_GROQ_VISION);
+        verify(fb, never()).textJson(any(), any(), any(), anyInt());
+        verify(fb).visionJson(any(), any(), org.mockito.ArgumentMatchers.argThat(list -> list.size() == 1), anyInt());
+    }
+
+    @Test
+    void analyzeBytes_textFallbackFails_pdfStillTriesVision() throws Exception {
+        var fb = mockFallback(ocrService);
+        when(fb.textAvailable(any())).thenReturn(true);
+        when(fb.textJson(any(), any(), any(), anyInt())).thenThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY));
+        when(fb.visionAvailable(any())).thenReturn(true);
+        when(fb.visionJson(any(), any(), any(), anyInt())).thenReturn(FALLBACK_JSON);
+
+        byte[] pdf = com.ltld.app.legacyvault.service.aifallbackservice.AiImagesTestSupport
+                .textPdf("TRICH LUC KHAI TU - Ho va ten: Tran Long Van - So: 123/2026");
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(pdf, "cert.pdf", "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo(DeathCertificateOcrServiceImpl.ENGINE_GROQ_VISION);
+    }
+
+    @Test
+    void analyzeBytes_noUsableFallback_isUnavailable() throws Exception {
+        mockFallback(ocrService);   // textAvailable / visionAvailable mặc định false
+        byte[] png = com.ltld.app.legacyvault.service.aifallbackservice.AiImagesTestSupport.png(10, 10);
+
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(png, "cert.png", "Trần Long Vân");
+
+        assertThat(result.getEngineSource()).isEqualTo(DeathCertificateOcrServiceImpl.ENGINE_UNAVAILABLE);
+    }
+
+    @Test
+    void isAiEngine_coversGeminiAndFallbacks_notDemoOrUnavailable() {
+        assertThat(DeathCertificateOcrServiceImpl.isAiEngine(DeathCertificateOcrServiceImpl.ENGINE_GEMINI)).isTrue();
+        assertThat(DeathCertificateOcrServiceImpl.isAiEngine(DeathCertificateOcrServiceImpl.ENGINE_DEEPSEEK_TEXT)).isTrue();
+        assertThat(DeathCertificateOcrServiceImpl.isAiEngine(DeathCertificateOcrServiceImpl.ENGINE_DEMO)).isFalse();
+        assertThat(DeathCertificateOcrServiceImpl.isAiEngine(DeathCertificateOcrServiceImpl.ENGINE_UNAVAILABLE)).isFalse();
+    }
 }

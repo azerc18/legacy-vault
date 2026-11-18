@@ -208,6 +208,7 @@
     "advisoryTag": "Trợ lý AI Cố vấn — Chỉ gợi ý tham khảo, quyết định cuối cùng thuộc về bạn",
     "sourceLabel": "Nguồn phân tích",
     "sourceGemini": "Gemini AI",
+    "sourceFallback": "AI dự phòng ({{provider}})",
     "sourceDemo": "Mô phỏng (Demo)",
     "sourceUnavailable": "Không khả dụng",
     "unavailableTitle": "Chưa phân tích được bằng AI, vui lòng tự kiểm tra",

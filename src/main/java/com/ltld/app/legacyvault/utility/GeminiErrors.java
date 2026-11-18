@@ -26,6 +26,39 @@ public final class GeminiErrors {
      * </ul>
      * Không chuyển với 400 (sai API key, file lỗi, nội dung bị chặn) hay 401/403: model dự phòng cũng sẽ lỗi y hệt.
      */
+    /**
+     * Mô tả lỗi để ghi log: chuỗi tên lớp exception (ngoài -> gốc), mã HTTP, và thông báo của lỗi mạng / nhà cung cấp.
+     * KHÔNG lấy message của lỗi parse JSON vì Jackson chèn đoạn nội dung trả về (có thể chứa số CCCD, họ tên).
+     * Ví dụ: "RestClientException <- SocketTimeoutException(Read timed out)", "HttpClientErrorException(404)".
+     */
+    public static String describe(Throwable ex) {
+        StringBuilder sb = new StringBuilder();
+        Throwable current = ex;
+        int depth = 0;
+        while (current != null && depth < MAX_CAUSE_DEPTH) {
+            if (sb.length() > 0) sb.append(" <- ");
+            sb.append(current.getClass().getSimpleName());
+            String detail = safeDetail(current);
+            if (detail != null) sb.append('(').append(detail).append(')');
+            current = current.getCause() == current ? null : current.getCause();
+            depth++;
+        }
+        return sb.toString();
+    }
+
+    private static String safeDetail(Throwable t) {
+        if (t instanceof HttpStatusCodeException h) {
+            return String.valueOf(h.getStatusCode().value());
+        }
+        if (t instanceof java.io.IOException && t.getClass().getName().startsWith("java.net")
+                || t instanceof TimeoutException
+                || t.getClass().getName().equals("com.ltld.app.legacyvault.service.aifallbackservice.AiProviderException")) {
+            String m = t.getMessage();
+            return m == null ? null : (m.length() > 300 ? m.substring(0, 300) + "..." : m);
+        }
+        return null;
+    }
+
     public static boolean isRetryable(Throwable ex) {
         Throwable current = ex;
         int depth = 0;

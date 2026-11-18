@@ -213,4 +213,77 @@ class AiSettingsServiceTest {
         service.forFeature(AiFeature.ASSISTANT);
         verify(repository, times(2)).findAll();       // sau commit: đọc lại DB
     }
+
+    // ===================== AI dự phòng (Groq / DeepSeek) =====================
+
+    private com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient fallbackClient(String groqKey, String dsKey) {
+        return new com.ltld.app.legacyvault.service.aifallbackservice.FallbackAiClient(
+                groqKey, "https://api.groq.com/openai/v1", "llama-3.3-70b-versatile",
+                "meta-llama/llama-4-scout-17b-16e-instruct", "", dsKey, "https://api.deepseek.com",
+                "deepseek-chat", "deepseek-reasoner", "deepseek");
+    }
+
+    @Test
+    void forFeature_includesFallbackChoices_withDefaultsWhenEmpty() {
+        service.setFallback(fallbackClient("g", "d"));
+        AiFeatureSetting r = row(AiFeature.DEATH_CERTIFICATE_OCR, true, null, null);
+        r.setTextFallbackProvider(com.ltld.app.legacyvault.enums.AiFallbackProvider.GROQ);
+        when(repository.findAll()).thenReturn(List.of(r));
+
+        AiFeatureConfig c = service.forFeature(AiFeature.DEATH_CERTIFICATE_OCR);
+
+        assertThat(c.fallbackEnabled()).isTrue();
+        assertThat(c.textFallbackProvider()).isEqualTo(com.ltld.app.legacyvault.enums.AiFallbackProvider.GROQ);
+        assertThat(c.textFallbackModel()).isEqualTo("llama-3.3-70b-versatile");     // mặc định của Groq
+        assertThat(c.visionFallbackModel()).isEqualTo("meta-llama/llama-4-scout-17b-16e-instruct");
+    }
+
+    @Test
+    void get_reportsFallbackKeysAndModels_neverKeyValues() {
+        service.setFallback(fallbackClient("groq-secret", ""));
+        when(repository.findAll()).thenReturn(List.of());
+
+        AiSettingsResponse res = service.get();
+
+        assertThat(res.fallback().groqKeyConfigured()).isTrue();
+        assertThat(res.fallback().deepseekKeyConfigured()).isFalse();
+        assertThat(res.fallback().deepseekModels()).containsExactly("deepseek-chat", "deepseek-reasoner");
+        assertThat(res.fallback().defaultTextProvider()).isEqualTo("DEEPSEEK");
+        assertThat(res.toString()).doesNotContain("groq-secret");
+        assertThat(res.features()).allSatisfy(f -> assertThat(f.fallbackEnabled()).isTrue());
+    }
+
+    @Test
+    void update_savesFallbackChoices_andAuditsThem() {
+        service.setFallback(fallbackClient("g", "d"));
+        when(repository.findById(AiFeature.ASSISTANT)).thenReturn(Optional.of(row(AiFeature.ASSISTANT, true, null, null)));
+
+        AiFeatureSettingResponse res = service.update(adminId, AiFeature.ASSISTANT, new UpdateAiFeatureSettingRequest(
+                true, null, null, false, "deepseek", "deepseek-reasoner", null));
+
+        assertThat(res.fallbackEnabled()).isFalse();
+        assertThat(res.textFallbackProvider()).isEqualTo("DEEPSEEK");
+        assertThat(res.textFallbackModel()).isEqualTo("deepseek-reasoner");
+        verify(auditLogService).log(eq(AuditAction.AI_SETTINGS_UPDATED), eq(AuditResult.SUCCESS), eq(adminId), any(),
+                eq("AiFeatureSetting"), isNull(), contains("textFallbackModel default -> deepseek-reasoner"));
+    }
+
+    @Test
+    void update_rejectsUnknownProvider_orModelOfAnotherProvider() {
+        service.setFallback(fallbackClient("g", "d"));
+        when(repository.findById(any())).thenReturn(Optional.of(row(AiFeature.ASSISTANT, true, null, null)));
+
+        assertThatThrownBy(() -> service.update(adminId, AiFeature.ASSISTANT,
+                new UpdateAiFeatureSettingRequest(true, null, null, true, "openai", null, null)))
+                .isInstanceOf(BusinessException.class);
+        // Model Groq nhưng nhà cung cấp văn bản là DeepSeek
+        assertThatThrownBy(() -> service.update(adminId, AiFeature.ASSISTANT,
+                new UpdateAiFeatureSettingRequest(true, null, null, true, "DEEPSEEK", "llama-3.3-70b-versatile", null)))
+                .isInstanceOf(BusinessException.class);
+        // Model đọc ảnh phải thuộc danh sách Groq
+        assertThatThrownBy(() -> service.update(adminId, AiFeature.CITIZEN_ID_OCR,
+                new UpdateAiFeatureSettingRequest(true, null, null, true, null, null, "deepseek-chat")))
+                .isInstanceOf(BusinessException.class);
+        verify(repository, never()).save(any());
+    }
 }

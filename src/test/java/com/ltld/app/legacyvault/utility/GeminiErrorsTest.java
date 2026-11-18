@@ -33,4 +33,20 @@ class GeminiErrorsTest {
         assertThat(GeminiErrors.isRetryable(new IllegalArgumentException("bad json"))).isFalse();
         assertThat(GeminiErrors.isRetryable(null)).isFalse();
     }
+
+    @Test
+    void describe_showsCauseChain_statusAndNetworkMessage() {
+        Exception timeout = new org.springframework.web.client.RestClientException("Error while extracting response",
+                new SocketTimeoutException("Read timed out"));
+        assertThat(GeminiErrors.describe(timeout))
+                .isEqualTo("RestClientException <- SocketTimeoutException(Read timed out)");
+        assertThat(GeminiErrors.describe(new HttpClientErrorException(HttpStatus.NOT_FOUND)))
+                .isEqualTo("HttpClientErrorException(404)");
+    }
+
+    @Test
+    void describe_neverIncludesParseErrorMessages_thatMayEchoDocumentContent() {
+        Exception parse = new IllegalStateException("Unexpected token near \"citizenId\":\"001099012345\"");
+        assertThat(GeminiErrors.describe(parse)).isEqualTo("IllegalStateException").doesNotContain("001099012345");
+    }
 }

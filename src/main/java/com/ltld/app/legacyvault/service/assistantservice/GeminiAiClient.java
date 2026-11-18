@@ -20,6 +20,9 @@ import java.util.Map;
 @ConditionalOnProperty(name = "app.ai.provider", havingValue = "gemini")
 public class GeminiAiClient implements AiClient {
 
+    private static final tools.jackson.databind.json.JsonMapper JSON = tools.jackson.databind.json.JsonMapper.builder()
+            .configure(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).build();
+
     private final RestClient client;
     private final String apiKey;
     private final String backupApiKey;
@@ -76,7 +79,7 @@ public class GeminiAiClient implements AiClient {
             return executeChat(model, apiKey, body);
         } catch (Exception primaryEx) {
             log.warn("Primary Gemini model '{}' failed for Vaulty chat: {}. Retryable: {}",
-                    model, primaryEx.getMessage(), GeminiErrors.isRetryable(primaryEx));
+                    model, GeminiErrors.describe(primaryEx), GeminiErrors.isRetryable(primaryEx));
             if (GeminiErrors.isRetryable(primaryEx) && backupModel != null && !backupModel.isBlank() && !backupModel.equalsIgnoreCase(model)) {
                 try {
                     String keyToUse = (backupApiKey != null && !backupApiKey.isBlank()) ? backupApiKey : apiKey;
@@ -85,7 +88,7 @@ public class GeminiAiClient implements AiClient {
                     return reply;
                 } catch (Exception backupEx) {
                     log.warn("Backup Gemini model '{}' also failed for Vaulty chat: {}",
-                            backupModel, backupEx.getMessage());
+                            backupModel, GeminiErrors.describe(backupEx));
                 }
             }
             throw primaryEx instanceof RuntimeException re ? re : new RuntimeException(primaryEx);
@@ -93,12 +96,17 @@ public class GeminiAiClient implements AiClient {
     }
 
     private String executeChat(String targetModel, String targetApiKey, Map<String, Object> body) {
-        GeminiResponse res = client.post()
+        byte[] rawBytes = client.post()
                 .uri("/models/{model}:generateContent", targetModel)
                 .header("x-goog-api-key", targetApiKey)
+                .accept(org.springframework.http.MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
-                .body(GeminiResponse.class);
+                // Đọc byte rồi tự parse: Gemini có lúc trả Content-Type application/octet-stream cho body JSON
+                .body(byte[].class);
+        // JSON luôn là UTF-8; không để Spring đoán charset theo Content-Type (octet-stream -> ISO-8859-1 làm hỏng tiếng Việt)
+        String rawBody = rawBytes == null ? null : new String(rawBytes, java.nio.charset.StandardCharsets.UTF_8);
+        GeminiResponse res = rawBody == null || rawBody.isBlank() ? null : JSON.readValue(rawBody, GeminiResponse.class);
 
         if (res == null || res.candidates() == null || res.candidates().isEmpty()) return "";
         var content = res.candidates().get(0).content();
