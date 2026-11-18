@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.controller;
 
+import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectionReasonDto;
@@ -143,6 +144,15 @@ public class LegalVerificationController {
             @Valid @RequestBody SignVerificationRequestDto dto) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Signed and unlocked the vault", service.sign(id, verifierId(jwt), dto)));
+    }
+
+    // V2: chữ ký số nhúng trong giấy chứng tử PDF (POST vì phải đọc + giải mã file, có thể chậm; không ghi DB)
+    @PostMapping("/{id}/document/signatures")
+    public ResponseEntity<ApiResponse<PdfSignatureReportDto>> inspectDocumentSignatures(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Document signatures inspected", service.inspectDocumentSignatures(id, verifierId(jwt))));
     }
 
     // userId nằm ở claim "sub" của token

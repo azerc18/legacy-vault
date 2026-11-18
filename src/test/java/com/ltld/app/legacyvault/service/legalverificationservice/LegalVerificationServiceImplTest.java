@@ -129,6 +129,9 @@ public class LegalVerificationServiceImplTest {
     @Mock
     private ReviewProgressRecorder progressRecorder;
 
+    @Mock
+    private PdfSignatureInspector pdfSignatureInspector;
+
     @InjectMocks
     private LegalVerificationServiceImpl service;
 
@@ -1347,5 +1350,33 @@ public class LegalVerificationServiceImplTest {
         assertThat(summary.getAwaitingSignature()).isEqualTo(2L);
         assertThat(summary.getSigned()).isEqualTo(150L);
         assertThat(summary.getRejected()).isEqualTo(7L);
+    }
+
+    // ---------- inspectDocumentSignatures (V2) ----------
+
+    @Test
+    void inspectSignatures_pendingNotChecked_throwsStepRequired() {
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(progressRepository.findByRequestIdAndVerifierId(requestId, verifierId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.inspectDocumentSignatures(requestId, verifierId))
+                .isInstanceOf(VerificationStepRequiredException.class);
+        verifyNoInteractions(pdfSignatureInspector, fileStorageService);
+    }
+
+    @Test
+    void inspectSignatures_checked_readsDecryptedFileAndInspects() throws Exception {
+        checkedOnly();
+        byte[] enc = {1, 2};
+        byte[] plain = {'%', 'P', 'D', 'F'};
+        com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto report =
+                com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto.builder().build();
+        when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
+        when(fileStorageService.readFile("enc://test.pdf")).thenReturn(enc);
+        when(cryptoService.decryptBytes(enc)).thenReturn(plain);
+        when(pdfSignatureInspector.inspect(requestId, plain)).thenReturn(report);
+
+        assertThat(service.inspectDocumentSignatures(requestId, verifierId)).isSameAs(report);
+        verify(progressRepository, never()).save(any()); // chỉ đọc, không ghi tiến độ
     }
 }

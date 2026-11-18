@@ -1,5 +1,6 @@
 package com.ltld.app.legacyvault.service.legalverificationservice;
 
+import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.DocumentVerificationResponseDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.RejectVerificationRequestDto;
 import com.ltld.app.legacyvault.dto.legalverificationdto.SignVerificationRequestDto;
@@ -104,6 +105,7 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
     private final ReviewProgressRecorder progressRecorder;
     private final VerifierAccessGuard verifierAccessGuard;
     private final VaultBeneficiaryRepository beneficiaryRepository;
+    private final PdfSignatureInspector pdfSignatureInspector;
 
     // UC12: danh sách hồ sơ đang chờ duyệt (Q23-b + N6: loại trừ xung đột lợi ích)
     @Override
@@ -166,6 +168,21 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
             log.error("Death certificate read/decrypt failed for request {}", requestId, e);
             throw new IllegalStateException("Could not read the document. Please try again later.");
         }
+    }
+
+    // V2: đọc chữ ký số nhúng trong giấy chứng tử PDF. Cùng điều kiện với "Xem": hồ sơ PENDING phải Check trước.
+    // Chỉ để tham khảo, không ghi tiến độ duyệt, không tự duyệt/từ chối.
+    @Override
+    @Transactional(readOnly = true)
+    public PdfSignatureReportDto inspectDocumentSignatures(UUID requestId, UUID verifierId) {
+        LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
+        if (request.getStatus() == LegalVerificationStatus.PENDING) {
+            VerificationReviewProgress progress = progressOf(requestId, verifierId);
+            if (progress == null || progress.getCheckedAt() == null) {
+                throw new VerificationStepRequiredException("Please check the document before reading its signatures.");
+            }
+        }
+        return pdfSignatureInspector.inspect(requestId, readDecryptedDocument(request, requestId));
     }
 
     // D1: Verifier xem giấy chứng tử

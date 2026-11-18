@@ -7,6 +7,7 @@ import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationRequestResp
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSummaryResponseDto;
 import com.ltld.app.legacyvault.enums.LegalVerificationStatus;
 import com.ltld.app.legacyvault.dto.legalverificationdto.VerificationDocumentDto;
+import com.ltld.app.legacyvault.dto.legalverificationdto.PdfSignatureReportDto;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -44,4 +45,7 @@ public interface LegalVerificationService {
 
     // D1: tải/xem giấy chứng tử (đã giải mã)
     VerificationDocumentDto getDocument(UUID requestId, UUID verifierId);
+
+    // V2: đọc chữ ký số (PAdES/PKCS#7) trong giấy chứng tử PDF, chỉ để tham khảo
+    PdfSignatureReportDto inspectDocumentSignatures(UUID requestId, UUID verifierId);
 }

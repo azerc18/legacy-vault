@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
     getRequestById, approveRequest, rejectRequest, verifyDocument, sendSignOtp, signRequest,
-    getDocumentBlob, getRejectionReasons, analyzeDocumentOcr,
+    getDocumentBlob, getRejectionReasons, analyzeDocumentOcr, inspectDocumentSignatures,
 } from '../api/verifierApi.js';
 import { getErrorCode, getErrorMessage } from '../api/http.js';
 import {
@@ -16,6 +16,7 @@ import ConfirmDialog from './ConfirmDialog.jsx';
 import { showBlobInTab, getBlobErrorMessage } from './blobUtils.js';
 import { PAGE_WIDTH } from '../Common/AppHeader.jsx';
 import OcrAnalysisCard from '../Common/OcrAnalysisCard.jsx';
+import PdfSignatureCard from './PdfSignatureCard.jsx';
 import OtpInput from '../Common/OtpInput.jsx';
 
 const RESEND_SECONDS = 60;          // khớp SIGN_OTP_RESEND_COOLDOWN_SECONDS của BE
@@ -45,6 +46,8 @@ export default function VerificationRequestDetail() {
     const [checking, setChecking] = useState(false);
     const [ocrLoading, setOcrLoading] = useState(false);
     const [ocrResult, setOcrResult] = useState(null);
+    const [sigLoading, setSigLoading] = useState(false);
+    const [sigReport, setSigReport] = useState(null);   // V2: chữ ký số trong PDF
     const [error, setError] = useState('');
     const [info, setInfo] = useState('');
     const [rejectReasons, setRejectReasons] = useState([]);   // [{ code, label }] từ BE
@@ -162,6 +165,20 @@ export default function VerificationRequestDetail() {
             setError(getErrorMessage(e, t('detail.err.ocr', 'Không thể phân tích giấy chứng tử bằng AI OCR.')));
         } finally {
             setOcrLoading(false);
+        }
+    };
+
+    // V2: đọc chữ ký số nhúng trong giấy chứng tử (PDF ký bởi cơ quan cấp / công chứng)
+    const handleInspectSignatures = async () => {
+        if (sigLoading) return;
+        setSigLoading(true);
+        setError('');
+        try {
+            setSigReport(await inspectDocumentSignatures(req.id));
+        } catch (e) {
+            setError(getErrorMessage(e, t('detail.err.signatures')));
+        } finally {
+            setSigLoading(false);
         }
     };
 
@@ -359,6 +376,19 @@ export default function VerificationRequestDetail() {
                                         </button>
                                         <button
                                             type="button"
+                                            data-testid="verifier-pdfsig-btn"
+                                            onClick={handleInspectSignatures}
+                                            disabled={busy || viewing || sigLoading || !req.documentChecked}
+                                            title={req.documentChecked ? undefined : t('detail.checkFirst')}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className={`material-symbols-outlined text-[20px] ${sigLoading ? 'animate-spin' : ''}`}>
+                                                {sigLoading ? 'progress_activity' : 'workspace_premium'}
+                                            </span>
+                                            {sigLoading ? t('detail.signaturesChecking') : t('detail.checkSignatures')}
+                                        </button>
+                                        <button
+                                            type="button"
                                             data-testid="verifier-ocr-btn"
                                             onClick={handleOcrDocument}
                                             disabled={busy || viewing || ocrLoading}
@@ -382,6 +412,18 @@ export default function VerificationRequestDetail() {
                                         >
                                             <span className="material-symbols-outlined text-[20px]">visibility</span>
                                             {viewing ? t('detail.opening') : t('detail.viewDocument')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            data-testid="verifier-pdfsig-btn"
+                                            onClick={handleInspectSignatures}
+                                            disabled={busy || viewing || sigLoading}
+                                            className="h-11 px-5 rounded-xl border border-outline-variant text-primary font-semibold hover:bg-surface-container-low disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            <span className={`material-symbols-outlined text-[20px] ${sigLoading ? 'animate-spin' : ''}`}>
+                                                {sigLoading ? 'progress_activity' : 'workspace_premium'}
+                                            </span>
+                                            {sigLoading ? t('detail.signaturesChecking') : t('detail.checkSignatures')}
                                         </button>
                                         <button
                                             type="button"
@@ -411,6 +453,7 @@ export default function VerificationRequestDetail() {
                                 <b>{checkResult.valid ? t('detail.valid') : t('detail.invalid')}</b>{checkResult.message ? ` — ${checkResult.message}` : ''}
                             </div>
                         )}
+                        <PdfSignatureCard report={sigReport} />
                         {ocrResult && (
                             <OcrAnalysisCard
                                 data={ocrResult}

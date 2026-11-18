@@ -185,10 +185,13 @@
       "sendCode": "Could not send the code.",
       "openDocument": "Could not open the document (HTTP {{status}}).",
       "noResponse": "no response",
-      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site."
+      "popupBlocked": "Your browser blocked the pop-up. Please allow pop-ups for this site.",
+      "signatures": "Could not read the document's digital signatures."
     },
     "vaultsTitle_one": "Vault to unlock ({{count}})",
-    "vaultsTitle_other": "Vaults to unlock ({{count}})"
+    "vaultsTitle_other": "Vaults to unlock ({{count}})",
+    "checkSignatures": "Check digital signatures",
+    "signaturesChecking": "Reading signatures..."
   },
   "rejectReason": {
     "DOCUMENT_UNREADABLE": "The document is blurry or unreadable",
@@ -247,5 +250,61 @@
       "UNVERIFIABLE": "The ID number on the document cannot be checked",
       "OWNER_NOT_VERIFIED": "Owner has not verified an ID; name check only"
     }
+  },
+  "pdfSig": {
+    "overall": {
+      "ALL_VALID": {
+        "title": "{{count}} valid digital signature(s)",
+        "text": "The signed content is intact, the signature covers the whole file and the certificate was valid at signing time."
+      },
+      "HAS_INVALID": {
+        "title": "Digital signature is NOT valid",
+        "text": "The file was changed after signing, or the signature does not match its certificate. Consider rejecting as \"suspected forgery\" unless it can be explained."
+      },
+      "HAS_UNVERIFIED": {
+        "title": "Signed, needs a closer look",
+        "text": "Not every check passed: content added after signing, certificate expired at signing time, or an unsupported algorithm. See each signature below."
+      },
+      "NO_SIGNATURE": {
+        "title": "The PDF has no digital signature",
+        "text": "Normal for a scan or photo of a paper certificate. Look closely at the stamp, handwritten signature and reference number."
+      },
+      "NOT_PDF": {
+        "title": "The document is an image, it cannot carry a digital signature",
+        "text": "Only PDF files hold digital signatures. Look closely at the stamp and handwritten signature."
+      },
+      "UNREADABLE": {
+        "title": "The PDF structure could not be read",
+        "text": "The file may be damaged or use an unusual format. Open it directly."
+      }
+    },
+    "check": {
+      "integrity": "Content not changed",
+      "whole": "Covers the whole file",
+      "certTime": "Certificate valid at signing",
+      "ok": "Passed",
+      "fail": "Failed",
+      "unknown": "Not checked"
+    },
+    "unknownSigner": "Unknown signer",
+    "selfSigned": "Self-signed certificate",
+    "issuer": "Certificate issuer",
+    "signedAt": "Signed at",
+    "validity": "Certificate validity",
+    "algorithm": "Algorithm",
+    "reason": "Reason",
+    "location": "Location",
+    "serial": "Certificate serial",
+    "problem": {
+      "SIGNATURE_ALGORITHM_UNSUPPORTED": "Signature algorithm not supported yet (e.g. RSA-PSS); no conclusion.",
+      "DIGEST_ALGORITHM_UNSUPPORTED": "Hash algorithm not supported yet; no conclusion.",
+      "SIGNER_CERTIFICATE_MISSING": "The signature does not include the signer's certificate.",
+      "SIGNATURE_DATA_CORRUPT": "The signature data is damaged.",
+      "BYTE_RANGE_INVALID": "The signed byte range is invalid.",
+      "NOT_CMS_SIGNED_DATA": "The signature is not PKCS#7/CMS.",
+      "NO_SIGNER": "The signature has no signer.",
+      "SIGNATURE_DICTIONARY_MISSING": "Signature data is missing."
+    },
+    "disclaimer": "For reference only. The chain to a licensed root CA and revocation (CRL/OCSP) are not checked. The decision is still yours."
   }
 }
