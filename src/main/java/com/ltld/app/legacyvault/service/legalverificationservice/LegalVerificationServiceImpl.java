@@ -478,15 +478,16 @@ public class LegalVerificationServiceImpl implements LegalVerificationService {
         return toDto(request);
     }
 
-    // V3: xem và kiểm lại chữ ký xác nhận của hồ sơ đã ký (chỉ verifier đã ký, guard như xem hồ sơ)
+    // V3: xem và kiểm lại chữ ký xác nhận của hồ sơ đã ký (chỉ verifier đã ký, guard như xem hồ sơ).
+    // Cố ý KHÔNG @Transactional: check() đọc + giải mã file qua mạng (R2), không nên giữ kết nối DB lúc đó.
+    // Mọi quan hệ check() cần đã được nạp sẵn bằng findWithDetailsByRequestId (review #293 n1).
     @Override
-    @Transactional(readOnly = true)
     public VerifierSignatureDto getSignature(UUID requestId, UUID verifierId) {
         LegalVerificationRequest request = verifierAccessGuard.requireReadable(requestId, verifierId);
         if (request.getStatus() != LegalVerificationStatus.SIGNED) {
             throw new BusinessException(ErrorCode.NOT_FOUND, "This request has not been signed yet.");
         }
-        DigitalSignature signature = signatureRepository.findByRequestId(requestId)
+        DigitalSignature signature = signatureRepository.findWithDetailsByRequestId(requestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "Signature not found for this request."));
         return signatureSealService.check(signature);
     }

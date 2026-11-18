@@ -1365,7 +1365,7 @@ public class LegalVerificationServiceImplTest {
                 com.ltld.app.legacyvault.dto.legalverificationdto.VerifierSignatureDto.builder()
                         .status(com.ltld.app.legacyvault.enums.SignatureSealStatus.VALID).build();
         when(verifierAccessGuard.requireReadable(requestId, verifierId)).thenReturn(pendingRequest);
-        when(signatureRepository.findByRequestId(requestId)).thenReturn(Optional.of(sig));
+        when(signatureRepository.findWithDetailsByRequestId(requestId)).thenReturn(Optional.of(sig));
         when(signatureSealService.check(sig)).thenReturn(dto);
 
         assertThat(service.getSignature(requestId, verifierId)).isSameAs(dto);

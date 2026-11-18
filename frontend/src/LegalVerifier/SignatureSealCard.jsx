@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getSignature } from '../api/verifierApi.js';
 import { getErrorMessage } from '../api/http.js';
@@ -20,12 +20,22 @@ export default function SignatureSealCard({ requestId }) {
     const [error, setError] = useState('');
     const [copied, setCopied] = useState('');
 
-    const fetchSeal = useCallback(() => getSignature(requestId)
-        .then((data) => { setSeal(data); setError(''); })
-        .catch((e) => setError(getErrorMessage(e, t('seal.loadError'))))
-        .finally(() => setLoading(false)), [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Chỉ nhận kết quả của lần gọi mới nhất: đổi hồ sơ hoặc bấm "Kiểm tra lại" liên tục thì
+    // phản hồi cũ về muộn sẽ bị bỏ qua (review #293 n2)
+    const latestCall = useRef(0);
+    const fetchSeal = useCallback(() => {
+        const call = ++latestCall.current;
+        const isLatest = () => call === latestCall.current;
+        return getSignature(requestId)
+            .then((data) => { if (isLatest()) { setSeal(data); setError(''); } })
+            .catch((e) => { if (isLatest()) setError(getErrorMessage(e, t('seal.loadError'))); })
+            .finally(() => { if (isLatest()) setLoading(false); });
+    }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    useEffect(() => { fetchSeal(); }, [fetchSeal]);
+    useEffect(() => {
+        fetchSeal();
+        return () => { latestCall.current += 1; }; // rời trang / đổi hồ sơ: bỏ kết quả đang bay về
+    }, [fetchSeal]);
 
     // Bấm "Kiểm tra lại": BE đọc lại file và kiểm lại chữ ký từ đầu
     const recheck = () => { setLoading(true); fetchSeal(); };

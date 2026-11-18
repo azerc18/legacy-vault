@@ -71,18 +71,48 @@ class SigningKeyIntegrationTest extends MySqlTestContainer {
 
     @Test
     void concurrentFirstSigners_endUpWithOneKey() throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(4);
+        assertConcurrentFirstSigners(false);
+    }
+
+    // Review #293 m1: giống lệnh ký thật, mỗi luồng đã mở transaction và đọc DB (snapshot REPEATABLE READ)
+    // TRƯỚC khi bên thắng commit khóa. Bên thua phải đọc lại trong transaction mới mới thấy khóa đó.
+    @Test
+    void concurrentFirstSigners_insideOpenTransactions_endUpWithOneKey() throws Exception {
+        assertConcurrentFirstSigners(true);
+    }
+
+    private void assertConcurrentFirstSigners(boolean insideTransaction) throws Exception {
+        int threads = 4;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch snapshotsOpen = new CountDownLatch(threads);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<SigningKey>> futures = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < threads; i++) {
             futures.add(pool.submit(() -> {
-                start.await();
-                return signingKeyService.getOrCreateActiveKey();
+                if (!insideTransaction) {
+                    snapshotsOpen.countDown();
+                    start.await();
+                    return signingKeyService.getOrCreateActiveKey();
+                }
+                return new TransactionTemplate(transactionManager).execute(status -> {
+                    repository.count(); // mở snapshot trước khi ai đó tạo khóa
+                    snapshotsOpen.countDown();
+                    try {
+                        start.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException(e);
+                    }
+                    SigningKey key = signingKeyService.getOrCreateActiveKey();
+                    signingKeyService.sign(key, "payload"); // khóa nhận được dùng ký được ngay
+                    return key;
+                });
             }));
         }
+        assertThat(snapshotsOpen.await(30, TimeUnit.SECONDS)).isTrue();
         start.countDown();
         for (Future<SigningKey> f : futures) {
-            assertThat(f.get(30, TimeUnit.SECONDS).getKeyRef()).isEqualTo("lv-sign-v1");
+            assertThat(f.get(60, TimeUnit.SECONDS).getKeyRef()).isEqualTo("lv-sign-v1");
         }
         pool.shutdown();
         assertThat(repository.count()).isEqualTo(1);

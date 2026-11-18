@@ -2,6 +2,7 @@ package com.ltld.app.legacyvault.repository;
 
 import com.ltld.app.legacyvault.entity.DigitalSignature;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +16,10 @@ public interface DigitalSignatureRepository extends JpaRepository<DigitalSignatu
     Optional<DigitalSignature> findByRequestId(UUID requestId);
 
     boolean existsByRequestId(UUID requestId);
+
+    // V3: nạp sẵn hồ sơ, verifier và khóa ký để kiểm chữ ký ngoài transaction (không giữ kết nối DB khi đọc file)
+    @EntityGraph(attributePaths = {"request", "verifier", "signingKey"})
+    Optional<DigitalSignature> findWithDetailsByRequestId(UUID requestId);
 
     // X4: chữ ký của yêu cầu xác minh đã SIGNED gần nhất có chứa vault này
     @Query("""

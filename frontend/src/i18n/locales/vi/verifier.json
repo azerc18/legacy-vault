@@ -297,7 +297,7 @@
     "publicKey": "Khóa công khai (PEM)",
     "copy": "Sao chép",
     "copied": "Đã chép",
-    "opensslHint": "Kiểm bằng OpenSSL: lưu payload thành payload.txt (đúng từng ký tự, không thêm dòng trống cuối), chữ ký thành sig.b64, khóa công khai thành public.pem, rồi chạy:",
+    "opensslHint": "Kiểm bằng OpenSSL: lưu payload thành payload.txt (đúng từng ký tự, xuống dòng kiểu LF, không thêm dòng trống cuối; trên Windows đừng lưu bằng Notepad vì có thể đổi sang CRLF), chữ ký thành sig.b64, khóa công khai thành public.pem, rồi chạy:",
     "disclaimer": "Đây là chữ ký do hệ thống LegacyVault cấp (khóa ECDSA P-256 của hệ thống), chưa phải chữ ký số có chứng thư của tổ chức CA được cấp phép."
   }
 }

@@ -54,10 +54,18 @@ public class SigningKeyService {
         try {
             return tx.execute(status -> repository.saveAndFlush(generate(FIRST_KEY_REF)));
         } catch (DataIntegrityViolationException e) {
-            // Hai lệnh ký đầu tiên chạy cùng lúc: bên thua đọc lại khóa bên thắng vừa tạo (key_ref unique)
+            // Hai lệnh ký đầu tiên chạy cùng lúc: bên thua đọc lại khóa bên thắng vừa tạo (key_ref unique).
+            // Đọc trong transaction MỚI: transaction ký bên ngoài (REPEATABLE READ) đã mở snapshot từ trước
+            // nên đọc ở đó sẽ không thấy dòng bên thắng vừa commit (review #293 m1).
             log.info("Signing key {} was created concurrently, reloading", FIRST_KEY_REF);
-            return repository.findByKeyRef(FIRST_KEY_REF)
-                    .orElseThrow(() -> new IllegalStateException("Signing key could not be created", e));
+            TransactionTemplate reload = new TransactionTemplate(transactionManager);
+            reload.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            reload.setReadOnly(true);
+            SigningKey winner = reload.execute(status -> repository.findByKeyRef(FIRST_KEY_REF).orElse(null));
+            if (winner == null) {
+                throw new IllegalStateException("Signing key could not be created", e);
+            }
+            return winner;
         }
     }
 

@@ -299,7 +299,7 @@
     "publicKey": "Public key (PEM)",
     "copy": "Copy",
     "copied": "Copied",
-    "opensslHint": "Check with OpenSSL: save the payload as payload.txt (exact characters, no trailing newline), the signature as sig.b64 and the public key as public.pem, then run:",
+    "opensslHint": "Check with OpenSSL: save the payload as payload.txt (exact characters, LF line endings, no trailing newline; on Windows avoid Notepad, which may switch to CRLF), the signature as sig.b64 and the public key as public.pem, then run:",
     "disclaimer": "This signature is issued by LegacyVault (the system's ECDSA P-256 key). It is not a digital signature backed by a licensed CA certificate."
   }
 }
