@@ -230,7 +230,7 @@ function FallbackFields({ t, fb, parts, feature, draft, disabled, onChange }) {
                                 onChange={(e) => onChange({ visionFallbackModel: e.target.value })}
                                 className={`${inputClass} mt-1 lv-mono`}>
                             <option value="">{t('aiSettings.useDefault', { model: fb.defaultVisionModel })}</option>
-                            {fb.groqModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                            {(fb.groqVisionModels || fb.groqModels).map((m) => <option key={m} value={m}>{m}</option>)}
                         </select>
                     </label>
                 )}

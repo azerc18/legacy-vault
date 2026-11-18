@@ -88,7 +88,7 @@ public class AssistantServiceImpl implements AssistantService {
             reply = aiClient.chat(systemPrompt, messages, config);
         } catch (RuntimeException e) {
             // Không log nội dung tin nhắn, chỉ log lỗi
-            log.warn("Assistant call failed for user {}: {}", userId, e.getMessage());
+            log.warn("Assistant call failed for user {}: {}", userId, com.ltld.app.legacyvault.utility.GeminiErrors.describe(e));
             reply = fallbackReply(userId, systemPrompt, messages, config);
         }
         return new ChatResponse(reply == null || reply.isBlank()

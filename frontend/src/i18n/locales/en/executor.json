@@ -131,7 +131,7 @@
       "ocrScan": "✨ Scan & Extract with AI (OCR)",
       "ocrScanning": "Scanning & cross-checking with AI OCR...",
       "ocrFailed": "Could not analyze document with AI OCR.",
-      "ocrPrivacyHint": "Privacy notice: When scanning with AI, the document is sent to Google Gemini AI for extraction (logged in system audit logs).",
+      "ocrPrivacyHint": "Privacy notice: When scanning with AI, the document is sent to Google Gemini AI for extraction; when Gemini fails, it goes to the fallback AI instead (Groq, or the text of a PDF to DeepSeek) (logged in system audit logs).",
       "notesPlaceholder": "Notes for the verifier (optional)",
       "button": "Submit for verification",
       "submitting": "Submitting...",

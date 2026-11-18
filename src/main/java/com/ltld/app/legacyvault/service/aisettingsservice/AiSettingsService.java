@@ -158,9 +158,9 @@ public class AiSettingsService {
                 throw new BusinessException(ErrorCode.AI_MODEL_NOT_ALLOWED,
                         "This fallback model is not in the allowed list of the chosen provider.");
             }
-            if (visionModel != null && !fallback.allowedModels(AiFallbackProvider.GROQ).contains(visionModel)) {
+            if (visionModel != null && !fallback.visionModels().contains(visionModel)) {
                 throw new BusinessException(ErrorCode.AI_MODEL_NOT_ALLOWED,
-                        "This image model is not in the allowed Groq list.");
+                        "This image model is not in the allowed Groq vision list.");
             }
         }
 
@@ -292,6 +292,7 @@ public class AiSettingsService {
         return new AiSettingsResponse.Fallback(
                 fallback.isConfigured(AiFallbackProvider.GROQ), fallback.isConfigured(AiFallbackProvider.DEEPSEEK),
                 fallback.allowedModels(AiFallbackProvider.GROQ), fallback.allowedModels(AiFallbackProvider.DEEPSEEK),
+                fallback.visionModels(),
                 fallback.defaultTextProvider().name(), textDefaults, fallback.defaultVisionModel());
     }
 
@@ -308,7 +309,7 @@ public class AiSettingsService {
 
     private String effectiveVisionModel(String chosen) {
         if (fallback == null) return chosen;
-        return chosen != null && fallback.allowedModels(AiFallbackProvider.GROQ).contains(chosen)
+        return chosen != null && fallback.visionModels().contains(chosen)
                 ? chosen : fallback.defaultVisionModel();
     }
 

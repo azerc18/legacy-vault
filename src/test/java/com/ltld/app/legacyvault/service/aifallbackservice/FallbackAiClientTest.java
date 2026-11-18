@@ -38,7 +38,7 @@ class FallbackAiClientTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         return new FallbackAiClient(groqKey, GROQ + "/", "llama-3.3-70b-versatile",
-                "meta-llama/llama-4-scout-17b-16e-instruct", "qwen-vision, ,", deepseekKey, DEEPSEEK,
+                "meta-llama/llama-4-scout-17b-16e-instruct", "qwen-vision, ,", "qwen-vision", deepseekKey, DEEPSEEK,
                 "deepseek-chat", "deepseek-reasoner", defaultText, builder);
     }
 
@@ -139,6 +139,8 @@ class FallbackAiClientTest {
         assertThat(client.allowedModels(AiFallbackProvider.GROQ)).containsExactly(
                 "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct", "qwen-vision");
         assertThat(client.allowedModels(AiFallbackProvider.DEEPSEEK)).containsExactly("deepseek-chat", "deepseek-reasoner");
+        // Ô đọc ảnh chỉ có model vision: model văn bản (llama-3.3-70b-versatile) không đọc được ảnh
+        assertThat(client.visionModels()).containsExactly("meta-llama/llama-4-scout-17b-16e-instruct", "qwen-vision");
         assertThat(build("k", "k", "nonsense").defaultTextProvider()).isEqualTo(AiFallbackProvider.DEEPSEEK);
         assertThat(build("k", "k", "GROQ").defaultTextProvider()).isEqualTo(AiFallbackProvider.GROQ);
     }
@@ -175,5 +177,16 @@ class FallbackAiClientTest {
     void providerError_handlesEmptyOrOddBodies() {
         assertThat(FallbackAiClient.providerError(null)).isEqualTo("(no message)");
         assertThat(FallbackAiClient.providerError("<html>502</html>")).isEqualTo("(unreadable error body)");
+    }
+
+    @Test
+    void visionJson_textOnlyModelSavedAsVisionModel_usesDefaultVisionModel() {
+        AiFeatureConfig cfg = new AiFeatureConfig(true, null, null, true, null, null, "llama-3.3-70b-versatile");
+        server.expect(requestTo(GROQ + "/chat/completions"))
+                .andExpect(jsonPath("$.model").value("meta-llama/llama-4-scout-17b-16e-instruct"))
+                .andRespond(withSuccess(REPLY, MediaType.APPLICATION_JSON));
+
+        client.visionJson(cfg, "doc", List.of(new byte[]{1}), 100);
+        server.verify();
     }
 }
