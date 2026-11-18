@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked", "aiSettings": "AI settings" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -381,5 +381,49 @@
     "byProvider": "By payment gateway",
     "providers": { "VNPAY": "VNPay", "PAYPAL": "PayPal" },
     "loadError": "Could not load the revenue report."
+  },
+  "aiSettings": {
+    "title": "AI settings",
+    "subtitle": "Turn each AI feature on or off and pick its model. API keys are not entered here: they are only set as server environment variables.",
+    "loadError": "Could not load AI settings.",
+    "saveError": "Could not save AI settings.",
+    "saved": "Saved settings for {{name}}.",
+    "status": {
+      "title": "AI connection",
+      "provider": "Provider",
+      "apiKey": "Main API key",
+      "backupKey": "Backup API key",
+      "set": "Set",
+      "notSet": "Not set",
+      "mockNote": "AI_PROVIDER is mock: Vaulty gives sample answers and the two readers do not call AI. The models below only apply after switching to gemini.",
+      "noKeyNote": "GEMINI_API_KEY is not set, so AI features cannot run yet.",
+      "keyHint": "To change a key, edit GEMINI_API_KEY / GEMINI_BACKUP_API_KEY on Azure (App Service restarts by itself)."
+    },
+    "features": {
+      "ASSISTANT": {
+        "name": "Vaulty assistant",
+        "desc": "Help chat. When off, users see that Vaulty is turned off."
+      },
+      "DEATH_CERTIFICATE_OCR": {
+        "name": "Death certificate reader",
+        "desc": "AI hints for Executors and Legal Verifiers. When off, they check documents themselves."
+      },
+      "CITIZEN_ID_OCR": {
+        "name": "ID card photo reader (Owner check)",
+        "desc": "Reads the ID card photo when the QR code cannot be scanned. When off, Owners scan the QR or type the details."
+      }
+    },
+    "enabled": "On",
+    "disabled": "Off",
+    "primary": "Main model",
+    "backup": "Backup model",
+    "useDefault": "Default ({{model}})",
+    "backupHint": "Used when the main model hits its quota, is overloaded or retired.",
+    "sameModel": "The backup model must differ from the main model. The backup is {{model}} (the default when left empty); pick another backup model.",
+    "save": "Save",
+    "updated": "Last changed {{when}} by {{who}}",
+    "neverUpdated": "Never changed, using defaults.",
+    "modelsHint": "Models come from GEMINI_MODEL, GEMINI_BACKUP_MODEL and GEMINI_ALLOWED_MODELS. Add a model through the environment variables.",
+    "auditHint": "Every save is written to the Audit log (AI_SETTINGS_UPDATED)."
   }
 }

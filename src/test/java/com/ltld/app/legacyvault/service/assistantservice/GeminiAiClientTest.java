@@ -180,4 +180,23 @@ class GeminiAiClientTest {
 
         server.verify();
     }
+
+    @Test
+    void chat_usesModelsChosenByAdmin_whenConfigGiven() {
+        String chosenUrl = BASE + "/models/gemini-3.6-pro:generateContent";
+        server.expect(requestTo(chosenUrl))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+        server.expect(requestTo(PRIMARY_URL))
+                .andExpect(header("x-goog-api-key", "backup-key"))
+                .andRespond(withSuccess("""
+                        {"candidates":[{"content":{"parts":[{"text":"OK"}]}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        String reply = client.chat("sys", List.of(new ChatMessage("user", "hi")),
+                new com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig(
+                        true, "gemini-3.6-pro", "gemini-3.6-flash"));
+
+        assertThat(reply).isEqualTo("OK");
+        server.verify();
+    }
 }

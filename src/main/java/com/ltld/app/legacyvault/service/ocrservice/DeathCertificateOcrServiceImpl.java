@@ -1,5 +1,8 @@
 package com.ltld.app.legacyvault.service.ocrservice;
 
+import com.ltld.app.legacyvault.enums.AiFeature;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService;
 import com.ltld.app.legacyvault.dto.ocrdto.DeathCertificateOcrResponseDto;
 import com.ltld.app.legacyvault.entity.ExecutorAssignment;
 import com.ltld.app.legacyvault.entity.LegalVerificationRequest;
@@ -17,6 +20,7 @@ import com.ltld.app.legacyvault.service.legalverificationservice.VerifierAccessG
 import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -71,6 +75,9 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
     public static final String DEFAULT_UNAVAILABLE_MESSAGE =
             "Chưa phân tích được bằng AI, vui lòng tự kiểm tra";
 
+    public static final String DISABLED_BY_ADMIN_MESSAGE =
+            "Quản trị viên đang tắt đọc tài liệu bằng AI, vui lòng tự kiểm tra";
+
     private final ExecutorAccessGuard executorAccessGuard;
     private final VerifierAccessGuard verifierAccessGuard;
     private final UploadedDocumentValidator uploadedDocumentValidator;
@@ -105,6 +112,10 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
      */
     @Value("${app.ai.ocr.demo-scenarios:false}")
     private boolean demoScenariosEnabled;
+
+    // Trang Cấu hình AI (bật / tắt, model). Không có (unit test dựng tay) thì luôn bật, model của biến môi trường.
+    @Autowired(required = false)
+    private AiSettingsService aiSettings;
 
     /*
      * Không đặt @Transactional cho cả hàm: lời gọi Gemini có thể mất tới 25 giây, giữ transaction
@@ -317,6 +328,14 @@ public class DeathCertificateOcrServiceImpl implements DeathCertificateOcrServic
         if (demoScenariosEnabled && isDemoScenarioFilename(fileName)) {
             return buildDemoSimulationResult(plainBytes, fileName, expectedOwnerName);
         }
+
+        // Trang Cấu hình AI: Admin tắt đọc giấy chứng tử thì không gọi Gemini; người dùng tự kiểm tra như khi AI lỗi
+        AiFeatureConfig aiConfig = aiSettings == null ? null : aiSettings.forFeature(AiFeature.DEATH_CERTIFICATE_OCR);
+        if (aiConfig != null && !aiConfig.enabled()) {
+            return buildUnavailableResult(expectedOwnerName, DISABLED_BY_ADMIN_MESSAGE);
+        }
+        String model = aiConfig != null && aiConfig.primaryModel() != null ? aiConfig.primaryModel() : this.model;
+        String backupModel = aiConfig != null ? aiConfig.backupModel() : this.backupModel;
 
         if ("gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank()) {
             try {

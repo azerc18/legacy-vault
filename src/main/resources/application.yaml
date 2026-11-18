@@ -181,6 +181,9 @@ app:
       backup-api-key: ${GEMINI_BACKUP_API_KEY:}
       model: ${GEMINI_MODEL:gemini-3.6-flash}
       backup-model: ${GEMINI_BACKUP_MODEL:gemini-3.5-flash}
+      # Trang Cấu hình AI: Admin chỉ chọn được model trong danh sách = model + backup-model + danh sách này
+      # (phân tách bằng dấu phẩy). Thêm model mới thì đặt biến môi trường, không gõ tự do trên giao diện.
+      allowed-models: ${GEMINI_ALLOWED_MODELS:}
     ocr:
       # Chỉ bật khi trình diễn: tên file chứa từ khoá (mismatch, blur, cccd...) sẽ trả kết quả MÔ PHỎNG (engineSource=DEMO_SIMULATION).
       demo-scenarios: ${AI_OCR_DEMO_SCENARIOS:false}

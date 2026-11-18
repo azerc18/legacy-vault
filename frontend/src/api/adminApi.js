@@ -175,6 +175,13 @@ export const adminApi = {
     unlockBeneficiary: ({ vaultId, beneficiaryId, reason }) =>
         http.post('/admin/beneficiary-locks/unlock', { vaultId, beneficiaryId, reason }).then(unwrap),
 
+    /* ---------- Cấu hình AI: bật / tắt chức năng, chọn model (không có API key) ---------- */
+    // -> { provider, apiKeyConfigured, backupApiKeyConfigured, defaultPrimaryModel, defaultBackupModel, allowedModels,
+    //      features: [{ feature, enabled, primaryModel, backupModel, primaryOverride, backupOverride, updatedAt, updatedByEmail }] }
+    getAiSettings: () => http.get('/admin/ai-settings').then(unwrap),
+    // body { enabled, primaryModel (null = mặc định), backupModel (null = mặc định) }
+    updateAiFeature: (feature, body) => http.put(`/admin/ai-settings/${feature}`, body).then(unwrap),
+
     /* ---------- C1: gói ---------- */
     // -> [{ id, code, name, priceVnd, durationDays, maxVaults, maxBeneficiaries, storageQuotaBytes, legacyMessagesEnabled, activeSubscribers }]
     listPlans: () => http.get('/admin/plans').then(unwrap),

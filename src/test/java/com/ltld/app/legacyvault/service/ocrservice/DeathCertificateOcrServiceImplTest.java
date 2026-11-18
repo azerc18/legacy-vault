@@ -428,4 +428,22 @@ class DeathCertificateOcrServiceImplTest {
         String cleaned = DeathCertificateOcrServiceImpl.cleanJsonContent(fenced);
         assertThat(cleaned).isEqualTo("{\"documentCategory\":\"VALID_DEATH_CERTIFICATE\"}");
     }
+
+    @Test
+    void analyzeBytes_skipsGemini_whenAdminTurnedDeathCertificateOcrOff() {
+        ReflectionTestUtils.setField(ocrService, "aiProvider", "gemini");
+        ReflectionTestUtils.setField(ocrService, "apiKey", "test-key");
+        com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService aiSettings =
+                org.mockito.Mockito.mock(com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService.class);
+        when(aiSettings.forFeature(com.ltld.app.legacyvault.enums.AiFeature.DEATH_CERTIFICATE_OCR))
+                .thenReturn(new com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig(
+                        false, "gemini-3.6-flash", "gemini-3.5-flash"));
+        ReflectionTestUtils.setField(ocrService, "aiSettings", aiSettings);
+
+        DeathCertificateOcrResponseDto result = ocrService.analyzeBytes(
+                "%PDF-1.4 x".getBytes(StandardCharsets.UTF_8), "trich_luc.pdf", "Trần Long Vân");
+
+        assertThat(result.getUnavailableMessage()).isEqualTo(DeathCertificateOcrServiceImpl.DISABLED_BY_ADMIN_MESSAGE);
+        assertThat(result.getDeceasedFullName()).isNull();
+    }
 }

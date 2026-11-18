@@ -1,10 +1,15 @@
 package com.ltld.app.legacyvault.service.identityservice;
 
+import com.ltld.app.legacyvault.enums.AiFeature;
 import com.ltld.app.legacyvault.exception.ErrorCode;
 import com.ltld.app.legacyvault.exception.UserProfileException;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiFeatureConfig;
+import com.ltld.app.legacyvault.service.aisettingsservice.AiSettingsService;
 import com.ltld.app.legacyvault.service.fileservice.UploadedDocumentValidator;
+import com.ltld.app.legacyvault.utility.GeminiErrors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -45,62 +50,102 @@ public class CitizenIdOcrClient {
     @Value("${app.ai.gemini.model:gemini-3.6-flash}")
     private String model;
 
+    @Value("${app.ai.gemini.backup-api-key:}")
+    private String backupApiKey;
+
+    @Value("${app.ai.gemini.backup-model:gemini-3.5-flash}")
+    private String backupModel;
+
+    // Trang Cấu hình AI (bật / tắt, model). Không có (unit test) thì luôn bật, model của biến môi trường.
+    @Autowired(required = false)
+    private AiSettingsService aiSettings;
+
     public boolean isAvailable() {
-        return "gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank();
+        return "gemini".equalsIgnoreCase(aiProvider) && apiKey != null && !apiKey.isBlank() && config().enabled();
     }
 
+    private AiFeatureConfig config() {
+        AiFeatureConfig c = aiSettings == null ? null : aiSettings.forFeature(AiFeature.CITIZEN_ID_OCR);
+        return c != null ? c : new AiFeatureConfig(true, model, backupModel);
+    }
+
+    /**
+     * Đọc ảnh bằng model chính; model chính hết quota / quá tải / bị ngừng (lỗi có thể thử lại) thì thử model
+     * dự phòng (và key dự phòng nếu có), giống OCR giấy chứng tử và Vaulty.
+     */
     public Extracted read(byte[] imageBytes) {
         if (!isAvailable()) {
             throw unavailable();
         }
+        AiFeatureConfig c = config();
+        String primary = c.primaryModel() != null ? c.primaryModel() : model;
         try {
-            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
-            factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT_MS));
-            RestClient client = RestClient.builder()
-                    .baseUrl("https://generativelanguage.googleapis.com/v1beta")
-                    .defaultHeader("x-goog-api-key", apiKey)
-                    .requestFactory(factory)
-                    .build();
-
-            String prompt = "Ảnh đính kèm là mặt trước Căn cước công dân / Căn cước Việt Nam. "
-                    + "CHỈ trích xuất thông tin thực sự đọc được; trường nào không đọc được thì trả null, "
-                    + "TUYỆT ĐỐI không đoán hay bịa. Trả về đúng JSON với các trường: "
-                    + "documentType (\"CCCD\" nếu đúng là thẻ căn cước Việt Nam, ngược lại \"OTHER\"), "
-                    + "citizenId (12 chữ số, không khoảng trắng), fullName (giữ nguyên dấu), "
-                    + "dateOfBirth (dd/MM/yyyy), gender (\"Nam\" hoặc \"Nữ\"), "
-                    + "placeOfResidence (nơi thường trú / nơi cư trú, nguyên văn).";
-
-            Map<String, Object> body = Map.of(
-                    "contents", List.of(Map.of("role", "user", "parts", List.of(
-                            Map.of("text", prompt),
-                            Map.of("inline_data", Map.of(
-                                    "mime_type", UploadedDocumentValidator.detectContentType(imageBytes),
-                                    "data", Base64.getEncoder().encodeToString(imageBytes)))))),
-                    "generationConfig", Map.of(
-                            "temperature", 0.0,
-                            "maxOutputTokens", 512,
-                            "responseMimeType", "application/json",
-                            "thinkingConfig", Map.of("thinkingBudget", 0)));
-
-            JsonNode res = client.post()
-                    .uri("/models/{model}:generateContent", model)
-                    .body(body)
-                    .retrieve()
-                    .body(JsonNode.class);
-            String json = res == null ? null
-                    : res.path("candidates").path(0).path("content").path("parts").path(0).path("text").asString(null);
-            if (json == null || json.isBlank()) {
-                throw new IllegalStateException("Empty response from Gemini");
-            }
-            return parse(json);
+            return readWith(imageBytes, primary, apiKey);
         } catch (UserProfileException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (Exception primaryEx) {
+            String backup = c.backupModel();
+            boolean canRetry = GeminiErrors.isRetryable(primaryEx) && backup != null && !backup.isBlank()
+                    && !backup.equalsIgnoreCase(primary);
             // Không ghi nội dung trả về vì có thể chứa số CCCD
-            log.warn("Citizen ID OCR failed: {}", e.getClass().getSimpleName());
+            log.warn("Citizen ID OCR failed on model '{}': {}. Retryable: {}", primary,
+                    primaryEx.getClass().getSimpleName(), canRetry);
+            if (canRetry) {
+                try {
+                    String key = backupApiKey != null && !backupApiKey.isBlank() ? backupApiKey : apiKey;
+                    Extracted x = readWith(imageBytes, backup, key);
+                    log.info("Citizen ID OCR succeeded on backup model '{}'", backup);
+                    return x;
+                } catch (Exception backupEx) {
+                    log.warn("Citizen ID OCR backup model '{}' also failed: {}", backup,
+                            backupEx.getClass().getSimpleName());
+                }
+            }
             throw unavailable();
         }
+    }
+
+    private Extracted readWith(byte[] imageBytes, String targetModel, String targetApiKey) throws Exception {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS));
+        factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT_MS));
+        RestClient client = RestClient.builder()
+                .baseUrl("https://generativelanguage.googleapis.com/v1beta")
+                .defaultHeader("x-goog-api-key", targetApiKey)
+                .requestFactory(factory)
+                .build();
+
+        String prompt = "Ảnh đính kèm là mặt trước Căn cước công dân / Căn cước Việt Nam. "
+                + "CHỈ trích xuất thông tin thực sự đọc được; trường nào không đọc được thì trả null, "
+                + "TUYỆT ĐỐI không đoán hay bịa. Trả về đúng JSON với các trường: "
+                + "documentType (\"CCCD\" nếu đúng là thẻ căn cước Việt Nam, ngược lại \"OTHER\"), "
+                + "citizenId (12 chữ số, không khoảng trắng), fullName (giữ nguyên dấu), "
+                + "dateOfBirth (dd/MM/yyyy), gender (\"Nam\" hoặc \"Nữ\"), "
+                + "placeOfResidence (nơi thường trú / nơi cư trú, nguyên văn).";
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of("role", "user", "parts", List.of(
+                        Map.of("text", prompt),
+                        Map.of("inline_data", Map.of(
+                                "mime_type", UploadedDocumentValidator.detectContentType(imageBytes),
+                                "data", Base64.getEncoder().encodeToString(imageBytes)))))),
+                "generationConfig", Map.of(
+                        "temperature", 0.0,
+                        "maxOutputTokens", 512,
+                        "responseMimeType", "application/json",
+                        "thinkingConfig", Map.of("thinkingBudget", 0)));
+
+        JsonNode res = client.post()
+                .uri("/models/{model}:generateContent", targetModel)
+                .body(body)
+                .retrieve()
+                .body(JsonNode.class);
+        String json = res == null ? null
+                : res.path("candidates").path(0).path("content").path("parts").path(0).path("text").asString(null);
+        if (json == null || json.isBlank()) {
+            throw new IllegalStateException("Empty response from Gemini");
+        }
+        return parse(json);
     }
 
     Extracted parse(String json) throws Exception {

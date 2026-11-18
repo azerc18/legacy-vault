@@ -86,5 +86,7 @@
   "IDENTITY_NAME_MISMATCH": "The name on the card differs from your account name.",
   "IDENTITY_UNDERAGE": "You must be at least 18 to enable the Dead Man's Switch.",
   "IDENTITY_LOCKED": "The Dead Man's Switch is being activated, so identity details cannot be changed.",
-  "IDENTITY_OCR_UNAVAILABLE": "The card photo cannot be read right now. Scan the QR code or enter the details manually."
+  "IDENTITY_OCR_UNAVAILABLE": "The card photo cannot be read right now. Scan the QR code or enter the details manually.",
+  "AI_FEATURE_DISABLED": "This AI feature is turned off by the administrator.",
+  "AI_MODEL_NOT_ALLOWED": "Invalid model: pick one from the list, different from the main model."
 }
