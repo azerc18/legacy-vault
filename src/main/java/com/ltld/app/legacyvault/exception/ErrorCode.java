@@ -62,6 +62,17 @@ public enum ErrorCode {
     DMS_NO_VAULT(HttpStatus.CONFLICT),
     // Lời mời làm Executor đã được trả lời, đã bị Owner thu hồi / thay người, hoặc DMS đã bắt đầu bàn giao
     EXECUTOR_INVITATION_CLOSED(HttpStatus.CONFLICT),
+    // Owner quản lý Executor: mã riêng để FE dịch được (trước đây trả câu tiếng Anh với mã chung)
+    EXECUTOR_ACCOUNT_NOT_FOUND(HttpStatus.UNPROCESSABLE_ENTITY),
+    EXECUTOR_SELF_ASSIGN(HttpStatus.BAD_REQUEST),
+    EXECUTOR_IS_CONFIRMER(HttpStatus.CONFLICT),
+    EXECUTOR_SAME_PERSON(HttpStatus.CONFLICT),
+    EXECUTOR_SLOT_TAKEN(HttpStatus.CONFLICT),
+    EXECUTOR_NOT_ASSIGNED(HttpStatus.NOT_FOUND),
+    EXECUTOR_HANDOVER_STARTED(HttpStatus.CONFLICT),
+    EXECUTOR_LAST_REVOKE(HttpStatus.CONFLICT),
+    EXECUTOR_LAST_REPLACE(HttpStatus.CONFLICT),
+    EXECUTOR_SLOT_CHANGED(HttpStatus.CONFLICT),
 
     // Verifier
     INVALID_SIGN_CODE(HttpStatus.BAD_REQUEST),
