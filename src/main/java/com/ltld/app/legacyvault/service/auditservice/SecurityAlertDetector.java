@@ -10,6 +10,7 @@ import com.ltld.app.legacyvault.enums.SecurityAlertStatus;
 import com.ltld.app.legacyvault.repository.AuditLogRepository;
 import com.ltld.app.legacyvault.repository.SecurityAlertRepository;
 import com.ltld.app.legacyvault.repository.UserRepository;
+import com.ltld.app.legacyvault.service.integrationservice.IntegrationSettingsService;
 import com.ltld.app.legacyvault.service.notificationservice.ExecutorNotificationService;
 import com.ltld.app.legacyvault.utility.AfterCommit;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +42,8 @@ public class SecurityAlertDetector {
     static final Duration EVENT_LOOKBACK = Duration.ofMinutes(15);
     static final String ADMIN_ROLE = "ADMIN";
     private static final Set<AuditAction> EVENT_ACTIONS =
-            EnumSet.of(AuditAction.ACCOUNT_LOCKED, AuditAction.TOKEN_REUSE_DETECTED, AuditAction.RBAC_CHANGE);
+            EnumSet.of(AuditAction.ACCOUNT_LOCKED, AuditAction.TOKEN_REUSE_DETECTED, AuditAction.RBAC_CHANGE,
+                    AuditAction.INTEGRATION_SETTINGS_UPDATED);
     private static final Set<AuditAction> DOWNLOAD_ACTIONS =
             EnumSet.of(AuditAction.ASSET_DOWNLOADED, AuditAction.DOCUMENT_DOWNLOADED);
 
@@ -138,6 +140,13 @@ public class SecurityAlertDetector {
             case TOKEN_REUSE_DETECTED -> SecurityAlertRule.REFRESH_TOKEN_REUSE;
             // AdminUserServiceImpl ghi detail "GRANT <ROLE>"
             case RBAC_CHANGE -> "GRANT ADMIN".equals(meta(log, "detail")) ? SecurityAlertRule.ADMIN_ROLE_GRANTED : null;
+            // IntegrationSettingsService ghi "kycMock ... (effective false -> true); reason=..." khi eKYC mô phỏng được bật
+            case INTEGRATION_SETTINGS_UPDATED -> {
+                String detail = meta(log, "detail");
+                yield detail != null && detail.startsWith("kycMock ")
+                        && detail.contains(IntegrationSettingsService.TURNED_ON_MARKER)
+                        ? SecurityAlertRule.KYC_MOCK_ENABLED : null;
+            }
             default -> null;
         };
     }
@@ -156,6 +165,14 @@ public class SecurityAlertDetector {
                 String target = targetId == null ? "unknown"
                         : userRepository.findById(targetId).map(User::getEmail).orElse(targetId.toString());
                 yield String.format("%s granted the ADMIN role to %s.", orUnknown(actor), target);
+            }
+            case KYC_MOCK_ENABLED -> {
+                String detail = meta(log, "detail");
+                int at = detail == null ? -1 : detail.indexOf("reason=");
+                String reason = at < 0 ? "" : " Reason: " + detail.substring(at + "reason=".length());
+                yield String.format("%s turned ON simulated eKYC (IP %s): beneficiaries can now pass identity checks "
+                        + "with any well-formed ID number. Turn it off on the Integrations page if this was not planned.%s",
+                        orUnknown(actor), ip, reason);
             }
             default -> rule.name();
         };

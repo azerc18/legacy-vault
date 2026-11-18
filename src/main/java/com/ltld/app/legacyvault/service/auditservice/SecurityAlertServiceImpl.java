@@ -95,6 +95,7 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
      * - MASS_DOWNLOAD: subject là id người dùng
      * - ACCOUNT_LOCKED / REFRESH_TOKEN_REUSE: subject là id audit log -> người thực hiện (hoặc email trong metadata)
      * - ADMIN_ROLE_GRANTED: subject là id audit log -> người được cấp ADMIN (entityId)
+     * - KYC_MOCK_ENABLED: subject là id audit log -> Admin đã bật eKYC mô phỏng (người thực hiện)
      * - LOGIN_FAILURES_FROM_IP: subject là IP, không có người dùng
      */
     private Map<UUID, User> relatedUsers(List<SecurityAlert> alerts) {
@@ -104,7 +105,7 @@ public class SecurityAlertServiceImpl implements SecurityAlertService {
             if (a.getRule() == null) continue;
             switch (a.getRule()) {
                 case MASS_DOWNLOAD -> parseUuid(a.getSubject()).ifPresent(id -> userIdByAlert.put(a.getId(), id));
-                case ACCOUNT_LOCKED, REFRESH_TOKEN_REUSE, ADMIN_ROLE_GRANTED ->
+                case ACCOUNT_LOCKED, REFRESH_TOKEN_REUSE, ADMIN_ROLE_GRANTED, KYC_MOCK_ENABLED ->
                         parseUuid(a.getSubject()).ifPresent(id -> logIdByAlert.put(a.getId(), id));
                 default -> { }
             }

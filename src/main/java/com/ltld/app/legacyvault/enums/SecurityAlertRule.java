@@ -6,7 +6,8 @@ public enum SecurityAlertRule {
     LOGIN_FAILURES_FROM_IP(SecurityAlertSeverity.HIGH),    // nhiều lần đăng nhập sai từ 1 IP (dò mật khẩu)
     REFRESH_TOKEN_REUSE(SecurityAlertSeverity.HIGH),       // refresh token đã xoay vòng bị dùng lại (bị đánh cắp)
     MASS_DOWNLOAD(SecurityAlertSeverity.HIGH),             // 1 user tải hàng loạt tài sản / tài liệu
-    ADMIN_ROLE_GRANTED(SecurityAlertSeverity.MEDIUM);      // có người vừa được cấp quyền ADMIN
+    ADMIN_ROLE_GRANTED(SecurityAlertSeverity.MEDIUM),      // có người vừa được cấp quyền ADMIN
+    KYC_MOCK_ENABLED(SecurityAlertSeverity.HIGH);          // Admin vừa bật eKYC mô phỏng (mọi CCCD đúng định dạng đều qua)
 
     private final SecurityAlertSeverity severity;
 

@@ -105,6 +105,8 @@ public enum AuditAction {
     IP_RATE_LIMITED,
     // Admin bật / tắt chức năng AI hoặc đổi model (trang Cấu hình AI)
     AI_SETTINGS_UPDATED,
+    // Admin đổi cờ tích hợp (eKYC mô phỏng) ở trang Tích hợp
+    INTEGRATION_SETTINGS_UPDATED,
     // Admin đổi mặc định / giới hạn DMS (trang Chính sách hệ thống)
     SYSTEM_POLICY_UPDATED
 }

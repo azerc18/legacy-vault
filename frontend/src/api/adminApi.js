@@ -182,6 +182,13 @@ export const adminApi = {
     // body { enabled, primaryModel (null = mặc định), backupModel (null = mặc định) }
     updateAiFeature: (feature, body) => http.put(`/admin/ai-settings/${feature}`, body).then(unwrap),
 
+    /* ---------- Tích hợp: trạng thái dịch vụ ngoài (chỉ đọc) + cờ eKYC mô phỏng ---------- */
+    // -> { kyc: {mockEnabled, mockOverride, envDefault, smsSandbox, toggleAllowed, updatedAt, updatedByEmail}, ai, signature, payments,
+    //      mail: {host, configured}, captcha, googleLogin }. Chỉ có "đã cấu hình / chưa", không có key.
+    getIntegrations: () => http.get('/admin/integrations').then(unwrap),
+    // body { enabled: true | false | null (= theo biến môi trường), reason (5–300 ký tự không tính khoảng trắng đầu / cuối) }
+    // 409 INTEGRATION_SETTING_LOCKED nếu enabled=true mà máy chủ không cho Admin bật (kyc.toggleAllowed=false)
+    updateKycMock: (body) => http.put('/admin/integrations/kyc-mock', body).then(unwrap),
     /* ---------- Chính sách hệ thống: mặc định / giới hạn DMS + thông tin chỉ đọc ---------- */
     // -> { policy: { checkinIntervalDays: {min, defaultValue, max}, gracePeriodDays, reminderCount, backupActivationWaitDays },
     //      hardLimits (cùng dạng; backupActivationWaitDays = số ngày tối đa), configsOutsideLimits, updatedAt, updatedByEmail }

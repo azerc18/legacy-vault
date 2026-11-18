@@ -1,6 +1,6 @@
 {
   "workspace": "Administration",
-  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked", "aiSettings": "AI settings", "systemPolicies": "Policies" },
+  "nav": { "users": "Users", "roles": "Roles", "vaults": "Vaults", "auditLogs": "Audit log", "alerts": "Alerts", "overview": "Overview", "payments": "Payments", "revenue": "Revenue", "plans": "Plans", "notifications": "Failed emails", "beneficiaryLocks": "Locked", "aiSettings": "AI settings", "integrations": "Integrations", "systemPolicies": "Policies" },
   "loading": "Loading...",
   "wait": "Please wait...",
   "search": "Search",
@@ -309,12 +309,14 @@
       "LOGIN_FAILURES_FROM_IP": "Many failed logins from one IP",
       "REFRESH_TOKEN_REUSE": "Refresh token reused (possible theft)",
       "MASS_DOWNLOAD": "Mass download by one user",
-      "ADMIN_ROLE_GRANTED": "ADMIN role granted"
+      "ADMIN_ROLE_GRANTED": "ADMIN role granted",
+      "KYC_MOCK_ENABLED": "Simulated eKYC turned on"
     },
     "meta_one": "{{count}} event · first {{first}} · last {{last}}",
     "meta_other": "{{count}} events · first {{first}} · last {{last}}",
     "acknowledgedAt": "acknowledged {{date}}",
     "viewLogs": "View logs",
+    "openIntegrations": "Open Integrations",
     "acknowledge": "Acknowledge",
     "severityFilter": "Filter by severity",
     "allSeverities": "All severities",
@@ -443,6 +445,96 @@
       "visionModel": "Image model (Groq)",
       "noKey": "No key is set for {{provider}}, so this fallback step cannot run yet.",
       "modelsHint": "Fallback models come from GROQ_TEXT_MODEL, GROQ_VISION_MODEL, GROQ_ALLOWED_MODELS, DEEPSEEK_MODEL and DEEPSEEK_ALLOWED_MODELS. Image models are only GROQ_VISION_MODEL and GROQ_VISION_ALLOWED_MODELS."
+    }
+  },
+  "integrations": {
+    "title": "Integrations",
+    "subtitle": "Status of the outside services LegacyVault uses, plus the simulated eKYC switch for beneficiaries.",
+    "loadError": "Could not load the integration status.",
+    "saveError": "Could not save the change.",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "hidden": "Not configured (hidden)",
+    "integrated": "Integrated",
+    "notIntegrated": "Not integrated",
+    "on": "On",
+    "off": "Off",
+    "sandbox": "Sandbox",
+    "live": "Live",
+    "updated": "Last changed {{when}} by {{who}}",
+    "keyHint": "Every key, secret and password is set only through environment variables; this page only says whether it is set.",
+    "auditHint": "Changes to simulated eKYC are written to the Audit log (INTEGRATION_SETTINGS_UPDATED) with the reason.",
+    "kyc": {
+      "title": "Beneficiary eKYC",
+      "mockOn": "Mock on",
+      "mockOff": "Mock off",
+      "desc": "When on, beneficiaries get an extra way to verify their identity with an ID number (simulated eKYC) next to the email OTP. Takes effect within 30 seconds, no redeploy needed.",
+      "choices": {
+        "env": "Follow environment",
+        "on": "Turn simulated eKYC on",
+        "off": "Turn simulated eKYC off"
+      },
+      "choiceHints": {
+        "on": "Overrides APP_KYC_MOCK_ENABLED",
+        "onLocked": "This server does not allow turning it on here",
+        "off": "Email OTP only"
+      },
+      "envNow": "APP_KYC_MOCK_ENABLED is now: {{state}}",
+      "onWarning": "Simulated eKYC accepts any ID number in the right format (12 digits, valid province code) without checking real records. Only turn it on for a demo or a test, and turn it off right after.",
+      "onAlert": "Saving creates a HIGH security alert and emails every admin.",
+      "lockedNote": "On this server admins can only turn simulated eKYC off. Turning it on needs APP_KYC_MOCK_ENABLED=true (or APP_KYC_MOCK_ADMIN_TOGGLE_ALLOWED=true) and a restart, so a hijacked admin account cannot turn it on.",
+      "lockedIgnored": "The \"On\" choice saved earlier is ignored because this server does not let admins turn it on; simulated eKYC follows the environment variable. Pick \"Follow environment\" or \"Turn simulated eKYC off\" again.",
+      "reason": "Reason for the change",
+      "reasonPlaceholder": "e.g. Demo for the review board on 20/11",
+      "reasonHint": "Required, at least {{min}} characters; written to the Audit log.",
+      "provider": "Provider",
+      "providerMock": "Simulated (ID format check)",
+      "sms": "Owner phone OTP",
+      "smsSandbox": "Sandbox: code shown on screen",
+      "smsReal": "Real SMS",
+      "neverUpdated": "Never changed, following the environment.",
+      "save": "Save",
+      "saved": "Simulated eKYC setting saved."
+    },
+    "ai": {
+      "title": "AI and OCR",
+      "provider": "AI_PROVIDER",
+      "geminiBackup": "Gemini backup",
+      "demo": "OCR demo scenarios",
+      "mockNote": "Using simulated AI: OCR and Vaulty return sample results.",
+      "link": "Choose models on the AI settings page"
+    },
+    "signature": {
+      "title": "Confirmation signing (Legal Verifier)",
+      "method": "Check before signing",
+      "methods": {
+        "EMAIL_OTP": "Email OTP"
+      },
+      "ca": "CA digital signature (VNPT, Viettel…)",
+      "hint": "A CA-issued digital signature needs a contract with a provider, so it is not integrated yet."
+    },
+    "payments": {
+      "title": "Payments",
+      "reconcile": "Pending order reconciliation",
+      "hint": "Sandbox = the gateway URL contains \"sandbox\" (VNPAY_PAY_URL, PAYPAL_BASE_URL). Without PayPal keys the PayPal button hides itself."
+    },
+    "mail": {
+      "title": "Email",
+      "host": "SMTP server",
+      "account": "Sending account",
+      "link": "See failed emails"
+    },
+    "captcha": {
+      "title": "CAPTCHA (Cloudflare Turnstile)",
+      "state": "Status",
+      "siteKey": "Site key",
+      "secretKey": "Secret key",
+      "missingKeys": "On but keys are missing: sign-up and forgot password will fail."
+    },
+    "google": {
+      "title": "Google sign-in",
+      "clientId": "Client ID",
+      "hint": "Without GOOGLE_CLIENT_ID the Google sign-in button hides itself."
     }
   },
   "systemPolicies": {

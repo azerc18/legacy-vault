@@ -125,6 +125,11 @@ export default function AdminAlerts() {
                                         <Icon name="history" className="text-[16px]" /> {t('alerts.viewLogs')}
                                     </Link>
                                 )}
+                                {a.rule === 'KYC_MOCK_ENABLED' && (
+                                    <Link to="/admin/integrations" className={linkCls}>
+                                        <Icon name="tune" className="text-[16px]" /> {t('alerts.openIntegrations')}
+                                    </Link>
+                                )}
                                 {a.relatedUserId && a.relatedUserStatus === 'ACTIVE' && a.relatedUserId !== me?.id && (
                                     <button onClick={() => setDialog({ kind: 'lock', alert: a })}
                                             className="h-9 px-3 rounded-xl border border-error/40 text-error text-sm font-semibold inline-flex items-center gap-1.5 hover:bg-error-container/40">
